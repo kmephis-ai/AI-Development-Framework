@@ -1,0 +1,49 @@
+{
+  "id": "python",
+  "language": "python",
+  "detect": {
+    "files": [
+      "pyproject.toml",
+      "requirements.txt"
+    ]
+  },
+  "commands": {
+    "unit": {
+      "command": [
+        "python",
+        "-m",
+        "unittest",
+        "discover",
+        "-s",
+        "tests"
+      ],
+      "phases": [
+        "pr",
+        "main"
+      ]
+    },
+    "build": {
+      "command": [],
+      "phases": [
+        "pr"
+      ]
+    },
+    "install": {
+      "command": [
+        "python",
+        "-m",
+        "pip",
+        "install",
+        "-r",
+        "requirements.txt"
+      ],
+      "phases": [
+        "bootstrap",
+        "pr",
+        "runtime"
+      ],
+      "requires_file": "requirements.txt"
+    }
+  },
+  "preview": {}
+}

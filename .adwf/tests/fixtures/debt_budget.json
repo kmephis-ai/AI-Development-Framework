@@ -1,0 +1,17 @@
+{
+  "case": "debt_budget",
+  "snapshot": {
+    "product_health": "VERIFIED",
+    "metrics": {
+      "implementation": 0.5,
+      "verification": 0.5
+    },
+    "issues": [],
+    "debt": {
+      "high": 1,
+      "budget_high": 0,
+      "medium": 2,
+      "budget_medium": 5
+    }
+  }
+}

@@ -1,0 +1,42 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>ADWF — панель владельца</title>
+<style>
+:root{--ink:#172033;--muted:#667085;--line:#e4e7ec;--panel:#fff;--bg:#f5f7fb;--accent:#3157d5;--good:#087443;--warn:#a15c00;--bad:#b42318}
+*{box-sizing:border-box} body{margin:0;background:var(--bg);color:var(--ink);font:16px/1.5 system-ui,-apple-system,"Segoe UI",sans-serif}
+main{max-width:1120px;margin:auto;padding:32px 20px 64px} h1{font-size:clamp(28px,5vw,46px);line-height:1.05;margin:8px 0} h2{font-size:18px;margin:0 0 12px}
+.eyebrow{color:var(--accent);font-weight:700;letter-spacing:.08em;text-transform:uppercase;font-size:12px} .muted{color:var(--muted)}
+.banner,.card{background:var(--panel);border:1px solid var(--line);border-radius:18px;padding:22px;box-shadow:0 8px 28px rgba(23,32,51,.05)}
+.banner{display:grid;grid-template-columns:1fr auto;gap:24px;align-items:center;margin:24px 0} .grid{display:grid;grid-template-columns:repeat(12,1fr);gap:16px}
+.card{grid-column:span 6} .wide{grid-column:span 12} .metric{font-size:28px;font-weight:750;margin:4px 0} .good{color:var(--good)} .warn{color:var(--warn)} .bad{color:var(--bad)}
+.primary{display:inline-block;background:var(--accent);color:#fff;text-decoration:none;font-weight:700;padding:11px 16px;border-radius:11px} code{font-size:13px;background:#f2f4f7;padding:3px 7px;border-radius:7px}
+table{width:100%;border-collapse:collapse} th,td{text-align:left;border-bottom:1px solid var(--line);padding:9px 0} th{font-weight:600} details{margin-top:16px} summary{cursor:pointer;font-weight:700}
+@media(max-width:760px){.banner{grid-template-columns:1fr}.card{grid-column:span 12}}
+</style>
+</head>
+<body><main>
+<div class="eyebrow">ADWF v1.6 · Executive Control Center</div>
+<h1>Цифровой продукт — одним взглядом</h1>
+<p class="muted">Статусы выводятся только из state и evidence. Неизвестное не становится зелёным.</p>
+<section class="banner">
+  <div><div class="eyebrow">Общий статус</div><div class="metric warn">ОСТАНОВЛЕНО — разрешены только диагностика и Recovery</div><div>Состояние продукта ещё не подтверждено</div></div>
+  <div><span class="muted">Предпросмотр ещё не создан</span></div>
+</section>
+<div class="grid">
+  <section class="card wide"><h2>Что изменилось</h2><p>Понятное резюме результата ещё не подготовлено.</p></section>
+  <section class="card"><h2>Проверка автоматикой</h2><div class="metric"><code>NOT_VERIFIED</code></div><p class="muted">Привязана к exact SHA и evidence.</p></section>
+  <section class="card"><h2>Решение владельца</h2><div class="metric"><code>PENDING</code></div><p>Откройте результат. Если всё устраивает, нажмите «ПРОДОЛЖИТЬ»; при проблеме Portal предложит простой выбор.</p></section>
+  <section class="card"><h2>Надёжность</h2><p>Открытых инцидентов: <strong>0</strong><br>Повторных: <strong>0</strong></p><p>Safe Healing: <code>NOT_CONFIGURED</code> / <code>NONE</code></p></section>
+  <section class="card"><h2>Стоимость</h2><div class="metric"><code>BLOCK</code></div><p>Cost guard: <code>BLOCK</code><br>Provider: <code>github_public_standard</code></p></section>
+  <section class="card wide"><h2>Следующее действие</h2><p><strong>До live reference cycle Control Plane, GitHub ruleset/readback, Preview execution, deployment и Product Health остаются NOT_VERIFIED.</strong></p></section>
+</div>
+<details class="card"><summary>Технические доказательства</summary><table><tr><th>Пакет</th><td><code>BROKEN</code></td></tr><tr><th>Настройка</th><td><code>BROKEN</code></td></tr><tr><th>Управление</th><td><code>NOT_VERIFIED</code></td></tr><tr><th>Продукт</th><td><code>NOT_VERIFIED</code></td></tr>
+<tr><th>Main SHA</th><td><code>NOT_VERIFIED</code></td></tr>
+<tr><th>Preview SHA</th><td><code>NOT_VERIFIED</code></td></tr>
+<tr><th>Evidence digest</th><td><code>NOT_VERIFIED</code></td></tr>
+<tr><th>Policy/Control blockers</th><td>До live reference cycle Control Plane, GitHub ruleset/readback, Preview execution, deployment и Product Health остаются NOT_VERIFIED.</td></tr>
+</table></details>
+</main></body></html>

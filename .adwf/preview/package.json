@@ -1,0 +1,9 @@
+{
+  "private": true,
+  "name": "adwf-preview-runtime",
+  "version": "1.6.0",
+  "description": "Pinned ADWF Playwright preview runtime",
+  "dependencies": {
+    "playwright": "1.62.0"
+  }
+}

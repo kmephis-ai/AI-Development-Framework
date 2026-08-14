@@ -1,0 +1,53 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "required": [
+    "id",
+    "title",
+    "state",
+    "cost_status",
+    "mandatory",
+    "requires_paid_ai_api"
+  ],
+  "additionalProperties": false,
+  "properties": {
+    "id": {
+      "type": "string"
+    },
+    "title": {
+      "type": "string"
+    },
+    "state": {
+      "enum": [
+        "NOT_STARTED",
+        "IMPLEMENTED",
+        "VERIFIED",
+        "ACCEPTED"
+      ]
+    },
+    "cost_status": {
+      "enum": [
+        "FREE_VERIFIED",
+        "INCLUDED_QUOTA",
+        "CONDITIONAL_FREE",
+        "OWNER_PROVIDED",
+        "METERED",
+        "PAID",
+        "UNKNOWN",
+        "STALE"
+      ]
+    },
+    "mandatory": {
+      "type": "boolean"
+    },
+    "requires_paid_ai_api": {
+      "const": false
+    },
+    "acceptance_evidence": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    }
+  }
+}

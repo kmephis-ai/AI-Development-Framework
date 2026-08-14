@@ -1,0 +1,27 @@
+name: ADWF Platform Smoke
+
+on:
+  push:
+    branches: [main]
+    paths: ['.adwf/**','START_ADWF.bat','START_ADWF.sh','.github/workflows/adwf-platform-smoke.yml']
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  smoke:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-24.04, windows-2022]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd
+        with:
+          persist-credentials: false
+          fetch-depth: 1
+      - uses: actions/setup-python@a309ff8b426b58ec0e2a45f0f869d46889d02405
+        with:
+          python-version: "3.12.13"
+          cache: false
+      - run: python .adwf/scripts/platform_smoke.py

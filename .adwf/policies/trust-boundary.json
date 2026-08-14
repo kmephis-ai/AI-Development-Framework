@@ -1,0 +1,25 @@
+{
+  "version": "1.6.0",
+  "paths": [
+    ".adwf/**",
+    "AGENTS.md",
+    "ADWS.md",
+    "SPECIFICATION.md",
+    ".github/workflows/adwf-*.yml",
+    ".gitlab-ci.yml",
+    ".adwf/providers/gitlab/ci/**",
+    "SECURITY.md",
+    "docs/governance/**"
+  ],
+  "weakening_is_risk": "R4",
+  "weakening_requires_human": true,
+  "self_modification_in_feature_pr": "FORBIDDEN",
+  "examples_of_weakening": [
+    "required true->false",
+    "autonomy increase",
+    "permission expansion",
+    "test removal",
+    "fail-closed weakening",
+    "evidence TTL expansion without rationale"
+  ]
+}

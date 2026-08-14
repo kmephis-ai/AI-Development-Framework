@@ -1,0 +1,142 @@
+{
+  "version": "1.6.0",
+  "states": [
+    "BACKLOG",
+    "SPECIFIED",
+    "READY",
+    "CLAIMED",
+    "IN_PROGRESS",
+    "REVIEW",
+    "VERIFICATION",
+    "DONE",
+    "BLOCKED",
+    "HOLD",
+    "HUMAN_REQUIRED",
+    "RECOVERY",
+    "CANCELLED"
+  ],
+  "transitions": {
+    "BACKLOG": [
+      "SPECIFIED",
+      "HOLD",
+      "CANCELLED"
+    ],
+    "SPECIFIED": [
+      "READY",
+      "BLOCKED",
+      "HUMAN_REQUIRED",
+      "HOLD",
+      "CANCELLED"
+    ],
+    "READY": [
+      "CLAIMED",
+      "BLOCKED",
+      "HOLD",
+      "HUMAN_REQUIRED",
+      "CANCELLED"
+    ],
+    "CLAIMED": [
+      "IN_PROGRESS",
+      "READY",
+      "BLOCKED",
+      "RECOVERY"
+    ],
+    "IN_PROGRESS": [
+      "REVIEW",
+      "BLOCKED",
+      "HUMAN_REQUIRED",
+      "RECOVERY"
+    ],
+    "REVIEW": [
+      "IN_PROGRESS",
+      "VERIFICATION",
+      "BLOCKED",
+      "RECOVERY"
+    ],
+    "VERIFICATION": [
+      "DONE",
+      "IN_PROGRESS",
+      "BLOCKED",
+      "RECOVERY"
+    ],
+    "DONE": [
+      "SPECIFIED"
+    ],
+    "BLOCKED": [
+      "SPECIFIED",
+      "READY",
+      "HUMAN_REQUIRED",
+      "HOLD",
+      "CANCELLED",
+      "RECOVERY"
+    ],
+    "HOLD": [
+      "BACKLOG",
+      "SPECIFIED",
+      "READY",
+      "CANCELLED"
+    ],
+    "HUMAN_REQUIRED": [
+      "SPECIFIED",
+      "READY",
+      "BLOCKED",
+      "HOLD",
+      "CANCELLED"
+    ],
+    "RECOVERY": [
+      "IN_PROGRESS",
+      "REVIEW",
+      "VERIFICATION",
+      "DONE",
+      "BLOCKED"
+    ],
+    "CANCELLED": []
+  },
+  "preconditions": {
+    "SPECIFIED->READY": [
+      "spec_valid",
+      "dependencies_resolved",
+      "risk_classified",
+      "conflict_domain_known",
+      "acceptance_present",
+      "product_health_allows",
+      "not_human_required"
+    ],
+    "READY->CLAIMED": [
+      "one_roadmap_id_one_issue",
+      "lease_absent",
+      "no_other_active_writer",
+      "conflict_domain_free",
+      "permission_allows",
+      "issue_fresh"
+    ],
+    "CLAIMED->IN_PROGRESS": [
+      "lease_active",
+      "lease_owner_exact",
+      "branch_exact"
+    ],
+    "IN_PROGRESS->REVIEW": [
+      "scope_gate_pass",
+      "tests_executed_or_na",
+      "docs_impact_assessed",
+      "lease_active"
+    ],
+    "REVIEW->VERIFICATION": [
+      "review_pass_exact_sha",
+      "ci_pass_exact_sha",
+      "evidence_fresh"
+    ],
+    "VERIFICATION->DONE": [
+      "acceptance_pass",
+      "runtime_evidence_if_required",
+      "product_health_allows",
+      "roadmap_issue_pr_one_to_one",
+      "evidence_fresh"
+    ],
+    "RECOVERY->DONE": [
+      "root_cause_recorded",
+      "regression_test_pass",
+      "runtime_evidence_if_required"
+    ]
+  }
+}

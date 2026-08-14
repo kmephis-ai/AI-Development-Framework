@@ -1,0 +1,26 @@
+{
+  "version": "1.6.0",
+  "baseline_required": true,
+  "product_health_states": [
+    "VERIFIED",
+    "DEGRADED",
+    "BROKEN",
+    "NOT_VERIFIED"
+  ],
+  "golden_paths": {
+    "required": true,
+    "count_recommended": {
+      "min": 5,
+      "max": 15
+    }
+  },
+  "evidence_ttl_hours": {
+    "reality": 168
+  },
+  "roadmap_permission": {
+    "BROKEN": "RECOVERY_ONLY",
+    "DEGRADED": "RECOVERY_OR_VERIFICATION_ONLY",
+    "NOT_VERIFIED": "RECOVERY_OR_VERIFICATION_ONLY",
+    "VERIFIED": "NORMAL"
+  }
+}

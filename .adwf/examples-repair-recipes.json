@@ -1,0 +1,50 @@
+{
+  "$schema": "./schemas/repair-recipe.schema.json",
+  "schema_version": 1,
+  "recipes": [
+    {
+      "recipe_id": "REC-SIGNUP_TIMEOUT",
+      "version": "1.0.0",
+      "title_ru": "Безопасное исправление тайм-аута регистрации",
+      "lifecycle": "ACTIVE",
+      "match": {"fingerprint_hash": "1e3dd962e3735608ae1e60ee03ec379736272abf79fdedd7559fedb68260c074"},
+      "compatibility": {
+        "policy_hashes": ["aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"],
+        "tool_versions": {"unittest": "stdlib"},
+        "runtime_versions": {"python": "3.12.13"}
+      },
+      "expires_at": "2027-08-13T00:00:00Z",
+      "actions": [
+        {
+          "action_id": "apply_local_patch",
+          "level": "H3",
+          "argv": ["python3", "tools/repair_signup_timeout.py"],
+          "writes": ["src/signup.py"],
+          "idempotent": true,
+          "destructive": false,
+          "network": false,
+          "requires_ai_api": false,
+          "monetary_cost": 0
+        },
+        {
+          "action_id": "verify_targeted_test",
+          "level": "H4",
+          "argv": ["python3", "-m", "unittest", "tests.test_signup"],
+          "writes": [],
+          "idempotent": true,
+          "destructive": false,
+          "network": false,
+          "requires_ai_api": false,
+          "monetary_cost": 0
+        }
+      ],
+      "verification": {"targeted": [["python3", "-m", "unittest", "tests.test_signup"]], "full_gates": true},
+      "certification": {"shadow_passes": 3, "independent_approval": true, "certified_at": "2026-08-12T10:00:00Z"},
+      "lifecycle_history": [
+        {"from": "DRAFT", "to": "SHADOW", "at": "2026-08-10T10:00:00Z", "reason": "REVIEWED", "independent_approval": false},
+        {"from": "SHADOW", "to": "CERTIFIED", "at": "2026-08-12T10:00:00Z", "reason": "THREE_SHADOW_PASSES", "independent_approval": true},
+        {"from": "CERTIFIED", "to": "ACTIVE", "at": "2026-08-12T11:00:00Z", "reason": "OWNER_POLICY_APPROVED", "independent_approval": true}
+      ]
+    }
+  ]
+}

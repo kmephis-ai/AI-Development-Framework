@@ -1,0 +1,147 @@
+{
+  "schema_version": 2,
+  "framework_version": "1.6.0",
+  "profile": "FREE_PUBLIC_GITHUB",
+  "canonical_provider": "github",
+  "active_autonomy": "A2",
+  "max_autonomous_risk": "R1",
+  "hard_budget_usd": 0,
+  "mandatory_ai_api": false,
+  "max_parallel_writers": 1,
+  "state_machine_version": "1.6.0",
+  "rules": {
+    "action_min_autonomy": {
+      "inspect": "A0",
+      "plan": "A0",
+      "reconcile": "A0",
+      "edit": "A1",
+      "test": "A1",
+      "continue": "A1",
+      "review": "A1",
+      "verify": "A1",
+      "observe": "A1",
+      "record_incident": "A1",
+      "commit": "A2",
+      "push": "A2",
+      "open_pr": "A2",
+      "claim": "A2",
+      "repair": "A2",
+      "cleanup": "A2",
+      "merge": "A3",
+      "deploy_dev": "A3",
+      "promote": "A3",
+      "rollback": "A3",
+      "close_issue": "A3",
+      "deploy_prod": "A4",
+      "delete": "A4",
+      "trust_change": "A4",
+      "owner_accept": "A4",
+      "certify_recipe": "A4"
+    },
+    "autonomy_rank": {
+      "A0": 0,
+      "A1": 1,
+      "A2": 2,
+      "A3": 3,
+      "A4": 4
+    },
+    "risk_rank": {
+      "R0": 0,
+      "R1": 1,
+      "R2": 2,
+      "R3": 3,
+      "R4": 4
+    },
+    "safe_health": [
+      "HEALTHY",
+      "VERIFIED"
+    ],
+    "non_mutating_actions": [
+      "inspect",
+      "plan",
+      "reconcile",
+      "review",
+      "verify",
+      "observe"
+    ],
+    "control_plane_optional_actions": [
+      "edit",
+      "test"
+    ],
+    "product_health_exempt_work_types": [
+      "recovery",
+      "verification",
+      "governance"
+    ],
+    "evidence_actions": [
+      "merge",
+      "deploy_dev",
+      "deploy_prod",
+      "promote",
+      "rollback",
+      "close_issue"
+    ],
+    "always_human_actions": [
+      "delete",
+      "deploy_prod",
+      "trust_change",
+      "owner_accept",
+      "certify_recipe"
+    ]
+  },
+  "sources": [
+    {
+      "path": ".adwf/actions-lock.json",
+      "sha256": "06e0a5a4b8cdd3b583e153be1226d1c56f2b0948816a15e8cf8186dccef9e7d8"
+    },
+    {
+      "path": ".adwf/autonomy-matrix.json",
+      "sha256": "470954496a9d603b18f7650ef573066db1db08923b057d029599f7fbc0036c2e"
+    },
+    {
+      "path": ".adwf/config.json",
+      "sha256": "51b9019686dc987d462be6073802afb2bba4313d18bb433225394477bfce1629"
+    },
+    {
+      "path": ".adwf/healing-config.json",
+      "sha256": "c9baed0cd5effc4df52472165e09e222ac32d405f8f6bf0b9a78f46284e3a7b9"
+    },
+    {
+      "path": ".adwf/policies/evidence.json",
+      "sha256": "1223d959d3b9ee938fdea5c85bb6a790fb921800c964a2cc0030d8c32df308f5"
+    },
+    {
+      "path": ".adwf/policies/orchestration.json",
+      "sha256": "68a037301dddc5100d4e1df2e9f165c2cf8d9d68202d35efff6f48229e6a7636"
+    },
+    {
+      "path": ".adwf/policies/reality.json",
+      "sha256": "2b8a3d8264af90014d05269deab88833d57e88f7124106cd5c8e9d352e5fcdf5"
+    },
+    {
+      "path": ".adwf/policies/roadmap-quality.json",
+      "sha256": "ea922e135da478ef5f31afd3216e66c28568663865dd8b63812625955da6b52e"
+    },
+    {
+      "path": ".adwf/policies/trust-boundary.json",
+      "sha256": "0b329faab7ed64ea9ccff1473487c00c0b428de03a479e07b6033b1c58740e62"
+    },
+    {
+      "path": ".adwf/profiles/FREE_PUBLIC_GITHUB.json",
+      "sha256": "8a25131927ee7ee5e0c64cec619b37dbf1614b28a27670b366320a10e06d27ea"
+    },
+    {
+      "path": ".adwf/providers.json",
+      "sha256": "3ca5782cc39dae435aa133721ae5b9095d16e9d50ff3d392c26b50792eeef1de"
+    },
+    {
+      "path": ".adwf/release-state-machine.json",
+      "sha256": "17617cf326b11ed12241f7b523e94d1c00a4a323d413bf03053fa99e38249203"
+    },
+    {
+      "path": ".adwf/state-machine.json",
+      "sha256": "137240ac3c78b754440d653847fd9e6105ced88a51c1dbed704b005b43896e45"
+    }
+  ],
+  "policy_hash": "2e4a9fa40ea3c41dd3a9492e00eaf9cfaa04adb226f356c540f3d6bcb5a0b822"
+}

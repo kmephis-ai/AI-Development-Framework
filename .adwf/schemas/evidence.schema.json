@@ -1,0 +1,24 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "ADWF v1.6 evidence",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["id", "kind", "status", "subject", "sha", "source", "source_type", "command", "runner", "created_at", "expires_at", "content_sha256", "artifact", "runtime_revision", "product_impact"],
+  "properties": {
+    "id": {"type": "string", "minLength": 8},
+    "kind": {"enum": ["CI", "REVIEW", "SMOKE", "GOLDEN_PATHS", "REALITY", "QCP", "ACP", "ADWF_SELF_AUDIT", "RELEASE"]},
+    "status": {"enum": ["PASS", "FAIL", "BLOCKED", "NOT_VERIFIED", "STALE", "N/A"]},
+    "subject": {"type": "string", "minLength": 1},
+    "sha": {"type": ["string", "null"], "pattern": "^[0-9a-f]{40}$"},
+    "source": {"type": "string", "minLength": 1},
+    "source_type": {"enum": ["LOCAL", "GITHUB_ACTIONS", "GITLAB_CI", "RUNTIME", "HUMAN_ATTESTATION"]},
+    "command": {"type": "array", "items": {"type": "string"}},
+    "runner": {"type": "string", "minLength": 1},
+    "created_at": {"type": "string", "format": "date-time"},
+    "expires_at": {"type": "string", "format": "date-time"},
+    "content_sha256": {"type": "string", "format": "sha256"},
+    "artifact": {"type": ["string", "null"]},
+    "runtime_revision": {"type": ["string", "null"]},
+    "product_impact": {"type": "boolean"}
+  }
+}

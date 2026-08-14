@@ -1,0 +1,58 @@
+{
+  "id": "fastapi",
+  "language": "python",
+  "detect": {
+    "contains": [
+      "fastapi"
+    ]
+  },
+  "commands": {
+    "unit": {
+      "command": [
+        "python",
+        "-m",
+        "pytest",
+        "-q"
+      ],
+      "phases": [
+        "pr",
+        "main"
+      ]
+    },
+    "start": {
+      "command": [
+        "python",
+        "-m",
+        "uvicorn",
+        "app:app",
+        "--host",
+        "127.0.0.1",
+        "--port",
+        "8000"
+      ],
+      "phases": [
+        "runtime"
+      ]
+    },
+    "install": {
+      "command": [
+        "python",
+        "-m",
+        "pip",
+        "install",
+        "-r",
+        "requirements.txt"
+      ],
+      "phases": [
+        "bootstrap",
+        "pr",
+        "runtime"
+      ],
+      "requires_file": "requirements.txt"
+    }
+  },
+  "preview": {
+    "default_url": "http://127.0.0.1:8000",
+    "health_path": "/docs"
+  }
+}

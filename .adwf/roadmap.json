@@ -1,0 +1,14 @@
+{
+  "schema_version": 1,
+  "goals": [
+    {
+      "id": "EXECUTIVE-AUTOPILOT",
+      "title_ru": "Executive Autopilot",
+      "tasks": [
+        {"roadmap_id":"CEO-001","title_ru":"Нулевой технический контроль владельца","dependencies":[],"product_impact":true},
+        {"roadmap_id":"PREVIEW-001","title_ru":"Встроенный desktop/mobile preview","dependencies":["CEO-001"],"product_impact":true},
+        {"roadmap_id":"RUNTIME-001","title_ru":"Возобновляемая многодневная работа","dependencies":["CEO-001"],"product_impact":false}
+      ]
+    }
+  ]
+}

@@ -1,0 +1,260 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "ADWF Pipeline IR",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "$schema",
+    "schema_version",
+    "framework_version",
+    "profile",
+    "provider",
+    "repository_visibility",
+    "runner",
+    "cost",
+    "lanes",
+    "required_checks",
+    "impact_router",
+    "platform_smoke",
+    "preview",
+    "durability",
+    "runtime",
+    "trust_boundary",
+    "executors"
+  ],
+  "properties": {
+    "$schema": {
+      "type": "string"
+    },
+    "schema_version": {
+      "const": 3
+    },
+    "framework_version": {
+      "type": "string",
+      "pattern": "^[0-9]+\\.[0-9]+\\.[0-9]+$"
+    },
+    "profile": {
+      "const": "FREE_PUBLIC_GITHUB"
+    },
+    "provider": {
+      "const": "github"
+    },
+    "repository_visibility": {
+      "const": "PUBLIC"
+    },
+    "runner": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "executor",
+        "label",
+        "larger_runners"
+      ],
+      "properties": {
+        "executor": {
+          "const": "GITHUB_HOSTED_STANDARD"
+        },
+        "label": {
+          "const": "ubuntu-24.04"
+        },
+        "larger_runners": {
+          "const": "BLOCK"
+        }
+      }
+    },
+    "cost": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "mode",
+        "projected_cost_usd",
+        "mandatory_ai_api_calls",
+        "cache",
+        "artifacts"
+      ],
+      "properties": {
+        "mode": {
+          "const": "FREE_ONLY"
+        },
+        "projected_cost_usd": {
+          "const": 0
+        },
+        "mandatory_ai_api_calls": {
+          "const": 0
+        },
+        "cache": {
+          "enum": [
+            "DISABLED_BY_DEFAULT",
+            "LOCKFILE_KEYED"
+          ]
+        },
+        "artifacts": {
+          "enum": [
+            "DISABLED_BY_DEFAULT",
+            "FAILURE_ONLY"
+          ]
+        }
+      }
+    },
+    "lanes": {
+      "type": "object",
+      "minProperties": 4
+    },
+    "required_checks": {
+      "type": "array",
+      "const": [
+        "fast-feedback",
+        "adwf/governance-gate",
+        "adwf/trusted-gate"
+      ]
+    },
+    "impact_router": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "enabled",
+        "full_framework_paths",
+        "preview_on_ui_impact"
+      ],
+      "properties": {
+        "enabled": {
+          "const": true
+        },
+        "full_framework_paths": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "string"
+          }
+        },
+        "preview_on_ui_impact": {
+          "const": true
+        }
+      }
+    },
+    "platform_smoke": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "linux",
+        "windows",
+        "functional_http"
+      ],
+      "properties": {
+        "linux": {
+          "const": "ubuntu-24.04"
+        },
+        "windows": {
+          "const": "windows-2022"
+        },
+        "functional_http": {
+          "const": true
+        }
+      }
+    },
+    "preview": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "engine",
+        "version",
+        "viewports",
+        "mandatory_on_ui_impact"
+      ],
+      "properties": {
+        "engine": {
+          "const": "PLAYWRIGHT"
+        },
+        "version": {
+          "const": "1.62.0"
+        },
+        "viewports": {
+          "const": [
+            "desktop",
+            "mobile"
+          ]
+        },
+        "mandatory_on_ui_impact": {
+          "const": true
+        }
+      }
+    },
+    "durability": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "hosted_runtime_store",
+        "hash_chain",
+        "restore_before_step",
+        "persist_after_step",
+        "private_work_memory"
+      ],
+      "properties": {
+        "hosted_runtime_store": {
+          "const": "GITHUB_PUBLIC_SAFE_PROJECTION"
+        },
+        "hash_chain": {
+          "const": true
+        },
+        "restore_before_step": {
+          "const": true
+        },
+        "persist_after_step": {
+          "const": true
+        },
+        "private_work_memory": {
+          "const": "LOCAL_OR_OWNER_CONTROLLED"
+        }
+      }
+    },
+    "runtime": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "python_exact"
+      ],
+      "properties": {
+        "python_exact": {
+          "type": "string",
+          "pattern": "^3\\.12\\.[0-9]+$"
+        }
+      }
+    },
+    "trust_boundary": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "default_branch_classifier",
+        "governance_exact_head_admin_approval"
+      ],
+      "properties": {
+        "default_branch_classifier": {
+          "const": true
+        },
+        "governance_exact_head_admin_approval": {
+          "const": true
+        }
+      }
+    },
+    "executors": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "registry",
+        "all_phases_registered",
+        "creative_adapter_optional"
+      ],
+      "properties": {
+        "registry": {
+          "const": "ActionExecutorRegistry"
+        },
+        "all_phases_registered": {
+          "const": true
+        },
+        "creative_adapter_optional": {
+          "const": true
+        }
+      }
+    }
+  }
+}

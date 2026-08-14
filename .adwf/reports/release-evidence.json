@@ -1,0 +1,27 @@
+{
+  "$schema": "../schemas/release-evidence.schema.json",
+  "schema_version": 1,
+  "framework_version": "1.6.0",
+  "scope": "PACKAGE_ONLY",
+  "created_at": "2026-08-13T00:00:00Z",
+  "policy_hash": "d88097499b14d80df5b6db03bc812f491e46b88dff68bfff9e985f47e2ec9a93",
+  "test_suite": {
+    "status": "PASS",
+    "count": 200
+  },
+  "checks": {
+    "policy": "PASS",
+    "static_ci": "PASS",
+    "schemas": "PASS",
+    "docs": "PASS",
+    "manifest": "PASS",
+    "package_doctor": "PASS",
+    "reproducible_zip": "PASS"
+  },
+  "monetary_budget_usd": 0,
+  "mandatory_ai_api": false,
+  "live_control_plane": "NOT_VERIFIED",
+  "live_product": "NOT_VERIFIED",
+  "archive_checksum_sidecar": "AI-Development-Framework-v1.6.0.zip.sha256",
+  "claim_limit": "Package verification does not certify an installed repository, deployment, or product."
+}

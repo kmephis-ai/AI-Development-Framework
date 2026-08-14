@@ -1,0 +1,55 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "ADWF sanitized incident",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "incident_id", "status", "severity", "occurred_at", "detected_at", "resolved_at", "source", "subject", "owner_summary_ru", "symptom_original", "impact", "environment", "fingerprint", "classification", "redaction", "attempts", "provenance", "cost_usage"],
+  "properties": {
+    "schema_version": {"const": 1},
+    "incident_id": {"type": "string", "pattern": "^INC-[0-9]{8}-[0-9a-f]{12}(-[0-9]+)?$"},
+    "status": {"enum": ["DETECTED", "SANITIZED", "NORMALIZED", "CLASSIFIED", "RETRYING", "RECOVERED", "RECIPE_SELECTED", "SANDBOX_APPLIED", "VERIFIED", "PR_PROPOSED", "OBSERVED", "INVESTIGATING", "CANDIDATE_FIX", "SHADOW_EVALUATION", "HUMAN_REQUIRED", "ESCALATED", "CLOSED", "ROLLED_BACK"]},
+    "severity": {"enum": ["SEV0", "SEV1", "SEV2", "SEV3", "SEV4"]},
+    "occurred_at": {"type": "string", "format": "date-time"},
+    "detected_at": {"type": "string", "format": "date-time"},
+    "resolved_at": {"type": ["string", "null"], "format": "date-time"},
+    "source": {"type": "object"},
+    "subject": {"type": "object"},
+    "owner_summary_ru": {"type": "string", "minLength": 10},
+    "symptom_original": {"type": "string", "minLength": 3},
+    "impact": {"type": "object"},
+    "environment": {"type": "object"},
+    "fingerprint": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["algorithm", "hash", "components"],
+      "properties": {
+        "algorithm": {"const": "sha256-v1"},
+        "hash": {"type": "string", "format": "sha256"},
+        "components": {"type": "object"}
+      }
+    },
+    "classification": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["type", "confidence", "evidence"],
+      "properties": {
+        "type": {"type": "string", "minLength": 1},
+        "confidence": {"type": "string", "minLength": 1},
+        "evidence": {"type": "array"}
+      }
+    },
+    "redaction": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["status", "findings_count", "finding_codes"],
+      "properties": {
+        "status": {"const": "SANITIZED"},
+        "findings_count": {"type": "integer", "minimum": 0},
+        "finding_codes": {"type": "array", "uniqueItems": true, "items": {"type": "string"}}
+      }
+    },
+    "attempts": {"type": "array"},
+    "provenance": {"type": "object"},
+    "cost_usage": {"type": "object", "required": ["monetary_cost", "ai_api_used"], "properties": {"monetary_cost": {"const": 0}, "ai_api_used": {"const": false}}}
+  }
+}

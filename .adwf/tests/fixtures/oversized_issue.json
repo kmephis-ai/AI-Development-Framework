@@ -1,0 +1,34 @@
+{
+  "case": "oversized_issue",
+  "issue": {
+    "id": "ARCH-9",
+    "roadmap_id": "ARCH-9",
+    "number": 9,
+    "title": "Перестроить всё сразу",
+    "state": "SPECIFIED",
+    "priority": "P1",
+    "risk": "R3",
+    "type": "governance",
+    "goal": "Перестроить Dashboard backend deployment и документацию",
+    "independent_goals": 4,
+    "acceptance_criteria": [
+      "Проверен результат A",
+      "Проверен результат B",
+      "Проверен результат C"
+    ],
+    "verification_plan": [
+      "Проверить каждый независимый результат"
+    ],
+    "conflict_domains": [
+      "dashboard-ui",
+      "storage",
+      "deployment"
+    ],
+    "dependencies": [],
+    "dependencies_resolved": true,
+    "human_required": false,
+    "autonomy_allowed": false,
+    "product_impact": true,
+    "roadmap_order": 9
+  }
+}

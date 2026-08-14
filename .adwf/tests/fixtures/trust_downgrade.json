@@ -1,0 +1,11 @@
+{
+  "case": "trust_downgrade",
+  "changes": [
+    {
+      "path": ".adwf/config.json",
+      "trust_boundary": true,
+      "effect": "WEAKEN",
+      "detail": "smoke required true -> false"
+    }
+  ]
+}

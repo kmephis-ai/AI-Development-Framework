@@ -1,0 +1,8 @@
+{
+  "case": "r4_automerge",
+  "risk": "R4",
+  "autonomy": "A4",
+  "ci": "PASS",
+  "review": "PASS",
+  "human_approved": false
+}

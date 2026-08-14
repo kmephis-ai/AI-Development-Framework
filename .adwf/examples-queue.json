@@ -1,0 +1,29 @@
+{
+  "leases": [],
+  "issues": [
+    {
+      "id": "DOC-001",
+      "roadmap_id": "DOC-001",
+      "number": 1,
+      "title": "Обновить документацию владельца",
+      "state": "READY",
+      "priority": "P1",
+      "risk": "R0",
+      "type": "docs",
+      "goal": "Сделать инструкцию владельца однозначной и короткой",
+      "acceptance_criteria": ["Владелец видит одну следующую команду"],
+      "verification_plan": ["Проверить ссылки и русскоязычный смысл"],
+      "conflict_domains": ["docs"],
+      "dependencies": [],
+      "dependencies_resolved": true,
+      "human_required": false,
+      "autonomy_allowed": true,
+      "product_impact": false,
+      "roadmap_order": 1,
+      "critical_path_score": 1,
+      "ready_since": "2026-08-13T00:00:00Z",
+      "writer_id": null,
+      "lease_id": null
+    }
+  ]
+}

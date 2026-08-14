@@ -1,0 +1,939 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "ADWF v1.4 configuration",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "$schema",
+    "framework_version",
+    "schema_version",
+    "profile",
+    "language",
+    "project",
+    "provider",
+    "policy",
+    "orchestration",
+    "workspace",
+    "reality",
+    "roadmap_quality",
+    "runtime",
+    "commands",
+    "ci",
+    "cost",
+    "github",
+    "gitlab",
+    "docs",
+    "pipeline_ir"
+  ],
+  "properties": {
+    "$schema": {
+      "type": "string"
+    },
+    "framework_version": {
+      "const": "1.4.0"
+    },
+    "schema_version": {
+      "const": 4
+    },
+    "profile": {
+      "enum": [
+        "FREE_PUBLIC_GITHUB",
+        "FREE_PRIVATE",
+        "FULL_GUARDED"
+      ]
+    },
+    "language": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "human_facing",
+        "machine_facing"
+      ],
+      "properties": {
+        "human_facing": {
+          "const": "ru"
+        },
+        "machine_facing": {
+          "const": "en"
+        }
+      }
+    },
+    "project": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "name",
+        "default_branch",
+        "type",
+        "runtime_product",
+        "repository_visibility"
+      ],
+      "properties": {
+        "name": {
+          "type": "string",
+          "minLength": 2
+        },
+        "default_branch": {
+          "type": "string",
+          "minLength": 1
+        },
+        "type": {
+          "type": "string",
+          "minLength": 2
+        },
+        "runtime_product": {
+          "type": "boolean"
+        },
+        "repository_visibility": {
+          "enum": [
+            "PUBLIC",
+            "PRIVATE",
+            "INTERNAL"
+          ]
+        }
+      }
+    },
+    "provider": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "mode",
+        "secondary_read_only",
+        "secondary_write_enabled"
+      ],
+      "properties": {
+        "mode": {
+          "enum": [
+            "local",
+            "github",
+            "gitlab"
+          ]
+        },
+        "secondary_read_only": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "enum": [
+            "github",
+            "gitlab",
+            null
+          ]
+        },
+        "secondary_write_enabled": {
+          "const": false
+        }
+      }
+    },
+    "policy": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "fail_mode",
+        "requested_autonomy",
+        "active_autonomy",
+        "max_autonomous_risk",
+        "a4_automatic",
+        "main_policy",
+        "independent_review",
+        "runtime_truth_required",
+        "trust_changes_human_gated",
+        "destructive_actions_human_gated"
+      ],
+      "properties": {
+        "fail_mode": {
+          "const": "CLOSED"
+        },
+        "requested_autonomy": {
+          "enum": [
+            "A0",
+            "A1",
+            "A2",
+            "A3",
+            "A4"
+          ]
+        },
+        "active_autonomy": {
+          "enum": [
+            "A0",
+            "A1",
+            "A2",
+            "A3"
+          ]
+        },
+        "max_autonomous_risk": {
+          "enum": [
+            "R0",
+            "R1",
+            "R2",
+            "R3"
+          ]
+        },
+        "a4_automatic": {
+          "const": false
+        },
+        "main_policy": {
+          "const": "PR_ONLY"
+        },
+        "independent_review": {
+          "const": true
+        },
+        "runtime_truth_required": {
+          "const": true
+        },
+        "trust_changes_human_gated": {
+          "const": true
+        },
+        "destructive_actions_human_gated": {
+          "const": true
+        }
+      }
+    },
+    "orchestration": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "enabled",
+        "max_parallel_writers",
+        "one_roadmap_id_one_issue",
+        "merge_integration",
+        "lease_ttl_minutes",
+        "heartbeat_minutes",
+        "reconcile_ttl_minutes",
+        "conflict_domains_required",
+        "continue_automatically",
+        "stop_only_on_roadmap_end_or_hard_blocker"
+      ],
+      "properties": {
+        "enabled": {
+          "const": true
+        },
+        "max_parallel_writers": {
+          "const": 1
+        },
+        "one_roadmap_id_one_issue": {
+          "const": true
+        },
+        "merge_integration": {
+          "const": "SERIALIZED"
+        },
+        "lease_ttl_minutes": {
+          "type": "integer",
+          "minimum": 5,
+          "maximum": 240
+        },
+        "heartbeat_minutes": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 60
+        },
+        "reconcile_ttl_minutes": {
+          "type": "integer",
+          "minimum": 5,
+          "maximum": 240
+        },
+        "conflict_domains_required": {
+          "const": true
+        },
+        "continue_automatically": {
+          "const": true
+        },
+        "stop_only_on_roadmap_end_or_hard_blocker": {
+          "const": true
+        }
+      }
+    },
+    "workspace": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "root",
+        "strategy",
+        "max_active",
+        "stall_timeout_minutes",
+        "retry_base_seconds",
+        "retry_max_seconds",
+        "max_retries",
+        "require_clean_cleanup"
+      ],
+      "properties": {
+        "root": {
+          "type": "string",
+          "pattern": "^\\.adwf-runtime/workspaces$"
+        },
+        "strategy": {
+          "const": "git_worktree"
+        },
+        "max_active": {
+          "const": 1
+        },
+        "stall_timeout_minutes": {
+          "type": "integer",
+          "minimum": 5,
+          "maximum": 240
+        },
+        "retry_base_seconds": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 300
+        },
+        "retry_max_seconds": {
+          "type": "integer",
+          "minimum": 30,
+          "maximum": 3600
+        },
+        "max_retries": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 10
+        },
+        "require_clean_cleanup": {
+          "const": true
+        }
+      }
+    },
+    "reality": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "baseline_certification_required",
+        "golden_paths_required_for_product_projects",
+        "required_product_gates",
+        "reality_check_every_significant_prs",
+        "reality_check_ttl_hours",
+        "block_feature_work_on_broken_or_unknown_product"
+      ],
+      "properties": {
+        "baseline_certification_required": {
+          "const": true
+        },
+        "golden_paths_required_for_product_projects": {
+          "const": true
+        },
+        "required_product_gates": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": {
+            "enum": [
+              "smoke",
+              "golden_paths",
+              "e2e"
+            ]
+          }
+        },
+        "reality_check_every_significant_prs": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "reality_check_ttl_hours": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "block_feature_work_on_broken_or_unknown_product": {
+          "const": true
+        }
+      }
+    },
+    "roadmap_quality": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "enabled",
+        "verification_gap_warn",
+        "verification_gap_block",
+        "false_progress_detection",
+        "issue_sizing",
+        "architecture_drift_detection",
+        "technical_debt_budget"
+      ],
+      "properties": {
+        "enabled": {
+          "const": true
+        },
+        "verification_gap_warn": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1
+        },
+        "verification_gap_block": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1
+        },
+        "false_progress_detection": {
+          "const": true
+        },
+        "issue_sizing": {
+          "const": true
+        },
+        "architecture_drift_detection": {
+          "const": true
+        },
+        "technical_debt_budget": {
+          "const": true
+        }
+      }
+    },
+    "runtime": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "node_major",
+        "python_exact",
+        "enforce_node_for_node_projects"
+      ],
+      "properties": {
+        "node_major": {
+          "const": 24
+        },
+        "python_exact": {
+          "const": "3.12.13"
+        },
+        "enforce_node_for_node_projects": {
+          "const": true
+        }
+      }
+    },
+    "commands": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "lint",
+        "unit",
+        "integration",
+        "build",
+        "smoke",
+        "golden_paths",
+        "e2e"
+      ],
+      "properties": {
+        "lint": {
+          "type": "object",
+          "required": [
+            "required",
+            "command",
+            "phases"
+          ],
+          "additionalProperties": false,
+          "properties": {
+            "required": {
+              "type": "boolean"
+            },
+            "command": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
+            "phases": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            }
+          }
+        },
+        "unit": {
+          "type": "object",
+          "required": [
+            "required",
+            "command",
+            "phases"
+          ],
+          "additionalProperties": false,
+          "properties": {
+            "required": {
+              "type": "boolean"
+            },
+            "command": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
+            "phases": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            }
+          }
+        },
+        "integration": {
+          "type": "object",
+          "required": [
+            "required",
+            "command",
+            "phases"
+          ],
+          "additionalProperties": false,
+          "properties": {
+            "required": {
+              "type": "boolean"
+            },
+            "command": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
+            "phases": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            }
+          }
+        },
+        "build": {
+          "type": "object",
+          "required": [
+            "required",
+            "command",
+            "phases"
+          ],
+          "additionalProperties": false,
+          "properties": {
+            "required": {
+              "type": "boolean"
+            },
+            "command": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
+            "phases": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            }
+          }
+        },
+        "smoke": {
+          "type": "object",
+          "required": [
+            "required",
+            "command",
+            "phases"
+          ],
+          "additionalProperties": false,
+          "properties": {
+            "required": {
+              "type": "boolean"
+            },
+            "command": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
+            "phases": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            }
+          }
+        },
+        "golden_paths": {
+          "type": "object",
+          "required": [
+            "required",
+            "command",
+            "phases"
+          ],
+          "additionalProperties": false,
+          "properties": {
+            "required": {
+              "type": "boolean"
+            },
+            "command": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
+            "phases": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            }
+          }
+        },
+        "e2e": {
+          "type": "object",
+          "required": [
+            "required",
+            "command",
+            "phases"
+          ],
+          "additionalProperties": false,
+          "properties": {
+            "required": {
+              "type": "boolean"
+            },
+            "command": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
+            "phases": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            }
+          }
+        }
+      }
+    },
+    "ci": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "default_executor",
+        "mandatory_ai_api",
+        "timeout_minutes",
+        "cancel_superseded",
+        "artifact_policy",
+        "artifact_retention_days",
+        "cache_policy",
+        "minimum_actions_runner",
+        "larger_runners_allowed",
+        "failure_artifacts_upload_only_on_failure",
+        "failure_artifact_max_days",
+        "separate_trust_domains",
+        "untrusted_runner_labels",
+        "main_runner_labels",
+        "trusted_runner_labels",
+        "hosted_runner"
+      ],
+      "properties": {
+        "default_executor": {
+          "enum": [
+            "GITHUB_HOSTED_STANDARD",
+            "SELF_HOSTED_OPTIONAL"
+          ]
+        },
+        "mandatory_ai_api": {
+          "const": false
+        },
+        "timeout_minutes": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 30
+        },
+        "cancel_superseded": {
+          "const": true
+        },
+        "artifact_policy": {
+          "enum": [
+            "DISABLED_BY_DEFAULT",
+            "FAILURE_ONLY"
+          ]
+        },
+        "artifact_retention_days": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 7
+        },
+        "cache_policy": {
+          "enum": [
+            "DISABLED_BY_DEFAULT",
+            "LOCKFILE_KEYED"
+          ]
+        },
+        "minimum_actions_runner": {
+          "const": "2.329.0"
+        },
+        "larger_runners_allowed": {
+          "const": false
+        },
+        "failure_artifacts_upload_only_on_failure": {
+          "const": true
+        },
+        "failure_artifact_max_days": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 1
+        },
+        "separate_trust_domains": {
+          "type": "boolean"
+        },
+        "untrusted_runner_labels": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": {
+            "type": "string"
+          }
+        },
+        "main_runner_labels": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": {
+            "type": "string"
+          }
+        },
+        "trusted_runner_labels": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": {
+            "type": "string"
+          }
+        },
+        "hosted_runner": {
+          "const": "ubuntu-24.04"
+        }
+      }
+    },
+    "cost": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "mode",
+        "monetary_budget",
+        "unknown_provider",
+        "potentially_paid_provider",
+        "registry",
+        "quota_evidence_ttl_minutes",
+        "default_ci_capability",
+        "allowed_capability_statuses",
+        "stale_capability",
+        "owner_provided_requires_attestation"
+      ],
+      "properties": {
+        "mode": {
+          "const": "FREE_ONLY"
+        },
+        "monetary_budget": {
+          "const": 0
+        },
+        "unknown_provider": {
+          "const": "BLOCK"
+        },
+        "potentially_paid_provider": {
+          "const": "BLOCK"
+        },
+        "registry": {
+          "const": ".adwf/providers.json"
+        },
+        "quota_evidence_ttl_minutes": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 1440
+        },
+        "default_ci_capability": {
+          "type": "string",
+          "minLength": 3
+        },
+        "allowed_capability_statuses": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 4,
+          "uniqueItems": true,
+          "items": {
+            "enum": [
+              "FREE_VERIFIED",
+              "INCLUDED_QUOTA",
+              "CONDITIONAL_FREE",
+              "OWNER_PROVIDED"
+            ]
+          }
+        },
+        "stale_capability": {
+          "const": "BLOCK"
+        },
+        "owner_provided_requires_attestation": {
+          "const": true
+        }
+      }
+    },
+    "github": {
+      "type": "object",
+      "required": [
+        "project",
+        "notifications",
+        "trust"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "project": {
+          "type": "object",
+          "required": [
+            "enabled",
+            "owner",
+            "number",
+            "dashboard_issue_number",
+            "token_secret"
+          ],
+          "additionalProperties": false,
+          "properties": {
+            "enabled": {
+              "type": "boolean"
+            },
+            "owner": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "number": {
+              "type": [
+                "integer",
+                "null"
+              ]
+            },
+            "dashboard_issue_number": {
+              "type": [
+                "integer",
+                "null"
+              ]
+            },
+            "token_secret": {
+              "const": "ADWF_PROJECT_TOKEN"
+            }
+          }
+        },
+        "notifications": {
+          "type": "object",
+          "required": [
+            "email_required",
+            "channels"
+          ],
+          "additionalProperties": false,
+          "properties": {
+            "email_required": {
+              "const": false
+            },
+            "channels": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            }
+          }
+        },
+        "trust": {
+          "type": "object",
+          "required": [
+            "required_check_names",
+            "trusted_check_app_slugs",
+            "trusted_reviewer_logins",
+            "check_ttl_hours",
+            "review_ttl_hours"
+          ],
+          "additionalProperties": false,
+          "properties": {
+            "required_check_names": {
+              "type": "array",
+              "minItems": 1,
+              "uniqueItems": true,
+              "items": {
+                "type": "string",
+                "minLength": 1
+              }
+            },
+            "trusted_check_app_slugs": {
+              "type": "array",
+              "minItems": 1,
+              "uniqueItems": true,
+              "items": {
+                "type": "string",
+                "minLength": 1
+              }
+            },
+            "trusted_reviewer_logins": {
+              "type": "array",
+              "uniqueItems": true,
+              "items": {
+                "type": "string",
+                "minLength": 1
+              }
+            },
+            "check_ttl_hours": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 168
+            },
+            "review_ttl_hours": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 720
+            }
+          }
+        }
+      }
+    },
+    "gitlab": {
+      "type": "object",
+      "required": [
+        "available",
+        "untrusted_runner_tags",
+        "main_runner_tags",
+        "trusted_runner_tags",
+        "shared_runner_quota_allowed"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "available": {
+          "const": true
+        },
+        "untrusted_runner_tags": {
+          "type": "array",
+          "minItems": 2,
+          "uniqueItems": true,
+          "items": {
+            "type": "string"
+          }
+        },
+        "main_runner_tags": {
+          "type": "array",
+          "minItems": 2,
+          "uniqueItems": true,
+          "items": {
+            "type": "string"
+          }
+        },
+        "trusted_runner_tags": {
+          "type": "array",
+          "minItems": 2,
+          "uniqueItems": true,
+          "items": {
+            "type": "string"
+          }
+        },
+        "shared_runner_quota_allowed": {
+          "const": false
+        }
+      }
+    },
+    "docs": {
+      "type": "object",
+      "required": [
+        "human_language",
+        "control_center",
+        "freshness_registry"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "human_language": {
+          "const": "ru"
+        },
+        "control_center": {
+          "type": "string"
+        },
+        "freshness_registry": {
+          "type": "string"
+        }
+      }
+    },
+    "pipeline_ir": {
+      "const": ".adwf/pipeline-ir.json"
+    }
+  }
+}

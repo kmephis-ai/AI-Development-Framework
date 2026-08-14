@@ -1,0 +1,230 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "ADWF v1.6 durable orchestration run",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "$schema",
+    "schema_version",
+    "run_id",
+    "roadmap_id",
+    "issue_id",
+    "risk",
+    "work_type",
+    "product_impact",
+    "owner_request_digest",
+    "phase",
+    "status",
+    "cycle",
+    "subject_sha",
+    "preview_digest",
+    "owner_acceptance_sha",
+    "policy_hash",
+    "attempts",
+    "max_attempts",
+    "max_cycles",
+    "deadline_at",
+    "last_failed_phase",
+    "blockers",
+    "monetary_budget_usd",
+    "events",
+    "event_head",
+    "revision",
+    "created_at",
+    "updated_at",
+    "work_branch"
+  ],
+  "properties": {
+    "$schema": {
+      "type": "string"
+    },
+    "schema_version": {
+      "const": 1
+    },
+    "run_id": {
+      "type": "string",
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9_.-]{7,96}$"
+    },
+    "roadmap_id": {
+      "type": "string"
+    },
+    "issue_id": {
+      "type": "string"
+    },
+    "risk": {
+      "enum": [
+        "R0",
+        "R1",
+        "R2",
+        "R3",
+        "R4"
+      ]
+    },
+    "work_type": {
+      "enum": [
+        "feature",
+        "bug",
+        "recovery",
+        "verification",
+        "governance",
+        "docs",
+        "migration"
+      ]
+    },
+    "product_impact": {
+      "type": "boolean"
+    },
+    "owner_request_digest": {
+      "type": "string",
+      "format": "sha256"
+    },
+    "phase": {
+      "enum": [
+        "RECONCILE",
+        "AUTHORIZE",
+        "CLAIM",
+        "WORKSPACE",
+        "EXECUTE",
+        "OPEN_PR",
+        "CI",
+        "REVIEW",
+        "PREVIEW",
+        "OWNER_ACCEPTANCE",
+        "MERGE",
+        "PROMOTE",
+        "OBSERVE",
+        "DONE",
+        "CLEANUP",
+        "NEXT",
+        "RECOVERY"
+      ]
+    },
+    "status": {
+      "enum": [
+        "RUNNING",
+        "RETRY_WAIT",
+        "RECOVERY",
+        "HUMAN_REQUIRED",
+        "BLOCKED",
+        "COMPLETE"
+      ]
+    },
+    "cycle": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "subject_sha": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "pattern": "^[0-9a-f]{40}$"
+    },
+    "preview_digest": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "format": "sha256"
+    },
+    "owner_acceptance_sha": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "pattern": "^[0-9a-f]{40}$"
+    },
+    "policy_hash": {
+      "type": "string",
+      "format": "sha256"
+    },
+    "attempts": {
+      "type": "object",
+      "additionalProperties": {
+        "type": "integer",
+        "minimum": 0
+      }
+    },
+    "max_attempts": {
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 10
+    },
+    "max_cycles": {
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 1000
+    },
+    "deadline_at": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "last_failed_phase": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "blockers": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "monetary_budget_usd": {
+      "const": 0
+    },
+    "events": {
+      "type": "array",
+      "items": {
+        "type": "object"
+      }
+    },
+    "event_head": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "format": "sha256"
+    },
+    "revision": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "created_at": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "updated_at": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "delivery_sha": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "pattern": "^[0-9a-f]{40}$"
+    },
+    "pull_request_number": {
+      "type": [
+        "integer",
+        "null"
+      ],
+      "minimum": 1
+    },
+    "preview_attestation_id": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "work_branch": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "pattern": "^adwf/[A-Za-z0-9._/-]{1,175}$"
+    }
+  }
+}

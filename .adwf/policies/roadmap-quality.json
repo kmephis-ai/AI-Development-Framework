@@ -1,0 +1,46 @@
+{
+  "version": "1.6.0",
+  "issue_sizing": {
+    "oversized": {
+      "independent_goals_gt": 1,
+      "conflict_domains_gt": 2,
+      "acceptance_criteria_gt": 10
+    },
+    "undersized": {
+      "trivial_and_bundleable": true
+    }
+  },
+  "verification_gap": {
+    "warn": 0.15,
+    "block_feature_progression": 0.3
+  },
+  "false_progress": {
+    "done_ratio_min": 0.7,
+    "broken_product_always_critical": true,
+    "high_gap": 0.3
+  },
+  "ready_queue": {
+    "min": 3,
+    "max": 12,
+    "stale_days": 30
+  },
+  "checkpoint": {
+    "qcp_every_significant_prs": 5,
+    "acp_after_arch_changes": 3
+  },
+  "debt": {
+    "budget": {
+      "high": 0,
+      "medium": 5
+    },
+    "interest_escalation": true
+  },
+  "roadmap_entropy": {
+    "blocked_ratio_attention": 0.3,
+    "dependency_cycle_critical": true
+  },
+  "product_value": {
+    "orphan_work_requires_reason": true,
+    "capability_coverage_required": true
+  }
+}

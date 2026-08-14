@@ -1,0 +1,15 @@
+adwf:release:
+  stage: release
+  tags: [self-hosted, adwf-trusted]
+  timeout: 15m
+  needs: ["adwf:test"]
+  interruptible: false
+  resource_group: adwf-release
+  script:
+    - python3 .adwf/adwf.py provider-check --input .adwf/requests/gitlab-self-hosted.json
+    - python3 .adwf/scripts/release.py --version "$ADWF_RELEASE_VERSION" --external
+  rules:
+    - if: '$CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH && $CI_PIPELINE_SOURCE == "web" && $ADWF_RELEASE_ENABLED == "true"'
+      when: manual
+      allow_failure: false
+    - when: never

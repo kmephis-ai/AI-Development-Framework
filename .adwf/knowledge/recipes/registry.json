@@ -1,0 +1,5 @@
+{
+  "$schema": "../../schemas/repair-recipe.schema.json",
+  "schema_version": 1,
+  "recipes": []
+}

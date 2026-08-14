@@ -1,0 +1,197 @@
+[
+  {
+    "name": "roadmap:ready",
+    "color": "0E8A16",
+    "description": "Готово к автоматическому взятию в работу"
+  },
+  {
+    "name": "roadmap:in-progress",
+    "color": "FBCA04",
+    "description": "Задача выполняется AI Writer"
+  },
+  {
+    "name": "roadmap:review",
+    "color": "8250DF",
+    "description": "Идёт независимый review"
+  },
+  {
+    "name": "roadmap:verification",
+    "color": "5319E7",
+    "description": "Изменение слито и ожидает exact-SHA/runtime verification"
+  },
+  {
+    "name": "roadmap:blocked",
+    "color": "D93F0B",
+    "description": "Продолжение заблокировано fail-closed"
+  },
+  {
+    "name": "roadmap:hold",
+    "color": "BFD4F2",
+    "description": "Сознательно отложено владельцем/политикой"
+  },
+  {
+    "name": "roadmap:needs-spec",
+    "color": "FEF2C0",
+    "description": "Требуется уточнение спецификации"
+  },
+  {
+    "name": "roadmap:needs-split",
+    "color": "F9D0C4",
+    "description": "Issue слишком крупный и требует декомпозиции"
+  },
+  {
+    "name": "roadmap:stale",
+    "color": "D4C5F9",
+    "description": "Спецификация устарела и требует revalidation"
+  },
+  {
+    "name": "human:required",
+    "color": "B60205",
+    "description": "Требуется решение владельца"
+  },
+  {
+    "name": "health:degraded",
+    "color": "D93F0B",
+    "description": "Здоровье реального продукта ухудшено"
+  },
+  {
+    "name": "recovery:active",
+    "color": "B60205",
+    "description": "Активен Recovery; feature progression приостановлен"
+  },
+  {
+    "name": "autopilot:eligible",
+    "color": "1D76DB",
+    "description": "Разрешено автономное выполнение согласно policy"
+  },
+  {
+    "name": "autopilot:blocked",
+    "color": "B60205",
+    "description": "Автономное продолжение запрещено"
+  },
+  {
+    "name": "quality:checkpoint",
+    "color": "5319E7",
+    "description": "Quality Checkpoint"
+  },
+  {
+    "name": "architecture:checkpoint",
+    "color": "5319E7",
+    "description": "Architecture Checkpoint"
+  },
+  {
+    "name": "debt:budget-exceeded",
+    "color": "D93F0B",
+    "description": "Превышен допустимый technical debt budget"
+  },
+  {
+    "name": "type:bug",
+    "color": "D73A4A",
+    "description": "Исправление дефекта"
+  },
+  {
+    "name": "type:feature",
+    "color": "A2EEEF",
+    "description": "Новая capability"
+  },
+  {
+    "name": "type:perf",
+    "color": "FBCA04",
+    "description": "Производительность"
+  },
+  {
+    "name": "type:ui",
+    "color": "C5DEF5",
+    "description": "UI/UX"
+  },
+  {
+    "name": "type:arch",
+    "color": "5319E7",
+    "description": "Архитектура"
+  },
+  {
+    "name": "type:security",
+    "color": "B60205",
+    "description": "Безопасность/privacy"
+  },
+  {
+    "name": "type:ops",
+    "color": "0052CC",
+    "description": "Operations/DevOps"
+  },
+  {
+    "name": "type:docs",
+    "color": "0075CA",
+    "description": "Документация"
+  },
+  {
+    "name": "type:test",
+    "color": "0E8A16",
+    "description": "Тесты"
+  },
+  {
+    "name": "type:migration",
+    "color": "E99695",
+    "description": "Миграция"
+  },
+  {
+    "name": "type:governance",
+    "color": "6F42C1",
+    "description": "Governance"
+  },
+  {
+    "name": "type:debt",
+    "color": "D4C5F9",
+    "description": "Technical debt"
+  },
+  {
+    "name": "risk:R0",
+    "color": "C2E0C6",
+    "description": "Тривиальный риск"
+  },
+  {
+    "name": "risk:R1",
+    "color": "0E8A16",
+    "description": "Низкий риск"
+  },
+  {
+    "name": "risk:R2",
+    "color": "FBCA04",
+    "description": "Средний риск"
+  },
+  {
+    "name": "risk:R3",
+    "color": "D93F0B",
+    "description": "Высокий риск"
+  },
+  {
+    "name": "risk:R4",
+    "color": "B60205",
+    "description": "Критический риск"
+  },
+  {
+    "name": "writer:active",
+    "color": "0052CC",
+    "description": "Issue имеет единственный активный Writer lease"
+  },
+  {
+    "name": "evidence:stale",
+    "color": "D93F0B",
+    "description": "Обязательное evidence устарело"
+  },
+  {
+    "name": "cost:blocked",
+    "color": "B60205",
+    "description": "Операция заблокирована нулевым денежным бюджетом"
+  },
+  {
+    "name": "provider:blocked",
+    "color": "B60205",
+    "description": "Provider неизвестен, отключён или потенциально платный"
+  },
+  {
+    "name": "control:split-brain",
+    "color": "B60205",
+    "description": "Источники состояния противоречат друг другу; требуется reconcile"
+  }
+]

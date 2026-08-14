@@ -1,0 +1,285 @@
+{
+  "$schema": "./schemas/config.schema.json",
+  "framework_version": "1.6.0",
+  "schema_version": 5,
+  "profile": "FREE_PUBLIC_GITHUB",
+  "language": {
+    "human_facing": "ru",
+    "machine_facing": "en"
+  },
+  "project": {
+    "name": "AI-Development-Framework",
+    "default_branch": "main",
+    "type": "framework",
+    "runtime_product": false,
+    "repository_visibility": "PUBLIC"
+  },
+  "provider": {
+    "mode": "github",
+    "secondary_read_only": null,
+    "secondary_write_enabled": false
+  },
+  "policy": {
+    "fail_mode": "CLOSED",
+    "requested_autonomy": "A3",
+    "active_autonomy": "A2",
+    "max_autonomous_risk": "R1",
+    "a4_automatic": false,
+    "main_policy": "PR_ONLY",
+    "independent_review": true,
+    "runtime_truth_required": true,
+    "trust_changes_human_gated": true,
+    "destructive_actions_human_gated": true
+  },
+  "orchestration": {
+    "enabled": true,
+    "max_parallel_writers": 1,
+    "one_roadmap_id_one_issue": true,
+    "merge_integration": "SERIALIZED",
+    "lease_ttl_minutes": 120,
+    "heartbeat_minutes": 30,
+    "reconcile_ttl_minutes": 60,
+    "conflict_domains_required": true,
+    "continue_automatically": true,
+    "stop_only_on_roadmap_end_or_hard_blocker": true
+  },
+  "workspace": {
+    "root": ".adwf-runtime/workspaces",
+    "strategy": "git_worktree",
+    "max_active": 1,
+    "stall_timeout_minutes": 45,
+    "retry_base_seconds": 30,
+    "retry_max_seconds": 900,
+    "max_retries": 3,
+    "require_clean_cleanup": true
+  },
+  "reality": {
+    "baseline_certification_required": true,
+    "golden_paths_required_for_product_projects": true,
+    "required_product_gates": [
+      "smoke",
+      "golden_paths"
+    ],
+    "reality_check_every_significant_prs": 5,
+    "reality_check_ttl_hours": 168,
+    "block_feature_work_on_broken_or_unknown_product": true
+  },
+  "roadmap_quality": {
+    "enabled": true,
+    "verification_gap_warn": 0.15,
+    "verification_gap_block": 0.3,
+    "false_progress_detection": true,
+    "issue_sizing": true,
+    "architecture_drift_detection": true,
+    "technical_debt_budget": true
+  },
+  "runtime": {
+    "node_major": 24,
+    "python_exact": "3.12.13",
+    "enforce_node_for_node_projects": true
+  },
+  "commands": {
+    "lint": {
+      "required": false,
+      "command": [],
+      "phases": [
+        "pr"
+      ]
+    },
+    "unit": {
+      "required": false,
+      "command": [],
+      "phases": [
+        "pr",
+        "main"
+      ]
+    },
+    "integration": {
+      "required": false,
+      "command": [],
+      "phases": [
+        "main"
+      ]
+    },
+    "build": {
+      "required": false,
+      "command": [],
+      "phases": [
+        "pr",
+        "main"
+      ]
+    },
+    "smoke": {
+      "required": false,
+      "command": [],
+      "phases": [
+        "runtime"
+      ]
+    },
+    "golden_paths": {
+      "required": false,
+      "command": [],
+      "phases": [
+        "runtime"
+      ]
+    },
+    "e2e": {
+      "required": false,
+      "command": [],
+      "phases": [
+        "runtime"
+      ]
+    }
+  },
+  "ci": {
+    "default_executor": "GITHUB_HOSTED_STANDARD",
+    "mandatory_ai_api": false,
+    "timeout_minutes": 15,
+    "cancel_superseded": true,
+    "artifact_policy": "DISABLED_BY_DEFAULT",
+    "artifact_retention_days": 1,
+    "cache_policy": "DISABLED_BY_DEFAULT",
+    "minimum_actions_runner": "2.329.0",
+    "larger_runners_allowed": false,
+    "failure_artifacts_upload_only_on_failure": true,
+    "failure_artifact_max_days": 1,
+    "separate_trust_domains": false,
+    "untrusted_runner_labels": [],
+    "main_runner_labels": [],
+    "trusted_runner_labels": [],
+    "hosted_runner": "ubuntu-24.04"
+  },
+  "cost": {
+    "mode": "FREE_ONLY",
+    "monetary_budget": 0,
+    "unknown_provider": "BLOCK",
+    "potentially_paid_provider": "BLOCK",
+    "registry": ".adwf/providers.json",
+    "quota_evidence_ttl_minutes": 60,
+    "default_ci_capability": "github_public_standard",
+    "allowed_capability_statuses": [
+      "FREE_VERIFIED"
+    ],
+    "stale_capability": "BLOCK",
+    "owner_provided_requires_attestation": true
+  },
+  "github": {
+    "project": {
+      "enabled": false,
+      "owner": null,
+      "number": null,
+      "dashboard_issue_number": null,
+      "token_secret": "ADWF_PROJECT_TOKEN"
+    },
+    "notifications": {
+      "email_required": false,
+      "channels": [
+        "checks",
+        "control-center"
+      ]
+    },
+    "trust": {
+      "required_check_names": [
+        "fast-feedback",
+        "adwf/governance-gate",
+        "adwf/trusted-gate"
+      ],
+      "trusted_check_app_slugs": [
+        "github-actions"
+      ],
+      "trusted_reviewer_logins": [],
+      "check_ttl_hours": 24,
+      "review_ttl_hours": 168
+    }
+  },
+  "gitlab": {
+    "available": true,
+    "untrusted_runner_tags": [
+      "self-hosted",
+      "adwf-untrusted-ephemeral"
+    ],
+    "main_runner_tags": [
+      "self-hosted",
+      "adwf-main-ephemeral"
+    ],
+    "trusted_runner_tags": [
+      "self-hosted",
+      "adwf-trusted"
+    ],
+    "shared_runner_quota_allowed": false
+  },
+  "docs": {
+    "human_language": "ru",
+    "control_center": "CONTROL_CENTER.md",
+    "freshness_registry": ".adwf/docs-registry.json"
+  },
+  "pipeline_ir": ".adwf/pipeline-ir.json",
+  "executive": {
+    "mode": "SIMPLE",
+    "primary_action": "CONTINUE",
+    "technical_details_default_hidden": true,
+    "roadmap_embedded": true,
+    "simple_status": true
+  },
+  "preview": {
+    "enabled": true,
+    "engine": "PLAYWRIGHT",
+    "engine_version": "1.62.0",
+    "baseline_optional": true,
+    "install_mode": "EXACT_PINNED",
+    "viewports": {
+      "desktop": {
+        "width": 1440,
+        "height": 900
+      },
+      "mobile": {
+        "width": 390,
+        "height": 844
+      }
+    }
+  },
+  "project_packs": {
+    "enabled": true,
+    "auto_detect": true,
+    "builtin": [
+      "python",
+      "fastapi",
+      "node",
+      "react",
+      "vue",
+      "angular",
+      "go"
+    ],
+    "materialized": false
+  },
+  "runtime_supervisor": {
+    "enabled": true,
+    "work_memory": ".adwf-runtime/work-context.json",
+    "remote_store": "GITHUB_ISSUE_LEDGER",
+    "resume_after_restart": true,
+    "action_envelopes": true,
+    "raw_chain_of_thought_storage": false,
+    "executor_registry": "ActionExecutorRegistry",
+    "single_ssot": "DURABLE_ORCHESTRATOR"
+  },
+  "release_automation": {
+    "auto_supported": true,
+    "owner_confirmation_required": true,
+    "semantic_versioning": true,
+    "tag_before_release": true,
+    "transactional_version_bump": true,
+    "caller_version_forbidden": true
+  },
+  "secrets": {
+    "mandatory_ai_secret": false,
+    "hosted_store": "GITHUB_ACTIONS_SECRETS",
+    "local_store": "OS_KEYRING",
+    "encrypted_runtime_file_allowed": false
+  },
+  "delivery": {
+    "deployment_required": false,
+    "promotion_adapter": "NONE",
+    "observation_required": false,
+    "observation_adapter": "NONE"
+  }
+}

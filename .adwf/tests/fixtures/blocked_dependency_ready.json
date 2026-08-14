@@ -1,0 +1,26 @@
+{
+  "case": "blocked_ready",
+  "issue": {
+    "id": "DEP-1",
+    "roadmap_id": "DEP-1",
+    "title": "Задача с блокером",
+    "state": "READY",
+    "priority": "P1",
+    "risk": "R1",
+    "goal": "Реализовать проверяемый результат",
+    "acceptance_criteria": [
+      "PASS"
+    ],
+    "verification_plan": [
+      "Запустить regression test"
+    ],
+    "conflict_domains": [
+      "deployment"
+    ],
+    "dependencies": [
+      "BASE-1"
+    ],
+    "dependencies_resolved": false,
+    "human_required": false
+  }
+}

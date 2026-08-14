@@ -1,0 +1,48 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "required": [
+    "id",
+    "type",
+    "severity",
+    "impact",
+    "interest",
+    "status"
+  ],
+  "properties": {
+    "id": {
+      "type": "string"
+    },
+    "type": {
+      "type": "string"
+    },
+    "severity": {
+      "enum": [
+        "LOW",
+        "MEDIUM",
+        "HIGH",
+        "CRITICAL"
+      ]
+    },
+    "impact": {
+      "type": "string"
+    },
+    "interest": {
+      "enum": [
+        "LOW",
+        "MEDIUM",
+        "HIGH",
+        "GROWING"
+      ]
+    },
+    "status": {
+      "enum": [
+        "OPEN",
+        "PLANNED",
+        "IN_PROGRESS",
+        "RESOLVED",
+        "ACCEPTED"
+      ]
+    }
+  }
+}

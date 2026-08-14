@@ -1,0 +1,42 @@
+{
+  "id": "FREE_PUBLIC_GITHUB",
+  "description": "Public GitHub Free: standard GitHub-hosted runner, $0 mandatory path, no self-hosted dependency.",
+  "repository_scope": "GITHUB_PUBLIC_FREE",
+  "enforcement_truth": "PLATFORM_READBACK_REQUIRED",
+  "github_private_branch_protection": "NOT_APPLICABLE_PUBLIC_PROFILE",
+  "required_checks_truth": "PLATFORM_READBACK_REQUIRED",
+  "platform_enforcement": {
+    "protected_main": true,
+    "required_status_checks": true,
+    "required_review": true,
+    "environments": false
+  },
+  "policy_enforcement": {
+    "pr_only": true,
+    "required_ci_by_process": true,
+    "independent_review": true,
+    "auto_merge": "OWNER_ACCEPTANCE_REQUIRED_FOR_PRODUCT_IMPACT",
+    "direct_main_push_forbidden": true
+  },
+  "default_autonomy": "A2",
+  "promotable_autonomy": "A3",
+  "max_autonomous_risk": "R1",
+  "recommended_ci_capability": "github_public_standard",
+  "allowed_capability_statuses": [
+    "FREE_VERIFIED"
+  ],
+  "forbidden_capability_statuses": [
+    "METERED",
+    "PAID",
+    "UNKNOWN",
+    "STALE"
+  ],
+  "github_hosted_minutes_policy": "PUBLIC_STANDARD_ONLY",
+  "runner": "ubuntu-24.04",
+  "larger_runners_allowed": false,
+  "mandatory_paid_ai_api": false,
+  "owner_resource_attestation_required": false,
+  "monetary_budget": 0,
+  "merge_rule": "Merge только после exact-HEAD fast-feedback + adwf/trusted-gate + authenticated owner acceptance when product-impact requires it.",
+  "deployment_rule": "Production promotion remains human-gated until deployed revision and observation are verified."
+}

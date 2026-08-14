@@ -1,0 +1,38 @@
+name: ADWF Main
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+permissions:
+  contents: read
+env:
+  PYTHONDONTWRITEBYTECODE: "1"
+concurrency:
+  group: adwf-main-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  canonical-verification:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd
+        with:
+          persist-credentials: false
+          fetch-depth: 2
+      - uses: actions/setup-python@a309ff8b426b58ec0e2a45f0f869d46889d02405
+        with:
+          python-version: "3.12.13"
+          cache: false
+      - name: Framework contract suite
+        run: |
+          python .adwf/adwf.py provider-check --input .adwf/requests/github-public-standard.json
+          python .adwf/scripts/validate_ci.py
+          python .adwf/scripts/validate_framework.py
+          python .adwf/scripts/validate_docs.py
+          python .adwf/scripts/validate_pipeline_ir.py
+          python .adwf/adwf.py doctor --scope package_integrity
+          python .adwf/adwf.py doctor --scope config_health
+          python .adwf/adwf.py self-test
+      - name: Project main gates
+        run: python .adwf/scripts/run_project_gates.py --phase main

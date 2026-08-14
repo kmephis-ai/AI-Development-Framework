@@ -1,0 +1,23 @@
+{
+  "case": "dependency_cycle",
+  "issues": [
+    {
+      "id": "A",
+      "dependencies": [
+        "B"
+      ]
+    },
+    {
+      "id": "B",
+      "dependencies": [
+        "C"
+      ]
+    },
+    {
+      "id": "C",
+      "dependencies": [
+        "A"
+      ]
+    }
+  ]
+}

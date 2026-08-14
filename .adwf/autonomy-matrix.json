@@ -1,0 +1,67 @@
+{
+  "version": "1.6.0",
+  "active_default": "A2",
+  "a4_automatic": false,
+  "levels": {
+    "A0": [
+      "inspect",
+      "plan",
+      "reconcile"
+    ],
+    "A1": [
+      "inspect",
+      "plan",
+      "reconcile",
+      "edit",
+      "test",
+      "continue",
+      "review",
+      "verify",
+      "observe",
+      "record_incident"
+    ],
+    "A2": [
+      "inspect",
+      "plan",
+      "reconcile",
+      "edit",
+      "test",
+      "continue",
+      "review",
+      "verify",
+      "observe",
+      "record_incident",
+      "commit",
+      "push",
+      "open_pr",
+      "claim",
+      "repair",
+      "cleanup"
+    ],
+    "A3": [
+      "inspect",
+      "plan",
+      "reconcile",
+      "edit",
+      "test",
+      "continue",
+      "review",
+      "verify",
+      "observe",
+      "record_incident",
+      "commit",
+      "push",
+      "open_pr",
+      "claim",
+      "repair",
+      "cleanup",
+      "merge",
+      "deploy_dev",
+      "promote",
+      "rollback",
+      "close_issue"
+    ],
+    "A4": []
+  },
+  "note_ru": "A4 требует отдельного решения владельца и никогда не включается автоматически."
+}

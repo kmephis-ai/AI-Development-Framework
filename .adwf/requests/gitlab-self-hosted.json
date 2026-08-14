@@ -1,0 +1,14 @@
+{
+  "provider": "gitlab_self_hosted",
+  "mandatory_ci": true,
+  "automated": true,
+  "projected_cost": 0,
+  "projected_units": 0,
+  "runner_class": "self_hosted",
+  "owner_resource": {
+    "confirmed": true,
+    "metered_control_plane": false,
+    "verified_at": "2026-08-13T00:00:00Z",
+    "valid_until": "2026-09-13T00:00:00Z"
+  }
+}

@@ -1,0 +1,20 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "ADWF v1.6 CI setup plan",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "mode", "detected", "provider", "proposed_commands", "blockers", "questions", "owner_summary_ru", "write_performed", "ai_api_required", "monetary_budget_usd"],
+  "properties": {
+    "schema_version": {"const": 1},
+    "mode": {"const": "DRY_RUN_ONLY"},
+    "detected": {"type": "object"},
+    "provider": {"type": "object"},
+    "proposed_commands": {"type": "object"},
+    "blockers": {"type": "array", "items": {"type": "string"}},
+    "questions": {"type": "array", "maxItems": 1, "items": {"type": "object"}},
+    "owner_summary_ru": {"type": "string", "minLength": 20},
+    "write_performed": {"const": false},
+    "ai_api_required": {"const": false},
+    "monetary_budget_usd": {"const": 0}
+  }
+}

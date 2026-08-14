@@ -1,0 +1,5 @@
+{
+  "schema_version": 1,
+  "fixtures": [],
+  "note_ru": "Regression fixture становится нормативной только через обычный trust-gated PR."
+}

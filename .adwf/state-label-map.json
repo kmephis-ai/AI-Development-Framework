@@ -1,0 +1,26 @@
+{
+  "version": "1.6.0",
+  "map": {
+    "READY": "roadmap:ready",
+    "CLAIMED": "roadmap:in-progress",
+    "IN_PROGRESS": "roadmap:in-progress",
+    "REVIEW": "roadmap:review",
+    "VERIFICATION": "roadmap:verification",
+    "BLOCKED": "roadmap:blocked",
+    "HOLD": "roadmap:hold",
+    "HUMAN_REQUIRED": "roadmap:blocked",
+    "RECOVERY": "recovery:active",
+    "SPECIFIED": "roadmap:needs-spec"
+  },
+  "mutually_exclusive": [
+    "roadmap:ready",
+    "roadmap:in-progress",
+    "roadmap:review",
+    "roadmap:verification",
+    "roadmap:blocked",
+    "roadmap:hold",
+    "roadmap:needs-spec",
+    "roadmap:needs-split",
+    "roadmap:stale"
+  ]
+}

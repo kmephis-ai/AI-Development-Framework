@@ -1,0 +1,36 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "ADWF provider and capability registry",
+  "type": "object", "additionalProperties": false,
+  "required": ["$schema", "schema_version", "hard_budget_usd", "allow_overage", "allow_credit_purchase", "allow_metered_provider", "allow_unknown_provider", "quota_evidence_ttl_minutes", "providers"],
+  "properties": {
+    "$schema": {"type": "string"}, "schema_version": {"const": 3}, "hard_budget_usd": {"const": 0},
+    "allow_overage": {"const": false}, "allow_credit_purchase": {"const": false},
+    "allow_metered_provider": {"const": false}, "allow_unknown_provider": {"const": false},
+    "quota_evidence_ttl_minutes": {"type": "integer", "minimum": 1, "maximum": 1440},
+    "providers": {"type": "object", "additionalProperties": {
+      "type": "object", "additionalProperties": false,
+      "required": ["provider_id", "capability_id", "provider_mode", "plane", "enabled", "classification", "billing_model", "repository_visibility_scope", "execution_class", "zero_cost_requirements", "requires_ai_api", "mandatory_ci_allowed", "automatic_execution_allowed", "official_source_url", "plan_scope", "required_credentials", "required_permissions", "hard_limit_mechanism", "verified_at", "valid_until", "outbound_domains", "data_handling", "deterministic_fallback", "internal_limits"],
+      "properties": {
+        "provider_id": {"type": "string", "minLength": 1}, "capability_id": {"type": "string", "minLength": 1},
+        "provider_mode": {"enum": ["local", "github", "gitlab", "openai"]}, "plane": {"enum": ["ci", "ai", "storage", "deployment", "governance"]},
+        "enabled": {"type": "boolean"},
+        "classification": {"enum": ["FREE_VERIFIED", "INCLUDED_QUOTA", "CONDITIONAL_FREE", "OWNER_PROVIDED", "METERED", "PAID", "UNKNOWN", "STALE"]},
+        "billing_model": {"enum": ["none", "owner_provided", "free_quota", "included_subscription", "metered", "unknown"]},
+        "repository_visibility_scope": {"enum": ["ANY", "PUBLIC_ONLY", "PRIVATE_ONLY", "NOT_APPLICABLE"]},
+        "execution_class": {"enum": ["LOCAL", "STANDARD_HOSTED", "SELF_HOSTED", "LARGER_HOSTED", "INTERACTIVE", "METERED_API", "PLATFORM_CONTROL"]},
+        "zero_cost_requirements": {"type": "array", "minItems": 1, "uniqueItems": true, "items": {"type": "string", "minLength": 3}},
+        "requires_ai_api": {"type": "boolean"}, "mandatory_ci_allowed": {"type": "boolean"},
+        "automatic_execution_allowed": {"type": "boolean"},
+        "official_source_url": {"type": "string", "pattern": "^https://"}, "plan_scope": {"type": "string", "minLength": 3},
+        "required_credentials": {"type": "array", "uniqueItems": true, "items": {"type": "string"}},
+        "required_permissions": {"type": "array", "uniqueItems": true, "items": {"type": "string"}},
+        "hard_limit_mechanism": {"type": "string", "minLength": 3},
+        "verified_at": {"type": "string", "format": "date-time"}, "valid_until": {"type": "string", "format": "date-time"},
+        "outbound_domains": {"type": "array", "uniqueItems": true, "items": {"type": "string"}},
+        "data_handling": {"type": "string", "minLength": 3}, "deterministic_fallback": {"type": "string", "minLength": 3},
+        "internal_limits": {"type": "object", "additionalProperties": {"anyOf": [{"type": "number"}, {"type": "boolean"}, {"type": "string"}]}}
+      }
+    }}
+  }
+}

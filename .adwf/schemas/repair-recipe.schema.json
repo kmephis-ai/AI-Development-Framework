@@ -1,0 +1,60 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "ADWF repair recipe registry",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["$schema", "schema_version", "recipes"],
+  "properties": {
+    "$schema": {"type": "string"},
+    "schema_version": {"const": 1},
+    "recipes": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["recipe_id", "version", "title_ru", "lifecycle", "match", "compatibility", "expires_at", "actions", "verification", "certification", "lifecycle_history"],
+        "properties": {
+          "recipe_id": {"type": "string", "pattern": "^REC-[A-Z0-9][A-Z0-9_-]{2,63}$"},
+          "version": {"type": "string", "pattern": "^[A-Za-z0-9][A-Za-z0-9._+-]{0,63}$"},
+          "title_ru": {"type": "string", "minLength": 10},
+          "lifecycle": {"enum": ["DRAFT", "SHADOW", "CERTIFIED", "ACTIVE", "QUARANTINED", "RETIRED"]},
+          "match": {"type": "object", "additionalProperties": false, "required": ["fingerprint_hash"], "properties": {"fingerprint_hash": {"type": "string", "format": "sha256"}}},
+          "compatibility": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["policy_hashes", "tool_versions", "runtime_versions"],
+            "properties": {
+              "policy_hashes": {"type": "array", "minItems": 1, "uniqueItems": true, "items": {"type": "string", "format": "sha256"}},
+              "tool_versions": {"type": "object", "additionalProperties": {"type": "string"}},
+              "runtime_versions": {"type": "object", "additionalProperties": {"type": "string"}}
+            }
+          },
+          "expires_at": {"type": "string", "format": "date-time"},
+          "actions": {
+            "type": "array",
+            "minItems": 1,
+            "items": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": ["action_id", "level", "argv", "writes", "idempotent", "destructive", "network", "requires_ai_api", "monetary_cost"],
+              "properties": {
+                "action_id": {"type": "string", "pattern": "^[a-z][a-z0-9_-]{2,63}$"},
+                "level": {"enum": ["H1", "H2", "H3", "H4"]},
+                "argv": {"type": "array", "minItems": 1, "items": {"type": "string", "minLength": 1}},
+                "writes": {"type": "array", "uniqueItems": true, "items": {"type": "string", "minLength": 1}},
+                "idempotent": {"const": true},
+                "destructive": {"const": false},
+                "network": {"const": false},
+                "requires_ai_api": {"const": false},
+                "monetary_cost": {"const": 0}
+              }
+            }
+          },
+          "verification": {"type": "object", "additionalProperties": false, "required": ["targeted", "full_gates"], "properties": {"targeted": {"type": "array", "minItems": 1, "items": {"type": "array", "minItems": 1, "items": {"type": "string"}}}, "full_gates": {"const": true}}},
+          "certification": {"type": "object", "additionalProperties": false, "required": ["shadow_passes", "independent_approval", "certified_at"], "properties": {"shadow_passes": {"type": "integer", "minimum": 0}, "independent_approval": {"type": "boolean"}, "certified_at": {"type": ["string", "null"], "format": "date-time"}}},
+          "lifecycle_history": {"type": "array", "items": {"type": "object"}}
+        }
+      }
+    }
+  }
+}

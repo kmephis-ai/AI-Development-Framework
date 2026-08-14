@@ -1,0 +1,1353 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "ADWF v1.6 project snapshot",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "$schema",
+    "framework_version",
+    "schema_version",
+    "project",
+    "provider",
+    "profile",
+    "status",
+    "autonomy_level",
+    "risk_ceiling",
+    "health",
+    "progress",
+    "main",
+    "runtime",
+    "orchestration",
+    "queue",
+    "work_items",
+    "active",
+    "workspace",
+    "snapshot",
+    "ci_metrics",
+    "cost_usage",
+    "project_projection",
+    "incident_knowledge",
+    "safe_healing",
+    "owner_experience",
+    "owner_decisions",
+    "release",
+    "gates",
+    "blockers",
+    "last_reconciled_at",
+    "last_verified_at"
+  ],
+  "properties": {
+    "$schema": {
+      "type": "string"
+    },
+    "framework_version": {
+      "type": "string",
+      "pattern": "^[0-9]+\\.[0-9]+\\.[0-9]+$"
+    },
+    "schema_version": {
+      "const": 3
+    },
+    "project": {
+      "type": "object",
+      "required": [
+        "name",
+        "default_branch"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "name": {
+          "type": "string"
+        },
+        "default_branch": {
+          "type": "string"
+        }
+      }
+    },
+    "provider": {
+      "type": "object",
+      "required": [
+        "mode",
+        "observed_at"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "mode": {
+          "enum": [
+            "local",
+            "github",
+            "gitlab"
+          ]
+        },
+        "observed_at": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "format": "date-time"
+        }
+      }
+    },
+    "profile": {
+      "enum": [
+        "FREE_PUBLIC_GITHUB",
+        "FREE_PRIVATE",
+        "FULL_GUARDED"
+      ]
+    },
+    "status": {
+      "enum": [
+        "BOOTSTRAP",
+        "ACTIVE",
+        "BLOCKED",
+        "RECOVERY",
+        "COMPLETE"
+      ]
+    },
+    "autonomy_level": {
+      "enum": [
+        "A0",
+        "A1",
+        "A2",
+        "A3"
+      ]
+    },
+    "risk_ceiling": {
+      "enum": [
+        "R0",
+        "R1",
+        "R2",
+        "R3"
+      ]
+    },
+    "health": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "product",
+        "roadmap",
+        "architecture",
+        "security",
+        "debt",
+        "adwf"
+      ],
+      "properties": {
+        "product": {
+          "enum": [
+            "VERIFIED",
+            "HEALTHY",
+            "DEGRADED",
+            "BROKEN",
+            "NOT_VERIFIED",
+            "STALE"
+          ]
+        },
+        "roadmap": {
+          "enum": [
+            "VERIFIED",
+            "HEALTHY",
+            "ATTENTION",
+            "CRITICAL",
+            "NOT_VERIFIED",
+            "STALE"
+          ]
+        },
+        "architecture": {
+          "enum": [
+            "VERIFIED",
+            "HEALTHY",
+            "ATTENTION",
+            "CRITICAL",
+            "NOT_VERIFIED",
+            "STALE"
+          ]
+        },
+        "security": {
+          "enum": [
+            "VERIFIED",
+            "HEALTHY",
+            "ATTENTION",
+            "CRITICAL",
+            "NOT_VERIFIED",
+            "STALE"
+          ]
+        },
+        "debt": {
+          "enum": [
+            "VERIFIED",
+            "HEALTHY",
+            "ATTENTION",
+            "CRITICAL",
+            "NOT_VERIFIED",
+            "STALE"
+          ]
+        },
+        "adwf": {
+          "enum": [
+            "VERIFIED",
+            "HEALTHY",
+            "BROKEN",
+            "NOT_VERIFIED",
+            "STALE"
+          ]
+        }
+      }
+    },
+    "progress": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "implementation",
+        "verification",
+        "product_readiness",
+        "verification_gap"
+      ],
+      "properties": {
+        "implementation": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1
+        },
+        "verification": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1
+        },
+        "product_readiness": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1
+        },
+        "verification_gap": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1
+        }
+      }
+    },
+    "main": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "head",
+        "health"
+      ],
+      "properties": {
+        "head": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "pattern": "^[0-9a-f]{40}$"
+        },
+        "health": {
+          "enum": [
+            "PASS",
+            "FAIL",
+            "NOT_VERIFIED",
+            "STALE"
+          ]
+        }
+      }
+    },
+    "runtime": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "canonical_revision",
+        "smoke",
+        "golden_paths",
+        "last_reality_check"
+      ],
+      "properties": {
+        "canonical_revision": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "smoke": {
+          "enum": [
+            "PASS",
+            "FAIL",
+            "NOT_VERIFIED",
+            "STALE",
+            "N/A"
+          ]
+        },
+        "golden_paths": {
+          "enum": [
+            "PASS",
+            "FAIL",
+            "NOT_VERIFIED",
+            "STALE",
+            "N/A"
+          ]
+        },
+        "last_reality_check": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "format": "date-time"
+        }
+      }
+    },
+    "orchestration": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "writers_active",
+        "reviewers_active",
+        "leases_active",
+        "conflicts",
+        "merge_train"
+      ],
+      "properties": {
+        "writers_active": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 1
+        },
+        "reviewers_active": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "leases_active": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 1
+        },
+        "conflicts": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "merge_train": {
+          "enum": [
+            "IDLE",
+            "BUSY",
+            "BLOCKED"
+          ]
+        }
+      }
+    },
+    "queue": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "ready",
+        "in_progress",
+        "review",
+        "blocked",
+        "human_required"
+      ],
+      "properties": {
+        "ready": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "in_progress": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 1
+        },
+        "review": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "blocked": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "human_required": {
+          "type": "integer",
+          "minimum": 0
+        }
+      }
+    },
+    "work_items": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "id",
+          "roadmap_id",
+          "number",
+          "title",
+          "state",
+          "priority",
+          "risk",
+          "type",
+          "goal",
+          "conflict_domains",
+          "dependencies",
+          "dependencies_resolved",
+          "human_required",
+          "autonomy_allowed",
+          "product_impact",
+          "roadmap_order",
+          "critical_path_score",
+          "ready_since",
+          "writer_id",
+          "lease_id",
+          "workspace_id",
+          "heartbeat_at",
+          "expires_at",
+          "updated_at"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "pattern": "^[A-Z][A-Z0-9_]*-[0-9]+$"
+          },
+          "roadmap_id": {
+            "type": "string",
+            "pattern": "^[A-Z][A-Z0-9_]*-[0-9]+$"
+          },
+          "number": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "title": {
+            "type": "string",
+            "minLength": 5
+          },
+          "state": {
+            "enum": [
+              "BACKLOG",
+              "SPECIFIED",
+              "READY",
+              "CLAIMED",
+              "IN_PROGRESS",
+              "REVIEW",
+              "VERIFICATION",
+              "DONE",
+              "BLOCKED",
+              "HOLD",
+              "HUMAN_REQUIRED",
+              "RECOVERY",
+              "CANCELLED"
+            ]
+          },
+          "priority": {
+            "enum": [
+              "P0",
+              "P1",
+              "P2",
+              "P3"
+            ]
+          },
+          "risk": {
+            "enum": [
+              "R0",
+              "R1",
+              "R2",
+              "R3",
+              "R4"
+            ]
+          },
+          "type": {
+            "enum": [
+              "feature",
+              "bug",
+              "recovery",
+              "verification",
+              "governance",
+              "docs",
+              "migration"
+            ]
+          },
+          "goal": {
+            "type": "string",
+            "minLength": 10
+          },
+          "conflict_domains": {
+            "type": "array",
+            "minItems": 1,
+            "uniqueItems": true,
+            "items": {
+              "type": "string"
+            }
+          },
+          "dependencies": {
+            "type": "array",
+            "uniqueItems": true,
+            "items": {
+              "type": "string",
+              "pattern": "^[A-Z][A-Z0-9_]*-[0-9]+$"
+            }
+          },
+          "dependencies_resolved": {
+            "type": "boolean"
+          },
+          "human_required": {
+            "type": "boolean"
+          },
+          "autonomy_allowed": {
+            "type": "boolean"
+          },
+          "product_impact": {
+            "type": "boolean"
+          },
+          "roadmap_order": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "critical_path_score": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "ready_since": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time"
+          },
+          "writer_id": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "pattern": "^[A-Za-z0-9_.@:-]+$"
+          },
+          "lease_id": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
+          },
+          "workspace_id": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "pattern": "^[a-z0-9][a-z0-9-]{2,96}$"
+          },
+          "heartbeat_at": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time"
+          },
+          "expires_at": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time"
+          },
+          "updated_at": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time"
+          }
+        }
+      }
+    },
+    "active": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "roadmap_id",
+        "issue",
+        "pr",
+        "branch",
+        "writer",
+        "lease_id",
+        "state"
+      ],
+      "properties": {
+        "roadmap_id": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "pattern": "^[A-Z][A-Z0-9_]*-[0-9]+$"
+        },
+        "issue": {
+          "type": [
+            "integer",
+            "null"
+          ]
+        },
+        "pr": {
+          "type": [
+            "integer",
+            "null"
+          ]
+        },
+        "branch": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "writer": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "pattern": "^[A-Za-z0-9_.@:-]+$"
+        },
+        "lease_id": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
+        },
+        "state": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "enum": [
+            "IN_PROGRESS",
+            "REVIEW",
+            "VERIFICATION",
+            "RECOVERY",
+            null
+          ]
+        }
+      }
+    },
+    "workspace": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "status",
+        "workspace_id",
+        "heartbeat_at",
+        "expires_at",
+        "retry_count",
+        "next_retry_at"
+      ],
+      "properties": {
+        "status": {
+          "enum": [
+            "NOT_CONFIGURED",
+            "ACTIVE",
+            "STALLED",
+            "RETRY_WAIT",
+            "RETRY_READY",
+            "RECOVERY",
+            "COMPLETED",
+            "CLEANED"
+          ]
+        },
+        "workspace_id": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "heartbeat_at": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "format": "date-time"
+        },
+        "expires_at": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "format": "date-time"
+        },
+        "retry_count": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "next_retry_at": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "format": "date-time"
+        }
+      }
+    },
+    "snapshot": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "observed_at",
+        "valid_until",
+        "source_main_sha",
+        "evidence_digest"
+      ],
+      "properties": {
+        "observed_at": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "format": "date-time"
+        },
+        "valid_until": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "format": "date-time"
+        },
+        "source_main_sha": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "pattern": "^[0-9a-f]{40}$"
+        },
+        "evidence_digest": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "pattern": "^[0-9a-f]{64}$"
+        }
+      }
+    },
+    "ci_metrics": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "status",
+        "observed_at",
+        "runs",
+        "p50_duration_seconds",
+        "p95_duration_seconds",
+        "p95_time_to_first_failure_seconds",
+        "p95_queue_seconds",
+        "flake_rate"
+      ],
+      "properties": {
+        "status": {
+          "enum": [
+            "VERIFIED",
+            "NOT_VERIFIED",
+            "STALE"
+          ]
+        },
+        "observed_at": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "format": "date-time"
+        },
+        "runs": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "p50_duration_seconds": {
+          "type": [
+            "number",
+            "null"
+          ],
+          "minimum": 0
+        },
+        "p95_duration_seconds": {
+          "type": [
+            "number",
+            "null"
+          ],
+          "minimum": 0
+        },
+        "p95_time_to_first_failure_seconds": {
+          "type": [
+            "number",
+            "null"
+          ],
+          "minimum": 0
+        },
+        "p95_queue_seconds": {
+          "type": [
+            "number",
+            "null"
+          ],
+          "minimum": 0
+        },
+        "flake_rate": {
+          "type": [
+            "number",
+            "null"
+          ],
+          "minimum": 0,
+          "maximum": 1
+        }
+      }
+    },
+    "cost_usage": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "status",
+        "capability",
+        "observed_at",
+        "hosted_minutes_used",
+        "hosted_minutes_internal_hard",
+        "artifact_mb",
+        "cache_mb"
+      ],
+      "properties": {
+        "status": {
+          "enum": [
+            "ALLOW_ZERO_COST",
+            "BLOCK_UNKNOWN",
+            "BLOCK_QUOTA",
+            "BLOCK_PAID",
+            "NOT_VERIFIED",
+            "STALE"
+          ]
+        },
+        "capability": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "observed_at": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "format": "date-time"
+        },
+        "hosted_minutes_used": {
+          "type": [
+            "number",
+            "null"
+          ],
+          "minimum": 0
+        },
+        "hosted_minutes_internal_hard": {
+          "type": [
+            "number",
+            "null"
+          ],
+          "minimum": 0
+        },
+        "artifact_mb": {
+          "type": [
+            "number",
+            "null"
+          ],
+          "minimum": 0
+        },
+        "cache_mb": {
+          "type": [
+            "number",
+            "null"
+          ],
+          "minimum": 0
+        }
+      }
+    },
+    "project_projection": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "status",
+        "observed_at",
+        "project_id",
+        "item_id"
+      ],
+      "properties": {
+        "status": {
+          "enum": [
+            "PASS",
+            "FAIL",
+            "NOT_VERIFIED",
+            "STALE",
+            "N/A"
+          ]
+        },
+        "observed_at": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "format": "date-time"
+        },
+        "project_id": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "item_id": {
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      }
+    },
+    "incident_knowledge": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "status",
+        "incident_count",
+        "open_count",
+        "repeated_count",
+        "latest_incident_id",
+        "store_digest"
+      ],
+      "properties": {
+        "status": {
+          "enum": [
+            "NOT_CONFIGURED",
+            "VERIFIED",
+            "STALE",
+            "BROKEN"
+          ]
+        },
+        "incident_count": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "open_count": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "repeated_count": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "latest_incident_id": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "pattern": "^INC-[0-9]{8}-[0-9a-f]{12}(-[0-9]+)?$"
+        },
+        "store_digest": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "format": "sha256"
+        }
+      }
+    },
+    "safe_healing": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "status",
+        "level",
+        "last_decision",
+        "circuit_open",
+        "active_recipe"
+      ],
+      "properties": {
+        "status": {
+          "enum": [
+            "NOT_CONFIGURED",
+            "IDLE",
+            "EVALUATING",
+            "HEALING",
+            "VERIFIED",
+            "BLOCKED",
+            "HUMAN_REQUIRED",
+            "QUARANTINED"
+          ]
+        },
+        "level": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "enum": [
+            "H0",
+            "H1",
+            "H2",
+            "H3",
+            "H4",
+            "H5",
+            "H6",
+            null
+          ]
+        },
+        "last_decision": {
+          "type": [
+            "object",
+            "null"
+          ],
+          "additionalProperties": false,
+          "properties": {
+            "result": {
+              "type": "string"
+            },
+            "reason_codes": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            }
+          }
+        },
+        "circuit_open": {
+          "type": "boolean"
+        },
+        "active_recipe": {
+          "type": [
+            "object",
+            "null"
+          ],
+          "additionalProperties": false,
+          "required": [
+            "recipe_id",
+            "version",
+            "digest"
+          ],
+          "properties": {
+            "recipe_id": {
+              "type": "string"
+            },
+            "version": {
+              "type": "string"
+            },
+            "digest": {
+              "type": "string",
+              "format": "sha256"
+            }
+          }
+        }
+      }
+    },
+    "owner_experience": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "product_brief",
+        "current_preview",
+        "acceptance",
+        "release_summary_ru"
+      ],
+      "properties": {
+        "product_brief": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "status",
+            "brief_id",
+            "goal_ru"
+          ],
+          "properties": {
+            "status": {
+              "enum": [
+                "NOT_CONFIGURED",
+                "READY",
+                "STALE"
+              ]
+            },
+            "brief_id": {
+              "type": [
+                "string",
+                "null"
+              ],
+              "pattern": "^BRIEF-[0-9a-f]{16}$"
+            },
+            "goal_ru": {
+              "type": [
+                "string",
+                "null"
+              ]
+            }
+          }
+        },
+        "current_preview": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "status",
+            "head_sha",
+            "preview_digest",
+            "url"
+          ],
+          "properties": {
+            "status": {
+              "enum": [
+                "READY",
+                "FAILED",
+                "STALE",
+                "NOT_VERIFIED"
+              ]
+            },
+            "head_sha": {
+              "type": [
+                "string",
+                "null"
+              ],
+              "pattern": "^[0-9a-f]{40}$"
+            },
+            "preview_digest": {
+              "type": [
+                "string",
+                "null"
+              ],
+              "format": "sha256"
+            },
+            "url": {
+              "type": [
+                "string",
+                "null"
+              ]
+            }
+          }
+        },
+        "acceptance": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "status",
+            "brief_id",
+            "head_sha",
+            "preview_digest",
+            "decided_at",
+            "decided_by",
+            "note_ru",
+            "stale_reason"
+          ],
+          "properties": {
+            "status": {
+              "enum": [
+                "PENDING",
+                "ACCEPTED",
+                "CHANGES_REQUESTED",
+                "DEFERRED",
+                "STALE",
+                "NOT_REQUIRED"
+              ]
+            },
+            "brief_id": {
+              "type": [
+                "string",
+                "null"
+              ],
+              "pattern": "^BRIEF-[0-9a-f]{16}$"
+            },
+            "head_sha": {
+              "type": [
+                "string",
+                "null"
+              ],
+              "pattern": "^[0-9a-f]{40}$"
+            },
+            "preview_digest": {
+              "type": [
+                "string",
+                "null"
+              ],
+              "format": "sha256"
+            },
+            "decided_at": {
+              "type": [
+                "string",
+                "null"
+              ],
+              "format": "date-time"
+            },
+            "decided_by": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "note_ru": {
+              "type": "string"
+            },
+            "stale_reason": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "policy_hash": {
+              "type": [
+                "string",
+                "null"
+              ],
+              "format": "sha256"
+            },
+            "authority": {
+              "type": [
+                "string",
+                "null"
+              ],
+              "enum": [
+                "OWNER",
+                null
+              ]
+            },
+            "nonce": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "source": {
+              "type": [
+                "string",
+                "null"
+              ],
+              "enum": [
+                "LOCAL_AUTHENTICATED",
+                "GITHUB_AUTHENTICATED",
+                null
+              ]
+            },
+            "provider_readback": {
+              "type": [
+                "boolean",
+                "null"
+              ]
+            }
+          }
+        },
+        "release_summary_ru": {
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      }
+    },
+    "owner_decisions": {
+      "type": "array",
+      "uniqueItems": true,
+      "items": {
+        "type": "string",
+        "minLength": 3
+      }
+    },
+    "release": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "latest",
+        "commit",
+        "health"
+      ],
+      "properties": {
+        "latest": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "commit": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "pattern": "^[0-9a-f]{40}$"
+        },
+        "health": {
+          "enum": [
+            "PASS",
+            "FAIL",
+            "NOT_VERIFIED",
+            "STALE"
+          ]
+        }
+      }
+    },
+    "gates": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "ci",
+        "review",
+        "docs",
+        "smoke",
+        "reality",
+        "roadmap_quality"
+      ],
+      "properties": {
+        "ci": {
+          "enum": [
+            "PASS",
+            "FAIL",
+            "NOT_VERIFIED",
+            "STALE",
+            "N/A"
+          ]
+        },
+        "review": {
+          "enum": [
+            "PASS",
+            "FAIL",
+            "NOT_VERIFIED",
+            "STALE",
+            "N/A"
+          ]
+        },
+        "docs": {
+          "enum": [
+            "PASS",
+            "FAIL",
+            "NOT_VERIFIED",
+            "STALE",
+            "N/A"
+          ]
+        },
+        "smoke": {
+          "enum": [
+            "PASS",
+            "FAIL",
+            "NOT_VERIFIED",
+            "STALE",
+            "N/A"
+          ]
+        },
+        "reality": {
+          "enum": [
+            "PASS",
+            "FAIL",
+            "NOT_VERIFIED",
+            "STALE",
+            "N/A"
+          ]
+        },
+        "roadmap_quality": {
+          "enum": [
+            "PASS",
+            "FAIL",
+            "NOT_VERIFIED",
+            "STALE",
+            "N/A"
+          ]
+        }
+      }
+    },
+    "blockers": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "last_reconciled_at": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "format": "date-time"
+    },
+    "last_verified_at": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "format": "date-time"
+    }
+  }
+}

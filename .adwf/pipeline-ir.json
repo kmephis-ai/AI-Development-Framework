@@ -1,0 +1,98 @@
+{
+  "$schema": "./schemas/pipeline-ir.schema.json",
+  "schema_version": 3,
+  "framework_version": "1.6.0",
+  "profile": "FREE_PUBLIC_GITHUB",
+  "provider": "github",
+  "repository_visibility": "PUBLIC",
+  "runner": {
+    "executor": "GITHUB_HOSTED_STANDARD",
+    "label": "ubuntu-24.04",
+    "larger_runners": "BLOCK"
+  },
+  "cost": {
+    "mode": "FREE_ONLY",
+    "projected_cost_usd": 0,
+    "mandatory_ai_api_calls": 0,
+    "cache": "DISABLED_BY_DEFAULT",
+    "artifacts": "DISABLED_BY_DEFAULT"
+  },
+  "lanes": {
+    "pr": {
+      "job": "fast-feedback",
+      "trusted": false,
+      "cancel_superseded": true,
+      "permissions": [
+        "contents:read"
+      ]
+    },
+    "trusted": {
+      "job": "trusted-gate",
+      "trusted": true,
+      "cancel_superseded": false,
+      "checkout": "DEFAULT_BRANCH_ONLY",
+      "execute_pr_code": false
+    },
+    "main": {
+      "job": "canonical-verification",
+      "trusted": true,
+      "cancel_superseded": true
+    },
+    "release": {
+      "job": "release",
+      "trusted": true,
+      "cancel_superseded": false,
+      "human_gate": true
+    }
+  },
+  "required_checks": [
+    "fast-feedback",
+    "adwf/governance-gate",
+    "adwf/trusted-gate"
+  ],
+  "impact_router": {
+    "enabled": true,
+    "full_framework_paths": [
+      ".adwf/**",
+      ".github/workflows/adwf-*",
+      "AGENTS.md",
+      "ADWS.md",
+      "SPECIFICATION.md",
+      "SECURITY.md"
+    ],
+    "preview_on_ui_impact": true
+  },
+  "platform_smoke": {
+    "linux": "ubuntu-24.04",
+    "windows": "windows-2022",
+    "functional_http": true
+  },
+  "preview": {
+    "engine": "PLAYWRIGHT",
+    "version": "1.62.0",
+    "viewports": [
+      "desktop",
+      "mobile"
+    ],
+    "mandatory_on_ui_impact": true
+  },
+  "durability": {
+    "hosted_runtime_store": "GITHUB_PUBLIC_SAFE_PROJECTION",
+    "hash_chain": true,
+    "restore_before_step": true,
+    "persist_after_step": true,
+    "private_work_memory": "LOCAL_OR_OWNER_CONTROLLED"
+  },
+  "runtime": {
+    "python_exact": "3.12.13"
+  },
+  "trust_boundary": {
+    "default_branch_classifier": true,
+    "governance_exact_head_admin_approval": true
+  },
+  "executors": {
+    "registry": "ActionExecutorRegistry",
+    "all_phases_registered": true,
+    "creative_adapter_optional": true
+  }
+}

@@ -1,0 +1,303 @@
+{
+  "version": "1.6.0",
+  "name": "ADWF Control Center",
+  "fields": [
+    {
+      "name": "Состояние ADWF",
+      "type": "single_select",
+      "options": [
+        "BACKLOG",
+        "SPECIFIED",
+        "READY",
+        "CLAIMED",
+        "IN_PROGRESS",
+        "REVIEW",
+        "VERIFICATION",
+        "BLOCKED",
+        "HOLD",
+        "HUMAN_REQUIRED",
+        "RECOVERY",
+        "DONE",
+        "CANCELLED"
+      ]
+    },
+    {
+      "name": "Roadmap ID",
+      "type": "text"
+    },
+    {
+      "name": "Приоритет",
+      "type": "single_select",
+      "options": [
+        "P0",
+        "P1",
+        "P2",
+        "P3"
+      ]
+    },
+    {
+      "name": "Риск",
+      "type": "single_select",
+      "options": [
+        "R0",
+        "R1",
+        "R2",
+        "R3",
+        "R4"
+      ]
+    },
+    {
+      "name": "Автономность",
+      "type": "single_select",
+      "options": [
+        "A0",
+        "A1",
+        "A2",
+        "A3",
+        "A4_HUMAN_ONLY"
+      ]
+    },
+    {
+      "name": "Тип работы",
+      "type": "single_select",
+      "options": [
+        "feature",
+        "bug",
+        "recovery",
+        "verification",
+        "governance",
+        "docs",
+        "migration"
+      ]
+    },
+    {
+      "name": "Writer",
+      "type": "text"
+    },
+    {
+      "name": "Lease ID",
+      "type": "text"
+    },
+    {
+      "name": "Lease до",
+      "type": "date"
+    },
+    {
+      "name": "Контур конфликта",
+      "type": "text"
+    },
+    {
+      "name": "Product Health",
+      "type": "single_select",
+      "options": [
+        "VERIFIED",
+        "HEALTHY",
+        "DEGRADED",
+        "BROKEN",
+        "NOT_VERIFIED",
+        "STALE"
+      ]
+    },
+    {
+      "name": "Machine Verified",
+      "type": "single_select",
+      "options": [
+        "VERIFIED",
+        "NOT_VERIFIED",
+        "STALE"
+      ]
+    },
+    {
+      "name": "Owner Accepted",
+      "type": "single_select",
+      "options": [
+        "PENDING",
+        "ACCEPTED",
+        "CHANGES_REQUESTED",
+        "DEFERRED",
+        "STALE",
+        "NOT_REQUIRED"
+      ]
+    },
+    {
+      "name": "Preview",
+      "type": "text"
+    },
+    {
+      "name": "Открытые инциденты",
+      "type": "number"
+    },
+    {
+      "name": "Safe Healing",
+      "type": "single_select",
+      "options": [
+        "NOT_CONFIGURED",
+        "IDLE",
+        "EVALUATING",
+        "HEALING",
+        "VERIFIED",
+        "BLOCKED",
+        "HUMAN_REQUIRED",
+        "QUARANTINED"
+      ]
+    },
+    {
+      "name": "Control Plane",
+      "type": "single_select",
+      "options": [
+        "VERIFIED",
+        "BROKEN",
+        "NOT_VERIFIED",
+        "STALE"
+      ]
+    },
+    {
+      "name": "Свежесть snapshot",
+      "type": "single_select",
+      "options": [
+        "FRESH",
+        "STALE",
+        "NOT_VERIFIED"
+      ]
+    },
+    {
+      "name": "Snapshot до",
+      "type": "date"
+    },
+    {
+      "name": "Verification",
+      "type": "single_select",
+      "options": [
+        "NOT_VERIFIED",
+        "IN_PROGRESS",
+        "PASS",
+        "FAIL",
+        "STALE",
+        "N/A"
+      ]
+    },
+    {
+      "name": "Workspace",
+      "type": "single_select",
+      "options": [
+        "NOT_CONFIGURED",
+        "ACTIVE",
+        "STALLED",
+        "RETRY_WAIT",
+        "RETRY_READY",
+        "RECOVERY",
+        "COMPLETED",
+        "CLEANED"
+      ]
+    },
+    {
+      "name": "Provider",
+      "type": "text"
+    },
+    {
+      "name": "Cost Guard",
+      "type": "single_select",
+      "options": [
+        "ALLOW_ZERO_COST",
+        "BLOCK_UNKNOWN",
+        "BLOCK_QUOTA",
+        "BLOCK_PAID",
+        "NOT_VERIFIED",
+        "STALE"
+      ]
+    },
+    {
+      "name": "Verification Gap %",
+      "type": "number"
+    },
+    {
+      "name": "CI p95 sec",
+      "type": "number"
+    },
+    {
+      "name": "CI flake %",
+      "type": "number"
+    },
+    {
+      "name": "Hosted minutes",
+      "type": "number"
+    },
+    {
+      "name": "Minutes hard",
+      "type": "number"
+    },
+    {
+      "name": "Artifacts MB",
+      "type": "number"
+    },
+    {
+      "name": "Cache MB",
+      "type": "number"
+    },
+    {
+      "name": "Требует владельца",
+      "type": "single_select",
+      "options": [
+        "NO",
+        "YES"
+      ]
+    },
+    {
+      "name": "Следующее действие",
+      "type": "text"
+    }
+  ],
+  "views": [
+    {
+      "name": "Главное для владельца",
+      "layout": "table",
+      "filter": "status:open"
+    },
+    {
+      "name": "Посмотреть и принять",
+      "layout": "table",
+      "filter": "owner_acceptance:PENDING,STALE,CHANGES_REQUESTED"
+    },
+    {
+      "name": "Инциденты и восстановление",
+      "layout": "table",
+      "filter": "incident_open:>0 OR healing:HUMAN_REQUIRED,QUARANTINED"
+    },
+    {
+      "name": "Требует владельца",
+      "filter": "human_required:YES"
+    },
+    {
+      "name": "Сейчас",
+      "filter": "state:CLAIMED,IN_PROGRESS,REVIEW,VERIFICATION,RECOVERY"
+    },
+    {
+      "name": "Roadmap и риски",
+      "layout": "roadmap"
+    },
+    {
+      "name": "Готово к работе",
+      "filter": "state:READY"
+    },
+    {
+      "name": "Качество и Reality",
+      "layout": "table"
+    },
+    {
+      "name": "Безопасность и стоимость",
+      "layout": "table"
+    },
+    {
+      "name": "CI performance",
+      "layout": "table"
+    },
+    {
+      "name": "Releases и deployments",
+      "layout": "table"
+    },
+    {
+      "name": "Debt и Architecture",
+      "layout": "table"
+    }
+  ]
+}

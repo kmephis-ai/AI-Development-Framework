@@ -1,0 +1,501 @@
+{
+  "$schema": "./schemas/providers.schema.json",
+  "schema_version": 3,
+  "hard_budget_usd": 0,
+  "allow_overage": false,
+  "allow_credit_purchase": false,
+  "allow_metered_provider": false,
+  "allow_unknown_provider": false,
+  "quota_evidence_ttl_minutes": 60,
+  "providers": {
+    "local_deterministic": {
+      "provider_id": "local",
+      "capability_id": "deterministic_ci",
+      "provider_mode": "local",
+      "plane": "ci",
+      "enabled": true,
+      "classification": "FREE_VERIFIED",
+      "billing_model": "none",
+      "repository_visibility_scope": "ANY",
+      "execution_class": "LOCAL",
+      "zero_cost_requirements": [
+        "No external billing provider is invoked"
+      ],
+      "requires_ai_api": false,
+      "mandatory_ci_allowed": true,
+      "automatic_execution_allowed": true,
+      "official_source_url": "https://docs.python.org/3/library/unittest.html",
+      "plan_scope": "Локальный Python runtime владельца",
+      "required_credentials": [],
+      "required_permissions": [
+        "read repository workspace"
+      ],
+      "hard_limit_mechanism": "Нет внешнего billing provider; запускается только локальный детерминированный код.",
+      "verified_at": "2026-08-13T00:00:00Z",
+      "valid_until": "2030-01-01T00:00:00Z",
+      "outbound_domains": [],
+      "data_handling": "Данные не покидают локальную машину.",
+      "deterministic_fallback": "Остановить проверку и показать локальную ошибку.",
+      "internal_limits": {}
+    },
+    "github_self_hosted": {
+      "provider_id": "github",
+      "capability_id": "actions_self_hosted",
+      "provider_mode": "github",
+      "plane": "ci",
+      "enabled": true,
+      "classification": "OWNER_PROVIDED",
+      "billing_model": "owner_provided",
+      "repository_visibility_scope": "ANY",
+      "execution_class": "SELF_HOSTED",
+      "zero_cost_requirements": [
+        "Fresh owner-resource attestation",
+        "No metered cloud provisioning"
+      ],
+      "requires_ai_api": false,
+      "mandatory_ci_allowed": true,
+      "automatic_execution_allowed": true,
+      "official_source_url": "https://docs.github.com/en/actions/concepts/runners/self-hosted-runners",
+      "plan_scope": "GitHub Actions на отдельном self-hosted runner владельца",
+      "required_credentials": [
+        "GitHub runner registration token"
+      ],
+      "required_permissions": [
+        "dedicated ephemeral untrusted runner",
+        "separate trusted runner"
+      ],
+      "hard_limit_mechanism": "GitHub-hosted minutes не расходуются; автоматическое cloud provisioning запрещено.",
+      "verified_at": "2026-08-13T00:00:00Z",
+      "valid_until": "2026-09-13T00:00:00Z",
+      "outbound_domains": [
+        "github.com",
+        "api.github.com",
+        "objects.githubusercontent.com"
+      ],
+      "data_handling": "PR-код выполняется только в одноразовом изолированном runner без secrets и доступа к production.",
+      "deterministic_fallback": "Локальные проверки; trusted mutation остаётся BLOCKED.",
+      "internal_limits": {
+        "max_parallel_jobs": 2
+      }
+    },
+    "gitlab_self_hosted": {
+      "provider_id": "gitlab",
+      "capability_id": "ci_self_hosted",
+      "provider_mode": "gitlab",
+      "plane": "ci",
+      "enabled": false,
+      "classification": "OWNER_PROVIDED",
+      "billing_model": "owner_provided",
+      "repository_visibility_scope": "ANY",
+      "execution_class": "SELF_HOSTED",
+      "zero_cost_requirements": [
+        "Fresh owner-resource attestation",
+        "No metered cloud provisioning"
+      ],
+      "requires_ai_api": false,
+      "mandatory_ci_allowed": true,
+      "automatic_execution_allowed": true,
+      "official_source_url": "https://docs.gitlab.com/ci/runners/",
+      "plan_scope": "GitLab CI на отдельном self-managed runner владельца",
+      "required_credentials": [
+        "GitLab runner authentication token",
+        "protected masked ADWF_GITLAB_TOKEN with read_api"
+      ],
+      "required_permissions": [
+        "dedicated ephemeral untrusted runner",
+        "separate protected trusted runner"
+      ],
+      "hard_limit_mechanism": "Shared compute minutes не используются; автоматическое cloud provisioning запрещено.",
+      "verified_at": "2026-08-13T00:00:00Z",
+      "valid_until": "2026-09-13T00:00:00Z",
+      "outbound_domains": [
+        "gitlab.com"
+      ],
+      "data_handling": "MR-код выполняется только в одноразовом изолированном runner без protected variables.",
+      "deterministic_fallback": "Локальные проверки; trusted mutation остаётся BLOCKED.",
+      "internal_limits": {
+        "max_parallel_jobs": 2
+      }
+    },
+    "github_public_standard": {
+      "provider_id": "github",
+      "capability_id": "actions_public_standard",
+      "provider_mode": "github",
+      "plane": "ci",
+      "enabled": true,
+      "classification": "FREE_VERIFIED",
+      "billing_model": "none",
+      "repository_visibility_scope": "PUBLIC_ONLY",
+      "execution_class": "STANDARD_HOSTED",
+      "zero_cost_requirements": [
+        "Repository visibility is PUBLIC",
+        "Runner is a standard GitHub-hosted runner"
+      ],
+      "requires_ai_api": false,
+      "mandatory_ci_allowed": true,
+      "automatic_execution_allowed": true,
+      "official_source_url": "https://docs.github.com/en/actions/reference/runners/github-hosted-runners",
+      "plan_scope": "Только public repository и standard GitHub-hosted runner",
+      "required_credentials": [
+        "GITHUB_TOKEN"
+      ],
+      "required_permissions": [
+        "contents: read"
+      ],
+      "hard_limit_mechanism": "Standard GitHub-hosted runners для public repositories бесплатны; larger runners запрещены.",
+      "verified_at": "2026-08-13T00:00:00Z",
+      "valid_until": "2026-09-13T00:00:00Z",
+      "outbound_domains": [
+        "github.com",
+        "api.github.com",
+        "objects.githubusercontent.com"
+      ],
+      "data_handling": "Исходный код публичен; включение требует отдельного решения владельца о раскрытии.",
+      "deterministic_fallback": "Локальные детерминированные проверки; trusted mutation остаётся BLOCKED до GitHub readback.",
+      "internal_limits": {
+        "larger_runners_allowed": false
+      }
+    },
+    "github_private_free_quota": {
+      "provider_id": "github",
+      "capability_id": "actions_private_standard",
+      "provider_mode": "github",
+      "plane": "ci",
+      "enabled": false,
+      "classification": "INCLUDED_QUOTA",
+      "billing_model": "free_quota",
+      "repository_visibility_scope": "PRIVATE_ONLY",
+      "execution_class": "STANDARD_HOSTED",
+      "zero_cost_requirements": [
+        "Repository visibility is PRIVATE",
+        "Fresh account quota and storage evidence",
+        "Overage is disabled"
+      ],
+      "requires_ai_api": false,
+      "mandatory_ci_allowed": true,
+      "automatic_execution_allowed": true,
+      "official_source_url": "https://docs.github.com/en/actions/reference/limits",
+      "plan_scope": "GitHub Free private repositories, общий лимит аккаунта/организации",
+      "required_credentials": [
+        "GITHUB_TOKEN"
+      ],
+      "required_permissions": [
+        "contents: read",
+        "billing budget stop usage"
+      ],
+      "hard_limit_mechanism": "Budget stop usage и allow_overage=false; без подтверждения hosted job блокируется.",
+      "verified_at": "2026-08-13T00:00:00Z",
+      "valid_until": "2026-09-13T00:00:00Z",
+      "outbound_domains": [
+        "github.com",
+        "api.github.com",
+        "objects.githubusercontent.com"
+      ],
+      "data_handling": "Private repository; PR job не получает secrets.",
+      "deterministic_fallback": "Self-hosted или локальные проверки.",
+      "internal_limits": {
+        "platform_minutes": 2000,
+        "normal_minutes": 1400,
+        "hard_minutes": 1600,
+        "recovery_reserve_minutes": 400,
+        "artifact_warning_mb": 250,
+        "artifact_stop_mb": 350,
+        "cache_stop_mb": 2048,
+        "max_parallel_jobs": 3,
+        "packages_enabled": false,
+        "larger_runners_allowed": false
+      }
+    },
+    "gitlab_shared_free_quota": {
+      "provider_id": "gitlab",
+      "capability_id": "shared_compute_free",
+      "provider_mode": "gitlab",
+      "plane": "ci",
+      "enabled": false,
+      "classification": "INCLUDED_QUOTA",
+      "billing_model": "free_quota",
+      "repository_visibility_scope": "ANY",
+      "execution_class": "STANDARD_HOSTED",
+      "zero_cost_requirements": [
+        "Fresh namespace compute quota evidence",
+        "Purchased compute is disabled"
+      ],
+      "requires_ai_api": false,
+      "mandatory_ci_allowed": true,
+      "automatic_execution_allowed": true,
+      "official_source_url": "https://docs.gitlab.com/ci/pipelines/compute_minutes/",
+      "plan_scope": "GitLab Free shared runners",
+      "required_credentials": [
+        "CI_JOB_TOKEN"
+      ],
+      "required_permissions": [
+        "protected variables excluded from MR jobs"
+      ],
+      "hard_limit_mechanism": "Internal hard limit ниже platform quota; overage и purchased compute запрещены.",
+      "verified_at": "2026-08-13T00:00:00Z",
+      "valid_until": "2026-09-13T00:00:00Z",
+      "outbound_domains": [
+        "gitlab.com"
+      ],
+      "data_handling": "MR job не получает protected variables.",
+      "deterministic_fallback": "Self-managed или локальные проверки.",
+      "internal_limits": {
+        "platform_minutes": 400,
+        "normal_minutes": 280,
+        "hard_minutes": 320,
+        "recovery_reserve_minutes": 80,
+        "max_parallel_jobs": 2
+      }
+    },
+    "chatgpt_codex_subscription": {
+      "provider_id": "openai",
+      "capability_id": "interactive_writer_reviewer",
+      "provider_mode": "openai",
+      "plane": "ai",
+      "enabled": false,
+      "classification": "CONDITIONAL_FREE",
+      "billing_model": "included_subscription",
+      "repository_visibility_scope": "NOT_APPLICABLE",
+      "execution_class": "INTERACTIVE",
+      "zero_cost_requirements": [
+        "Active owner subscription",
+        "Interactive use only",
+        "Automatic credit purchase is disabled"
+      ],
+      "requires_ai_api": false,
+      "mandatory_ci_allowed": false,
+      "automatic_execution_allowed": false,
+      "official_source_url": "https://learn.chatgpt.com/docs/pricing",
+      "plan_scope": "Только действующая подписка владельца; usage reset без автоматической покупки credits",
+      "required_credentials": [
+        "ChatGPT subscription session"
+      ],
+      "required_permissions": [
+        "interactive user session"
+      ],
+      "hard_limit_mechanism": "auto_credit_purchase=false; при исчерпании usage ожидать reset.",
+      "verified_at": "2026-08-13T00:00:00Z",
+      "valid_until": "2026-09-13T00:00:00Z",
+      "outbound_domains": [
+        "chatgpt.com"
+      ],
+      "data_handling": "Код передаётся в разрешённую владельцем ChatGPT-сессию; API key не используется.",
+      "deterministic_fallback": "Mandatory deterministic CI продолжает работать без AI provider.",
+      "internal_limits": {
+        "auto_credit_purchase": false
+      }
+    },
+    "openai_api": {
+      "provider_id": "openai",
+      "capability_id": "api_inference",
+      "provider_mode": "openai",
+      "plane": "ai",
+      "enabled": false,
+      "classification": "METERED",
+      "billing_model": "metered",
+      "repository_visibility_scope": "NOT_APPLICABLE",
+      "execution_class": "METERED_API",
+      "zero_cost_requirements": [
+        "Never eligible in FREE_ONLY mode"
+      ],
+      "requires_ai_api": true,
+      "mandatory_ci_allowed": false,
+      "automatic_execution_allowed": false,
+      "official_source_url": "https://openai.com/api/pricing/",
+      "plan_scope": "Usage-based API",
+      "required_credentials": [
+        "OPENAI_API_KEY"
+      ],
+      "required_permissions": [
+        "external API billing"
+      ],
+      "hard_limit_mechanism": "FREE_ONLY всегда блокирует metered API.",
+      "verified_at": "2026-08-13T00:00:00Z",
+      "valid_until": "2026-09-13T00:00:00Z",
+      "outbound_domains": [
+        "api.openai.com"
+      ],
+      "data_handling": "Внешняя передача данных и usage-based billing.",
+      "deterministic_fallback": "Interactive subscription при отдельном разрешении либо работа без AI.",
+      "internal_limits": {}
+    },
+    "github_larger_runner": {
+      "provider_id": "github",
+      "capability_id": "larger_runner",
+      "provider_mode": "github",
+      "plane": "ci",
+      "enabled": false,
+      "classification": "PAID",
+      "billing_model": "metered",
+      "repository_visibility_scope": "ANY",
+      "execution_class": "LARGER_HOSTED",
+      "zero_cost_requirements": [
+        "Never eligible in FREE_ONLY mode"
+      ],
+      "requires_ai_api": false,
+      "mandatory_ci_allowed": false,
+      "automatic_execution_allowed": false,
+      "official_source_url": "https://docs.github.com/en/billing/concepts/product-billing/github-actions",
+      "plan_scope": "GitHub-hosted larger runners",
+      "required_credentials": [
+        "payment method"
+      ],
+      "required_permissions": [
+        "billing"
+      ],
+      "hard_limit_mechanism": "FREE_ONLY всегда блокирует larger runners.",
+      "verified_at": "2026-08-13T00:00:00Z",
+      "valid_until": "2026-09-13T00:00:00Z",
+      "outbound_domains": [
+        "github.com"
+      ],
+      "data_handling": "GitHub-hosted execution.",
+      "deterministic_fallback": "Standard или self-hosted runner.",
+      "internal_limits": {}
+    },
+    "github_public_branch_protection": {
+      "provider_id": "github",
+      "capability_id": "public_branch_protection",
+      "provider_mode": "github",
+      "plane": "governance",
+      "enabled": false,
+      "classification": "FREE_VERIFIED",
+      "billing_model": "none",
+      "repository_visibility_scope": "PUBLIC_ONLY",
+      "execution_class": "PLATFORM_CONTROL",
+      "zero_cost_requirements": [
+        "Repository visibility is PUBLIC",
+        "Owner configures protected branch or ruleset"
+      ],
+      "requires_ai_api": false,
+      "mandatory_ci_allowed": false,
+      "automatic_execution_allowed": false,
+      "official_source_url": "https://docs.github.com/en/repositories/configuring-branches-and-merges-in-your-repository/managing-protected-branches/about-protected-branches",
+      "plan_scope": "GitHub Free public repositories",
+      "required_credentials": [
+        "Owner or repository administrator session"
+      ],
+      "required_permissions": [
+        "Repository administration"
+      ],
+      "hard_limit_mechanism": "Enable only after live repository visibility and rules readback.",
+      "verified_at": "2026-08-13T00:00:00Z",
+      "valid_until": "2026-09-13T00:00:00Z",
+      "outbound_domains": [
+        "github.com",
+        "api.github.com"
+      ],
+      "data_handling": "Public repository governance metadata.",
+      "deterministic_fallback": "Process guard remains honest but cannot technically prevent a direct push.",
+      "internal_limits": {}
+    },
+    "github_private_branch_protection": {
+      "provider_id": "github",
+      "capability_id": "private_branch_protection",
+      "provider_mode": "github",
+      "plane": "governance",
+      "enabled": false,
+      "classification": "PAID",
+      "billing_model": "metered",
+      "repository_visibility_scope": "PRIVATE_ONLY",
+      "execution_class": "PLATFORM_CONTROL",
+      "zero_cost_requirements": [
+        "Never assumed available on GitHub Free private repositories"
+      ],
+      "requires_ai_api": false,
+      "mandatory_ci_allowed": false,
+      "automatic_execution_allowed": false,
+      "official_source_url": "https://docs.github.com/en/repositories/configuring-branches-and-merges-in-your-repository/managing-protected-branches/about-protected-branches",
+      "plan_scope": "Private repository requires an eligible paid GitHub plan",
+      "required_credentials": [
+        "Eligible GitHub plan",
+        "Owner or repository administrator session"
+      ],
+      "required_permissions": [
+        "Repository administration",
+        "Billing owner"
+      ],
+      "hard_limit_mechanism": "FREE_ONLY blocks activation; never advertise private platform enforcement without readback.",
+      "verified_at": "2026-08-13T00:00:00Z",
+      "valid_until": "2026-09-13T00:00:00Z",
+      "outbound_domains": [
+        "github.com",
+        "api.github.com"
+      ],
+      "data_handling": "Private repository governance metadata.",
+      "deterministic_fallback": "FREE_PRIVATE process guard plus human merge discipline, or public repository after explicit owner decision.",
+      "internal_limits": {}
+    },
+    "gitlab_free_protected_branches": {
+      "provider_id": "gitlab",
+      "capability_id": "free_protected_branches",
+      "provider_mode": "gitlab",
+      "plane": "governance",
+      "enabled": false,
+      "classification": "FREE_VERIFIED",
+      "billing_model": "none",
+      "repository_visibility_scope": "ANY",
+      "execution_class": "PLATFORM_CONTROL",
+      "zero_cost_requirements": [
+        "GitLab Free project",
+        "Owner configures protected branch"
+      ],
+      "requires_ai_api": false,
+      "mandatory_ci_allowed": false,
+      "automatic_execution_allowed": false,
+      "official_source_url": "https://docs.gitlab.com/user/project/repository/branches/protected/",
+      "plan_scope": "GitLab Free protected branches; required approval rules are a separate capability",
+      "required_credentials": [
+        "Maintainer or Owner session"
+      ],
+      "required_permissions": [
+        "Project administration"
+      ],
+      "hard_limit_mechanism": "Enable only after protected-branch readback; do not infer required approvals.",
+      "verified_at": "2026-08-13T00:00:00Z",
+      "valid_until": "2026-09-13T00:00:00Z",
+      "outbound_domains": [
+        "gitlab.com"
+      ],
+      "data_handling": "Project governance metadata.",
+      "deterministic_fallback": "Local/process guard with truthful limitation.",
+      "internal_limits": {}
+    },
+    "gitlab_required_approvals": {
+      "provider_id": "gitlab",
+      "capability_id": "required_merge_request_approvals",
+      "provider_mode": "gitlab",
+      "plane": "governance",
+      "enabled": false,
+      "classification": "PAID",
+      "billing_model": "metered",
+      "repository_visibility_scope": "ANY",
+      "execution_class": "PLATFORM_CONTROL",
+      "zero_cost_requirements": [
+        "Never assumed available on GitLab Free"
+      ],
+      "requires_ai_api": false,
+      "mandatory_ci_allowed": false,
+      "automatic_execution_allowed": false,
+      "official_source_url": "https://docs.gitlab.com/user/project/merge_requests/approvals/",
+      "plan_scope": "Required approval rules require an eligible GitLab tier",
+      "required_credentials": [
+        "Eligible GitLab plan",
+        "Maintainer or Owner session"
+      ],
+      "required_permissions": [
+        "Project administration",
+        "Billing owner"
+      ],
+      "hard_limit_mechanism": "FREE_ONLY blocks activation and never treats optional approval as required enforcement.",
+      "verified_at": "2026-08-13T00:00:00Z",
+      "valid_until": "2026-09-13T00:00:00Z",
+      "outbound_domains": [
+        "gitlab.com"
+      ],
+      "data_handling": "Project governance metadata.",
+      "deterministic_fallback": "Independent review remains process-gated and is reported as not platform-enforced.",
+      "internal_limits": {}
+    }
+  }
+}

@@ -1,0 +1,5 @@
+{
+  "case": "stale_review",
+  "review_sha": "abc123",
+  "head_sha": "def456"
+}

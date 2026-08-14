@@ -1,0 +1,34 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "ADWF evidence graph index projection",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "event_count", "head_event_sha256", "log_sha256", "generated_at", "records"],
+  "properties": {
+    "schema_version": {"const": 1},
+    "event_count": {"type": "integer", "minimum": 0},
+    "head_event_sha256": {"type": ["string", "null"], "format": "sha256"},
+    "log_sha256": {"type": "string", "format": "sha256"},
+    "generated_at": {"type": ["string", "null"], "format": "date-time"},
+    "records": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["key", "event_id", "sequence", "kind", "status", "sha", "runtime_revision", "created_at", "expires_at", "event_sha256"],
+        "properties": {
+          "key": {"type": "string", "minLength": 1},
+          "event_id": {"type": "string", "minLength": 8},
+          "sequence": {"type": "integer", "minimum": 1},
+          "kind": {"type": "string", "minLength": 1},
+          "status": {"type": "string", "minLength": 1},
+          "sha": {"type": ["string", "null"], "pattern": "^[0-9a-f]{40}$"},
+          "runtime_revision": {"type": ["string", "null"], "pattern": "^[0-9a-f]{40}$"},
+          "created_at": {"type": "string", "format": "date-time"},
+          "expires_at": {"type": "string", "format": "date-time"},
+          "event_sha256": {"type": "string", "format": "sha256"}
+        }
+      }
+    }
+  }
+}

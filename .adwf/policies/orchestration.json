@@ -1,0 +1,26 @@
+{
+  "version": "1.6.0",
+  "selection_order": [
+    "recovery",
+    "priority",
+    "roadmap_order",
+    "critical_path",
+    "lower_risk",
+    "oldest_ready"
+  ],
+  "parallelism": {
+    "R0_R1_verified": 1,
+    "R2": 1,
+    "R3": 1,
+    "R4": 0,
+    "DEGRADED": 0,
+    "BROKEN": 0,
+    "NOT_VERIFIED": 0,
+    "RECOVERY": 1
+  },
+  "merge": "SERIALIZED",
+  "claim": "LEASE_REQUIRED",
+  "same_issue_multi_writer": false,
+  "one_active_writer_default": true,
+  "conflict_domain_overlap": "SERIALIZE"
+}

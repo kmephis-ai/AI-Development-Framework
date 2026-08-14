@@ -1,0 +1,16 @@
+{
+  "action": "claim",
+  "autonomy": "A2",
+  "risk": "R0",
+  "max_autonomous_risk": "R1",
+  "work_type": "docs",
+  "health": {
+    "package_integrity": "VERIFIED",
+    "config_health": "VERIFIED",
+    "control_plane_health": "VERIFIED",
+    "product_health": "VERIFIED"
+  },
+  "provider_allowed": true,
+  "provider_potentially_paid": false,
+  "projected_cost": 0
+}

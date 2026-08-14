@@ -1,0 +1,10 @@
+{
+  "provider": "github_public_standard",
+  "mandatory_ci": true,
+  "projected_cost": 0,
+  "repository_visibility": "PUBLIC",
+  "runner": "ubuntu-24.04",
+  "larger_runner": false,
+  "runner_class": "standard",
+  "automated": true
+}

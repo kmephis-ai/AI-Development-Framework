@@ -1,0 +1,16 @@
+{
+  "case": "architecture_drift",
+  "snapshot": {
+    "product_health": "VERIFIED",
+    "metrics": {
+      "issues_total": 10,
+      "issues_done": 5,
+      "implementation": 0.5,
+      "verification": 0.5
+    },
+    "issues": [],
+    "architecture": {
+      "drift": "VIOLATION"
+    }
+  }
+}

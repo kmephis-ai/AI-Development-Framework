@@ -1,0 +1,20 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "ADWF append-only incident event",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "sequence", "event_id", "event_type", "observed_at", "previous_hash", "incident_id", "fingerprint_hash", "event_hash"],
+  "properties": {
+    "schema_version": {"const": 1},
+    "sequence": {"type": "integer", "minimum": 1},
+    "event_id": {"type": "string", "pattern": "^IEV-[0-9]{8}-[0-9a-f]{12}$"},
+    "event_type": {"enum": ["INCIDENT_RECORDED", "DUPLICATE_OBSERVED"]},
+    "observed_at": {"type": "string", "format": "date-time"},
+    "previous_hash": {"type": "string", "format": "sha256"},
+    "incident_id": {"type": "string"},
+    "fingerprint_hash": {"type": "string", "format": "sha256"},
+    "incident": {"type": "object"},
+    "duplicate_observation": {"type": "object"},
+    "event_hash": {"type": "string", "format": "sha256"}
+  }
+}

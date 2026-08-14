@@ -1,0 +1,22 @@
+{
+  "case": "agent_conflict",
+  "issue": {
+    "id": "UI-2",
+    "conflict_domains": [
+      "dashboard-ui"
+    ]
+  },
+  "leases": [
+    {
+      "issue_id": "UI-1",
+      "worker_id": "codex-a",
+      "conflict_domains": [
+        "dashboard-ui"
+      ],
+      "claimed_at": "2026-08-12T20:00:00Z",
+      "expires_at": "2099-08-12T22:00:00Z",
+      "base_sha": "abc1234",
+      "status": "ACTIVE"
+    }
+  ]
+}

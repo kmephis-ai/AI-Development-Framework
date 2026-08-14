@@ -1,0 +1,58 @@
+{
+  "id": "node",
+  "language": "javascript",
+  "detect": {
+    "files": [
+      "package.json"
+    ]
+  },
+  "commands": {
+    "lint": {
+      "command": [
+        "npm",
+        "run",
+        "lint"
+      ],
+      "requires_script": "lint",
+      "phases": [
+        "pr"
+      ]
+    },
+    "unit": {
+      "command": [
+        "npm",
+        "test"
+      ],
+      "requires_script": "test",
+      "phases": [
+        "pr",
+        "main"
+      ]
+    },
+    "build": {
+      "command": [
+        "npm",
+        "run",
+        "build"
+      ],
+      "requires_script": "build",
+      "phases": [
+        "pr",
+        "main"
+      ]
+    },
+    "install": {
+      "command": [
+        "npm",
+        "ci"
+      ],
+      "phases": [
+        "bootstrap",
+        "pr",
+        "runtime"
+      ],
+      "requires_file": "package-lock.json"
+    }
+  },
+  "preview": {}
+}

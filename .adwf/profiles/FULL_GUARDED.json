@@ -1,0 +1,44 @@
+{
+  "id": "FULL_GUARDED",
+  "description": "Repository, где владелец отдельно подтвердил доступность platform enforcement; профиль не подразумевает бесплатность private GitHub.",
+  "repository_scope": "PUBLIC_FREE_OR_OWNER_VERIFIED_PLATFORM_PLAN",
+  "enforcement_truth": "PLATFORM_CAPABILITY_MUST_BE_VERIFIED_BEFORE_ACTIVATION",
+  "github_private_branch_protection": "REQUIRES_SEPARATE_ELIGIBLE_PLAN_ATTESTATION",
+  "required_checks_truth": "PLATFORM_READBACK_REQUIRED",
+  "platform_enforcement": {
+    "protected_main": true,
+    "required_status_checks": true,
+    "required_review": true,
+    "environments": "RECOMMENDED_WHEN_AVAILABLE"
+  },
+  "policy_enforcement": {
+    "pr_only": true,
+    "required_ci_by_process": true,
+    "independent_review": true,
+    "auto_merge": "ALLOWED_FOR_R0_R1_AFTER_ALL_GATES",
+    "direct_main_push_forbidden": true
+  },
+  "default_autonomy": "A1",
+  "promotable_autonomy": "A2",
+  "max_autonomous_risk": "R1",
+  "recommended_ci_capability": "github_public_standard",
+  "allowed_capability_statuses": [
+    "FREE_VERIFIED",
+    "INCLUDED_QUOTA",
+    "CONDITIONAL_FREE",
+    "OWNER_PROVIDED"
+  ],
+  "forbidden_capability_statuses": [
+    "METERED",
+    "PAID",
+    "UNKNOWN",
+    "STALE"
+  ],
+  "github_hosted_minutes_policy": "PUBLIC_STANDARD_ONLY_OR_EXPLICIT_OWNER_ATTESTATION",
+  "larger_runners_allowed": false,
+  "mandatory_paid_ai_api": false,
+  "owner_resource_attestation_required": true,
+  "monetary_budget": 0,
+  "merge_rule": "Merge только после актуальных canonical CI/review/evidence; более строгая repository policy имеет приоритет.",
+  "deployment_rule": "Production deployment управляется отдельно; R4 остаётся Human-Gated."
+}

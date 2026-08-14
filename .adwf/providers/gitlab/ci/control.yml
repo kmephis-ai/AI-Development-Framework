@@ -1,0 +1,18 @@
+adwf:control-health:
+  stage: control
+  tags: [self-hosted, adwf-trusted]
+  timeout: 10m
+  needs: ["adwf:test"]
+  interruptible: false
+  resource_group: adwf-control
+  script:
+    - python3 .adwf/adwf.py provider-check --input .adwf/requests/gitlab-self-hosted.json
+    - python3 .adwf/scripts/gitlab_reconcile.py --apply
+    - python3 .adwf/adwf.py doctor --json
+  rules:
+    - if: '$CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH && $CI_PIPELINE_SOURCE == "push"'
+      allow_failure: false
+    - if: '$CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH && $CI_PIPELINE_SOURCE == "web"'
+      when: manual
+      allow_failure: false
+    - when: never

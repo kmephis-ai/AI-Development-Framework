@@ -1,0 +1,162 @@
+{
+  "$schema": "./schemas/project-state.schema.json",
+  "framework_version": "1.6.0",
+  "schema_version": 3,
+  "project": {
+    "name": "AI-Development-Framework",
+    "default_branch": "main"
+  },
+  "provider": {
+    "mode": "github",
+    "observed_at": null
+  },
+  "profile": "FREE_PUBLIC_GITHUB",
+  "status": "BOOTSTRAP",
+  "autonomy_level": "A1",
+  "risk_ceiling": "R1",
+  "health": {
+    "product": "NOT_VERIFIED",
+    "roadmap": "NOT_VERIFIED",
+    "architecture": "NOT_VERIFIED",
+    "security": "NOT_VERIFIED",
+    "debt": "NOT_VERIFIED",
+    "adwf": "NOT_VERIFIED"
+  },
+  "progress": {
+    "implementation": 0.0,
+    "verification": 0.0,
+    "product_readiness": 0.0,
+    "verification_gap": 0.0
+  },
+  "main": {
+    "head": null,
+    "health": "NOT_VERIFIED"
+  },
+  "runtime": {
+    "canonical_revision": null,
+    "smoke": "NOT_VERIFIED",
+    "golden_paths": "NOT_VERIFIED",
+    "last_reality_check": null
+  },
+  "orchestration": {
+    "writers_active": 0,
+    "reviewers_active": 0,
+    "leases_active": 0,
+    "conflicts": 0,
+    "merge_train": "IDLE"
+  },
+  "queue": {
+    "ready": 0,
+    "in_progress": 0,
+    "review": 0,
+    "blocked": 0,
+    "human_required": 0
+  },
+  "work_items": [],
+  "active": {
+    "roadmap_id": null,
+    "issue": null,
+    "pr": null,
+    "branch": null,
+    "writer": null,
+    "lease_id": null,
+    "state": null
+  },
+  "workspace": {
+    "status": "NOT_CONFIGURED",
+    "workspace_id": null,
+    "heartbeat_at": null,
+    "expires_at": null,
+    "retry_count": 0,
+    "next_retry_at": null
+  },
+  "snapshot": {
+    "observed_at": null,
+    "valid_until": null,
+    "source_main_sha": null,
+    "evidence_digest": null
+  },
+  "ci_metrics": {
+    "status": "NOT_VERIFIED",
+    "observed_at": null,
+    "runs": 0,
+    "p50_duration_seconds": null,
+    "p95_duration_seconds": null,
+    "p95_time_to_first_failure_seconds": null,
+    "p95_queue_seconds": null,
+    "flake_rate": null
+  },
+  "cost_usage": {
+    "status": "NOT_VERIFIED",
+    "capability": null,
+    "observed_at": null,
+    "hosted_minutes_used": null,
+    "hosted_minutes_internal_hard": null,
+    "artifact_mb": null,
+    "cache_mb": null
+  },
+  "project_projection": {
+    "status": "N/A",
+    "observed_at": null,
+    "project_id": null,
+    "item_id": null
+  },
+  "incident_knowledge": {
+    "status": "NOT_CONFIGURED",
+    "incident_count": 0,
+    "open_count": 0,
+    "repeated_count": 0,
+    "latest_incident_id": null,
+    "store_digest": null
+  },
+  "safe_healing": {
+    "status": "NOT_CONFIGURED",
+    "level": null,
+    "last_decision": null,
+    "circuit_open": false,
+    "active_recipe": null
+  },
+  "owner_experience": {
+    "product_brief": {
+      "status": "NOT_CONFIGURED",
+      "brief_id": null,
+      "goal_ru": null
+    },
+    "current_preview": {
+      "status": "NOT_VERIFIED",
+      "head_sha": null,
+      "preview_digest": null,
+      "url": null
+    },
+    "acceptance": {
+      "status": "PENDING",
+      "brief_id": null,
+      "head_sha": null,
+      "preview_digest": null,
+      "decided_at": null,
+      "decided_by": null,
+      "note_ru": "",
+      "stale_reason": null
+    },
+    "release_summary_ru": null
+  },
+  "owner_decisions": [],
+  "release": {
+    "latest": null,
+    "commit": null,
+    "health": "NOT_VERIFIED"
+  },
+  "gates": {
+    "ci": "NOT_VERIFIED",
+    "review": "NOT_VERIFIED",
+    "docs": "NOT_VERIFIED",
+    "smoke": "NOT_VERIFIED",
+    "reality": "NOT_VERIFIED",
+    "roadmap_quality": "NOT_VERIFIED"
+  },
+  "blockers": [
+    "До live reference cycle Control Plane, GitHub ruleset/readback, Preview execution, deployment и Product Health остаются NOT_VERIFIED."
+  ],
+  "last_reconciled_at": null,
+  "last_verified_at": null
+}

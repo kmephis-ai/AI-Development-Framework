@@ -1,0 +1,9 @@
+{
+  "provider": "github_private_free_quota", "mandatory_ci": true, "automated": true,
+  "repository_visibility": "PRIVATE", "runner_class": "standard",
+  "projected_cost": 0, "projected_units": 12,
+  "quota": {"used": 0, "limit": 2000, "observed_at": "CHANGE_ME_RFC3339", "hard_spend_limit_zero": true, "allow_overage": false},
+  "storage": {"artifact_mb": 0, "cache_mb": 0, "observed_at": "CHANGE_ME_RFC3339"},
+  "projected_artifact_mb": 0,
+  "projected_cache_mb": 0
+}

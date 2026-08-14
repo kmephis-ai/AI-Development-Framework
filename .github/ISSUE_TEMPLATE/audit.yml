@@ -1,0 +1,25 @@
+name: Независимый аудит
+description: Read-only аудит repository, subsystem, Roadmap или ADWF
+title: "[AUDIT] "
+labels: []
+body:
+  - type: textarea
+    id: target
+    attributes:
+      label: Объект аудита
+    validations:
+      required: true
+  - type: textarea
+    id: focus
+    attributes:
+      label: Фокус
+      description: Архитектура, тесты, security, performance, documentation, governance, Roadmap Quality и т.д.
+    validations:
+      required: true
+  - type: checkboxes
+    id: mode
+    attributes:
+      label: Режим
+      options:
+        - label: READ-ONLY. Не изменять repository во время аудита.
+          required: true

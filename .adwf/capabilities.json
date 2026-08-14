@@ -1,0 +1,159 @@
+{
+  "version": "1.6.0",
+  "capabilities": [
+    {
+      "id": "trusted_diff_classifier",
+      "title": "Base-branch trusted diff classifier",
+      "state": "VERIFIED",
+      "cost_status": "FREE_VERIFIED",
+      "mandatory": true,
+      "requires_paid_ai_api": false,
+      "acceptance_evidence": [
+        ".adwf/tests/test_trust.py"
+      ]
+    },
+    {
+      "id": "free_only_cost_guard",
+      "title": "Fail-closed zero-money provider guard",
+      "state": "VERIFIED",
+      "cost_status": "FREE_VERIFIED",
+      "mandatory": true,
+      "requires_paid_ai_api": false,
+      "acceptance_evidence": [
+        ".adwf/tests/test_cost_guard.py"
+      ]
+    },
+    {
+      "id": "recursive_docs_freshness",
+      "title": "Recursive source-to-document freshness",
+      "state": "VERIFIED",
+      "cost_status": "FREE_VERIFIED",
+      "mandatory": true,
+      "requires_paid_ai_api": false,
+      "acceptance_evidence": [
+        ".adwf/tests/test_docs_freshness_recursive.py"
+      ]
+    },
+    {
+      "id": "exact_head_provenance",
+      "title": "Exact check and independent review provenance",
+      "state": "VERIFIED",
+      "cost_status": "FREE_VERIFIED",
+      "mandatory": true,
+      "requires_paid_ai_api": false,
+      "acceptance_evidence": [
+        ".adwf/tests/test_trust.py"
+      ]
+    },
+    {
+      "id": "unified_action_authorization",
+      "title": "Unified claim/continue/review/recovery authorization",
+      "state": "VERIFIED",
+      "cost_status": "FREE_VERIFIED",
+      "mandatory": true,
+      "requires_paid_ai_api": false,
+      "acceptance_evidence": [
+        ".adwf/tests/test_p0_safety_evidence.py"
+      ]
+    },
+    {
+      "id": "durable_orchestration_core",
+      "title": "Restart-safe idempotent orchestration journal",
+      "state": "VERIFIED",
+      "cost_status": "FREE_VERIFIED",
+      "mandatory": true,
+      "requires_paid_ai_api": false,
+      "acceptance_evidence": [
+        ".adwf/tests/test_durable_orchestrator.py"
+      ]
+    },
+    {
+      "id": "exact_product_evidence_graph",
+      "title": "Append-only exact-SHA/runtime product evidence graph",
+      "state": "VERIFIED",
+      "cost_status": "FREE_VERIFIED",
+      "mandatory": true,
+      "requires_paid_ai_api": false,
+      "acceptance_evidence": [
+        ".adwf/tests/test_p0_safety_evidence.py"
+      ]
+    },
+    {
+      "id": "github_remote_transition_saga",
+      "title": "Observable ETag/CAS GitHub Issue transition saga",
+      "state": "VERIFIED",
+      "cost_status": "FREE_VERIFIED",
+      "mandatory": true,
+      "requires_paid_ai_api": false,
+      "acceptance_evidence": [
+        ".adwf/tests/test_remote_saga.py"
+      ]
+    },
+    {
+      "id": "incident_knowledge",
+      "title": "Sanitized append-only incident knowledge and fingerprinting",
+      "state": "VERIFIED",
+      "cost_status": "FREE_VERIFIED",
+      "mandatory": true,
+      "requires_paid_ai_api": false,
+      "acceptance_evidence": [
+        ".adwf/tests/test_incidents.py"
+      ]
+    },
+    {
+      "id": "safe_healing_authorizer",
+      "title": "H0-H6 exact-match safe healing authorization",
+      "state": "VERIFIED",
+      "cost_status": "FREE_VERIFIED",
+      "mandatory": true,
+      "requires_paid_ai_api": false,
+      "acceptance_evidence": [
+        ".adwf/tests/test_healing.py"
+      ]
+    },
+    {
+      "id": "owner_experience",
+      "title": "Product Brief, preview-bound acceptance and human changelog",
+      "state": "VERIFIED",
+      "cost_status": "FREE_VERIFIED",
+      "mandatory": true,
+      "requires_paid_ai_api": false,
+      "acceptance_evidence": [
+        ".adwf/tests/test_owner_experience.py"
+      ]
+    },
+    {
+      "id": "executive_control_center",
+      "title": "Escaped Markdown and self-contained HTML owner dashboard",
+      "state": "VERIFIED",
+      "cost_status": "FREE_VERIFIED",
+      "mandatory": true,
+      "requires_paid_ai_api": false,
+      "acceptance_evidence": [
+        ".adwf/tests/test_dashboard.py"
+      ]
+    },
+    {
+      "id": "transactional_v1_3_migration",
+      "title": "Transactional v1.2 to v1.3 migration with rollback",
+      "state": "VERIFIED",
+      "cost_status": "FREE_VERIFIED",
+      "mandatory": true,
+      "requires_paid_ai_api": false,
+      "acceptance_evidence": [
+        ".adwf/tests/test_migration_v1_3.py"
+      ]
+    },
+    {
+      "id": "ci_setup_assistant",
+      "title": "Read-only zero-cost CI setup planner",
+      "state": "VERIFIED",
+      "cost_status": "FREE_VERIFIED",
+      "mandatory": false,
+      "requires_paid_ai_api": false,
+      "acceptance_evidence": [
+        ".adwf/tests/test_setup_assistant.py"
+      ]
+    }
+  ]
+}

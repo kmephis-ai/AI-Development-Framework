@@ -1,0 +1,44 @@
+{
+  "$schema": "./schemas/owner-experience.schema.json",
+  "schema_version": 1,
+  "product_brief": {
+    "schema_version": 1,
+    "brief_id": "BRIEF-0123456789abcdef",
+    "goal_ru": "Добавить понятную форму регистрации для нового клиента.",
+    "value_ru": "Клиент сможет начать работу без помощи технического специалиста.",
+    "outcome_ru": "После отправки формы клиент видит подтверждение и получает письмо.",
+    "acceptance_criteria_ru": ["Форма открывается", "Письмо отправляется", "Ошибка показана понятным языком"],
+    "visual_expectation_ru": "Владелец видит готовую страницу в предпросмотре.",
+    "constraints_ru": ["Обязательный CI не использует платный AI/API", "Денежный бюджет равен нулю"],
+    "owner_request_original": "Сделайте простую регистрацию и покажите мне готовый результат.",
+    "created_at": "2026-08-13T12:00:00Z",
+    "redaction": {"status": "SANITIZED", "findings_count": 0}
+  },
+  "current_preview": {
+    "status": "READY",
+    "head_sha": "cccccccccccccccccccccccccccccccccccccccc",
+    "preview_digest": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+    "url": "http://127.0.0.1:4173",
+    "screenshots": [{"name": "registration-desktop", "digest": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee", "artifact": "preview/registration-desktop.png"}],
+    "created_at": "2026-08-13T12:30:00Z",
+    "valid_until": "2026-08-13T14:30:00Z"
+  },
+  "acceptance": {
+    "status": "ACCEPTED",
+    "brief_id": "BRIEF-0123456789abcdef",
+    "head_sha": "cccccccccccccccccccccccccccccccccccccccc",
+    "preview_digest": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+    "decided_at": "2026-08-13T12:45:00Z",
+    "decided_by": "product-owner",
+    "note_ru": "Результат соответствует задаче.",
+    "stale_reason": null
+  },
+  "release_summary_ru": "Добавлена форма регистрации. Проверено подтверждение и отправка письма.",
+  "release_facts": [
+    {
+      "summary_ru": "Добавлена форма регистрации.",
+      "verification_ru": "Проверены успешная отправка и понятная ошибка.",
+      "value_ru": "Новый клиент может начать работу самостоятельно."
+    }
+  ]
+}

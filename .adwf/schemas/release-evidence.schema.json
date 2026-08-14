@@ -1,0 +1,141 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "ADWF v1.6 package release evidence",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "$schema",
+    "schema_version",
+    "framework_version",
+    "scope",
+    "created_at",
+    "policy_hash",
+    "test_suite",
+    "checks",
+    "monetary_budget_usd",
+    "mandatory_ai_api",
+    "live_control_plane",
+    "live_product",
+    "archive_checksum_sidecar",
+    "claim_limit"
+  ],
+  "properties": {
+    "$schema": {
+      "type": "string"
+    },
+    "schema_version": {
+      "const": 1
+    },
+    "framework_version": {
+      "type": "string",
+      "pattern": "^[0-9]+\\.[0-9]+\\.[0-9]+$"
+    },
+    "scope": {
+      "const": "PACKAGE_ONLY"
+    },
+    "created_at": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "policy_hash": {
+      "type": "string",
+      "format": "sha256"
+    },
+    "test_suite": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "status",
+        "count"
+      ],
+      "properties": {
+        "status": {
+          "enum": [
+            "PASS",
+            "PENDING"
+          ]
+        },
+        "count": {
+          "type": "integer",
+          "minimum": 1
+        }
+      }
+    },
+    "checks": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "policy",
+        "static_ci",
+        "schemas",
+        "docs",
+        "manifest",
+        "package_doctor",
+        "reproducible_zip"
+      ],
+      "properties": {
+        "policy": {
+          "enum": [
+            "PASS",
+            "PENDING"
+          ]
+        },
+        "static_ci": {
+          "enum": [
+            "PASS",
+            "PENDING"
+          ]
+        },
+        "schemas": {
+          "enum": [
+            "PASS",
+            "PENDING"
+          ]
+        },
+        "docs": {
+          "enum": [
+            "PASS",
+            "PENDING"
+          ]
+        },
+        "manifest": {
+          "enum": [
+            "PASS",
+            "PENDING"
+          ]
+        },
+        "package_doctor": {
+          "enum": [
+            "PASS",
+            "PENDING"
+          ]
+        },
+        "reproducible_zip": {
+          "enum": [
+            "PASS",
+            "PENDING"
+          ]
+        }
+      }
+    },
+    "monetary_budget_usd": {
+      "const": 0
+    },
+    "mandatory_ai_api": {
+      "const": false
+    },
+    "live_control_plane": {
+      "const": "NOT_VERIFIED"
+    },
+    "live_product": {
+      "const": "NOT_VERIFIED"
+    },
+    "archive_checksum_sidecar": {
+      "type": "string",
+      "pattern": "^AI-Development-Framework-v[0-9]+\\.[0-9]+\\.[0-9]+\\.zip\\.sha256$"
+    },
+    "claim_limit": {
+      "const": "Package verification does not certify an installed repository, deployment, or product."
+    }
+  }
+}

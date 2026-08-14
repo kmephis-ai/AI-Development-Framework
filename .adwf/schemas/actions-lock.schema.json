@@ -1,0 +1,27 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "ADWF trusted GitHub Actions lock",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "verified_at", "valid_until", "actions"],
+  "properties": {
+    "schema_version": {"const": 1},
+    "verified_at": {"type": "string", "format": "date-time"},
+    "valid_until": {"type": "string", "format": "date-time"},
+    "actions": {
+      "type": "object",
+      "additionalProperties": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["version", "sha", "runtime", "minimum_runner", "source_url"],
+        "properties": {
+          "version": {"type": "string", "minLength": 1},
+          "sha": {"type": "string", "pattern": "^[0-9a-f]{40}$"},
+          "runtime": {"const": "node24"},
+          "minimum_runner": {"type": "string", "minLength": 1},
+          "source_url": {"type": "string", "pattern": "^https://github\\.com/"}
+        }
+      }
+    }
+  }
+}

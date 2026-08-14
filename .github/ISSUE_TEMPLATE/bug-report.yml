@@ -1,0 +1,53 @@
+name: Сообщить о проблеме
+description: Три простых вопроса; технические детали система соберёт сама
+title: "[Проблема] "
+labels: ["type:bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Не вставляйте пароль, token, платёжные или персональные данные. Можно перетащить screenshot или короткое видео в поле ниже.
+  - type: textarea
+    id: expected
+    attributes:
+      label: Что вы ожидали?
+      placeholder: Например: после нажатия «Зарегистрироваться» должна появиться страница подтверждения.
+    validations:
+      required: true
+  - type: textarea
+    id: actual
+    attributes:
+      label: Что произошло?
+      placeholder: Опишите своими словами; технические термины не нужны.
+    validations:
+      required: true
+  - type: textarea
+    id: where_when
+    attributes:
+      label: Где и когда вы это увидели?
+      placeholder: Например: сегодня на странице регистрации в браузере телефона.
+    validations:
+      required: true
+  - type: dropdown
+    id: impact
+    attributes:
+      label: Насколько это мешает?
+      options:
+        - Нельзя продолжить работу
+        - Работать можно, но с ограничением
+        - Небольшое неудобство
+        - Не уверен(а)
+    validations:
+      required: true
+  - type: textarea
+    id: attachments
+    attributes:
+      label: Screenshot или видео (необязательно)
+      description: Перетащите файл сюда. Перед отправкой убедитесь, что на нём нет секретных данных.
+  - type: checkboxes
+    id: privacy
+    attributes:
+      label: Безопасность данных
+      options:
+        - label: Я проверил(а), что сообщение и вложения не содержат паролей, tokens, платёжных или чужих персональных данных.
+          required: true

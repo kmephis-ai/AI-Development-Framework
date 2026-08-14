@@ -1,0 +1,48 @@
+{
+  "$schema": "./schemas/healing-config.schema.json",
+  "schema_version": 1,
+  "enabled": true,
+  "mandatory_ai_api": false,
+  "monetary_budget": 0,
+  "allow_network": false,
+  "automatic_rollback_certified": false,
+  "budgets": {
+    "max_attempts": 2,
+    "max_elapsed_seconds": 900,
+    "max_actions": 4,
+    "max_changed_files": 10,
+    "max_false_heals": 1
+  },
+  "transient_failure_types": [
+    "RUNNER_INTERRUPTED",
+    "RUNNER_EXTERNAL_DEPENDENCY",
+    "API_TRANSIENT",
+    "NETWORK_TRANSIENT"
+  ],
+  "deterministic_failure_types": [
+    "TEST_ASSERTION",
+    "SCHEMA_VALIDATION",
+    "COMPILE_ERROR",
+    "POLICY_VIOLATION",
+    "SECURITY_VIOLATION"
+  ],
+  "protected_paths": [
+    ".git/**",
+    ".github/workflows/**",
+    ".adwf/policies/**",
+    ".adwf/schemas/**",
+    ".adwf/actions-lock.json",
+    ".adwf/providers.json",
+    ".adwf/config.json",
+    ".adwf/healing-config.json",
+    ".adwf/lib/healing.py",
+    ".adwf/effective-policy.json",
+    ".adwf/knowledge/recipes/**",
+    ".adwf/knowledge/incidents/**",
+    ".adwf/knowledge/regressions/**",
+    "**/.env",
+    "**/.env.*",
+    "**/*secret*",
+    "**/*credential*"
+  ]
+}

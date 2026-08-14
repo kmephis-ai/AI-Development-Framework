@@ -1,0 +1,49 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "ADWF v1.6 remote transition saga",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version", "saga_id", "idempotency_key", "provider", "repo",
+    "issue_number", "lease_id", "from_label", "target_label", "from_state",
+    "to_state", "original_body", "original_body_sha256", "desired_body",
+    "desired_body_sha256", "expected_updated_at", "policy_hash", "status",
+    "steps", "attempts", "last_error", "created_at", "updated_at"
+  ],
+  "properties": {
+    "$schema": {"type": "string"},
+    "schema_version": {"const": 1},
+    "saga_id": {"type": "string", "format": "sha256"},
+    "idempotency_key": {"type": "string", "format": "sha256"},
+    "provider": {"const": "github"},
+    "repo": {"type": "string", "pattern": "^[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+$"},
+    "issue_number": {"type": "integer", "minimum": 1},
+    "lease_id": {"type": "string", "minLength": 1},
+    "from_label": {"type": "string"},
+    "target_label": {"type": "string"},
+    "from_state": {"type": "string"},
+    "to_state": {"type": "string"},
+    "original_body": {"type": "string"},
+    "original_body_sha256": {"type": "string", "format": "sha256"},
+    "desired_body": {"type": "string"},
+    "desired_body_sha256": {"type": "string", "format": "sha256"},
+    "expected_updated_at": {"type": "string", "format": "date-time"},
+    "policy_hash": {"type": "string", "format": "sha256"},
+    "status": {"enum": ["PLANNED", "DRY_RUN", "APPLYING", "RECOVERY_REQUIRED", "COMMITTED", "COMPENSATED"]},
+    "steps": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["ADD_TARGET_LABEL", "PATCH_MARKER_BODY", "REMOVE_OLD_LABEL", "VERIFY_POSTCONDITION"],
+      "properties": {
+        "ADD_TARGET_LABEL": {"enum": ["PENDING", "PASS"]},
+        "PATCH_MARKER_BODY": {"enum": ["PENDING", "PASS"]},
+        "REMOVE_OLD_LABEL": {"enum": ["PENDING", "PASS"]},
+        "VERIFY_POSTCONDITION": {"enum": ["PENDING", "PASS"]}
+      }
+    },
+    "attempts": {"type": "integer", "minimum": 0},
+    "last_error": {"type": ["string", "null"]},
+    "created_at": {"type": "string", "format": "date-time"},
+    "updated_at": {"type": "string", "format": "date-time"}
+  }
+}

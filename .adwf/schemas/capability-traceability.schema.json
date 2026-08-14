@@ -1,0 +1,79 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "ADWF v1.6 capability traceability",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "framework_version",
+    "capabilities"
+  ],
+  "properties": {
+    "$schema": {
+      "type": "string"
+    },
+    "schema_version": {
+      "const": 1
+    },
+    "framework_version": {
+      "type": "string",
+      "pattern": "^[0-9]+\\.[0-9]+\\.[0-9]+$"
+    },
+    "capabilities": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "id",
+          "status",
+          "owner_claim_ru",
+          "entrypoints",
+          "production_paths",
+          "verification"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "pattern": "^[A-Z0-9_-]+$"
+          },
+          "status": {
+            "enum": [
+              "IMPLEMENTED",
+              "LIVE_NOT_VERIFIED",
+              "OPTIONAL_ADAPTER",
+              "NOT_IMPLEMENTED"
+            ]
+          },
+          "owner_claim_ru": {
+            "type": "string",
+            "minLength": 3
+          },
+          "entrypoints": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "production_paths": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "verification": {
+            "type": "array",
+            "minItems": 1,
+            "items": {
+              "type": "string"
+            }
+          },
+          "live_boundary": {
+            "type": "string"
+          }
+        }
+      }
+    }
+  }
+}

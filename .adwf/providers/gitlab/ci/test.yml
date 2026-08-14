@@ -1,0 +1,12 @@
+adwf:test:
+  stage: test
+  timeout: 15m
+  needs: ["adwf:validate"]
+  script:
+    - python3 .adwf/adwf.py self-test
+    - python3 .adwf/scripts/run_project_gates.py --phase pr
+  rules:
+    - if: '$CI_PIPELINE_SOURCE == "merge_request_event"'
+    - if: '$CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH'
+    - if: '$CI_PIPELINE_SOURCE == "web"'
+

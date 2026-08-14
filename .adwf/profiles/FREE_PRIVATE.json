@@ -1,0 +1,34 @@
+{
+  "id": "FREE_PRIVATE",
+  "description": "GitHub Free private: нулевой денежный бюджет, self-hosted CI и честное process enforcement без ложного обещания private branch protection.",
+  "repository_scope": "GITHUB_PRIVATE_FREE",
+  "enforcement_truth": "PROCESS_GUARDED_PLATFORM_NOT_ENFORCED",
+  "github_private_branch_protection": "PAID_CAPABILITY_BLOCKED_IN_FREE_ONLY",
+  "required_checks_truth": "VERIFIED_BY_PROCESS_NOT_PLATFORM_ENFORCED",
+  "platform_enforcement": {
+    "protected_main": false,
+    "required_status_checks": false,
+    "required_review": false,
+    "environments": false
+  },
+  "policy_enforcement": {
+    "pr_only": true,
+    "required_ci_by_process": true,
+    "independent_review": true,
+    "auto_merge": "DISABLED_UNTIL_CERTIFIED",
+    "direct_main_push_forbidden": true
+  },
+  "default_autonomy": "A1",
+  "promotable_autonomy": "A2",
+  "max_autonomous_risk": "R1",
+  "recommended_ci_capability": "github_self_hosted",
+  "allowed_capability_statuses": ["FREE_VERIFIED", "INCLUDED_QUOTA", "CONDITIONAL_FREE", "OWNER_PROVIDED"],
+  "forbidden_capability_statuses": ["METERED", "PAID", "UNKNOWN", "STALE"],
+  "github_hosted_minutes_policy": "DISABLED_BY_DEFAULT_PRIVATE_QUOTA_REQUIRES_FRESH_USAGE_PROOF",
+  "larger_runners_allowed": false,
+  "mandatory_paid_ai_api": false,
+  "owner_resource_attestation_required": true,
+  "monetary_budget": 0,
+  "merge_rule": "Merge только после актуальных canonical CI/review/evidence; более строгая repository policy имеет приоритет.",
+  "deployment_rule": "Production deployment управляется отдельно; R4 остаётся Human-Gated."
+}

@@ -1,0 +1,85 @@
+{
+  "id": "vue",
+  "language": "javascript",
+  "detect": {
+    "dependency": "vue"
+  },
+  "commands": {
+    "lint": {
+      "command": [
+        "npm",
+        "run",
+        "lint"
+      ],
+      "requires_script": "lint",
+      "phases": [
+        "pr"
+      ]
+    },
+    "unit": {
+      "command": [
+        "npm",
+        "test"
+      ],
+      "requires_script": "test",
+      "phases": [
+        "pr",
+        "main"
+      ]
+    },
+    "build": {
+      "command": [
+        "npm",
+        "run",
+        "build"
+      ],
+      "requires_script": "build",
+      "phases": [
+        "pr",
+        "main"
+      ]
+    },
+    "start": {
+      "command": [
+        "npm",
+        "run",
+        "dev",
+        "--",
+        "--host",
+        "127.0.0.1",
+        "--port",
+        "4173"
+      ],
+      "requires_script": "dev",
+      "phases": [
+        "runtime"
+      ]
+    },
+    "install": {
+      "command": [
+        "npm",
+        "ci"
+      ],
+      "phases": [
+        "bootstrap",
+        "pr",
+        "runtime"
+      ],
+      "requires_file": "package-lock.json"
+    }
+  },
+  "preview": {
+    "desktop": [
+      1440,
+      900
+    ],
+    "mobile": [
+      390,
+      844
+    ],
+    "golden_paths": [
+      "/"
+    ],
+    "default_url": "http://127.0.0.1:4173"
+  }
+}

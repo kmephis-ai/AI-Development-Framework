@@ -1,0 +1,1 @@
+{"id":"go","language":"go","detect":{"files":["go.mod"]},"commands":{"unit":{"command":["go","test","./..."],"phases":["pr","main"]},"build":{"command":["go","build","./..."],"phases":["pr","main"]}},"preview":{}}

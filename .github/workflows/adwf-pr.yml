@@ -1,0 +1,56 @@
+name: ADWF PR
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, edited, ready_for_review]
+permissions:
+  contents: read
+env:
+  PYTHONDONTWRITEBYTECODE: "1"
+concurrency:
+  group: adwf-pr-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+jobs:
+  fast-feedback:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          persist-credentials: false
+          fetch-depth: 2
+      - uses: actions/setup-python@a309ff8b426b58ec0e2a45f0f869d46889d02405
+        with:
+          python-version: "3.12.13"
+          cache: false
+      - name: Route change impact first
+        id: impact
+        run: python .adwf/scripts/impact_router.py --base "${{ github.event.pull_request.base.sha }}" --head "${{ github.event.pull_request.head.sha }}"
+      - name: Universal safety guard
+        env:
+          ADWF_BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          ADWF_HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        run: |
+          python .adwf/scripts/validate_ci.py
+          python .adwf/adwf.py provider-check --input .adwf/requests/github-public-standard.json
+          python .adwf/scripts/validate_pr.py --event "$GITHUB_EVENT_PATH" --base-sha "$ADWF_BASE_SHA" --head-sha "$ADWF_HEAD_SHA"
+      - name: Framework structural/contracts gate
+        if: steps.impact.outputs.full_framework == 'true'
+        run: |
+          python .adwf/scripts/validate_framework.py
+          python .adwf/scripts/validate_pipeline_ir.py
+          python .adwf/adwf.py doctor --scope package_integrity
+          python .adwf/adwf.py doctor --scope config_health
+          python .adwf/adwf.py self-test
+      - name: Executable documentation contracts
+        if: steps.impact.outputs.docs == 'true' || steps.impact.outputs.full_framework == 'true'
+        run: python .adwf/scripts/validate_docs.py
+      - name: Provider contract suite
+        if: steps.impact.outputs.provider == 'true'
+        run: python -m unittest discover -s .adwf/tests -p 'test_provider*.py' -q
+      - name: Relevant project PR gates
+        run: python .adwf/scripts/run_project_gates.py --phase pr
+      - name: Exact-revision Playwright preview
+        if: steps.impact.outputs.preview == 'true'
+        run: python .adwf/scripts/run_preview.py --install-playwright

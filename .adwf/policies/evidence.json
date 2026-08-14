@@ -1,0 +1,27 @@
+{
+  "version": "1.6.0",
+  "statuses": [
+    "PASS",
+    "FAIL",
+    "BLOCKED",
+    "NOT_VERIFIED",
+    "STALE",
+    "N/A"
+  ],
+  "ttl_hours": {
+    "REVIEW": 24,
+    "CI": 24,
+    "SMOKE": 24,
+    "GOLDEN_PATHS": 24,
+    "REALITY": 168,
+    "QCP": 168,
+    "ACP": 720
+  },
+  "exact_sha_required": [
+    "REVIEW",
+    "CI",
+    "SMOKE",
+    "GOLDEN_PATHS"
+  ],
+  "never_infer_pass": true
+}

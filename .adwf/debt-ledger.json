@@ -1,0 +1,9 @@
+{
+  "version": "1.6.0",
+  "items": [],
+  "budget": {
+    "high": 0,
+    "medium": 5
+  },
+  "note": "Technical debt регистрируется агрегировано; не каждый TODO требует отдельного Issue."
+}

@@ -1,0 +1,13 @@
+adwf:validate:
+  stage: validate
+  timeout: 10m
+  script:
+    - python3 .adwf/adwf.py provider-check --input .adwf/requests/gitlab-self-hosted.json
+    - python3 .adwf/scripts/validate_framework.py
+    - python3 .adwf/adwf.py doctor --scope package_integrity
+    - python3 .adwf/adwf.py doctor --scope config_health
+    - if [ "$CI_PIPELINE_SOURCE" = "merge_request_event" ]; then python3 .adwf/scripts/validate_pr.py --body "$CI_MERGE_REQUEST_DESCRIPTION" --base-sha "$CI_MERGE_REQUEST_DIFF_BASE_SHA" --head-sha "$CI_COMMIT_SHA"; fi
+  rules:
+    - if: '$CI_PIPELINE_SOURCE == "merge_request_event"'
+    - if: '$CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH'
+    - if: '$CI_PIPELINE_SOURCE == "web"'

@@ -1,0 +1,111 @@
+{
+  "version": "1.6.0",
+  "documents": [
+    {
+      "path": "README.md",
+      "watched": [
+        "docs/**",
+        ".adwf/project-state.json",
+        ".adwf/lib/**",
+        ".adwf/capability-traceability.json",
+        ".github/workflows/**"
+      ],
+      "mode": "generated-status-block+manual",
+      "source_digest": "afa10da24603cbc312b337cc592ff78a374337dc242034f57f8d6b6fa1ccdf4c",
+      "reviewed_at": "2026-08-14T07:25:00Z",
+      "valid_until": "2026-09-14T07:25:00Z"
+    },
+    {
+      "path": "AGENTS.md",
+      "watched": [
+        ".adwf/**",
+        ".github/workflows/**",
+        ".gitlab-ci.yml"
+      ],
+      "mode": "manual-governance",
+      "source_digest": "ab598e8085c4565985ec19f794fa2fb5a9beefbe6726c25de918d7b19a8ac577",
+      "reviewed_at": "2026-08-14T07:25:00Z",
+      "valid_until": "2026-09-14T07:25:00Z"
+    },
+    {
+      "path": "docs/architecture/CI_CD_ARCHITECTURE.md",
+      "watched": [
+        ".github/workflows/**",
+        ".gitlab-ci.yml",
+        ".adwf/providers/gitlab/ci/**",
+        ".adwf/scripts/**"
+      ],
+      "mode": "architecture",
+      "source_digest": "210455eed6d2e74794eba70669b69bc8c7b6bf4f61b3f4d80e05c3124b01d018",
+      "reviewed_at": "2026-08-14T07:25:00Z",
+      "valid_until": "2026-09-14T07:25:00Z"
+    },
+    {
+      "path": "CONTROL_CENTER.md",
+      "watched": [
+        ".adwf/project-state.json",
+        ".adwf/providers.json",
+        ".adwf/evidence-ledger.json"
+      ],
+      "mode": "generated",
+      "source_digest": "bf76d0c9ddcd11614474038c97c363480abdaa7bba2d46f2f65af1b6a1bed5f7",
+      "reviewed_at": "2026-08-14T07:25:00Z",
+      "valid_until": "2026-09-14T07:25:00Z"
+    },
+    {
+      "path": "docs/V1_6_IMPLEMENTATION_REPORT.md",
+      "watched": [
+        "SPECIFICATION.md",
+        ".adwf/lib/**",
+        ".adwf/schemas/**",
+        ".github/workflows/**",
+        ".gitlab-ci.yml",
+        ".adwf/capability-traceability.json",
+        ".adwf/scripts/validate_capabilities.py"
+      ],
+      "mode": "implementation-certification",
+      "source_digest": "8091420535bf3beb628dbfcbafe647bca452429d8f88ca940a87590586626f8e",
+      "reviewed_at": "2026-08-14T07:25:00Z",
+      "valid_until": "2026-09-14T07:25:00Z"
+    },
+    {
+      "path": "docs/operations/OWNER_AI_GUIDE.md",
+      "watched": [
+        ".adwf/lib/owner_experience.py",
+        ".adwf/lib/dashboard.py",
+        ".adwf/project-state.json",
+        ".github/ISSUE_TEMPLATE/bug-report.yml"
+      ],
+      "mode": "owner-guide",
+      "source_digest": "825bce6785f2038c6acd5cf1e48eb9a914a18fed713efa8eb2be6e28d104e2ed",
+      "reviewed_at": "2026-08-14T07:25:00Z",
+      "valid_until": "2026-09-14T07:25:00Z"
+    },
+    {
+      "path": "docs/governance/RECOVERY_PLAYBOOK.md",
+      "watched": [
+        ".adwf/lib/healing.py",
+        ".adwf/lib/incidents.py",
+        ".adwf/healing-config.json",
+        ".adwf/schemas/repair-recipe.schema.json"
+      ],
+      "mode": "governance",
+      "source_digest": "68f0c11d641d731c0a6560fe566f0aeb307aed37ed5bd812cf1773ef4ca7b3e4",
+      "reviewed_at": "2026-08-14T07:25:00Z",
+      "valid_until": "2026-09-14T07:25:00Z"
+    },
+    {
+      "path": "docs/operations/FREE_LIMITS_AND_NOTIFICATIONS.md",
+      "watched": [
+        ".adwf/config.json",
+        ".adwf/providers.json",
+        ".adwf/profiles/**",
+        ".adwf/lib/cost_guard.py"
+      ],
+      "mode": "provider-facts",
+      "source_digest": "5c9e3037235dd924c5cc675ccd9537e300144db4e25a0e722f569c26d6d87859",
+      "reviewed_at": "2026-08-14T07:25:00Z",
+      "valid_until": "2026-09-14T07:25:00Z"
+    }
+  ]
+}

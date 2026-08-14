@@ -1,0 +1,27 @@
+# ADWF v1.6 — Bootstrap Checklist
+
+- [ ] Package Integrity и strict schemas подтверждены.
+- [ ] Project name/type/runtime_product/default branch и Node 24 для Node-проекта настроены.
+- [ ] Active autonomy = A1; A4 automatic = false.
+- [ ] Раздельные untrusted/main/trusted runner labels/tags и Python 3.12.13 проверены.
+- [ ] Hosted quota providers и AI/API mandatory checks выключены.
+- [ ] Repository visibility и FREE_ONLY capability classification подтверждены свежими facts; larger runners выключены.
+- [ ] Project commands представлены arrays; обязательные PR/main/unit и runtime smoke/Golden Paths gates не пусты.
+- [ ] Effective Policy с source hashes компилируется без противоречий.
+- [ ] `.adwf/project-state.json` остаётся template; live reconciliation пишет только `.adwf-runtime/project-state.json`.
+- [ ] Единственная Roadmap, Roadmap IDs, Issues и dependencies формализованы.
+- [ ] Labels/Project fields/readback, четыре owner views, Dashboard Issue и `CONTROL_CENTER.md` сверены.
+- [ ] GitHub: второй reviewer login и `ADWF_PROJECT_TOKEN` настроены; GitLab: protected masked `ADWF_GITLAB_TOKEN` с `read_api` настроен только для trusted job.
+- [ ] `github.trust.trusted_reviewer_logins`, trusted check apps/names и TTL заполнены; пустой allowlist оставляет merge заблокированным.
+- [ ] Atomic claim создаёт один строгий Issue marker; label/state/lease/workspace/heartbeat/expiry проходят provider readback.
+- [ ] Workspace Manager создаёт isolated worktree; heartbeat/stall/retry/clean cleanup проверены.
+- [ ] Baseline, Golden Paths, runtime revision source и evidence TTL определены.
+- [ ] Product Brief, preview adapter, immutable digest, screenshots и Owner Acceptance проверены.
+- [ ] Incident store, sanitization, external tail anchor и bug intake проверены без реальных secrets/PII.
+- [ ] Safe Healing budgets, protected paths, empty recipe registry и circuit breaker проверены; automatic rollback остаётся false.
+- [ ] Durable Orchestrator прошёл restart/idempotency/tamper/deadline scenarios; provider adapter вызывает следующий шаг.
+- [ ] `validate_framework`, `self-test`, static CI security и manifest checks PASS.
+- [ ] Reconciliation показывает не более одного Writer и отсутствие conflicts.
+- [ ] Первый R0/R1 item прошёл полный lifecycle до обсуждения A2.
+- [ ] Production deploy, destructive actions, R4 и external release human-gated.
+- [ ] LICENSE выбран либо external release остаётся заблокирован.

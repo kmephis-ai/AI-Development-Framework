@@ -1,0 +1,261 @@
+{
+  "$schema": "./schemas/capability-traceability.schema.json",
+  "schema_version": 1,
+  "framework_version": "1.6.0",
+  "capabilities": [
+    {
+      "id": "TRUSTED_GATE",
+      "status": "IMPLEMENTED",
+      "owner_claim_ru": "Доверенный gate не разрешает PR самостоятельно ослабить собственные правила проверки.",
+      "entrypoints": [
+        ".adwf/scripts/publish_trusted_gate.py"
+      ],
+      "production_paths": [
+        ".adwf/lib/trust_boundary.py",
+        ".adwf/lib/github_rulesets.py",
+        ".github/workflows/adwf-control.yml"
+      ],
+      "verification": [
+        ".adwf/tests/test_v16_remediation.py"
+      ]
+    },
+    {
+      "id": "DURABLE_FULL_LOOP",
+      "status": "OPTIONAL_ADAPTER",
+      "owner_claim_ru": "Runtime Supervisor исполняет детерминированные фазы, а EXECUTE/RECOVERY ожидают сменный Creative Agent adapter, если он не настроен.",
+      "entrypoints": [
+        ".adwf/adwf.py",
+        ".adwf/scripts/run_active_supervisor.py"
+      ],
+      "production_paths": [
+        ".adwf/lib/runtime_supervisor.py",
+        ".adwf/lib/action_executors.py",
+        ".adwf/lib/durable_orchestrator.py"
+      ],
+      "verification": [
+        ".adwf/tests/test_v16_remediation.py"
+      ],
+      "live_boundary": "Полностью unattended генерация кода требует отдельно подключённый разрешённый Creative Agent; отсутствие adapter возвращает WAITING_AGENT, а не ложный PASS."
+    },
+    {
+      "id": "OWNER_WAKEUP_CONTINUE",
+      "status": "IMPLEMENTED",
+      "owner_claim_ru": "Старт задачи и кнопка ПРОДОЛЖИТЬ связаны с durable run и будят trusted controller.",
+      "entrypoints": [
+        ".adwf/adwf.py",
+        ".adwf/lib/owner_portal.py"
+      ],
+      "production_paths": [
+        ".adwf/lib/owner_intent_service.py",
+        ".adwf/lib/owner_authority.py",
+        ".adwf/lib/controller_wakeup.py"
+      ],
+      "verification": [
+        ".adwf/tests/test_v16_remediation.py"
+      ]
+    },
+    {
+      "id": "SINGLE_SSOT",
+      "status": "IMPLEMENTED",
+      "owner_claim_ru": "Durable Orchestrator является единственным authoritative workflow state; остальные состояния являются контекстом или проекциями.",
+      "entrypoints": [
+        ".github/workflows/adwf-control.yml"
+      ],
+      "production_paths": [
+        ".adwf/lib/durable_orchestrator.py",
+        ".adwf/lib/durable_projection.py",
+        ".adwf/lib/work_memory.py"
+      ],
+      "verification": [
+        ".adwf/scripts/validate_pipeline_ir.py",
+        ".adwf/tests/test_v16_remediation.py"
+      ]
+    },
+    {
+      "id": "ACTIVE_TASK_IDENTITY",
+      "status": "IMPLEMENTED",
+      "owner_claim_ru": "Новая задача не перезаписывает Brief/Work Memory уже активного run и ставится в очередь.",
+      "entrypoints": [
+        ".adwf/adwf.py"
+      ],
+      "production_paths": [
+        ".adwf/lib/owner_intent_service.py",
+        ".adwf/lib/work_memory.py"
+      ],
+      "verification": [
+        ".adwf/tests/test_v16_remediation.py"
+      ]
+    },
+    {
+      "id": "EXACT_SHA_PREVIEW",
+      "status": "IMPLEMENTED",
+      "owner_claim_ru": "Preview принимается только с доказанной привязкой к exact revision.",
+      "entrypoints": [
+        ".adwf/adwf.py",
+        ".adwf/scripts/run_preview.py"
+      ],
+      "production_paths": [
+        ".adwf/lib/preview_engine.py",
+        ".adwf/scripts/collect_preview_attestation.py",
+        ".github/workflows/adwf-pr.yml",
+        ".github/workflows/adwf-control.yml"
+      ],
+      "verification": [
+        ".adwf/tests/test_v16_remediation.py"
+      ]
+    },
+    {
+      "id": "TRANSACTIONAL_AUTO_RELEASE",
+      "status": "IMPLEMENTED",
+      "owner_claim_ru": "Auto release сначала готовит согласованный version-bump transaction и не выпускает архив с противоречивой внутренней версией.",
+      "entrypoints": [
+        ".adwf/adwf.py",
+        ".adwf/scripts/release.py"
+      ],
+      "production_paths": [
+        ".adwf/lib/release_transaction.py",
+        ".github/workflows/adwf-release.yml"
+      ],
+      "verification": [
+        ".adwf/tests/test_v16_remediation.py"
+      ]
+    },
+    {
+      "id": "PROJECT_PACKS",
+      "status": "IMPLEMENTED",
+      "owner_claim_ru": "Project Pack не только определяется, но и детерминированно материализует runtime/build/preview configuration через governance flow.",
+      "entrypoints": [
+        ".adwf/adwf.py",
+        ".adwf/scripts/github_bootstrap.py"
+      ],
+      "production_paths": [
+        ".adwf/lib/pack_materializer.py",
+        ".adwf/lib/github_bootstrap.py",
+        ".adwf/packs"
+      ],
+      "verification": [
+        ".adwf/tests/test_v16_remediation.py"
+      ]
+    },
+    {
+      "id": "PUBLIC_SAFE_RUNTIME_LEDGER",
+      "status": "IMPLEMENTED",
+      "owner_claim_ru": "Многодневный public checkpoint хранит только безопасную проекцию и привязан к защищённому внешнему anchor.",
+      "entrypoints": [
+        ".adwf/scripts/github_runtime_sync.py"
+      ],
+      "production_paths": [
+        ".adwf/lib/github_runtime_store.py",
+        ".adwf/lib/github_rulesets.py",
+        ".github/workflows/adwf-control.yml"
+      ],
+      "verification": [
+        ".adwf/tests/test_v16_remediation.py"
+      ]
+    },
+    {
+      "id": "RULESET_READBACK",
+      "status": "LIVE_NOT_VERIFIED",
+      "owner_claim_ru": "Canonical GitHub rulesets создаются и проверяются через provider readback с no-bypass и source-bound required checks.",
+      "entrypoints": [
+        ".adwf/scripts/github_bootstrap.py"
+      ],
+      "production_paths": [
+        ".adwf/lib/github_rulesets.py",
+        ".adwf/lib/github_readback.py",
+        ".adwf/lib/github_provider.py"
+      ],
+      "verification": [
+        ".adwf/tests/test_v16_remediation.py"
+      ],
+      "live_boundary": "Фактическое создание и readback GitHub rulesets нельзя подтвердить локальным ZIP; требуется живой public repository."
+    },
+    {
+      "id": "PIPELINE_IR_GENERATION",
+      "status": "IMPLEMENTED",
+      "owner_claim_ru": "GitHub workflow projections генерируются из Pipeline IR и ручной drift блокируется.",
+      "entrypoints": [
+        ".adwf/scripts/generate_pipeline.py"
+      ],
+      "production_paths": [
+        ".adwf/pipeline-ir.json",
+        ".github/workflows/adwf-pr.yml",
+        ".github/workflows/adwf-control.yml",
+        ".github/workflows/adwf-main.yml",
+        ".github/workflows/adwf-release.yml",
+        ".github/workflows/adwf-platform-smoke.yml"
+      ],
+      "verification": [
+        ".adwf/scripts/validate_pipeline_ir.py",
+        ".adwf/tests/test_v16_remediation.py"
+      ]
+    },
+    {
+      "id": "PERFORMANCE_PLANE",
+      "status": "LIVE_NOT_VERIFIED",
+      "owner_claim_ru": "Trusted collector формирует per-impact/per-pack метрики и regression budgets, но зелёный статус требует достаточной живой выборки.",
+      "entrypoints": [
+        ".adwf/scripts/github_metrics_collector.py"
+      ],
+      "production_paths": [
+        ".adwf/lib/metrics.py",
+        ".adwf/lib/performance_evidence.py",
+        ".github/workflows/adwf-control.yml"
+      ],
+      "verification": [
+        ".adwf/tests/test_v16_remediation.py"
+      ],
+      "live_boundary": "Не менее требуемого числа живых CI samples; provider queue показывается отдельно."
+    },
+    {
+      "id": "AGENT_RETURN_WAKEUP",
+      "status": "OPTIONAL_ADAPTER",
+      "owner_claim_ru": "Agent result принимается только через bounded inbox contract и затем возвращается в Runtime Supervisor.",
+      "entrypoints": [
+        ".adwf/scripts/publish_agent_request.py",
+        ".adwf/scripts/consume_agent_result.py"
+      ],
+      "production_paths": [
+        ".adwf/lib/github_agent_inbox.py",
+        ".github/workflows/adwf-control.yml"
+      ],
+      "verification": [
+        ".adwf/tests/test_v16_remediation.py"
+      ],
+      "live_boundary": "Конкретный ChatGPT/Codex/Claude adapter остаётся заменяемым и не входит в mandatory FREE_ONLY correctness path."
+    },
+    {
+      "id": "DELIVERY_OBSERVATION",
+      "status": "OPTIONAL_ADAPTER",
+      "owner_claim_ru": "Delivery contract проверяет exact source/artifact observation; reference adapter не выдаётся за production hosting.",
+      "entrypoints": [
+        ".adwf/scripts/reference_delivery.py"
+      ],
+      "production_paths": [
+        ".adwf/lib/delivery_adapters.py",
+        "examples/reference-app"
+      ],
+      "verification": [
+        ".adwf/tests/test_v16_remediation.py"
+      ],
+      "live_boundary": "Production-specific deploy adapter выбирается проектом; NONE при required delivery блокирует цикл."
+    },
+    {
+      "id": "WINDOWS_HOSTED_SMOKE",
+      "status": "LIVE_NOT_VERIFIED",
+      "owner_claim_ru": "Canonical workflow содержит functional HTTP smoke на Linux и Windows hosted runners.",
+      "entrypoints": [
+        ".github/workflows/adwf-platform-smoke.yml"
+      ],
+      "production_paths": [
+        ".adwf/scripts/platform_smoke.py",
+        "START_ADWF.bat",
+        "START_ADWF.sh"
+      ],
+      "verification": [
+        ".adwf/tests/test_v16_remediation.py"
+      ],
+      "live_boundary": "Linux smoke проверяется локально; Windows hosted certification возможна только после запуска workflow в GitHub."
+    }
+  ]
+}

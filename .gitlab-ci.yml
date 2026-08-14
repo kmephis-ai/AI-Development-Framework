@@ -1,0 +1,16 @@
+# ADWF v1.6 — GitLab is a secondary optional provider.
+# Public GitHub is the mandatory $0 path. GitLab shared compute has a finite
+# included quota; therefore the package does not auto-start GitLab CI and does
+# not require a self-hosted runner. A live bootstrap must generate/verify the
+# quota-aware GitLab pipeline before enabling it.
+workflow:
+  rules:
+    - when: never
+
+stages: [validate]
+
+adwf:gitlab-secondary-disabled:
+  stage: validate
+  script:
+    - echo "ADWF GitLab secondary CI is fail-closed until quota/provider readback is certified."
+    - exit 1

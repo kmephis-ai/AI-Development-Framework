@@ -1,0 +1,14 @@
+{
+  "case": "false_progress",
+  "snapshot": {
+    "product_health": "BROKEN",
+    "metrics": {
+      "issues_total": 100,
+      "issues_done": 100,
+      "implementation": 1.0,
+      "verification": 0.2,
+      "product_readiness": 0.1
+    },
+    "issues": []
+  }
+}

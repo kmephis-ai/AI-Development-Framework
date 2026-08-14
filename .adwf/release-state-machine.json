@@ -1,0 +1,128 @@
+{
+  "version": "1.6.0",
+  "states": [
+    "BUILT",
+    "MACHINE_VERIFIED",
+    "PREVIEWED",
+    "OWNER_ACCEPTED",
+    "STAGED",
+    "PROMOTED",
+    "OBSERVED",
+    "STABLE",
+    "PAUSED",
+    "ROLLED_BACK",
+    "RECOVERY",
+    "CANCELLED"
+  ],
+  "transitions": {
+    "BUILT": [
+      "MACHINE_VERIFIED",
+      "RECOVERY",
+      "CANCELLED"
+    ],
+    "MACHINE_VERIFIED": [
+      "PREVIEWED",
+      "STAGED",
+      "RECOVERY",
+      "CANCELLED"
+    ],
+    "PREVIEWED": [
+      "OWNER_ACCEPTED",
+      "RECOVERY",
+      "CANCELLED"
+    ],
+    "OWNER_ACCEPTED": [
+      "STAGED",
+      "RECOVERY",
+      "CANCELLED"
+    ],
+    "STAGED": [
+      "PROMOTED",
+      "RECOVERY",
+      "CANCELLED"
+    ],
+    "PROMOTED": [
+      "OBSERVED",
+      "PAUSED",
+      "ROLLED_BACK",
+      "RECOVERY"
+    ],
+    "OBSERVED": [
+      "STABLE",
+      "PAUSED",
+      "ROLLED_BACK",
+      "RECOVERY"
+    ],
+    "STABLE": [
+      "ROLLED_BACK",
+      "RECOVERY"
+    ],
+    "PAUSED": [
+      "OBSERVED",
+      "ROLLED_BACK",
+      "RECOVERY"
+    ],
+    "ROLLED_BACK": [
+      "OBSERVED",
+      "STABLE",
+      "RECOVERY"
+    ],
+    "RECOVERY": [
+      "MACHINE_VERIFIED",
+      "PREVIEWED",
+      "STAGED",
+      "ROLLED_BACK",
+      "CANCELLED"
+    ],
+    "CANCELLED": []
+  },
+  "preconditions": {
+    "BUILT->MACHINE_VERIFIED": [
+      "ci_exact_sha",
+      "evidence_fresh",
+      "artifact_digest_verified"
+    ],
+    "MACHINE_VERIFIED->PREVIEWED": [
+      "preview_exact_sha",
+      "preview_digest_verified"
+    ],
+    "PREVIEWED->OWNER_ACCEPTED": [
+      "owner_acceptance_exact_sha",
+      "owner_acceptance_preview_digest"
+    ],
+    "MACHINE_VERIFIED->STAGED": [
+      "owner_acceptance_not_required",
+      "promotion_authorized"
+    ],
+    "OWNER_ACCEPTED->STAGED": [
+      "acceptance_fresh",
+      "promotion_authorized"
+    ],
+    "STAGED->PROMOTED": [
+      "deployment_exact_artifact",
+      "cost_zero_verified",
+      "provider_allowed"
+    ],
+    "PROMOTED->OBSERVED": [
+      "runtime_revision_exact",
+      "observation_started"
+    ],
+    "OBSERVED->STABLE": [
+      "runtime_gates_pass",
+      "observation_window_complete",
+      "no_critical_incident"
+    ],
+    "PROMOTED->ROLLED_BACK": [
+      "rollback_target_verified",
+      "rollback_authorized"
+    ],
+    "OBSERVED->ROLLED_BACK": [
+      "rollback_target_verified",
+      "rollback_authorized"
+    ],
+    "PAUSED->ROLLED_BACK": [
+      "rollback_target_verified",
+      "rollback_authorized"
+    ]
+  }
+}
