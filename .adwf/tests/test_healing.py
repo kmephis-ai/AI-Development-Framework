@@ -43,7 +43,7 @@ class SafeHealingTests(unittest.TestCase):
             "compatibility": {
                 "policy_hashes": [self.policy_hash],
                 "tool_versions": {"unittest": "stdlib"},
-                "runtime_versions": {"python": "3.12.13"},
+                "runtime_versions": {"python": "3.12.10"},
             },
             "expires_at": "2027-08-13T00:00:00Z",
             "actions": [{
@@ -62,7 +62,7 @@ class SafeHealingTests(unittest.TestCase):
         return {
             "policy_result": "ALLOW", "policy_hash": self.policy_hash,
             "tool_versions": {"unittest": "stdlib"},
-            "runtime_versions": {"python": "3.12.13"},
+            "runtime_versions": {"python": "3.12.10"},
             "attempts": 0, "elapsed_seconds": 0, "changed_files": 0,
             "monetary_cost": 0, "ai_api_required": False,
         }

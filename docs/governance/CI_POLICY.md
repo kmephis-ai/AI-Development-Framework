@@ -8,7 +8,7 @@ CI доказывает только выполненные deterministic checks
 - Mutating controller исполняет code только из default branch, сериализован, читает trust policy из base SHA и классифицирует provider diff без PR checkout.
 - Fast PR validation не считается trusted merge gate; exact checks/reviews требуют allowlisted provenance.
 - Third-party Actions pinned на full commit SHA; GitLab includes только local.
-- Python — `3.12.13`; Node-проект — Node `24.x`.
+- Python — `3.12.10`; Node-проект — Node `24.x`.
 - Project commands — непустые arrays, `shell=False`. Пустая required команда = `NOT_VERIFIED` + fail.
 - Cache только lockfile-keyed; cache miss не влияет на correctness. Артефакты default `FAILURE_ONLY`, retention 1 day.
 - Concurrency отменяет только superseded read-only checks. Control/release не отменяются.

@@ -100,7 +100,7 @@
     },
     {
       "path": ".adwf/config.json",
-      "sha256": "51b9019686dc987d462be6073802afb2bba4313d18bb433225394477bfce1629"
+      "sha256": "e84871fc9cb6145f2ddadd34b2e122a1ef897688d10ecf92cc58a68d79c02f47"
     },
     {
       "path": ".adwf/healing-config.json",
@@ -143,5 +143,5 @@
       "sha256": "137240ac3c78b754440d653847fd9e6105ced88a51c1dbed704b005b43896e45"
     }
   ],
-  "policy_hash": "2e4a9fa40ea3c41dd3a9492e00eaf9cfaa04adb226f356c540f3d6bcb5a0b822"
+  "policy_hash": "72b702f4a5d69740933140c8b30abf88d9d7b0e249cf5acfe81ce255b3f0ff23"
 }

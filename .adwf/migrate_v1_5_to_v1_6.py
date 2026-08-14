@@ -37,6 +37,7 @@ def migrated_config(old:dict)->dict:
     v.setdefault('runtime_supervisor',{}).update({'enabled':True,'work_memory':'.adwf-runtime/work-context.json','remote_store':'GITHUB_ISSUE_LEDGER','resume_after_restart':True,'action_envelopes':True,'raw_chain_of_thought_storage':False,'executor_registry':'ActionExecutorRegistry','single_ssot':'DURABLE_ORCHESTRATOR'})
     v.setdefault('project_packs',{}).update({'enabled':True,'auto_detect':True,'builtin':['python','fastapi','node','react','vue','angular','go'],'materialized':False})
     v.setdefault('release_automation',{}).update({'auto_supported':True,'owner_confirmation_required':True,'semantic_versioning':True,'tag_before_release':True,'transactional_version_bump':True,'caller_version_forbidden':True})
+    v.setdefault('runtime',{})['python_exact']='3.12.10'
     v.setdefault('delivery',{'deployment_required':False,'promotion_adapter':'NONE','observation_required':False,'observation_adapter':'NONE'})
     v.setdefault('github',{}).setdefault('trust',{})['required_check_names']=['fast-feedback','adwf/governance-gate','adwf/trusted-gate']
     return v

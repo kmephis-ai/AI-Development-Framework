@@ -11,7 +11,7 @@
       "compatibility": {
         "policy_hashes": ["aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"],
         "tool_versions": {"unittest": "stdlib"},
-        "runtime_versions": {"python": "3.12.13"}
+        "runtime_versions": {"python": "3.12.10"}
       },
       "expires_at": "2027-08-13T00:00:00Z",
       "actions": [

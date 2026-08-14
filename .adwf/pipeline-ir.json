@@ -22,7 +22,9 @@
       "job": "fast-feedback",
       "trusted": false,
       "cancel_superseded": true,
-      "permissions": ["contents:read"]
+      "permissions": [
+        "contents:read"
+      ]
     },
     "trusted": {
       "job": "trusted-gate",
@@ -43,10 +45,21 @@
       "human_gate": true
     }
   },
-  "required_checks": ["fast-feedback","adwf/governance-gate","adwf/trusted-gate"],
+  "required_checks": [
+    "fast-feedback",
+    "adwf/governance-gate",
+    "adwf/trusted-gate"
+  ],
   "impact_router": {
     "enabled": true,
-    "full_framework_paths": [".adwf/**",".github/workflows/adwf-*","AGENTS.md","ADWS.md","SPECIFICATION.md","SECURITY.md"],
+    "full_framework_paths": [
+      ".adwf/**",
+      ".github/workflows/adwf-*",
+      "AGENTS.md",
+      "ADWS.md",
+      "SPECIFICATION.md",
+      "SECURITY.md"
+    ],
     "preview_on_ui_impact": true
   },
   "platform_smoke": {
@@ -57,7 +70,10 @@
   "preview": {
     "engine": "PLAYWRIGHT",
     "version": "1.62.0",
-    "viewports": ["desktop","mobile"],
+    "viewports": [
+      "desktop",
+      "mobile"
+    ],
     "mandatory_on_ui_impact": true
   },
   "durability": {
