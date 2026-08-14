@@ -26,6 +26,7 @@ _DANGEROUS_TRUE_KEYS = re.compile(
 )
 _AUTONOMY = {f"A{index}": index for index in range(5)}
 _RISK = {f"R{index}": index for index in range(5)}
+_INTEGRITY_PROJECTIONS = {"MANIFEST.json", "SHA256SUMS.txt"}
 
 
 def normalize_repo_path(value: str) -> str:
@@ -127,16 +128,20 @@ def detect_gate_weakening(path: str, old_text: str | None, new_text: str | None,
     except (json.JSONDecodeError, TypeError):
         pass
 
-    removed = [line.strip() for line in old_text.splitlines() if line.strip() and line not in new_text.splitlines()]
-    for line in removed:
-        lowered = line.lower()
-        if (
-            re.search(r"(?:validate_|self-test|unittest|required_status|human-gated|fail[_ -]?closed)", lowered)
-            or re.search(r"(?:contents|issues|checks|pull-requests):\s*read", lowered)
-            or re.search(r"(?:required|enforce|protected|independent)[^\n]*(?:true|yes)", lowered)
-        ):
-            reasons.append(f"PROTECTIVE_LINE_REMOVED:{normalized}")
-            break
+    # Compare protective signatures, not whole source lines.  A deterministic
+    # generator may keep the same gates while changing an unrelated literal on
+    # the same long line; that must not be reported as gate weakening.
+    protective = re.compile(
+        r"(?:validate_[A-Za-z0-9_.-]+|self-test|unittest|"
+        r"required_status[A-Za-z0-9_.-]*|human-gated|fail[_ -]?closed|"
+        r"(?:contents|issues|checks|pull-requests):\s*read|"
+        r"(?:required|enforce|protected|independent)[^,\n]{0,80}(?:true|yes))",
+        re.IGNORECASE,
+    )
+    old_markers = {match.group(0).lower() for match in protective.finditer(old_text)}
+    new_markers = {match.group(0).lower() for match in protective.finditer(new_text)}
+    if old_markers - new_markers:
+        reasons.append(f"PROTECTIVE_LINE_REMOVED:{normalized}")
     if re.search(r"(?:contents|issues|checks|pull-requests|id-token):\s*write", new_text) and not re.search(
         r"(?:contents|issues|checks|pull-requests|id-token):\s*write", old_text
     ):
@@ -184,7 +189,9 @@ def classify_diff(changed_files: Iterable[Any], policy: dict[str, Any]) -> dict[
         candidates = [record["path"]]
         if record.get("old_path"):
             candidates.append(record["old_path"])
-        if any(is_protected_path(candidate, patterns) for candidate in candidates):
+        if record["path"] in _INTEGRITY_PROJECTIONS or any(
+            is_protected_path(candidate, patterns) for candidate in candidates
+        ):
             protected.append(record["path"])
             detected = detect_gate_weakening(
                 record["path"], record.get("old_text"), record.get("new_text"), status=record["status"]

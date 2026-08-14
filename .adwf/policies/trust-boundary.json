@@ -9,7 +9,9 @@
     ".gitlab-ci.yml",
     ".adwf/providers/gitlab/ci/**",
     "SECURITY.md",
-    "docs/governance/**"
+    "docs/governance/**",
+    "MANIFEST.json",
+    "SHA256SUMS.txt"
   ],
   "weakening_is_risk": "R4",
   "weakening_requires_human": true,
