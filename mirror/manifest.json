@@ -1,0 +1,11 @@
+{
+  "schema_version": 1,
+  "source_repository": "kmephis-ai/AI-Development-Framework",
+  "source_ref": "refs/heads/agent/local-mirror-bootstrap-20260815",
+  "source_sha": "44690dbbd2c19212ac46596f8e6aa000498a261f",
+  "bundle_sha256": "6481b3f117b04ce9d198f498d2409b4951b9677beba991173da89d8856ea958b",
+  "bundle_bytes": 632822,
+  "base64_bytes": 843764,
+  "chunk_bytes": 45000,
+  "parts": 19
+}
