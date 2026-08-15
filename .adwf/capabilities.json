@@ -1,10 +1,13 @@
 {
   "version": "1.6.0",
+  "catalog_role": "COST_AND_IMPLEMENTATION_SUMMARY",
+  "truth_model_version": 2,
+  "canonical_truth": ".adwf/capability-traceability.json",
   "capabilities": [
     {
       "id": "trusted_diff_classifier",
       "title": "Base-branch trusted diff classifier",
-      "state": "VERIFIED",
+      "implementation_status": "IMPLEMENTED",
       "cost_status": "FREE_VERIFIED",
       "mandatory": true,
       "requires_paid_ai_api": false,
@@ -15,7 +18,7 @@
     {
       "id": "free_only_cost_guard",
       "title": "Fail-closed zero-money provider guard",
-      "state": "VERIFIED",
+      "implementation_status": "IMPLEMENTED",
       "cost_status": "FREE_VERIFIED",
       "mandatory": true,
       "requires_paid_ai_api": false,
@@ -26,7 +29,7 @@
     {
       "id": "recursive_docs_freshness",
       "title": "Recursive source-to-document freshness",
-      "state": "VERIFIED",
+      "implementation_status": "IMPLEMENTED",
       "cost_status": "FREE_VERIFIED",
       "mandatory": true,
       "requires_paid_ai_api": false,
@@ -37,7 +40,7 @@
     {
       "id": "exact_head_provenance",
       "title": "Exact check and independent review provenance",
-      "state": "VERIFIED",
+      "implementation_status": "IMPLEMENTED",
       "cost_status": "FREE_VERIFIED",
       "mandatory": true,
       "requires_paid_ai_api": false,
@@ -48,7 +51,7 @@
     {
       "id": "unified_action_authorization",
       "title": "Unified claim/continue/review/recovery authorization",
-      "state": "VERIFIED",
+      "implementation_status": "IMPLEMENTED",
       "cost_status": "FREE_VERIFIED",
       "mandatory": true,
       "requires_paid_ai_api": false,
@@ -59,7 +62,7 @@
     {
       "id": "durable_orchestration_core",
       "title": "Restart-safe idempotent orchestration journal",
-      "state": "VERIFIED",
+      "implementation_status": "IMPLEMENTED",
       "cost_status": "FREE_VERIFIED",
       "mandatory": true,
       "requires_paid_ai_api": false,
@@ -70,7 +73,7 @@
     {
       "id": "exact_product_evidence_graph",
       "title": "Append-only exact-SHA/runtime product evidence graph",
-      "state": "VERIFIED",
+      "implementation_status": "IMPLEMENTED",
       "cost_status": "FREE_VERIFIED",
       "mandatory": true,
       "requires_paid_ai_api": false,
@@ -81,7 +84,7 @@
     {
       "id": "github_remote_transition_saga",
       "title": "Observable ETag/CAS GitHub Issue transition saga",
-      "state": "VERIFIED",
+      "implementation_status": "IMPLEMENTED",
       "cost_status": "FREE_VERIFIED",
       "mandatory": true,
       "requires_paid_ai_api": false,
@@ -92,7 +95,7 @@
     {
       "id": "incident_knowledge",
       "title": "Sanitized append-only incident knowledge and fingerprinting",
-      "state": "VERIFIED",
+      "implementation_status": "IMPLEMENTED",
       "cost_status": "FREE_VERIFIED",
       "mandatory": true,
       "requires_paid_ai_api": false,
@@ -103,7 +106,7 @@
     {
       "id": "safe_healing_authorizer",
       "title": "H0-H6 exact-match safe healing authorization",
-      "state": "VERIFIED",
+      "implementation_status": "IMPLEMENTED",
       "cost_status": "FREE_VERIFIED",
       "mandatory": true,
       "requires_paid_ai_api": false,
@@ -114,7 +117,7 @@
     {
       "id": "owner_experience",
       "title": "Product Brief, preview-bound acceptance and human changelog",
-      "state": "VERIFIED",
+      "implementation_status": "IMPLEMENTED",
       "cost_status": "FREE_VERIFIED",
       "mandatory": true,
       "requires_paid_ai_api": false,
@@ -125,7 +128,7 @@
     {
       "id": "executive_control_center",
       "title": "Escaped Markdown and self-contained HTML owner dashboard",
-      "state": "VERIFIED",
+      "implementation_status": "IMPLEMENTED",
       "cost_status": "FREE_VERIFIED",
       "mandatory": true,
       "requires_paid_ai_api": false,
@@ -136,7 +139,7 @@
     {
       "id": "transactional_v1_3_migration",
       "title": "Transactional v1.2 to v1.3 migration with rollback",
-      "state": "VERIFIED",
+      "implementation_status": "IMPLEMENTED",
       "cost_status": "FREE_VERIFIED",
       "mandatory": true,
       "requires_paid_ai_api": false,
@@ -147,7 +150,7 @@
     {
       "id": "ci_setup_assistant",
       "title": "Read-only zero-cost CI setup planner",
-      "state": "VERIFIED",
+      "implementation_status": "IMPLEMENTED",
       "cost_status": "FREE_VERIFIED",
       "mandatory": false,
       "requires_paid_ai_api": false,
