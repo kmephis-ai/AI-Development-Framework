@@ -99,48 +99,7 @@
               "minLength": 3
             }
           }
-        },
-        "allOf": [
-          {
-            "if": {
-              "properties": {
-                "status": {
-                  "const": "LIVE_NOT_VERIFIED"
-                }
-              },
-              "required": [
-                "status"
-              ]
-            },
-            "then": {
-              "required": [
-                "live_boundary"
-              ]
-            }
-          },
-          {
-            "if": {
-              "properties": {
-                "status": {
-                  "const": "LIVE_VERIFIED"
-                }
-              },
-              "required": [
-                "status"
-              ]
-            },
-            "then": {
-              "required": [
-                "live_boundary"
-              ],
-              "properties": {
-                "live_evidence": {
-                  "minItems": 1
-                }
-              }
-            }
-          }
-        ]
+        }
       }
     }
   }
