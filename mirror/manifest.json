@@ -2,10 +2,11 @@
   "schema_version": 1,
   "source_repository": "kmephis-ai/AI-Development-Framework",
   "source_ref": "refs/heads/agent/local-mirror-bootstrap-20260815",
-  "source_sha": "44690dbbd2c19212ac46596f8e6aa000498a261f",
-  "bundle_sha256": "6481b3f117b04ce9d198f498d2409b4951b9677beba991173da89d8856ea958b",
-  "bundle_bytes": 632822,
-  "base64_bytes": 843764,
+  "source_sha": "f44ab254c3fe8ed4da6fcd2c18afec2c9a9c420f",
+  "bundle_sha256": "b7c5dca0e51e0df000284cd176398dc4d933eac4fbe19880badfc4cd66034031",
+  "bundle_bytes": 1272905,
+  "base64_bytes": 1697208,
   "chunk_bytes": 45000,
-  "parts": 19
+  "parts": 38,
+  "artifact_name": "adwf-local-mirror-bundle"
 }

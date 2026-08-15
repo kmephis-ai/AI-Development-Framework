@@ -1,14 +1,14 @@
 /tmp/repository.bundle is okay
 The bundle contains these 17 refs:
-44690dbbd2c19212ac46596f8e6aa000498a261f refs/heads/agent/local-mirror-bootstrap-20260815
+f44ab254c3fe8ed4da6fcd2c18afec2c9a9c420f refs/heads/agent/local-mirror-bootstrap-20260815
 d18db8e7038991084ad5452ac4151fb9cb0f4e63 refs/remotes/origin/adwf/bootstrap-seed-v1-6
 c96b56d2f0c1ab111fdaf49eeb89e096674dc4d7 refs/remotes/origin/adwf/gov-002-postmerge-cert
 13b602b0956306b8271bec14b0a53ce2b07a2e96 refs/remotes/origin/adwf/gov003-status-bridge
 e4bc0a8eef368cfcee6bd2abc3e4d6c8d5bae5cb refs/remotes/origin/adwf/gov004-status-bridge
 ee802334da5dd41c1799021837438d32e3a0805a refs/remotes/origin/agent/audit-foundation-baseline
-0fc26c4e0a4e1ab690614d90b6a7ca1694dd5689 refs/remotes/origin/agent/fnd-001-capability-truth-v2
+d24bd113462494eb2ecf92c8b8fc4dbd34325aab refs/remotes/origin/agent/fnd-001-capability-truth-v2
 df1834bb89522a578dd770282f4c67eb835138de refs/remotes/origin/agent/gov-002-control-plane-cert
-44690dbbd2c19212ac46596f8e6aa000498a261f refs/remotes/origin/agent/local-mirror-bootstrap-20260815
+f44ab254c3fe8ed4da6fcd2c18afec2c9a9c420f refs/remotes/origin/agent/local-mirror-bootstrap-20260815
 26b888fa6aa6f114def0c9de839ac0e96458be64 refs/remotes/origin/agent/solo-maintainer-trusted-bootstrap
 e624ef9aa13d706e9ba0699200efc8d7c6acc2bc refs/remotes/origin/agent/windows-python-compat
 4fc95c436b26130f16bc9e06a6e9da838bdb9d0e refs/remotes/origin/gov/003-generated-projection-deadlock
@@ -16,6 +16,6 @@ c3151e39c48a13e7ce475fcb7d606cb8c4d49295 refs/remotes/origin/gov/004-trusted-sta
 051fc8c40640c8b8f86312f86d7105fdebeeb5ab refs/remotes/origin/main
 26bdfcdbb3dbafa1d5d976d012301647c9b310c0 refs/remotes/origin/rel/001a-documentation-truth
 8f47de35957297037b2516d19e9b9775ace1e734 refs/remotes/origin/rel/001c-dry-run-evidence
-44690dbbd2c19212ac46596f8e6aa000498a261f HEAD
+f44ab254c3fe8ed4da6fcd2c18afec2c9a9c420f HEAD
 The bundle records a complete history.
 The bundle uses this hash algorithm: sha1
