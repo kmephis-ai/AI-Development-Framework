@@ -1,0 +1,25 @@
+name: CI-REC-001 Windows startup diagnostic
+
+on:
+  push:
+    branches:
+      - agent/diag-ci-rec001-win-startup-20260816-a1
+
+permissions:
+  contents: read
+
+jobs:
+  windows-startup-diagnostic:
+    runs-on: windows-2022
+    steps:
+      - name: Checkout exact diagnostic branch
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd
+        with:
+          persist-credentials: false
+          fetch-depth: 1
+      - name: Set up Python
+        uses: actions/setup-python@a309ff8b426b58ec0e2a45f0f869d46889d02405
+        with:
+          python-version: '3.12.10'
+      - name: Probe dashboard readiness for 60 seconds
+        run: python .transport/ci-rec001/diag_win_startup.py
