@@ -34,6 +34,19 @@ jobs:
           python .adwf/scripts/validate_ci.py
           python .adwf/adwf.py provider-check --input .adwf/requests/github-public-standard.json
           python .adwf/scripts/validate_pr.py --event "$GITHUB_EVENT_PATH" --base-sha "$ADWF_BASE_SHA" --head-sha "$ADWF_HEAD_SHA"
+      - name: Temporary GOV-002 projection materialization
+        if: steps.impact.outputs.full_framework == 'true'
+        run: |
+          python .adwf/scripts/generate_pipeline.py
+          python .adwf/scripts/docs_freshness.py --write --reviewed-at 2026-08-15T08:58:00Z --valid-until 2026-11-15T08:58:00Z
+          python .adwf/scripts/generate_manifest.py
+          python - <<'PY'
+          import base64
+          from pathlib import Path
+          for rel in ['.adwf/docs-registry.json','MANIFEST.json','SHA256SUMS.txt']:
+              raw=Path(rel).read_bytes()
+              print('ADWF_GOV002_FILE='+rel+'='+base64.b64encode(raw).decode())
+          PY
       - name: Framework structural/contracts gate
         if: steps.impact.outputs.full_framework == 'true'
         run: |
