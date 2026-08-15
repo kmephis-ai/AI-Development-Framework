@@ -11,7 +11,7 @@
         ".github/workflows/**"
       ],
       "mode": "generated-status-block+manual",
-      "source_digest": "59a197c73ac1ea675b9ab332e0249005e526eddc3440ef49d2596f51a6c03f68",
+      "source_digest": "2f07748583c3f2a4e518b3f6b3dd37d6e8b2194cdb8b0d7064cf06f7fc380fc5",
       "reviewed_at": "2026-08-15T00:00:00Z",
       "valid_until": "2026-11-15T00:00:00Z"
     },
@@ -24,7 +24,7 @@
         "skills/**"
       ],
       "mode": "manual-governance",
-      "source_digest": "7179dbfaea0f35483134c32f85ccd18cf2c305325f51a0eec815812014f368c2",
+      "source_digest": "23a8fdc5709d6c0906cef51d0cc594260d5ef91a2a57b4707397eeb87826c2cc",
       "reviewed_at": "2026-08-15T00:00:00Z",
       "valid_until": "2026-11-15T00:00:00Z"
     },
@@ -37,7 +37,7 @@
         ".adwf/scripts/**"
       ],
       "mode": "architecture",
-      "source_digest": "b37f083a0f50e3ee71f56e51e0c8de57cd803949e996d1eccf16201b80ae10bf",
+      "source_digest": "a14c3c5b6247e4145082f3b335b8df69edcf4a8457151433d69eb92e9d288a5a",
       "reviewed_at": "2026-08-15T00:00:00Z",
       "valid_until": "2026-11-15T00:00:00Z"
     },
@@ -65,7 +65,7 @@
         ".adwf/scripts/validate_capabilities.py"
       ],
       "mode": "implementation-certification",
-      "source_digest": "96fbb97016cb0f401b41b0717ff0e372deeba260be92d4a94617d9a9a692fc37",
+      "source_digest": "389b51871fb45ebcd089330904ae5ff5d205c99baccf9461ce1a582e7c1c7fbe",
       "reviewed_at": "2026-08-15T00:00:00Z",
       "valid_until": "2026-11-15T00:00:00Z"
     },
@@ -105,6 +105,22 @@
       ],
       "mode": "provider-facts",
       "source_digest": "61094eb026194041ef8d6e7dd8a0efc3c17182b12bbb3313cc6460ce342d60a9",
+      "reviewed_at": "2026-08-15T00:00:00Z",
+      "valid_until": "2026-11-15T00:00:00Z"
+    },
+    {
+      "path": "docs/operations/SKILL_OPERATING_LAYER.md",
+      "watched": [
+        ".adwf/lib/skill_layer.py",
+        ".adwf/scripts/validate_skills.py",
+        ".adwf/scripts/generate_skill_registry.py",
+        ".adwf/scripts/eval_skills.py",
+        ".adwf/scripts/vendor_skill.py",
+        ".adwf/schemas/skill*.json",
+        ".adwf/skill-legacy-allowlist.json"
+      ],
+      "mode": "skill-governance",
+      "source_digest": "6b79258e5425995e1a04824e543d163756715fc9cf5711c564363bf2e0ecc3d2",
       "reviewed_at": "2026-08-15T00:00:00Z",
       "valid_until": "2026-11-15T00:00:00Z"
     }

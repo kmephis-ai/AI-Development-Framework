@@ -1,0 +1,29 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://adwf.local/schemas/skill-eval.schema.json",
+  "title": "ADWF deterministic Skill eval fixture",
+  "type": "object",
+  "required": ["schema_version", "skill_id", "kind", "cases"],
+  "additionalProperties": false,
+  "properties": {
+    "schema_version": {"type": "integer", "const": 1},
+    "skill_id": {"type": "string", "pattern": "^[a-z0-9][a-z0-9-]{2,63}$"},
+    "kind": {"type": "string", "enum": ["trigger-positive", "trigger-negative", "success-cases", "adversarial"]},
+    "cases": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "required": ["id"],
+        "properties": {
+          "id": {"type": "string", "pattern": "^[A-Za-z0-9._-]{2,100}$"},
+          "input": {"type": "string", "maxLength": 2000},
+          "expected_trigger": {"type": "boolean"},
+          "required_phrases": {"type": "array", "items": {"type": "string", "maxLength": 300}, "uniqueItems": true},
+          "forbidden_phrases": {"type": "array", "items": {"type": "string", "maxLength": 300}, "uniqueItems": true}
+        },
+        "additionalProperties": false
+      }
+    }
+  }
+}

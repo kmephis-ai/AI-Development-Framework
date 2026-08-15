@@ -1,0 +1,36 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://adwf.local/schemas/skill-registry.schema.json",
+  "title": "ADWF generated Skill registry",
+  "type": "object",
+  "required": ["schema_version", "generated", "startup_routers", "skills"],
+  "additionalProperties": false,
+  "properties": {
+    "schema_version": {"type": "integer", "const": 1},
+    "generated": {"type": "boolean", "const": true},
+    "startup_routers": {"type": "array", "maxItems": 3, "uniqueItems": true, "items": {"type": "string", "pattern": "^[a-z0-9][a-z0-9-]{2,63}$"}},
+    "skills": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["id", "kind", "lifecycle", "path", "entrypoint", "descriptor_sha256", "package_sha256", "startup_visible", "routed_by", "routes", "security_status", "eval_status", "no_trigger_precision"],
+        "additionalProperties": false,
+        "properties": {
+          "id": {"type": "string", "pattern": "^[a-z0-9][a-z0-9-]{2,63}$"},
+          "kind": {"type": "string", "enum": ["router", "leaf"]},
+          "lifecycle": {"type": "string", "minLength": 3, "maxLength": 30},
+          "path": {"type": "string", "pattern": "^skills/[a-z0-9][a-z0-9-]{2,63}$"},
+          "entrypoint": {"type": "string", "const": "SKILL.md"},
+          "descriptor_sha256": {"type": "string", "format": "sha256"},
+          "package_sha256": {"type": "string", "format": "sha256"},
+          "startup_visible": {"type": "boolean"},
+          "routed_by": {"type": "array", "items": {"type": "string"}, "uniqueItems": true},
+          "routes": {"type": "array", "items": {"type": "string"}, "uniqueItems": true},
+          "security_status": {"type": "string", "enum": ["PASS", "FAIL"]},
+          "eval_status": {"type": "string", "enum": ["PASS", "FAIL"]},
+          "no_trigger_precision": {"type": "number", "minimum": 0, "maximum": 1}
+        }
+      }
+    }
+  }
+}
