@@ -1,15 +1,114 @@
-name: LIFECYCLE-001 transport staging
+name: LIFECYCLE-001 Managed Surface Contract materializer
 
 on:
   push:
     branches:
-      - __never_trigger_lifecycle001_staging__
+      - agent/materialize-lifecycle001-20260816-a1
 
 permissions:
-  contents: read
+  contents: write
 
 jobs:
-  noop:
+  materialize:
     runs-on: ubuntu-24.04
     steps:
-      - run: echo staging-disabled
+      - name: Checkout transport branch
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd
+        with:
+          fetch-depth: 0
+
+      - name: Checkout exact feature branch
+        shell: bash
+        run: |
+          set -euo pipefail
+          TRANSPORT_SHA="$GITHUB_SHA"
+          git fetch origin agent/lifecycle-001-managed-surface-contract
+          git checkout -B agent/lifecycle-001-managed-surface-contract origin/agent/lifecycle-001-managed-surface-contract
+          test "$(git rev-parse HEAD)" = '7ab450168637211e871f8a0966717a8120962faf'
+          echo "TRANSPORT_SHA=$TRANSPORT_SHA" >> "$GITHUB_ENV"
+
+      - name: Materialize exact transport payloads
+        shell: bash
+        run: |
+          set -euo pipefail
+          copy_payload() {
+            src="$1"; dst="$2"
+            mkdir -p "$(dirname "$dst")"
+            git show "$TRANSPORT_SHA:$src" > "$dst"
+          }
+          copy_payload .transport/lifecycle001/managed_surface.py .adwf/lib/managed_surface.py
+          copy_payload .transport/lifecycle001/test_managed_surface.py .adwf/tests/test_managed_surface.py
+          copy_payload .transport/lifecycle001/managed-surface-policy.json .adwf/managed-surface-policy.json
+          copy_payload .transport/lifecycle001/managed-surface-policy.schema.json .adwf/schemas/managed-surface-policy.schema.json
+          copy_payload .transport/lifecycle001/managed-surface-snapshot.schema.json .adwf/schemas/managed-surface-snapshot.schema.json
+          copy_payload .transport/lifecycle001/managed-surface-plan.schema.json .adwf/schemas/managed-surface-plan.schema.json
+          copy_payload .transport/lifecycle001/validate_managed_surface.py .adwf/scripts/validate_managed_surface.py
+          copy_payload .transport/lifecycle001/MANAGED_SURFACE_CONTRACT.md docs/governance/MANAGED_SURFACE_CONTRACT.md
+          git show "$TRANSPORT_SHA:.transport/lifecycle001/mutate.py" > /tmp/lifecycle001-mutate.py
+          git show "$TRANSPORT_SHA:.transport/lifecycle001/patch_trace_tests.py" > /tmp/lifecycle001-patch-trace-tests.py
+          python /tmp/lifecycle001-mutate.py
+          python /tmp/lifecycle001-patch-trace-tests.py
+          git diff --check
+
+      - name: Regenerate canonical projections
+        shell: bash
+        run: |
+          set -euo pipefail
+          python .adwf/scripts/docs_freshness.py --write
+          python .adwf/scripts/generate_manifest.py
+          git diff --check
+
+      - name: Validate LIFECYCLE-001 before publish
+        shell: bash
+        run: |
+          set -euo pipefail
+          python -m unittest discover -s .adwf/tests -p 'test_managed_surface.py' -v
+          python -m unittest discover -s .adwf/tests -p 'test_decision_traceability.py' -v
+          python .adwf/scripts/validate_managed_surface.py
+          python .adwf/scripts/validate_traceability.py
+          python .adwf/scripts/validate_capabilities.py
+          python .adwf/scripts/docs_freshness.py
+          python .adwf/scripts/generate_manifest.py --check
+          python .adwf/scripts/validate_framework.py
+          python .adwf/adwf.py self-test
+          git diff --check
+          python - <<'PY'
+          import subprocess
+          expected = {
+              '.adwf/capabilities.json',
+              '.adwf/capability-traceability.json',
+              '.adwf/decision-requirement-traceability.json',
+              '.adwf/docs-registry.json',
+              '.adwf/lib/managed_surface.py',
+              '.adwf/managed-surface-policy.json',
+              '.adwf/roadmap.json',
+              '.adwf/schemas/managed-surface-plan.schema.json',
+              '.adwf/schemas/managed-surface-policy.schema.json',
+              '.adwf/schemas/managed-surface-snapshot.schema.json',
+              '.adwf/scripts/validate_capabilities.py',
+              '.adwf/scripts/validate_framework.py',
+              '.adwf/scripts/validate_managed_surface.py',
+              '.adwf/tests/test_decision_traceability.py',
+              '.adwf/tests/test_managed_surface.py',
+              'MANIFEST.json',
+              'SHA256SUMS.txt',
+              'docs/governance/MANAGED_SURFACE_CONTRACT.md',
+          }
+          actual = set(subprocess.check_output(['git', 'diff', '--name-only'], text=True).splitlines())
+          if actual != expected:
+              raise SystemExit('UNEXPECTED_DIFF:' + repr(sorted(actual ^ expected)))
+          print('EXPECTED_DIFF: PASS', len(actual))
+          PY
+
+      - name: Commit and push only after PASS
+        shell: bash
+        run: |
+          set -euo pipefail
+          git status --short
+          git add .adwf/capabilities.json .adwf/capability-traceability.json .adwf/decision-requirement-traceability.json .adwf/docs-registry.json .adwf/lib/managed_surface.py .adwf/managed-surface-policy.json .adwf/roadmap.json .adwf/schemas/managed-surface-plan.schema.json .adwf/schemas/managed-surface-policy.schema.json .adwf/schemas/managed-surface-snapshot.schema.json .adwf/scripts/validate_capabilities.py .adwf/scripts/validate_framework.py .adwf/scripts/validate_managed_surface.py .adwf/tests/test_decision_traceability.py .adwf/tests/test_managed_surface.py MANIFEST.json SHA256SUMS.txt docs/governance/MANAGED_SURFACE_CONTRACT.md
+          test "$(git diff --cached --name-only | wc -l)" -eq 18
+          git diff --cached --name-only
+          git config user.name 'ADWF LIFECYCLE-001 Materializer'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git commit -m 'LIFECYCLE-001: add Managed Surface Contract v1'
+          git push origin HEAD:agent/lifecycle-001-managed-surface-contract
