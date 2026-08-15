@@ -1,0 +1,195 @@
+name: GOV-013 TRACE main-history repair materializer
+
+on:
+  push:
+    branches:
+      - agent/materialize-gov013-20260815-a1
+    paths:
+      - .github/workflows/gov013-materialize.yml
+
+permissions:
+  contents: write
+
+jobs:
+  materialize:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 12
+    steps:
+      - name: Checkout transport branch
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd
+        with:
+          fetch-depth: 0
+
+      - name: Checkout exact repair branch
+        shell: bash
+        run: |
+          set -euo pipefail
+          git fetch origin agent/gov-013-trace-main-history-fix
+          git checkout -B agent/gov-013-trace-main-history-fix origin/agent/gov-013-trace-main-history-fix
+          test "$(git rev-parse HEAD)" = '84ea5120471af9070eb4a6657c5e0cb4c2639a55'
+
+      - name: Apply narrow fail-closed repair and regressions
+        shell: bash
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          from pathlib import Path
+
+          lib = Path('.adwf/lib/decision_traceability.py')
+          text = lib.read_text(encoding='utf-8')
+          old_transition = '''def validate_revision_transition(previous: dict[str, Any], current: dict[str, Any]) -> list[str]:
+              """Existing records/references/edges are immutable; supersession is additive."""
+              errors: list[str] = []
+              if int(current.get("revision", 0)) <= int(previous.get("revision", 0)):
+                  errors.append("TRACE_REVISION_NOT_INCREASING")
+          '''
+          new_transition = '''def validate_revision_transition(previous: dict[str, Any], current: dict[str, Any]) -> list[str]:
+              """Existing records/references/edges are immutable; supersession is additive."""
+              if current == previous:
+                  return []
+              errors: list[str] = []
+              if int(current.get("revision", 0)) <= int(previous.get("revision", 0)):
+                  errors.append("TRACE_REVISION_NOT_INCREASING")
+          '''
+          if old_transition not in text:
+              raise SystemExit('expected transition block not found')
+          text = text.replace(old_transition, new_transition, 1)
+
+          start = text.index('def _git_previous_graph(root: Path) -> dict[str, Any] | None:\n')
+          end = text.index('\n\ndef validate_traceability_graph(', start)
+          old_helper = text[start:end]
+          new_helper = '''def _git_previous_graph(root: Path) -> dict[str, Any] | None:
+              """Read the preceding graph revision; current HEAD is never its own predecessor."""
+              candidates: list[str] = []
+              head: str | None = None
+              try:
+                  process = subprocess.run(
+                      ["git", "rev-parse", "HEAD"], cwd=root, capture_output=True, text=True, check=False, timeout=5
+                  )
+                  if process.returncode == 0 and re.fullmatch(r"[0-9a-f]{40}", process.stdout.strip()):
+                      head = process.stdout.strip()
+              except (OSError, subprocess.TimeoutExpired):
+                  pass
+
+              def add_candidate(value: str | None) -> None:
+                  if value and re.fullmatch(r"[0-9a-f]{40}", value) and value != head:
+                      candidates.append(value)
+
+              env_base = __import__("os").environ.get("ADWF_BASE_SHA")
+              add_candidate(env_base)
+              try:
+                  process = subprocess.run(
+                      ["git", "merge-base", "HEAD", "origin/main"], cwd=root, capture_output=True, text=True, check=False, timeout=5
+                  )
+                  if process.returncode == 0:
+                      add_candidate(process.stdout.strip())
+              except (OSError, subprocess.TimeoutExpired):
+                  pass
+              try:
+                  process = subprocess.run(
+                      ["git", "rev-parse", "HEAD^"], cwd=root, capture_output=True, text=True, check=False, timeout=5
+                  )
+                  if process.returncode == 0:
+                      add_candidate(process.stdout.strip())
+              except (OSError, subprocess.TimeoutExpired):
+                  pass
+              for revision in dict.fromkeys(candidates):
+                  process = subprocess.run(
+                      ["git", "show", f"{revision}:.adwf/decision-requirement-traceability.json"],
+                      cwd=root, capture_output=True, text=True, check=False,
+                  )
+                  if process.returncode == 0:
+                      value = strict_loads(process.stdout)
+                      return value if isinstance(value, dict) else None
+              return None
+          '''
+          text = text[:start] + new_helper + text[end:]
+          lib.write_text(text, encoding='utf-8', newline='\n')
+
+          tests = Path('.adwf/tests/test_decision_traceability.py')
+          t = tests.read_text(encoding='utf-8')
+          if 'import subprocess\n' not in t:
+              t = t.replace('import shutil\nimport sys\n', 'import shutil\nimport subprocess\nimport sys\n', 1)
+          t = t.replace(
+              'from lib.decision_traceability import (  # noqa: E402\n    project_traceability,',
+              'from lib.decision_traceability import (  # noqa: E402\n    _git_previous_graph,\n    project_traceability,',
+              1,
+          )
+          marker = '\n\nif __name__ == "__main__":\n    unittest.main()\n'
+          additions = r'''
+
+              def test_17_unchanged_graph_is_not_a_revision_transition(self) -> None:
+                  self.assertEqual(validate_revision_transition(self.graph, copy.deepcopy(self.graph)), [])
+
+              def test_18_changed_graph_without_revision_bump_still_fails_closed(self) -> None:
+                  current = copy.deepcopy(self.graph)
+                  current["records"][1]["statement_ru"] += " changed without revision bump"
+                  current = seal_graph(current)
+                  errors = validate_revision_transition(self.graph, current)
+                  self.assertIn("TRACE_REVISION_NOT_INCREASING", errors)
+                  self.assertIn("TRACE_IMMUTABLE_ITEM_CHANGED:records:REQ-TRACE-001", errors)
+
+              def test_19_canonical_main_never_uses_head_as_previous_graph(self) -> None:
+                  with tempfile.TemporaryDirectory() as temp_name:
+                      root = Path(temp_name)
+                      graph_path = root / ".adwf/decision-requirement-traceability.json"
+                      graph_path.parent.mkdir(parents=True)
+                      subprocess.run(["git", "init", "-q"], cwd=root, check=True)
+                      subprocess.run(["git", "config", "user.name", "TRACE test"], cwd=root, check=True)
+                      subprocess.run(["git", "config", "user.email", "trace@example.invalid"], cwd=root, check=True)
+                      previous = copy.deepcopy(self.graph)
+                      graph_path.write_text(json.dumps(previous, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+                      subprocess.run(["git", "add", "."], cwd=root, check=True)
+                      subprocess.run(["git", "commit", "-qm", "previous graph"], cwd=root, check=True)
+                      current = copy.deepcopy(previous)
+                      current["revision"] = 2
+                      current = seal_graph(current)
+                      graph_path.write_text(json.dumps(current, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+                      subprocess.run(["git", "add", "."], cwd=root, check=True)
+                      subprocess.run(["git", "commit", "-qm", "current graph"], cwd=root, check=True)
+                      subprocess.run(["git", "update-ref", "refs/remotes/origin/main", "HEAD"], cwd=root, check=True)
+                      resolved = _git_previous_graph(root)
+                      self.assertIsNotNone(resolved)
+                      self.assertEqual(resolved["revision"], 1)
+                      self.assertEqual(resolved["graph_sha256"], previous["graph_sha256"])
+          '''
+          if 'test_17_unchanged_graph_is_not_a_revision_transition' not in t:
+              if marker not in t:
+                  raise SystemExit('test insertion marker not found')
+              t = t.replace(marker, additions + marker, 1)
+          tests.write_text(t, encoding='utf-8', newline='\n')
+          PY
+          git diff --check
+
+      - name: Regenerate deterministic projections
+        shell: bash
+        run: |
+          set -euo pipefail
+          python .adwf/scripts/docs_freshness.py --write
+          python .adwf/scripts/generate_manifest.py
+          git diff --check
+
+      - name: Validate repair before publish
+        shell: bash
+        run: |
+          set -euo pipefail
+          python -m unittest discover -s .adwf/tests -p 'test_decision_traceability.py' -v
+          python .adwf/scripts/validate_traceability.py
+          python .adwf/scripts/docs_freshness.py
+          python .adwf/scripts/generate_manifest.py --check
+          python .adwf/scripts/validate_framework.py
+          python .adwf/adwf.py self-test
+
+      - name: Commit and push repair only after PASS
+        shell: bash
+        run: |
+          set -euo pipefail
+          git status --short
+          git diff --check
+          git add .adwf/lib/decision_traceability.py .adwf/tests/test_decision_traceability.py .adwf/docs-registry.json MANIFEST.json SHA256SUMS.txt
+          test "$(git diff --cached --name-only | wc -l)" -eq 5
+          git diff --cached --name-only
+          git config user.name 'ADWF GOV-013 Materializer'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git commit -m 'GOV-013: repair TRACE previous-revision selection on main'
+          git push origin HEAD:agent/gov-013-trace-main-history-fix
