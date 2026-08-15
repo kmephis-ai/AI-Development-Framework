@@ -25,6 +25,15 @@ def load(relative: str, errors: list[str]):
         return {}
 
 
+def _run_checked_script(script: str, errors: list[str]) -> None:
+    process = subprocess.run([sys.executable, str(ROOT / ".adwf/scripts" / script)], cwd=ROOT, capture_output=True, text=True, check=False)
+    if process.returncode:
+        errors.append(f"GENERATED_OR_FRESHNESS_CHECK_FAILED:{script}")
+        for line in process.stdout.splitlines():
+            if line.startswith("- EXPECTED_SOURCE_DIGEST:"):
+                errors.append(f"DIAGNOSTIC:{script}:{line[2:]}")
+
+
 def main() -> int:
     errors: list[str] = []
     required = [
@@ -44,7 +53,7 @@ def main() -> int:
         ".adwf/lib/action_executors.py", ".adwf/lib/trust_boundary.py", ".adwf/lib/github_provider.py", ".adwf/lib/github_readback.py",
         ".adwf/lib/github_runtime_store.py", ".adwf/lib/owner_authority.py", ".adwf/lib/owner_intent_service.py", ".adwf/lib/durable_projection.py",
         ".adwf/lib/controller_wakeup.py", ".adwf/lib/pack_materializer.py", ".adwf/lib/performance_evidence.py", ".adwf/lib/delivery_adapters.py",
-        ".adwf/lib/release_transaction.py", ".adwf/lib/preview_engine.py", ".adwf/capability-traceability.json", ".adwf/scripts/validate_capabilities.py", ".adwf/roadmap.json",
+        ".adwf/lib/release_transaction.py", ".adwf/capability-traceability.json", ".adwf/scripts/validate_capabilities.py", ".adwf/roadmap.json",
         ".github/workflows/adwf-pr.yml", ".github/workflows/adwf-main.yml",
         ".github/workflows/adwf-control.yml", ".github/workflows/adwf-platform-smoke.yml", ".gitlab-ci.yml",
     ]
@@ -79,9 +88,7 @@ def main() -> int:
     if process.returncode:
         errors.extend(line for line in process.stdout.splitlines() if line.startswith("- "))
     for script in ("compile_policy.py", "generate_labels.py", "docs_freshness.py", "validate_docs.py", "validate_pipeline_ir.py", "validate_capabilities.py"):
-        process = subprocess.run([sys.executable, str(ROOT / ".adwf/scripts" / script)], cwd=ROOT, capture_output=True, text=True, check=False)
-        if process.returncode:
-            errors.append(f"GENERATED_OR_FRESHNESS_CHECK_FAILED:{script}")
+        _run_checked_script(script, errors)
     manifest = subprocess.run([sys.executable, str(ROOT / ".adwf/scripts/generate_manifest.py"), "--check"], cwd=ROOT, capture_output=True, text=True, check=False)
     if manifest.returncode:
         errors.append("MANIFEST_OR_SHA256SUMS_STALE")
