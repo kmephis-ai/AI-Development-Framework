@@ -1,0 +1,28 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://adwf.local/schemas/skill-legacy-allowlist.schema.json",
+  "title": "ADWF exact-digest legacy Skill bridge",
+  "type": "object",
+  "required": ["schema_version", "entries"],
+  "additionalProperties": false,
+  "properties": {
+    "schema_version": {"type": "integer", "const": 1},
+    "entries": {
+      "type": "array",
+      "uniqueItems": true,
+      "items": {
+        "type": "object",
+        "required": ["id", "path", "package_sha256", "reason", "migration_issue", "expires_on"],
+        "additionalProperties": false,
+        "properties": {
+          "id": {"type": "string", "pattern": "^[a-z0-9][a-z0-9-]{2,63}$"},
+          "path": {"type": "string", "pattern": "^skills/[a-z0-9][a-z0-9-]{2,63}$"},
+          "package_sha256": {"type": "string", "format": "sha256"},
+          "reason": {"type": "string", "minLength": 20, "maxLength": 1000},
+          "migration_issue": {"type": "string", "minLength": 3, "maxLength": 100},
+          "expires_on": {"type": "string", "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}$"}
+        }
+      }
+    }
+  }
+}

@@ -1,0 +1,322 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://adwf.local/schemas/skill.schema.json",
+  "title": "ADWF managed Skill descriptor",
+  "type": "object",
+  "required": [
+    "schema_version",
+    "id",
+    "kind",
+    "lifecycle",
+    "origin",
+    "description",
+    "entrypoint",
+    "routing",
+    "effects",
+    "external_domains",
+    "dependencies",
+    "evals",
+    "quality",
+    "context_budget"
+  ],
+  "additionalProperties": false,
+  "properties": {
+    "schema_version": {
+      "type": "integer",
+      "const": 1
+    },
+    "id": {
+      "type": "string",
+      "pattern": "^[a-z0-9][a-z0-9-]{2,63}$"
+    },
+    "kind": {
+      "type": "string",
+      "enum": [
+        "router",
+        "leaf"
+      ]
+    },
+    "lifecycle": {
+      "type": "string",
+      "enum": [
+        "DRAFT",
+        "VALIDATED",
+        "SECURITY_SCANNED",
+        "EVAL_PASSED",
+        "APPROVED",
+        "ACTIVE",
+        "DEPRECATED",
+        "UNTRUSTED",
+        "QUARANTINED",
+        "SCANNED",
+        "VENDORED"
+      ]
+    },
+    "origin": {
+      "type": "object",
+      "required": [
+        "kind"
+      ],
+      "properties": {
+        "kind": {
+          "type": "string",
+          "enum": [
+            "first_party",
+            "vendor"
+          ]
+        },
+        "provenance": {
+          "type": "object",
+          "required": [
+            "source_url",
+            "source_ref",
+            "source_digest",
+            "license",
+            "attribution",
+            "imported_at",
+            "local_modifications"
+          ],
+          "additionalProperties": false,
+          "properties": {
+            "source_url": {
+              "type": "string",
+              "minLength": 8,
+              "maxLength": 500
+            },
+            "source_ref": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 200
+            },
+            "source_digest": {
+              "type": "string",
+              "format": "sha256"
+            },
+            "license": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 200
+            },
+            "imported_at": {
+              "type": "string",
+              "format": "date-time"
+            },
+            "local_modifications": {
+              "type": "array",
+              "items": {
+                "type": "string",
+                "maxLength": 500
+              },
+              "uniqueItems": true
+            },
+            "attribution": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 500
+            }
+          }
+        }
+      },
+      "additionalProperties": false
+    },
+    "description": {
+      "type": "string",
+      "minLength": 20,
+      "maxLength": 320
+    },
+    "entrypoint": {
+      "type": "string",
+      "const": "SKILL.md"
+    },
+    "routing": {
+      "type": "object",
+      "required": [
+        "startup_visible",
+        "routed_by",
+        "routes",
+        "trigger_terms",
+        "negative_terms"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "startup_visible": {
+          "type": "boolean"
+        },
+        "routed_by": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "pattern": "^[a-z0-9][a-z0-9-]{2,63}$"
+          },
+          "uniqueItems": true,
+          "maxItems": 3
+        },
+        "routes": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "pattern": "^[a-z0-9][a-z0-9-]{2,63}$"
+          },
+          "uniqueItems": true
+        },
+        "trigger_terms": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "string",
+            "minLength": 2,
+            "maxLength": 120
+          },
+          "uniqueItems": true
+        },
+        "negative_terms": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 2,
+            "maxLength": 120
+          },
+          "uniqueItems": true
+        }
+      }
+    },
+    "effects": {
+      "type": "object",
+      "required": [
+        "shell",
+        "filesystem",
+        "network",
+        "secrets"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "shell": {
+          "type": "boolean"
+        },
+        "filesystem": {
+          "type": "string",
+          "enum": [
+            "none",
+            "read",
+            "write"
+          ]
+        },
+        "network": {
+          "type": "string",
+          "enum": [
+            "none",
+            "provider_connector",
+            "outbound"
+          ]
+        },
+        "secrets": {
+          "type": "string",
+          "enum": [
+            "none",
+            "provider_managed"
+          ]
+        }
+      }
+    },
+    "external_domains": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "pattern": "^[A-Za-z0-9.-]+$"
+      },
+      "uniqueItems": true
+    },
+    "evals": {
+      "type": "object",
+      "required": [
+        "trigger_positive",
+        "trigger_negative",
+        "success_cases",
+        "adversarial"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "trigger_positive": {
+          "type": "string",
+          "const": "evals/trigger-positive.json"
+        },
+        "trigger_negative": {
+          "type": "string",
+          "const": "evals/trigger-negative.json"
+        },
+        "success_cases": {
+          "type": "string",
+          "const": "evals/success-cases.json"
+        },
+        "adversarial": {
+          "type": "string",
+          "const": "evals/adversarial.json"
+        }
+      }
+    },
+    "quality": {
+      "type": "object",
+      "required": [
+        "min_no_trigger_precision"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "min_no_trigger_precision": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1
+        }
+      }
+    },
+    "context_budget": {
+      "type": "object",
+      "required": [
+        "max_description_chars",
+        "max_skill_md_chars"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "max_description_chars": {
+          "type": "integer",
+          "minimum": 20,
+          "maximum": 1000
+        },
+        "max_skill_md_chars": {
+          "type": "integer",
+          "minimum": 100,
+          "maximum": 50000
+        }
+      }
+    },
+    "dependencies": {
+      "type": "array",
+      "uniqueItems": true,
+      "items": {
+        "type": "object",
+        "required": [
+          "name",
+          "pin",
+          "source"
+        ],
+        "additionalProperties": false,
+        "properties": {
+          "name": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 120
+          },
+          "pin": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 200
+          },
+          "source": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 300
+          }
+        }
+      }
+    }
+  }
+}
