@@ -69,6 +69,14 @@ class TrustedGatePublicationTests(unittest.TestCase):
         GATE._publish(client, "adwf/trusted-gate", "e" * 40, True, "Trusted", "x" * 500)
         self.assertEqual(len(client.calls[1][1]["description"]), 140)
 
+    def test_trusted_controller_has_status_write_but_pr_lane_does_not(self):
+        control = (ROOT / ".github/workflows/adwf-control.yml").read_text(encoding="utf-8")
+        pr = (ROOT / ".github/workflows/adwf-pr.yml").read_text(encoding="utf-8")
+        self.assertIn("      statuses: write\n", control)
+        self.assertIn("ref: ${{ github.event.repository.default_branch }}", control)
+        self.assertIn("persist-credentials: false", control)
+        self.assertNotIn("statuses: write", pr)
+
 
 if __name__ == "__main__":
     unittest.main()
