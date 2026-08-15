@@ -1,0 +1,66 @@
+{
+  "schema_version": 1,
+  "purpose": "Durable planning memory for independent ADWF audits. This registry is historical context, not live provider truth.",
+  "rules": {
+    "before_new_audit": [
+      "Read this registry and the latest referenced audit report before forming recommendations.",
+      "Re-read current main/provider/runtime state; prior audit findings are not current-state evidence.",
+      "Compare the new factual state with prior accepted decisions and report the delta.",
+      "Do not re-propose deferred/rejected capabilities without new consumer evidence or a changed constraint.",
+      "Do not claim an accepted recommendation is implemented until repository/provider/runtime evidence proves it.",
+      "When superseding a prior decision, record the new audit/decision and the reason for supersession."
+    ],
+    "authority": "Owner-accepted audit decisions are planning constraints until explicitly superseded; live facts always require fresh evidence.",
+    "implementation_truth": "AUDIT_ACCEPTED does not imply IMPLEMENTED or LIVE_VERIFIED."
+  },
+  "audits": [
+    {
+      "audit_id": "ADWF-FOUNDATION-2026-08-15",
+      "date": "2026-08-15",
+      "repository": "kmephis-ai/AI-Development-Framework",
+      "baseline_sha": "8f47de35957297037b2516d19e9b9775ace1e734",
+      "mode": "READ_ONLY_DESIGN_ONLY",
+      "status": "ACCEPTED_AS_PLANNING_BASELINE",
+      "report_path": "AUDITS/ADWF_FOUNDATION_AUDIT_2026-08-15.md",
+      "owner_decision": "Внедрить результаты аудита и сохранить историю для последующих AI-аудитов.",
+      "headline": "Сильное governance/control-plane ядро уже существует; следующий critical path — Engineering Truth, Consumer Lifecycle, heterogeneous conformance и Human-by-Exception proof, а не расширение Core ради расширения.",
+      "accepted_release_train": [
+        "v1.7.0 Foundation Truth & Work Intelligence",
+        "v1.8.0 Consumer Lifecycle & Portability",
+        "v1.9.0 Heterogeneous Conformance & Human-by-Exception",
+        "v2.0.0 Engineering OS Foundation Stable / FOUNDATION_READY"
+      ],
+      "accepted_decisions": [
+        "ADWF 2.x is an evolution/stabilization of the existing architecture, not a rewrite.",
+        "Prefer extending existing subsystems; new subsystem only when existing contracts cannot represent the capability safely.",
+        "Do not create hundreds of long-horizon Issues now; use rolling-wave planning and detail the current release only.",
+        "First implementation priority is Capability Truth Model v2, then Roadmap/Outcome truth, AIWorkPackage/AIWorkResult and durable Decision/Traceability contracts.",
+        "Consumer product must outlive the framework: bootstrap/adopt/upgrade/rollback/detach/recover are Foundation requirements.",
+        "Reference conformance must cover standard web/software, Apps Script/data-centric and edge/automation classes.",
+        "FOUNDATION_READY must be a machine-verifiable gate rather than a documentation claim.",
+        "After FOUNDATION_READY, ADWF development should become primarily consumer-driven by Family Digital Platform, PrihRashOnline, Wiren Board and other real products.",
+        "Do not prematurely introduce Kubernetes, Kafka, service mesh, Redis, vector DB, mandatory paid AI APIs or a custom CI backend without real consumer evidence."
+      ],
+      "foundation_critical_path": [
+        "Capability/State Truth",
+        "Roadmap DAG + Verified Outcome Progress",
+        "AI Work Contracts + Decision/Requirement Traceability",
+        "Consumer Lifecycle + Managed Surfaces + Recovery",
+        "Project Pack SDK + Environment/Data Safety",
+        "Three-class Reference Consumer Conformance",
+        "Human-by-Exception end-to-end proof",
+        "Final adversarial audit + FOUNDATION_READY gate"
+      ],
+      "known_not_implemented_at_audit_close": [
+        "Capability Truth Model v2",
+        "first-class AIWorkPackage and AIWorkResult",
+        "formal Managed Surface Contract",
+        "safe detach conformance",
+        "Apps Script reference pack",
+        "edge/Wiren Board reference pack",
+        "three-class conformance lab",
+        "machine FOUNDATION_READY gate"
+      ]
+    }
+  ]
+}
