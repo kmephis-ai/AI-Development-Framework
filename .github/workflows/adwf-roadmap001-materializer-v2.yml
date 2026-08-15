@@ -65,13 +65,13 @@ jobs:
           python .adwf/tests/test_v15_executive.py
           python .adwf/tests/test_adversarial.py
           python .adwf/tests/test_reconciliation.py
-          python .adwf/scripts/generate_docs_registry.py --check
+          python .adwf/scripts/docs_freshness.py
           python .adwf/scripts/generate_skill_registry.py --check
           python .adwf/scripts/generate_manifest.py --check
           python .adwf/scripts/validate_framework.py
           python .adwf/scripts/validate_docs.py
-          python .adwf/scripts/validate_ci_static.py
-          python .adwf/scripts/validate_capability_truth.py
+          python .adwf/scripts/validate_ci.py
+          python .adwf/scripts/validate_capabilities.py
           python .adwf/adwf.py self-test
 
       - name: Verify exact tree, commit, and push target branch
