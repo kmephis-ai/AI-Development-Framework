@@ -1,0 +1,29 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "ADWF Managed Surface Snapshot v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["$schema", "schema_version", "role", "source_revision", "source_manifest_sha256", "entries"],
+  "properties": {
+    "$schema": {"const": ".adwf/schemas/managed-surface-snapshot.schema.json"},
+    "schema_version": {"const": 1},
+    "role": {"const": "MANAGED_SURFACE_SNAPSHOT"},
+    "source_revision": {"type": "string", "pattern": "^[0-9a-f]{40}$"},
+    "source_manifest_sha256": {"type": "string", "format": "sha256"},
+    "entries": {
+      "type": "array",
+      "uniqueItems": true,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["path", "ownership", "installed_sha256", "managed_by_adwf"],
+        "properties": {
+          "path": {"type": "string", "minLength": 1},
+          "ownership": {"enum": ["FRAMEWORK_PRIVATE", "SHARED_GUARDED", "CONSUMER_OWNED"]},
+          "installed_sha256": {"type": "string", "format": "sha256"},
+          "managed_by_adwf": {"type": "boolean"}
+        }
+      }
+    }
+  }
+}
