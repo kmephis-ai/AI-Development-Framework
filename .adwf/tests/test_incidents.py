@@ -115,7 +115,12 @@ class IncidentKnowledgeTests(unittest.TestCase):
             target = Path(tmp) / "target.jsonl"
             target.write_text("", encoding="utf-8")
             link = Path(tmp) / "store.jsonl"
-            link.symlink_to(target)
+            try:
+                link.symlink_to(target)
+            except OSError as exc:
+                if os.name == "nt" and getattr(exc, "winerror", None) == 1314:
+                    self.skipTest("Windows symlink privilege is unavailable")
+                raise
             with self.assertRaisesRegex(ValueError, "SYMLINK_FORBIDDEN"):
                 record_incident(link, self.raw(), now=self.now)
 

@@ -59,7 +59,7 @@ def run_command_adapter(command:str,root:str|Path,subject_sha:str,*,timeout:int,
     base=Path(root).resolve();out=base/'.adwf-runtime/delivery'/f'{kind}-result.json';out.parent.mkdir(parents=True,exist_ok=True)
     if out.exists():out.unlink()
     env={**os.environ,'ADWF_SUBJECT_SHA':subject_sha,'ADWF_ADAPTER_ATTESTATION':str(out),'ADWF_ADAPTER_KIND':kind}
-    p=subprocess.run(shlex.split(command),cwd=base,env=env,text=True,capture_output=True,check=False,timeout=timeout)
+    p=subprocess.run(shlex.split(command,posix=os.name!='nt'),cwd=base,env=env,text=True,encoding='utf-8',errors='replace',capture_output=True,check=False,timeout=timeout)
     result={'status':'PASS' if p.returncode==0 else 'FAIL','exit_code':p.returncode,'stdout_tail':p.stdout[-500:],'stderr_tail':p.stderr[-500:]}
     if p.returncode!=0:return result
     if not out.is_file():return {**result,'status':'NOT_VERIFIED','reason':'DELIVERY_ATTESTATION_MISSING'}

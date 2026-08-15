@@ -124,11 +124,7 @@
     },
     {
       "path": ".adwf/policies/trust-boundary.json",
-      "sha256": "0b329faab7ed64ea9ccff1473487c00c0b428de03a479e07b6033b1c58740e62"
-    },
-    {
-      "path": ".adwf/profiles/FREE_PUBLIC_GITHUB.json",
-      "sha256": "8a25131927ee7ee5e0c64cec619b37dbf1614b28a27670b366320a10e06d27ea"
+      "sha256": "5193ad3ff5d49f659d88f2120d97606dd65639f1cae704bab12255786f5e97da"
     },
     {
       "path": ".adwf/providers.json",
@@ -141,7 +137,11 @@
     {
       "path": ".adwf/state-machine.json",
       "sha256": "137240ac3c78b754440d653847fd9e6105ced88a51c1dbed704b005b43896e45"
+    },
+    {
+      "path": ".adwf\\profiles\\FREE_PUBLIC_GITHUB.json",
+      "sha256": "8a25131927ee7ee5e0c64cec619b37dbf1614b28a27670b366320a10e06d27ea"
     }
   ],
-  "policy_hash": "72b702f4a5d69740933140c8b30abf88d9d7b0e249cf5acfe81ce255b3f0ff23"
+  "policy_hash": "fc8fa8933ad82b3e2d094a1db7204d54a88e090a2278d846d53e5388a67af2e8"
 }
