@@ -11,6 +11,7 @@ ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT / ".adwf"))
 from lib.contracts import validate  # noqa: E402
 from lib.strict_json import load as strict_json_load  # noqa: E402
+from lib.roadmap_view import validate_roadmap_graph  # noqa: E402
 
 
 def load(relative: str, errors: list[str]):
@@ -67,6 +68,10 @@ def main() -> int:
         data = load(data_name, errors)
         schema = load(schema_name, errors)
         errors.extend(f"SCHEMA:{data_name}:{item.path}:{item.code}" for item in validate(data, schema))
+    roadmap = load(".adwf/roadmap.json", errors)
+    roadmap_tasks = [task for goal in (roadmap.get("goals") or []) for task in (goal.get("tasks") or [])]
+    graph = validate_roadmap_graph(roadmap_tasks)
+    errors.extend("ROADMAP_GRAPH:" + item for item in graph["errors"])
     version=(ROOT / "VERSION").read_text(encoding="utf-8").strip() if (ROOT / "VERSION").is_file() else ""
     machine = load(".adwf/state-machine.json", errors)
     config = load(".adwf/config.json", errors)

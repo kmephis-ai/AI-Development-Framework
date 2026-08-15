@@ -11,6 +11,7 @@ from .strict_json import load as strict_json_load
 from .leases import active_leases
 from .orchestration import choose_next as policy_choose_next
 from .policy import DecisionContext, evaluate_permission
+from .roadmap_view import validate_roadmap_graph
 
 RISK_RANK = {f"R{i}": i for i in range(5)}
 PRIORITY_RANK = {"P0": 0, "P1": 1, "P2": 2, "P3": 3}
@@ -162,8 +163,12 @@ def roadmap_audit(snapshot: dict[str, Any], policy: dict[str, Any] | None = None
         findings.append(f"verification_gap:warn:{gap:.2f}")
         if severity == "HEALTHY":
             severity = "ATTENTION"
-    if dependency_cycles(issues):
-        findings.append("dependency_cycle")
+    graph = validate_roadmap_graph(issues)
+    if graph["status"] != "PASS":
+        for finding in graph["errors"]:
+            findings.append("roadmap_graph:" + finding)
+        if any(item.startswith("DEPENDENCY_CYCLE:") for item in graph["errors"]):
+            findings.append("dependency_cycle")
         severity = "CRITICAL"
     for issue in issues:
         result = issue_quality(issue, policy)
