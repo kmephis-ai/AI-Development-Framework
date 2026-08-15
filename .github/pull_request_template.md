@@ -31,5 +31,8 @@ Rollback: описать безопасный и проверенный возв
 ## Trust boundary
 
 - [ ] PR не ослабляет ADWF/CI/security/autonomy/permissions
-- [ ] Trust change вынесен в отдельный GOV PR, классифицирован R4 и human-gated
+- [ ] Trust impact классифицирован trusted automation по политике из BASE revision
+- Authorization: AUTO / OWNER_DECISION_REQUIRED / N/A
+- [ ] Только если `Authorization=OWNER_DECISION_REQUIRED`: trust change вынесен в отдельный GOV PR, классифицирован R4 и human-gated
 
+Для routine safe changes отдельная SHA-аттестация не требуется. Если trusted policy возвращает `OWNER_DECISION_REQUIRED`, automation должна показать владельцу понятную причину и запросить решение.
