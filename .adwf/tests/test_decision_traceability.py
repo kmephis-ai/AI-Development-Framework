@@ -6,6 +6,7 @@ import copy
 import hashlib
 import json
 import shutil
+import subprocess
 import sys
 import tempfile
 import unittest
@@ -13,6 +14,7 @@ import unittest
 ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT / ".adwf"))
 from lib.decision_traceability import (  # noqa: E402
+    _git_previous_graph,
     project_traceability,
     seal_graph,
     validate_revision_transition,
@@ -254,6 +256,42 @@ class DecisionTraceabilityTests(unittest.TestCase):
             self.assertEqual(result["projection"]["verified_evidence_refs"], ["EVIDREF-TRACE-001"])
         finally:
             temp.cleanup()
+
+
+    def test_17_unchanged_graph_is_not_a_revision_transition(self) -> None:
+        self.assertEqual(validate_revision_transition(self.graph, copy.deepcopy(self.graph)), [])
+
+    def test_18_changed_graph_without_revision_bump_still_fails_closed(self) -> None:
+        current = copy.deepcopy(self.graph)
+        current["records"][1]["statement_ru"] += " changed without revision bump"
+        current = seal_graph(current)
+        errors = validate_revision_transition(self.graph, current)
+        self.assertIn("TRACE_REVISION_NOT_INCREASING", errors)
+        self.assertIn("TRACE_IMMUTABLE_ITEM_CHANGED:records:REQ-TRACE-001", errors)
+
+    def test_19_canonical_main_never_uses_head_as_previous_graph(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_name:
+            root = Path(temp_name)
+            graph_path = root / ".adwf/decision-requirement-traceability.json"
+            graph_path.parent.mkdir(parents=True)
+            subprocess.run(["git", "init", "-q"], cwd=root, check=True)
+            subprocess.run(["git", "config", "user.name", "TRACE test"], cwd=root, check=True)
+            subprocess.run(["git", "config", "user.email", "trace@example.invalid"], cwd=root, check=True)
+            previous = copy.deepcopy(self.graph)
+            graph_path.write_text(json.dumps(previous, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+            subprocess.run(["git", "add", "."], cwd=root, check=True)
+            subprocess.run(["git", "commit", "-qm", "previous graph"], cwd=root, check=True)
+            current = copy.deepcopy(previous)
+            current["revision"] = 2
+            current = seal_graph(current)
+            graph_path.write_text(json.dumps(current, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+            subprocess.run(["git", "add", "."], cwd=root, check=True)
+            subprocess.run(["git", "commit", "-qm", "current graph"], cwd=root, check=True)
+            subprocess.run(["git", "update-ref", "refs/remotes/origin/main", "HEAD"], cwd=root, check=True)
+            resolved = _git_previous_graph(root)
+            self.assertIsNotNone(resolved)
+            self.assertEqual(resolved["revision"], 1)
+            self.assertEqual(resolved["graph_sha256"], previous["graph_sha256"])
 
 
 if __name__ == "__main__":
