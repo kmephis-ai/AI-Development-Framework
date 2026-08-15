@@ -22,6 +22,7 @@ def is_framework_owned(root:Path,path:Path)->bool:
     # present in every release because delivery/observation capability tests and the
     # CEO golden-path smoke depend on it. Product application files remain excluded.
     if text.startswith('examples/reference-app/'): return True
+    if text.startswith('skills/'): return True
     if text in ROOT_FILES: return True
     framework_doc_prefixes=('docs/governance/','docs/framework/','docs/architecture/','docs/operations/','docs/migration/','docs/decisions/','docs/templates/')
     if text.startswith(framework_doc_prefixes): return True
