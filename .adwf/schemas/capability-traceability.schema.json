@@ -1,10 +1,12 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "title": "ADWF v1.6 capability traceability",
+  "title": "ADWF capability truth model v2",
   "type": "object",
   "additionalProperties": false,
   "required": [
     "schema_version",
+    "truth_model_version",
+    "role",
     "framework_version",
     "capabilities"
   ],
@@ -13,7 +15,13 @@
       "type": "string"
     },
     "schema_version": {
-      "const": 1
+      "const": 2
+    },
+    "truth_model_version": {
+      "const": 2
+    },
+    "role": {
+      "const": "CANONICAL_CAPABILITY_TRUTH"
     },
     "framework_version": {
       "type": "string",
@@ -28,10 +36,12 @@
         "required": [
           "id",
           "status",
+          "execution_mode",
           "owner_claim_ru",
           "entrypoints",
           "production_paths",
-          "verification"
+          "verification",
+          "live_evidence"
         ],
         "properties": {
           "id": {
@@ -40,10 +50,20 @@
           },
           "status": {
             "enum": [
+              "NOT_DESIGNED",
+              "DESIGNED_ONLY",
+              "PARTIAL",
               "IMPLEMENTED",
               "LIVE_NOT_VERIFIED",
-              "OPTIONAL_ADAPTER",
-              "NOT_IMPLEMENTED"
+              "LIVE_VERIFIED",
+              "DEPRECATED",
+              "BLOCKED"
+            ]
+          },
+          "execution_mode": {
+            "enum": [
+              "CORE",
+              "OPTIONAL_ADAPTER"
             ]
           },
           "owner_claim_ru": {
@@ -64,15 +84,63 @@
           },
           "verification": {
             "type": "array",
-            "minItems": 1,
             "items": {
               "type": "string"
             }
           },
           "live_boundary": {
-            "type": "string"
+            "type": "string",
+            "minLength": 3
+          },
+          "live_evidence": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 3
+            }
           }
-        }
+        },
+        "allOf": [
+          {
+            "if": {
+              "properties": {
+                "status": {
+                  "const": "LIVE_NOT_VERIFIED"
+                }
+              },
+              "required": [
+                "status"
+              ]
+            },
+            "then": {
+              "required": [
+                "live_boundary"
+              ]
+            }
+          },
+          {
+            "if": {
+              "properties": {
+                "status": {
+                  "const": "LIVE_VERIFIED"
+                }
+              },
+              "required": [
+                "status"
+              ]
+            },
+            "then": {
+              "required": [
+                "live_boundary"
+              ],
+              "properties": {
+                "live_evidence": {
+                  "minItems": 1
+                }
+              }
+            }
+          }
+        ]
       }
     }
   }
