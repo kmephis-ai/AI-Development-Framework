@@ -24,7 +24,16 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          cat .trace001-transport/chunk-* | base64 --decode > /tmp/trace001-candidate.tar.gz
+          cat \
+            .trace001-transport/chunk-00 \
+            .trace001-transport/chunk-01 \
+            .trace001-transport/chunk-02 \
+            .trace001-transport/chunk-03 \
+            .trace001-transport/chunk-05 \
+            .trace001-transport/chunk-07 \
+            .trace001-transport/chunk-09a \
+            .trace001-transport/chunk-09b \
+            | base64 --decode > /tmp/trace001-candidate.tar.gz
           echo '53dd8b51b03ebad8218f25b0dd88a02bff83718452e3e1d27b14534d6ddded8b  /tmp/trace001-candidate.tar.gz' | sha256sum --check --strict
           tar -tzf /tmp/trace001-candidate.tar.gz
 
