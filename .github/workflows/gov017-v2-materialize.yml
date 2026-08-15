@@ -1,0 +1,108 @@
+name: GOV-017 v2 materialize and verify
+
+on:
+  push:
+    branches:
+      - agent/materialize-gov017-v2-20260816-a1
+
+permissions:
+  contents: write
+
+jobs:
+  materialize:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    env:
+      BASE_SHA: 21b1585d557d20cb49e93f4420ce7bb977832d65
+      FEATURE_BRANCH: agent/gov017-standing-proof-v2
+      PYTHONDONTWRITEBYTECODE: '1'
+    steps:
+      - name: Checkout disposable transport
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd
+        with:
+          fetch-depth: 0
+
+      - name: Setup canonical Python
+        uses: actions/setup-python@a309ff8b426b58ec0e2a45f0f869d46889d02405
+        with:
+          python-version: '3.12.10'
+
+      - name: Materialize exact UX-only candidate
+        run: |
+          set -euo pipefail
+          REMOTE_MAIN="$(git ls-remote origin refs/heads/main | awk '{print $1}')"
+          test "$REMOTE_MAIN" = "$BASE_SHA"
+          git checkout --detach "$BASE_SHA"
+          python - <<'PY'
+          from pathlib import Path
+          path=Path('.github/pull_request_template.md')
+          text=path.read_text(encoding='utf-8')
+          old='''## Trust boundary\n\n- [ ] PR не ослабляет ADWF/CI/security/autonomy/permissions\n- [ ] Trust change вынесен в отдельный GOV PR, классифицирован R4 и human-gated\n\n'''
+          new='''## Trust boundary\n\n- [ ] PR не ослабляет ADWF/CI/security/autonomy/permissions\n- [ ] Trust impact классифицирован trusted automation по политике из BASE revision\n- Authorization: AUTO / OWNER_DECISION_REQUIRED / N/A\n- [ ] Только если `Authorization=OWNER_DECISION_REQUIRED`: trust change вынесен в отдельный GOV PR, классифицирован R4 и human-gated\n\nДля routine safe changes отдельная SHA-аттестация не требуется. Если trusted policy возвращает `OWNER_DECISION_REQUIRED`, automation должна показать владельцу понятную причину и запросить решение.\n'''
+          if text.count(old)!=1:
+              raise SystemExit('TEMPLATE_EXPECTED_BLOCK_NOT_EXACTLY_ONCE')
+          path.write_text(text.replace(old,new),encoding='utf-8',newline='\n')
+          PY
+          python .adwf/scripts/generate_manifest.py
+          git diff --check
+          test "$(git diff --name-only | wc -l | tr -d ' ')" = '3'
+          git diff --name-only | grep -Fx '.github/pull_request_template.md'
+          git diff --name-only | grep -Fx 'MANIFEST.json'
+          git diff --name-only | grep -Fx 'SHA256SUMS.txt'
+
+      - name: Commit immutable candidate
+        run: |
+          set -euo pipefail
+          git config user.name 'ADWF GOV-017 Materializer'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add .github/pull_request_template.md MANIFEST.json SHA256SUMS.txt
+          git commit -m 'GOV-017: prove Standing Owner Authorization after provider repair'
+          echo "CANDIDATE_SHA=$(git rev-parse HEAD)" >> "$GITHUB_ENV"
+          echo "CANDIDATE_TREE=$(git rev-parse HEAD^{tree})" >> "$GITHUB_ENV"
+
+      - name: Prove BASE Standing Policy auto-authorizes exact diff
+        run: |
+          set -euo pipefail
+          git worktree add --detach /tmp/gov017-base "$BASE_SHA"
+          cd /tmp/gov017-base
+          python - "$BASE_SHA" "$CANDIDATE_SHA" <<'PY'
+          import json,sys
+          from pathlib import Path
+          root=Path('.').resolve();sys.path.insert(0,str(root/'.adwf'))
+          from lib.trust import classify_git_diff
+          result=classify_git_diff(root,sys.argv[1],sys.argv[2])
+          print(json.dumps(result,ensure_ascii=False,sort_keys=True))
+          assert result['result']=='ALLOW',result
+          assert result['authorization_mode']=='STANDING_OWNER_POLICY',result
+          assert result['human_required'] is False,result
+          assert result['weakening']==[],result
+          assert result['manual_required_files']==[],result
+          assert result['standing_policy']['revision']==1,result
+          PY
+
+      - name: Verify focused and full framework contracts
+        run: |
+          set -euo pipefail
+          python .adwf/tests/test_standing_owner_authorization.py
+          python .adwf/scripts/docs_freshness.py
+          python .adwf/scripts/generate_manifest.py --check
+          python .adwf/scripts/validate_framework.py
+          git diff --check
+          python .adwf/adwf.py self-test
+          git reset --hard "$CANDIDATE_SHA"
+          test "$(git rev-parse HEAD^{tree})" = "$CANDIDATE_TREE"
+          python .adwf/scripts/validate_framework.py
+          python .adwf/scripts/generate_manifest.py --check
+          git diff --check
+          test -z "$(git status --porcelain)"
+
+      - name: Publish atomic feature branch
+        run: |
+          set -euo pipefail
+          REMOTE_MAIN="$(git ls-remote origin refs/heads/main | awk '{print $1}')"
+          test "$REMOTE_MAIN" = "$BASE_SHA"
+          test "$(git rev-parse HEAD)" = "$CANDIDATE_SHA"
+          test "$(git rev-parse HEAD^{tree})" = "$CANDIDATE_TREE"
+          REMOTE_FEATURE="$(git ls-remote origin "refs/heads/${FEATURE_BRANCH}" | awk '{print $1}')"
+          test "$REMOTE_FEATURE" = "$BASE_SHA"
+          git push origin "$CANDIDATE_SHA:refs/heads/$FEATURE_BRANCH"
