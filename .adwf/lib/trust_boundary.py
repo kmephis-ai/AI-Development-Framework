@@ -27,11 +27,16 @@ TRUST_BOUNDARY_PATTERNS = (
 )
 
 
+def _normalize(path: str) -> str:
+    normalized = str(path).replace("\\", "/")
+    return normalized[2:] if normalized.startswith("./") else normalized
+
+
 def _match(path: str, pattern: str) -> bool:
     # fnmatch handles '*' but not a special globstar contract consistently
     # across platforms, so treat '/**' as an explicit recursive prefix.
-    normalized = str(path).replace("\\", "/").lstrip("./")
-    pat = pattern.replace("\\", "/").lstrip("./")
+    normalized = _normalize(path)
+    pat = _normalize(pattern)
     if pat.endswith("/**"):
         return normalized == pat[:-3] or normalized.startswith(pat[:-2])
     return fnmatch(normalized, pat)
@@ -42,7 +47,7 @@ def is_trust_boundary_path(path: str) -> bool:
 
 
 def classify_changed_files(paths: Iterable[str]) -> dict:
-    changed = sorted({str(p).replace("\\", "/").lstrip("./") for p in paths if str(p).strip()})
+    changed = sorted({_normalize(p) for p in paths if str(p).strip()})
     protected = [p for p in changed if is_trust_boundary_path(p)]
     return {
         "changed_files": changed,
