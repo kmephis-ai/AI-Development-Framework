@@ -3,8 +3,8 @@
   "version": "1.6.0",
   "schema_version": 3,
   "scope": "FRAMEWORK_OWNED_TRUST_BOUNDARY",
-  "file_count_excluding_manifests": 340,
-  "total_bytes_excluding_manifests": 1366045,
+  "file_count_excluding_manifests": 341,
+  "total_bytes_excluding_manifests": 1366441,
   "files": [
     ".adwf/actions-lock.json",
     ".adwf/adwf.py",
@@ -273,6 +273,7 @@
     ".adwf/tests/test_v16_remediation.py",
     ".adwf/tests/test_windows_launcher.py",
     ".adwf/tests/test_workspaces.py",
+    ".gitattributes",
     ".github/ISSUE_TEMPLATE/ai-development-task.yml",
     ".github/ISSUE_TEMPLATE/audit.yml",
     ".github/ISSUE_TEMPLATE/bug-report.yml",

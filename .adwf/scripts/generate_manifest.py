@@ -10,7 +10,7 @@ import argparse,hashlib,json,os,tempfile
 ROOT=Path(__file__).resolve().parents[2]
 EXCLUDED_PARTS={"__pycache__",".adwf-runtime","migrations","dist","node_modules"}
 EXCLUDED_NAMES={"MANIFEST.json","SHA256SUMS.txt"}
-ROOT_FILES={"VERSION","README.md","ADWS.md","AGENTS.md","SECURITY.md","SPECIFICATION.md","INSTALL.md","LICENSE_DECISION_REQUIRED.md","START_ADWF.bat","START_ADWF.sh","CHANGELOG.md","CONTROL_CENTER.md","CONTROL_CENTER.html","labels.json",".gitlab-ci.yml",".gitignore"}
+ROOT_FILES={"VERSION","README.md","ADWS.md","AGENTS.md","SECURITY.md","SPECIFICATION.md","INSTALL.md","LICENSE_DECISION_REQUIRED.md","START_ADWF.bat","START_ADWF.sh","CHANGELOG.md","CONTROL_CENTER.md","CONTROL_CENTER.html","labels.json",".gitlab-ci.yml",".gitignore",".gitattributes"}
 
 def digest(path:Path)->str:return hashlib.sha256(path.read_bytes()).hexdigest()
 def is_framework_owned(root:Path,path:Path)->bool:

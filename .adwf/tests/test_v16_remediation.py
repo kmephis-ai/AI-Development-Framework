@@ -31,6 +31,11 @@ class GateClient:
     def collaborator_permission(self,login):return {'permission':'admin'}
 
 class V16RemediationTests(unittest.TestCase):
+    def test_repository_text_line_endings_are_canonicalized(self):
+        attrs=(ROOT/'.gitattributes').read_text(encoding='utf-8')
+        self.assertIn('* text=auto eol=lf',attrs)
+        for rel in ('.adwf/docs-registry.json','.adwf/effective-policy.json','MANIFEST.json','SHA256SUMS.txt'):
+            self.assertNotIn(b'\r\n',(ROOT/rel).read_bytes(),rel)
     def test_every_durable_phase_has_one_canonical_executor(self):
         self.assertEqual(set(ActionExecutorRegistry(ROOT).phases()),set(PHASES))
 
