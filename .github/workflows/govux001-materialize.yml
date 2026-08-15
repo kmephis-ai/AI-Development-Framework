@@ -1,0 +1,120 @@
+name: GOVUX-001 materialize and verify
+
+on:
+  push:
+    branches:
+      - agent/materialize-govux001-20260816-a1
+
+permissions:
+  contents: write
+
+env:
+  BASE_SHA: 96ab6f6c7ab46a8059a75d72d4422c4f04dd7b33
+  EXPECTED_TREE: 283d36a72d5aa26f04b0d99c378bf0e734426537
+  PATCH_GZ_SHA256: 9f8f4ace10db9e40844cbab8196ba77dd46feb2bbea816e220d0f36f7c768d6e
+  FEATURE_BRANCH: agent/govux001-standing-owner-authorization
+
+jobs:
+  materialize:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - name: Checkout disposable transport
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd
+        with:
+          path: transport
+          persist-credentials: false
+          fetch-depth: 1
+
+      - name: Checkout exact canonical base
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd
+        with:
+          ref: ${{ env.BASE_SHA }}
+          path: workspace
+          persist-credentials: true
+          fetch-depth: 2
+
+      - name: Restore exact candidate patch
+        shell: bash
+        run: |
+          set -euo pipefail
+          cat transport/.transport/govux001.patch.gz.b64.part1 transport/.transport/govux001.patch.gz.b64.part2 | base64 --decode > /tmp/govux001.patch.gz
+          actual="$(sha256sum /tmp/govux001.patch.gz | awk '{print $1}')"
+          test "$actual" = "$PATCH_GZ_SHA256"
+          gzip -dc /tmp/govux001.patch.gz > /tmp/govux001.patch
+          cd workspace
+          test "$(git rev-parse HEAD)" = "$BASE_SHA"
+          git apply --index /tmp/govux001.patch
+          git diff --cached --check
+          tree="$(git write-tree)"
+          echo "candidate_tree=$tree"
+          test "$tree" = "$EXPECTED_TREE"
+          test -z "$(git status --porcelain | grep -E '^.. \.transport/|^.. \.github/workflows/govux001-materialize\.yml$' || true)"
+
+      - name: Verify focused GOVUX contracts
+        shell: bash
+        working-directory: workspace
+        run: |
+          set -euo pipefail
+          python .adwf/tests/test_standing_owner_authorization.py
+          python .adwf/tests/test_trust.py
+          python .adwf/tests/test_generated_projection_trust.py
+          python .adwf/tests/test_trusted_controller.py
+          python .adwf/tests/test_v16_remediation.py
+
+      - name: Verify full framework
+        shell: bash
+        working-directory: workspace
+        run: |
+          set -euo pipefail
+          git checkout -- .
+          python .adwf/scripts/compile_policy.py
+          python .adwf/scripts/docs_freshness.py
+          python .adwf/scripts/generate_manifest.py --check
+          python .adwf/scripts/validate_framework.py
+          python .adwf/adwf.py self-test > /tmp/govux-selftest.log 2>&1
+          tail -25 /tmp/govux-selftest.log
+          grep -q 'Ran 368 tests' /tmp/govux-selftest.log
+          grep -q '^OK$' /tmp/govux-selftest.log
+          git checkout -- .
+          python .adwf/scripts/compile_policy.py
+          python .adwf/scripts/docs_freshness.py
+          python .adwf/scripts/generate_manifest.py --check
+          python .adwf/scripts/validate_framework.py
+          git diff --cached --check
+          test "$(git write-tree)" = "$EXPECTED_TREE"
+
+      - name: Prove old BASE policy still requires human for this self-modification
+        shell: bash
+        working-directory: workspace
+        run: |
+          set -euo pipefail
+          git config user.name 'ADWF GOVUX-001 Materializer'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git commit -m 'GOVUX-001: standing owner authorization by exception'
+          python - <<'PY'
+          from pathlib import Path
+          import sys
+          root=Path('.').resolve(); sys.path.insert(0,str(root/'.adwf'))
+          from lib.trust import classify_git_diff
+          base='96ab6f6c7ab46a8059a75d72d4422c4f04dd7b33'
+          head=__import__('subprocess').check_output(['git','rev-parse','HEAD'],text=True).strip()
+          r=classify_git_diff(root,base,head)
+          print(r)
+          assert r['result']=='HUMAN_REQUIRED', r
+          assert r['required_risk']=='R4', r
+          assert r['required_work_type']=='GOV', r
+          assert r.get('authorization_mode')=='EXPLICIT_HUMAN_REQUIRED', r
+          assert r.get('feature_files')==[], r
+          PY
+          test "$(git rev-parse HEAD^)" = "$BASE_SHA"
+          test "$(git rev-parse HEAD^{tree})" = "$EXPECTED_TREE"
+
+      - name: Publish atomic feature branch
+        shell: bash
+        working-directory: workspace
+        run: |
+          set -euo pipefail
+          git push origin "HEAD:refs/heads/$FEATURE_BRANCH"
+          echo "feature_head=$(git rev-parse HEAD)"
+          echo "feature_tree=$(git rev-parse HEAD^{tree})"
