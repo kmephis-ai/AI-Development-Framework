@@ -1,0 +1,68 @@
+name: TRACE-001 Materialize Verified Candidate
+
+on:
+  push:
+    branches:
+      - agent/materialize-trace001-20260815-a1
+    paths:
+      - .github/workflows/trace001-materialize.yml
+
+permissions:
+  contents: write
+
+jobs:
+  materialize:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 12
+    steps:
+      - name: Checkout transport branch
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd
+        with:
+          fetch-depth: 0
+
+      - name: Reconstruct exact verified candidate payload
+        shell: bash
+        run: |
+          set -euo pipefail
+          cat .trace001-transport/chunk-* | base64 --decode > /tmp/trace001-candidate.tar.gz
+          echo '53dd8b51b03ebad8218f25b0dd88a02bff83718452e3e1d27b14534d6ddded8b  /tmp/trace001-candidate.tar.gz' | sha256sum --check --strict
+          tar -tzf /tmp/trace001-candidate.tar.gz
+
+      - name: Apply payload to exact feature branch
+        shell: bash
+        run: |
+          set -euo pipefail
+          git fetch origin agent/trace-001-decision-requirement-graph
+          git checkout -B agent/trace-001-decision-requirement-graph origin/agent/trace-001-decision-requirement-graph
+          tar -xzf /tmp/trace001-candidate.tar.gz
+          git diff --check
+          test -x .adwf/scripts/validate_traceability.py
+
+      - name: Validate TRACE and framework
+        shell: bash
+        run: |
+          set -euo pipefail
+          python .adwf/scripts/validate_traceability.py
+          python .adwf/scripts/validate_capabilities.py
+          python .adwf/scripts/docs_freshness.py
+          python .adwf/scripts/validate_docs.py
+          python .adwf/scripts/validate_ci.py
+          python .adwf/scripts/validate_pipeline_ir.py
+          python .adwf/scripts/generate_manifest.py --check
+          python .adwf/scripts/validate_framework.py
+          python .adwf/adwf.py self-test
+
+      - name: Verify exact Git tree and publish
+        shell: bash
+        run: |
+          set -euo pipefail
+          git add -A
+          ACTUAL_TREE="$(git write-tree)"
+          EXPECTED_TREE='ee2cab61656e3d5060648c4492aebdec6d464cad'
+          echo "actual_tree=${ACTUAL_TREE}"
+          echo "expected_tree=${EXPECTED_TREE}"
+          test "${ACTUAL_TREE}" = "${EXPECTED_TREE}"
+          git config user.name 'ADWF TRACE Materializer'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git commit -m 'TRACE-001: materialize verified traceability candidate'
+          git push origin HEAD:agent/trace-001-decision-requirement-graph
