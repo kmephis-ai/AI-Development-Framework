@@ -4,7 +4,7 @@
   "required": [
     "id",
     "title",
-    "state",
+    "implementation_status",
     "cost_status",
     "mandatory",
     "requires_paid_ai_api"
@@ -17,12 +17,14 @@
     "title": {
       "type": "string"
     },
-    "state": {
+    "implementation_status": {
       "enum": [
-        "NOT_STARTED",
+        "NOT_DESIGNED",
+        "DESIGNED_ONLY",
+        "PARTIAL",
         "IMPLEMENTED",
-        "VERIFIED",
-        "ACCEPTED"
+        "DEPRECATED",
+        "BLOCKED"
       ]
     },
     "cost_status": {
