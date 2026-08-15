@@ -11,9 +11,9 @@
         ".github/workflows/**"
       ],
       "mode": "generated-status-block+manual",
-      "source_digest": "59a197c73ac1ea675b9ab332e0249005e526eddc3440ef49d2596f51a6c03f68",
-      "reviewed_at": "2026-08-13T00:00:00Z",
-      "valid_until": "2026-11-13T00:00:00Z"
+      "source_digest": "73aa08bb57a0dbbdd324c6da9037dc61a3f0929e0bf5b65c218532ae0aeb7173",
+      "reviewed_at": "2026-08-15T00:00:00Z",
+      "valid_until": "2026-11-15T00:00:00Z"
     },
     {
       "path": "AGENTS.md",
@@ -24,9 +24,9 @@
         "skills/**"
       ],
       "mode": "manual-governance",
-      "source_digest": "b5cefbac985bb70777c95ad4520ff9967414153bdaf639066d1b186b12ffce8f",
-      "reviewed_at": "2026-08-13T00:00:00Z",
-      "valid_until": "2026-11-13T00:00:00Z"
+      "source_digest": "7179dbfaea0f35483134c32f85ccd18cf2c305325f51a0eec815812014f368c2",
+      "reviewed_at": "2026-08-15T00:00:00Z",
+      "valid_until": "2026-11-15T00:00:00Z"
     },
     {
       "path": "docs/architecture/CI_CD_ARCHITECTURE.md",
@@ -37,9 +37,9 @@
         ".adwf/scripts/**"
       ],
       "mode": "architecture",
-      "source_digest": "43d32ab54ac58264e29c0ce79cc4ab060b7aa5668e88454ca4ea9b751ada0cdd",
-      "reviewed_at": "2026-08-13T00:00:00Z",
-      "valid_until": "2026-11-13T00:00:00Z"
+      "source_digest": "b37f083a0f50e3ee71f56e51e0c8de57cd803949e996d1eccf16201b80ae10bf",
+      "reviewed_at": "2026-08-15T00:00:00Z",
+      "valid_until": "2026-11-15T00:00:00Z"
     },
     {
       "path": "CONTROL_CENTER.md",
@@ -50,8 +50,8 @@
       ],
       "mode": "generated",
       "source_digest": "bf76d0c9ddcd11614474038c97c363480abdaa7bba2d46f2f65af1b6a1bed5f7",
-      "reviewed_at": "2026-08-13T00:00:00Z",
-      "valid_until": "2026-11-13T00:00:00Z"
+      "reviewed_at": "2026-08-15T00:00:00Z",
+      "valid_until": "2026-11-15T00:00:00Z"
     },
     {
       "path": "docs/V1_6_IMPLEMENTATION_REPORT.md",
@@ -66,8 +66,8 @@
       ],
       "mode": "implementation-certification",
       "source_digest": "96fbb97016cb0f401b41b0717ff0e372deeba260be92d4a94617d9a9a692fc37",
-      "reviewed_at": "2026-08-13T00:00:00Z",
-      "valid_until": "2026-11-13T00:00:00Z"
+      "reviewed_at": "2026-08-15T00:00:00Z",
+      "valid_until": "2026-11-15T00:00:00Z"
     },
     {
       "path": "docs/operations/OWNER_AI_GUIDE.md",
@@ -79,8 +79,8 @@
       ],
       "mode": "owner-guide",
       "source_digest": "825bce6785f2038c6acd5cf1e48eb9a914a18fed713efa8eb2be6e28d104e2ed",
-      "reviewed_at": "2026-08-13T00:00:00Z",
-      "valid_until": "2026-11-13T00:00:00Z"
+      "reviewed_at": "2026-08-15T00:00:00Z",
+      "valid_until": "2026-11-15T00:00:00Z"
     },
     {
       "path": "docs/governance/RECOVERY_PLAYBOOK.md",
@@ -92,8 +92,8 @@
       ],
       "mode": "governance",
       "source_digest": "68f0c11d641d731c0a6560fe566f0aeb307aed37ed5bd812cf1773ef4ca7b3e4",
-      "reviewed_at": "2026-08-13T00:00:00Z",
-      "valid_until": "2026-11-13T00:00:00Z"
+      "reviewed_at": "2026-08-15T00:00:00Z",
+      "valid_until": "2026-11-15T00:00:00Z"
     },
     {
       "path": "docs/operations/FREE_LIMITS_AND_NOTIFICATIONS.md",
@@ -105,8 +105,8 @@
       ],
       "mode": "provider-facts",
       "source_digest": "61094eb026194041ef8d6e7dd8a0efc3c17182b12bbb3313cc6460ce342d60a9",
-      "reviewed_at": "2026-08-13T00:00:00Z",
-      "valid_until": "2026-11-13T00:00:00Z"
+      "reviewed_at": "2026-08-15T00:00:00Z",
+      "valid_until": "2026-11-15T00:00:00Z"
     },
     {
       "path": "docs/operations/LOCAL_GIT_MIRROR.md",
@@ -115,7 +115,7 @@
         ".adwf/tests/test_local_git_mirror_skill.py",
         ".adwf/scripts/generate_manifest.py"
       ],
-      "source_digest": "58f480c8f1d8a32f7b4d8111166e128c44dcc20674e5a059bfbe760e1cade432",
+      "source_digest": "86f8b5a85667720cdc3d9abd5a46bdd08cf9477d8824137661096f741f3d6e76",
       "reviewed_at": "2026-08-15T00:00:00Z",
       "valid_until": "2026-11-15T00:00:00Z",
       "mode": "operations"
