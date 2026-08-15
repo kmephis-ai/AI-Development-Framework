@@ -1,0 +1,71 @@
+name: SKILL-001A pure-trust materialize
+
+on:
+  push:
+    branches:
+      - agent/skill001a-pure-trust-scratch-20260815
+    paths:
+      - .github/workflows/skill001a-pure-trust.yml
+
+permissions:
+  contents: write
+
+jobs:
+  materialize:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd
+        with:
+          fetch-depth: 1
+          persist-credentials: true
+
+      - name: Remove feature documentation and helper
+        shell: bash
+        run: |
+          set -euo pipefail
+          rm -f docs/operations/SKILL_OPERATING_LAYER.md
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          p = Path('.adwf/docs-registry.json')
+          data = json.loads(p.read_text(encoding='utf-8'))
+          data['documents'] = [d for d in data['documents'] if d.get('path') != 'docs/operations/SKILL_OPERATING_LAYER.md']
+          p.write_text(json.dumps(data, ensure_ascii=False, indent=2) + '\n', encoding='utf-8')
+          PY
+          rm -f .github/workflows/skill001a-pure-trust.yml
+          python .adwf/scripts/docs_freshness.py --write
+          python .adwf/scripts/generate_manifest.py
+          git add -A
+
+      - name: Verify pure trust candidate
+        shell: bash
+        env:
+          TERM: xterm
+        run: |
+          set -euo pipefail
+          python .adwf/scripts/validate_ci.py
+          python .adwf/scripts/validate_capabilities.py
+          python .adwf/scripts/validate_skills.py
+          python .adwf/scripts/generate_skill_registry.py --check
+          python .adwf/scripts/docs_freshness.py
+          python .adwf/scripts/validate_docs.py
+          python .adwf/scripts/generate_manifest.py --check
+          python .adwf/scripts/validate_framework.py
+          python -m unittest discover -s .adwf/tests -p 'test_skill_operating_layer.py' -v
+          python .adwf/adwf.py self-test
+          python .adwf/scripts/validate_framework.py
+          git diff --check --cached
+          if git status --porcelain | grep -E '^.. skills/'; then
+            echo '::error title=FEATURE_SCOPE_VIOLATION::skills content found in pure trust candidate'
+            exit 1
+          fi
+
+      - name: Publish scratch tree
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git commit -m 'SKILL-001A: materialize pure trust candidate'
+          git push origin HEAD:agent/skill001a-pure-trust-scratch-20260815
