@@ -1,0 +1,62 @@
+name: ADWF Local Git Mirror Fallback
+
+on:
+  push:
+    branches:
+      - __BOOTSTRAP_BRANCH__
+
+permissions:
+  contents: write
+
+env:
+  SOURCE_SHA: __SOURCE_SHA__
+  SOURCE_BRANCH: __SOURCE_BRANCH__
+
+jobs:
+  build-chunks:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd
+        with:
+          fetch-depth: 0
+
+      - name: Build exact-source Base64 chunks
+        shell: bash
+        run: |
+          set -euo pipefail
+          git cat-file -e "${SOURCE_SHA}^{commit}"
+          git branch -f adwf-source "${SOURCE_SHA}"
+          rm -rf mirror
+          mkdir -p mirror/chunks
+          git bundle create /tmp/repository.bundle refs/heads/adwf-source --tags
+          git bundle verify /tmp/repository.bundle
+          BUNDLE_SHA256="$(sha256sum /tmp/repository.bundle | awk '{print $1}')"
+          BUNDLE_BYTES="$(wc -c < /tmp/repository.bundle | tr -d ' ')"
+          base64 -w0 /tmp/repository.bundle > /tmp/repository.bundle.b64
+          split -b 45000 -d -a 4 --additional-suffix=.b64part /tmp/repository.bundle.b64 mirror/chunks/part-
+          PARTS="$(find mirror/chunks -type f -name 'part-*.b64part' | wc -l | tr -d ' ')"
+          cat > mirror/manifest.json <<JSON
+          {
+            "schema_version": 1,
+            "source_repository": "${GITHUB_REPOSITORY}",
+            "source_branch": "${SOURCE_BRANCH}",
+            "source_sha": "${SOURCE_SHA}",
+            "transport_sha": "${GITHUB_SHA}",
+            "bundle_sha256": "${BUNDLE_SHA256}",
+            "bundle_bytes": ${BUNDLE_BYTES},
+            "chunk_bytes": 45000,
+            "parts": ${PARTS},
+            "bundle_ref": "refs/heads/adwf-source"
+          }
+          JSON
+
+      - name: Publish chunks on disposable branch
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add mirror
+          git commit -m "chore: publish local mirror fallback chunks [mirror-output]"
+          git push origin HEAD:${GITHUB_REF_NAME}
