@@ -57,26 +57,22 @@ jobs:
         run: python .adwf/scripts/github_runtime_sync.py --restore
       - name: Publish trusted exact-HEAD and governance gates
         if: github.event_name == 'workflow_run' || github.event_name == 'pull_request_review'
-        continue-on-error: true
         env:
           GITHUB_TOKEN: ${{ github.token }}
         run: python .adwf/scripts/publish_trusted_gate.py --event "$GITHUB_EVENT_PATH"
       - name: Compile provider facts/evidence/AssuranceSnapshot
         if: github.event_name == 'workflow_run'
-        continue-on-error: true
         env:
           GITHUB_TOKEN: ${{ github.token }}
           ADWF_SUBJECT_SHA: ${{ github.event.workflow_run.head_sha }}
         run: python .adwf/scripts/github_reconcile.py --apply --subject-sha "$ADWF_SUBJECT_SHA"
-      - name: Read back exact-revision preview attestation from provider logs
+      - name: Read back exact-revision preview attestation from provider evidence
         if: github.event_name == 'workflow_run'
-        continue-on-error: true
         env:
           GITHUB_TOKEN: ${{ github.token }}
         run: python .adwf/scripts/collect_preview_attestation.py --event "$GITHUB_EVENT_PATH"
       - name: Complete staged GitHub bootstrap after trusted seed checks
         if: github.event_name == 'workflow_run'
-        continue-on-error: true
         env:
           GITHUB_TOKEN: ${{ github.token }}
         run: python .adwf/scripts/github_bootstrap.py --apply

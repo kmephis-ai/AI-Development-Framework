@@ -4,10 +4,10 @@
 v1.6 closes the self-attestation gap: a successful PR workflow is never enough
 when the PR changes ADWF evaluators, policy or trusted workflows. The default-
 branch controller reads the PR diff itself through GitHub API and requires an
-exact-HEAD approval from a repository admin for governance changes.
+exact-HEAD human authorization for governance changes.
 """
 from __future__ import annotations
-import argparse,json,os,sys
+import argparse,json,os,re,sys
 from pathlib import Path
 from typing import Any
 ROOT=Path(__file__).resolve().parents[2];sys.path.insert(0,str(ROOT/'.adwf'))
@@ -16,12 +16,26 @@ from lib.provider_contracts import ProviderContractError
 from lib.strict_json import loads as strict_loads
 from lib.trust_boundary import classify_changed_files
 
+OWNER_ATTESTATION=re.compile(r'(?mi)^\s*Owner-Attestation:\s*`?([0-9a-f]{40})`?\s*$')
+
 
 def _pull_number(live:dict[str,Any])->int|None:
     prs=live.get('pull_requests') or []
     if len(prs)!=1:return None
     try:return int(prs[0].get('number'))
     except (TypeError,ValueError):return None
+
+
+def _pull_number_for_sha(client:GitHubClient,live:dict[str,Any],sha:str)->int|None:
+    """Resolve the PR even when GitHub drops workflow_run.pull_requests after merge."""
+    direct=_pull_number(live)
+    if direct is not None:return direct
+    matches=[]
+    for pr in client.pulls():
+        if str((pr.get('head') or {}).get('sha') or '')!=sha:continue
+        try:matches.append(int(pr.get('number')))
+        except (TypeError,ValueError):continue
+    return matches[0] if len(matches)==1 else None
 
 
 def _admin_exact_head_approval(client:GitHubClient,pr_number:int,sha:str,author_login:str)->dict[str,Any]:
@@ -35,8 +49,34 @@ def _admin_exact_head_approval(client:GitHubClient,pr_number:int,sha:str,author_
         try:perm=client.collaborator_permission(login)
         except Exception:continue
         if str(perm.get('permission') or '').lower()!='admin':continue
-        candidates.append({'login':login,'review_id':review.get('id'),'commit_id':review.get('commit_id')})
+        candidates.append({'login':login,'review_id':review.get('id'),'commit_id':review.get('commit_id'),'kind':'ADMIN_REVIEW'})
     return {'verified':bool(candidates),'approvals':candidates}
+
+
+def _owner_exact_head_attestation(client:GitHubClient,pr:dict[str,Any],sha:str)->dict[str,Any]:
+    """Verify a SHA-bound human owner marker for a solo-maintainer repository.
+
+    The marker is accepted only from the PR author's GitHub-authenticated PR body
+    and only when that identity has repository admin permission. Automation must
+    never synthesize this marker without a real owner confirmation.
+    """
+    author=str((pr.get('user') or {}).get('login') or '')
+    if not author:return {'verified':False,'reason':'PR_AUTHOR_MISSING'}
+    matches=OWNER_ATTESTATION.findall(str(pr.get('body') or ''))
+    if matches!=[sha]:return {'verified':False,'reason':'OWNER_ATTESTATION_EXACT_HEAD_REQUIRED','matches':matches}
+    try:perm=client.collaborator_permission(author)
+    except Exception:return {'verified':False,'reason':'OWNER_ADMIN_PERMISSION_NOT_VERIFIED'}
+    if str(perm.get('permission') or '').lower()!='admin':return {'verified':False,'reason':'OWNER_ADMIN_PERMISSION_REQUIRED'}
+    return {'verified':True,'login':author,'commit_id':sha,'kind':'SOLO_MAINTAINER_OWNER_ATTESTATION'}
+
+
+def _governance_authorization(client:GitHubClient,pr_number:int,pr:dict[str,Any],sha:str)->dict[str,Any]:
+    author=str((pr.get('user') or {}).get('login') or '')
+    review=_admin_exact_head_approval(client,pr_number,sha,author)
+    if review['verified']:return {'verified':True,'mode':'ADMIN_REVIEW','evidence':review}
+    owner=_owner_exact_head_attestation(client,pr,sha)
+    if owner['verified']:return {'verified':True,'mode':'SOLO_MAINTAINER_OWNER_ATTESTATION','evidence':owner}
+    return {'verified':False,'mode':None,'evidence':{'admin_review':review,'owner_attestation':owner}}
 
 
 def evaluate_trusted_gate(client:GitHubClient,repo:str,workflow_run:dict[str,Any])->dict[str,Any]:
@@ -48,7 +88,7 @@ def evaluate_trusted_gate(client:GitHubClient,repo:str,workflow_run:dict[str,Any
     if live.get('name')!='ADWF PR':reasons.append('UNEXPECTED_WORKFLOW')
     if live.get('event')!='pull_request':reasons.append('UNTRUSTED_EVENT_SOURCE')
     if live.get('status')!='completed' or live.get('conclusion')!='success':reasons.append('FAST_FEEDBACK_NOT_PASS')
-    pr_number=_pull_number(live)
+    pr_number=_pull_number_for_sha(client,live,sha)
     if pr_number is None:reasons.append('PR_READBACK_MISSING')
     checks=client.check_runs(sha)
     fast=[c for c in checks if c.get('name')=='fast-feedback' and c.get('head_sha')==sha]
@@ -64,12 +104,11 @@ def evaluate_trusted_gate(client:GitHubClient,repo:str,workflow_run:dict[str,Any
         governance['files']=classification['trust_boundary_files']
         governance['required']=classification['trust_boundary_changed']
         if classification['trust_boundary_changed']:
-            author=str((pr.get('user') or {}).get('login') or '')
-            approval=_admin_exact_head_approval(client,pr_number,sha,author)
+            approval=_governance_authorization(client,pr_number,pr,sha)
             governance['approval']=approval
             governance['verified']=approval['verified']
             if not approval['verified']:
-                governance_reasons.append('GOVERNANCE_ADMIN_EXACT_HEAD_APPROVAL_REQUIRED')
+                governance_reasons.append('GOVERNANCE_EXACT_HEAD_HUMAN_ATTESTATION_REQUIRED')
                 reasons.append('TRUST_BOUNDARY_CHANGE_NOT_AUTHORIZED')
     governance['reason_codes']=governance_reasons
     return {'sha':sha,'pr_number':pr_number,'reasons':reasons,'governance':governance}
@@ -77,7 +116,6 @@ def evaluate_trusted_gate(client:GitHubClient,repo:str,workflow_run:dict[str,Any
 
 def _publish(client:GitHubClient,name:str,sha:str,passed:bool,title:str,summary:str)->None:
     client.post(f'/repos/{client.repo}/check-runs',{'name':name,'head_sha':sha,'status':'completed','conclusion':'success' if passed else 'failure','output':{'title':title,'summary':summary[:65000]}})
-
 
 
 def workflow_run_from_event(client:GitHubClient,event:dict[str,Any])->dict[str,Any]:
@@ -102,7 +140,7 @@ def main()->int:
     event=strict_loads(Path(a.event).read_text(encoding='utf-8'));client=GitHubClient(repo,token);wr=workflow_run_from_event(client,event)
     result=evaluate_trusted_gate(client,repo,wr);sha=result.get('sha') or ''
     if len(sha)!=40:print('TRUSTED_GATE: BLOCK: invalid workflow_run identity');return 2
-    gov=result['governance'];gov_summary='PASS: no trust-boundary changes.' if not gov['required'] else ('PASS: exact-HEAD repository-admin approval verified.' if gov['verified'] else 'BLOCK: '+', '.join(gov['reason_codes']))
+    gov=result['governance'];gov_summary='PASS: no trust-boundary changes.' if not gov['required'] else ('PASS: exact-HEAD human authorization verified.' if gov['verified'] else 'BLOCK: '+', '.join(gov['reason_codes']))
     _publish(client,'adwf/governance-gate',sha,gov['verified'],'ADWF governance trust-boundary gate',gov_summary)
     reasons=result['reasons'];passed=not reasons
     summary='PASS: provider-attested exact SHA and trusted evaluator boundary.' if passed else 'BLOCK: '+', '.join(reasons)

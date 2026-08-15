@@ -14,6 +14,7 @@ from .github_auth import detect_repository,discover_token
 from .github_provider import GitHubClient
 from .github_rulesets import canonical_ruleset_payload,verify_rulesets,discover_check_source,runtime_anchor_ruleset_payload,verify_runtime_anchor_ruleset
 from .pack_materializer import materialize_project_pack
+from .strict_json import loads as strict_loads
 
 SEED_BRANCH='adwf/bootstrap-seed-v1-6';SEED_FILE='ADWF_BOOTSTRAP_SEED.md'
 
@@ -25,6 +26,18 @@ def _open_pr_for_branch(client:GitHubClient,branch:str)->dict[str,Any]|None:
     for pr in client.pulls():
         if pr.get('state')=='open' and str((pr.get('head') or {}).get('ref') or '')==branch:return pr
     return None
+
+def _framework_self_host(root:Path)->bool:
+    """Return true only for the ADWF framework repository itself.
+
+    Project Pack detection describes a product runtime. The framework package is
+    intentionally not a runtime product, so absence of a product pack is a
+    valid NOT_APPLICABLE state rather than HUMAN_REQUIRED.
+    """
+    try:cfg=strict_loads((root/'.adwf/config.json').read_text(encoding='utf-8'))
+    except Exception:return False
+    project=cfg.get('project') if isinstance(cfg,dict) else {}
+    return isinstance(project,dict) and project.get('type')=='framework' and project.get('runtime_product') is False
 
 def ensure_seed_pr(client:GitHubClient,default_branch:str,default_sha:str)->dict[str,Any]:
     existing=_open_pr_for_branch(client,SEED_BRANCH)
@@ -44,7 +57,7 @@ def _pack_projection_files(root:Path,desired_config:dict[str,Any])->dict[str,str
         return {rel:(target/rel).read_text(encoding='utf-8') for rel in ('.adwf/config.json','.adwf/effective-policy.json','MANIFEST.json','SHA256SUMS.txt')}
 
 def ensure_pack_pr(client:GitHubClient,root:Path,default_branch:str,default_sha:str,plan:dict[str,Any])->dict[str,Any]:
-    if plan.get('status')=='HUMAN_REQUIRED':return {'status':'NOT_APPLICABLE','reason':'PROJECT_PACK_NOT_DETECTED'}
+    if plan.get('status') in {'HUMAN_REQUIRED','NOT_APPLICABLE'}:return {'status':'NOT_APPLICABLE','reason':plan.get('reason') or 'PROJECT_PACK_NOT_DETECTED'}
     if plan.get('status')=='ALREADY_MATERIALIZED':return {'status':'ALREADY_MATERIALIZED','pack':plan.get('pack')}
     pack=str(plan.get('pack') or 'generic');branch=f'adwf/project-pack-{pack}-v1-6'
     existing=_open_pr_for_branch(client,branch)
@@ -58,6 +71,8 @@ def ensure_pack_pr(client:GitHubClient,root:Path,default_branch:str,default_sha:
 
 def bootstrap_repository(root:str|Path,*,apply:bool)->dict[str,Any]:
     base=Path(root).resolve();pack_plan=materialize_project_pack(base,base,apply=False)
+    if pack_plan.get('status')=='HUMAN_REQUIRED' and _framework_self_host(base):
+        pack_plan={'status':'NOT_APPLICABLE','reason':'FRAMEWORK_SELF_HOST_PROJECT_PACK_NOT_APPLICABLE','write_performed':False}
     repo=detect_repository(base);token,source=discover_token()
     if not repo:return {'status':'HUMAN_REQUIRED','reason':'GITHUB_REPOSITORY_NOT_DETECTED','credential_source':source,'project_pack':pack_plan}
     if not token:return {'status':'HUMAN_REQUIRED','reason':'GITHUB_AUTH_REQUIRED','repository':repo,'credential_source':source,'project_pack':pack_plan}
@@ -90,8 +105,9 @@ def bootstrap_repository(root:str|Path,*,apply:bool)->dict[str,Any]:
         if not anchor_rules['readback_verified']:
             return {'status':'NOT_VERIFIED','repository':repo,'ruleset':existing,'runtime_anchor_ruleset':anchor_rules,'check_source':source_proof,'project_pack':pack_plan,'credential_source':source}
     if pack_plan.get('status')=='ALREADY_MATERIALIZED':
-        pack_pr={'status':'ALREADY_MATERIALIZED','pack':pack_plan.get('pack')}
-        status='VERIFIED'
+        pack_pr={'status':'ALREADY_MATERIALIZED','pack':pack_plan.get('pack')};status='VERIFIED'
+    elif pack_plan.get('status')=='NOT_APPLICABLE':
+        pack_pr={'status':'NOT_APPLICABLE','reason':pack_plan.get('reason')};status='VERIFIED'
     else:
         pack_pr=ensure_pack_pr(client,base,default,default_sha,pack_plan) if apply else {'status':'READY_TO_CREATE_GOVERNANCE_PR'}
         status='WAITING_OWNER_GOVERNANCE_APPROVAL' if pack_pr.get('status') in {'GOVERNANCE_PR_WAITING_OWNER_APPROVAL','GOVERNANCE_PR_CREATED'} else ('READY_TO_APPLY' if not apply else 'NOT_VERIFIED')
