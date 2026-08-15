@@ -96,12 +96,14 @@ Default для любого пути, которого нет в package manifes
 
 Проверить canonical contract:
 
+<!-- adwf-doc: skip(reason=validated-by-framework-contract-suite) -->
 ```bash
 python .adwf/scripts/validate_managed_surface.py
 ```
 
 Построить read-only adoption plan для consumer checkout:
 
+<!-- adwf-doc: skip(reason=requires-consumer-checkout-and-exact-revision) -->
 ```bash
 python .adwf/scripts/validate_managed_surface.py \
   --consumer-root /path/to/project \
@@ -110,6 +112,7 @@ python .adwf/scripts/validate_managed_surface.py \
 
 Построить read-only detach plan по trusted snapshot:
 
+<!-- adwf-doc: skip(reason=requires-consumer-checkout-and-trusted-snapshot) -->
 ```bash
 python .adwf/scripts/validate_managed_surface.py \
   --consumer-root /path/to/project \
