@@ -115,7 +115,27 @@ def evaluate_trusted_gate(client:GitHubClient,repo:str,workflow_run:dict[str,Any
 
 
 def _publish(client:GitHubClient,name:str,sha:str,passed:bool,title:str,summary:str)->None:
-    client.post(f'/repos/{client.repo}/check-runs',{'name':name,'head_sha':sha,'status':'completed','conclusion':'success' if passed else 'failure','output':{'title':title,'summary':summary[:65000]}})
+    """Publish one trusted decision through both provider gate transports.
+
+    Checks API is retained as rich audit evidence. Commit Status API carries the
+    same exact-SHA decision into branch rulesets without depending on which
+    historical GitHub Actions check suite receives a programmatic check run.
+    The check run is written first: if either provider write fails, the caller
+    fails closed and the required status cannot become a complete false PASS.
+    """
+    conclusion='success' if passed else 'failure'
+    client.post(f'/repos/{client.repo}/check-runs',{
+        'name':name,
+        'head_sha':sha,
+        'status':'completed',
+        'conclusion':conclusion,
+        'output':{'title':title,'summary':summary[:65000]},
+    })
+    client.post(f'/repos/{client.repo}/statuses/{sha}',{
+        'state':conclusion,
+        'context':name,
+        'description':summary[:140],
+    })
 
 
 def workflow_run_from_event(client:GitHubClient,event:dict[str,Any])->dict[str,Any]:
