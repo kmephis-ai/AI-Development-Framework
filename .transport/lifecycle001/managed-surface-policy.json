@@ -1,0 +1,28 @@
+{
+  "$schema": ".adwf/schemas/managed-surface-policy.schema.json",
+  "schema_version": 1,
+  "role": "MANAGED_SURFACE_POLICY",
+  "source_inventory": "MANIFEST.json",
+  "source_checksums": "SHA256SUMS.txt",
+  "default_manifest_ownership": "FRAMEWORK_PRIVATE",
+  "default_unlisted_ownership": "CONSUMER_OWNED",
+  "shared_guarded_paths": [
+    ".gitattributes",
+    ".gitignore",
+    ".gitlab-ci.yml",
+    "AGENTS.md",
+    "CHANGELOG.md",
+    "README.md",
+    "SECURITY.md",
+    "VERSION",
+    "labels.json"
+  ],
+  "snapshot_schema": ".adwf/schemas/managed-surface-snapshot.schema.json",
+  "plan_schema": ".adwf/schemas/managed-surface-plan.schema.json",
+  "invariants": [
+    "PROJECT_MUST_OUTLIVE_FRAMEWORK",
+    "READ_ONLY_PLANNER_V1",
+    "DRIFT_BLOCKS_DESTRUCTIVE_DETACH",
+    "SHARED_GUARDED_PRESERVED"
+  ]
+}
