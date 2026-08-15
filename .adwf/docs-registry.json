@@ -11,7 +11,7 @@
         ".github/workflows/**"
       ],
       "mode": "generated-status-block+manual",
-      "source_digest": "12c5820cd67068c65ccdef51493b294bb3e2295e9ddb920b4eee14a9ae41e62a",
+      "source_digest": "95cf34445ea680236ece92759d9be37fc0d82cc005467986f687a2061100a84b",
       "reviewed_at": "2026-08-13T00:00:00Z",
       "valid_until": "2026-11-13T00:00:00Z"
     },
@@ -24,7 +24,7 @@
         "skills/**"
       ],
       "mode": "manual-governance",
-      "source_digest": "ef7f0b3ccdb7e0b5ee035d4a85cf44ce2dc2306a1053e9a789387ff328e4532e",
+      "source_digest": "48740468bbab66567076ac5009f1c014c15162ba343cd11b0b4d181f0a1200f1",
       "reviewed_at": "2026-08-13T00:00:00Z",
       "valid_until": "2026-11-13T00:00:00Z"
     },
@@ -37,7 +37,7 @@
         ".adwf/scripts/**"
       ],
       "mode": "architecture",
-      "source_digest": "d9e167a7bb8493873bd8086cdc4e88563f6349c373d481d3b1b6efd96a4e3a3a",
+      "source_digest": "80d8271efa70b7722a3e5d24889ce3dc738850625695ea37b44b34905be4d8d8",
       "reviewed_at": "2026-08-13T00:00:00Z",
       "valid_until": "2026-11-13T00:00:00Z"
     },
@@ -65,7 +65,7 @@
         ".adwf/scripts/validate_capabilities.py"
       ],
       "mode": "implementation-certification",
-      "source_digest": "d954c4d59e20818a5e4cfea8ed08e5adfabba9b32351c6fd06ae5dfcabe716ee",
+      "source_digest": "8aa1916bea002225909d444b35bfe18dd251414bc014ae9e9de8a4222884dc41",
       "reviewed_at": "2026-08-13T00:00:00Z",
       "valid_until": "2026-11-13T00:00:00Z"
     },
@@ -122,6 +122,22 @@
       ],
       "mode": "operations",
       "source_digest": "b73efed85abf805badba59d14e7328e81a3613d39892d641b8c4eb2d686cf566",
+      "reviewed_at": "2026-08-13T00:00:00Z",
+      "valid_until": "2026-11-13T00:00:00Z"
+    },
+    {
+      "path": "docs/governance/AI_WORK_CONTRACTS.md",
+      "watched": [
+        ".adwf/lib/ai_work_contracts.py",
+        ".adwf/lib/runtime_supervisor.py",
+        ".adwf/lib/action_executors.py",
+        ".adwf/lib/github_agent_inbox.py",
+        ".adwf/schemas/ai-work-package.schema.json",
+        ".adwf/schemas/ai-work-result.schema.json",
+        ".adwf/tests/test_ai_work_contracts.py"
+      ],
+      "mode": "governance",
+      "source_digest": "252af6d74df0e9aee929aad28fe3f56ad33a6a6e7a4180cf2dc3f89180d9f4b5",
       "reviewed_at": "2026-08-13T00:00:00Z",
       "valid_until": "2026-11-13T00:00:00Z"
     }

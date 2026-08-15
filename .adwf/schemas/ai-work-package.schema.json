@@ -1,0 +1,30 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "ADWF AIWorkPackage v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["$schema", "schema_version", "package_id", "package_digest", "run_id", "roadmap_id", "issue_id", "revision", "phase", "work_type", "risk", "base_sha", "goal", "acceptance_criteria", "verification_plan", "conflict_domains", "allowed_write_surfaces", "forbidden_write_surfaces", "required_evidence", "monetary_budget_usd", "created_at"],
+  "properties": {
+    "$schema": {"const": ".adwf/schemas/ai-work-package.schema.json"},
+    "schema_version": {"const": 1},
+    "package_id": {"type": "string", "pattern": "^AIWP-[0-9a-f]{24}$"},
+    "package_digest": {"type": "string", "format": "sha256"},
+    "run_id": {"type": "string", "minLength": 3},
+    "roadmap_id": {"type": "string", "minLength": 1},
+    "issue_id": {"type": "string", "minLength": 1},
+    "revision": {"type": "integer", "minimum": 0},
+    "phase": {"enum": ["EXECUTE", "RECOVERY"]},
+    "work_type": {"enum": ["feature", "bug", "recovery", "verification", "governance", "docs", "migration"]},
+    "risk": {"enum": ["R0", "R1", "R2", "R3", "R4"]},
+    "base_sha": {"type": "string", "pattern": "^[0-9a-f]{40}$"},
+    "goal": {"type": "string", "minLength": 10},
+    "acceptance_criteria": {"type": "array", "minItems": 1, "uniqueItems": true, "items": {"type": "string", "minLength": 3}},
+    "verification_plan": {"type": "array", "minItems": 1, "uniqueItems": true, "items": {"type": "string", "minLength": 3}},
+    "conflict_domains": {"type": "array", "minItems": 1, "uniqueItems": true, "items": {"type": "string", "minLength": 1}},
+    "allowed_write_surfaces": {"type": "array", "minItems": 1, "uniqueItems": true, "items": {"type": "string", "minLength": 1}},
+    "forbidden_write_surfaces": {"type": "array", "uniqueItems": true, "items": {"type": "string", "minLength": 1}},
+    "required_evidence": {"type": "array", "minItems": 1, "uniqueItems": true, "items": {"type": "string", "minLength": 1}},
+    "monetary_budget_usd": {"const": 0},
+    "created_at": {"type": "string", "format": "date-time"}
+  }
+}

@@ -15,6 +15,7 @@ from .github_provider import GitHubClient
 from .strict_json import loads as strict_loads
 from .work_memory import WorkMemoryStore
 from .delivery_adapters import promote_reference, observe_reference, run_command_adapter
+from .ai_work_contracts import canonicalize_low_trust_claim
 
 SHA=re.compile(r'^[0-9a-f]{40}$')
 
@@ -92,7 +93,14 @@ def _run_agent_command(root:Path,state:dict[str,Any],key:str,envelope:dict[str,A
     if proc.returncode:return _result(state,key,'FAIL',reason_codes=['AGENT_COMMAND_FAILED'],metadata={'exit_code':proc.returncode,'stderr_tail':proc.stderr[-500:]})
     if not result.is_file():return _result(state,key,'FAIL',reason_codes=['AGENT_RESULT_MISSING'])
     value=strict_loads(result.read_text(encoding='utf-8'))
-    return value if isinstance(value,dict) else _result(state,key,'FAIL',reason_codes=['AGENT_RESULT_INVALID'])
+    if not isinstance(value,dict):return _result(state,key,'FAIL',reason_codes=['AGENT_RESULT_INVALID'])
+    package=envelope.get('work_package')
+    if not isinstance(package,dict):return _result(state,key,'FAIL',reason_codes=['AI_WORK_PACKAGE_MISSING'])
+    try:work_result=canonicalize_low_trust_claim(value,package=package)
+    except ValueError as exc:return _result(state,key,'FAIL',reason_codes=['AGENT_RESULT_CONTRACT_INVALID'],metadata={'contract_error':str(exc)[:300]})
+    return {'phase':state['phase'],'outcome':work_result['outcome'],'idempotency_key':key,'subject_sha':work_result.get('head_sha'),
+            'preview_digest':state.get('preview_digest'),'evidence_refs':[],'reason_codes':work_result['reason_codes'],
+            'transient':work_result['outcome']=='RETRY','cost_usd':0,'metadata':{'source':'LOW_TRUST_AGENT_COMMAND','ai_work_result':work_result}}
 
 
 def creative_executor(root:Path,state:dict[str,Any],key:str,envelope:dict[str,Any])->dict[str,Any]|ExecutorWait:
