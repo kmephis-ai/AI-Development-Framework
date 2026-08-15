@@ -1,0 +1,105 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "ADWF durable decision and requirement traceability graph v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "$schema", "schema_version", "role", "revision", "records",
+    "capability_refs", "work_unit_refs", "evidence_refs", "edges", "graph_sha256"
+  ],
+  "properties": {
+    "$schema": {"const": ".adwf/schemas/decision-requirement-traceability.schema.json"},
+    "schema_version": {"const": 1},
+    "role": {"const": "CANONICAL_DECISION_REQUIREMENT_TRACEABILITY"},
+    "revision": {"type": "integer", "minimum": 1},
+    "records": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "id", "kind", "version", "status", "title_ru", "statement_ru",
+          "source_path", "source_sha256", "record_sha256"
+        ],
+        "properties": {
+          "id": {"type": "string", "pattern": "^(?:INTENT|REQ|DEC)-[A-Z0-9_-]+$"},
+          "kind": {"enum": ["OWNER_INTENT_REF", "REQUIREMENT", "DECISION"]},
+          "version": {"type": "integer", "minimum": 1},
+          "status": {"enum": ["ACTIVE", "ACCEPTED", "REJECTED", "DEFERRED", "WITHDRAWN"]},
+          "title_ru": {"type": "string", "minLength": 3},
+          "statement_ru": {"type": "string", "minLength": 10},
+          "source_path": {"type": ["string", "null"]},
+          "source_sha256": {"type": ["string", "null"], "format": "sha256"},
+          "record_sha256": {"type": "string", "format": "sha256"}
+        }
+      }
+    },
+    "capability_refs": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["id", "capability_id", "ref_sha256"],
+        "properties": {
+          "id": {"type": "string", "pattern": "^CAPREF-[A-Z0-9_-]+$"},
+          "capability_id": {"type": "string", "pattern": "^[A-Z0-9_-]+$"},
+          "ref_sha256": {"type": "string", "format": "sha256"}
+        }
+      }
+    },
+    "work_unit_refs": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["id", "roadmap_id", "issue_number", "ai_work_package_id", "ref_sha256"],
+        "properties": {
+          "id": {"type": "string", "pattern": "^WORKREF-[A-Z0-9_-]+$"},
+          "roadmap_id": {"type": "string", "pattern": "^[A-Z][A-Z0-9_]*-[0-9]+$"},
+          "issue_number": {"type": ["integer", "null"], "minimum": 1},
+          "ai_work_package_id": {"type": ["string", "null"], "pattern": "^AIWP-[0-9a-f]{24}$"},
+          "ref_sha256": {"type": "string", "format": "sha256"}
+        }
+      }
+    },
+    "evidence_refs": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["id", "evidence_id", "subject", "sha", "ref_sha256"],
+        "properties": {
+          "id": {"type": "string", "pattern": "^EVIDREF-[A-Z0-9_-]+$"},
+          "evidence_id": {"type": "string", "minLength": 8},
+          "subject": {"type": "string", "minLength": 1},
+          "sha": {"type": ["string", "null"], "pattern": "^[0-9a-f]{40}$"},
+          "ref_sha256": {"type": "string", "format": "sha256"}
+        }
+      }
+    },
+    "edges": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["id", "type", "from", "to", "edge_sha256"],
+        "properties": {
+          "id": {"type": "string", "pattern": "^EDGE-[A-Z0-9_-]+$"},
+          "type": {
+            "enum": [
+              "INTENT_TO_REQUIREMENT", "REQUIREMENT_TO_DECISION", "DECISION_TO_CAPABILITY",
+              "CAPABILITY_TO_WORK", "WORK_TO_EVIDENCE", "REQUIREMENT_SUPERSEDES_REQUIREMENT",
+              "DECISION_SUPERSEDES_DECISION"
+            ]
+          },
+          "from": {"type": "string", "minLength": 3},
+          "to": {"type": "string", "minLength": 3},
+          "edge_sha256": {"type": "string", "format": "sha256"}
+        }
+      }
+    },
+    "graph_sha256": {"type": "string", "format": "sha256"}
+  }
+}

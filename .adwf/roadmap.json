@@ -5,9 +5,80 @@
       "id": "EXECUTIVE-AUTOPILOT",
       "title_ru": "Executive Autopilot",
       "tasks": [
-        {"roadmap_id":"CEO-001","title_ru":"Нулевой технический контроль владельца","dependencies":[],"product_impact":true},
-        {"roadmap_id":"PREVIEW-001","title_ru":"Встроенный desktop/mobile preview","dependencies":["CEO-001"],"product_impact":true},
-        {"roadmap_id":"RUNTIME-001","title_ru":"Возобновляемая многодневная работа","dependencies":["CEO-001"],"product_impact":false}
+        {
+          "roadmap_id": "CEO-001",
+          "title_ru": "Нулевой технический контроль владельца",
+          "dependencies": [],
+          "product_impact": true
+        },
+        {
+          "roadmap_id": "PREVIEW-001",
+          "title_ru": "Встроенный desktop/mobile preview",
+          "dependencies": [
+            "CEO-001"
+          ],
+          "product_impact": true
+        },
+        {
+          "roadmap_id": "RUNTIME-001",
+          "title_ru": "Возобновляемая многодневная работа",
+          "dependencies": [
+            "CEO-001"
+          ],
+          "product_impact": false
+        }
+      ]
+    },
+    {
+      "id": "FOUNDATION-ENGINEERING-OS",
+      "title_ru": "Engineering OS Foundation — critical path",
+      "tasks": [
+        {
+          "roadmap_id": "FND-001",
+          "title_ru": "Capability Truth Model v2",
+          "dependencies": [],
+          "product_impact": false
+        },
+        {
+          "roadmap_id": "DEVENV-001",
+          "title_ru": "Developer Execution Resilience / Local Git Mirror",
+          "dependencies": [
+            "FND-001"
+          ],
+          "product_impact": false
+        },
+        {
+          "roadmap_id": "SKILL-001",
+          "title_ru": "Skill Operating Layer v1",
+          "dependencies": [
+            "DEVENV-001"
+          ],
+          "product_impact": false
+        },
+        {
+          "roadmap_id": "ROADMAP-001",
+          "title_ru": "Roadmap DAG + Verified Outcome Progress",
+          "dependencies": [
+            "SKILL-001"
+          ],
+          "product_impact": false
+        },
+        {
+          "roadmap_id": "AIWORK-001",
+          "title_ru": "First-class AI Work Contracts",
+          "dependencies": [
+            "ROADMAP-001"
+          ],
+          "product_impact": false
+        },
+        {
+          "roadmap_id": "TRACE-001",
+          "title_ru": "Durable Decision + Requirement Traceability Graph v1",
+          "dependencies": [
+            "AIWORK-001"
+          ],
+          "product_impact": false
+        }
       ]
     }
   ]

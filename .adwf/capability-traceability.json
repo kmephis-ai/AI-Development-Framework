@@ -311,6 +311,24 @@
       ],
       "live_boundary": "LIVE_VERIFIED требует реального creative executor/consumer result, привязанного к AIWorkPackage, и downstream trusted exact-SHA evidence; локальные contract tests подтверждают implementation, но не live adapter truth.",
       "live_evidence": []
+    },
+    {
+      "id": "DECISION_REQUIREMENT_TRACEABILITY",
+      "status": "LIVE_NOT_VERIFIED",
+      "execution_mode": "CORE",
+      "owner_claim_ru": "Требования и архитектурные/продуктовые решения хранятся как долговечная typed chain до capability/work/evidence без подмены существующих SSOT.",
+      "entrypoints": [
+        ".adwf/scripts/validate_traceability.py"
+      ],
+      "production_paths": [
+        ".adwf/lib/decision_traceability.py",
+        ".adwf/decision-requirement-traceability.json"
+      ],
+      "verification": [
+        ".adwf/tests/test_decision_traceability.py"
+      ],
+      "live_boundary": "LIVE_VERIFIED требует реальную downstream evidence-связь для consumer/work outcome; canonical graph TRACE-001 намеренно остаётся INCOMPLETE до post-merge evidence.",
+      "live_evidence": []
     }
   ]
 }

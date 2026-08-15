@@ -1,0 +1,89 @@
+{
+  "$schema": ".adwf/schemas/decision-requirement-traceability.schema.json",
+  "schema_version": 1,
+  "role": "CANONICAL_DECISION_REQUIREMENT_TRACEABILITY",
+  "revision": 1,
+  "records": [
+    {
+      "id": "INTENT-FOUNDATION-20260815",
+      "kind": "OWNER_INTENT_REF",
+      "version": 1,
+      "status": "ACTIVE",
+      "title_ru": "Foundation Architecture Audit intent",
+      "statement_ru": "Превратить ADWF в доказуемую Engineering Operating System, где решения, требования, capability, work и evidence связаны долговечной проверяемой цепочкой.",
+      "source_path": "AUDITS/ADWF_FOUNDATION_AUDIT_2026-08-15.md",
+      "source_sha256": "98d6018fac4275ca405567b3c0b7be871b18584362ed5f4b1e1d589ef325a2f0",
+      "record_sha256": "dd8fd9fc0462d091a17527d38f370cfb38a7ee796591a3979a199a85d29f14fc"
+    },
+    {
+      "id": "REQ-TRACE-001",
+      "kind": "REQUIREMENT",
+      "version": 1,
+      "status": "ACTIVE",
+      "title_ru": "Долговременная трассируемость причин и результата",
+      "statement_ru": "ADWF должен хранить machine-verifiable chain Owner Intent → Requirement → Decision → Capability → Work Unit → Evidence, не используя chat или runtime Work Memory как долгосрочный SSOT.",
+      "source_path": null,
+      "source_sha256": null,
+      "record_sha256": "96d6ea5d9cfdeac382761164dae17c4e68c7b75ebf8cf1534d89bc7b4d35377b"
+    },
+    {
+      "id": "DEC-TRACE-001",
+      "kind": "DECISION",
+      "version": 1,
+      "status": "ACCEPTED",
+      "title_ru": "Тонкий typed trace graph поверх существующих SSOT",
+      "statement_ru": "Хранить first-class только durable intent/requirement/decision records, а Capability Truth, Roadmap/AIWorkPackage и Evidence Graph связывать typed references без копирования их payload.",
+      "source_path": null,
+      "source_sha256": null,
+      "record_sha256": "8f8b5835db73dc71e842ad5c5019b3fba3238628cbd74485c114edd3de08346e"
+    }
+  ],
+  "capability_refs": [
+    {
+      "id": "CAPREF-DECISION_REQUIREMENT_TRACEABILITY",
+      "capability_id": "DECISION_REQUIREMENT_TRACEABILITY",
+      "ref_sha256": "7c2284b047ac44ac280d138266a4e64b1a32edb7d2a768a0bee99fb570133ec4"
+    }
+  ],
+  "work_unit_refs": [
+    {
+      "id": "WORKREF-TRACE-001",
+      "roadmap_id": "TRACE-001",
+      "issue_number": 42,
+      "ai_work_package_id": null,
+      "ref_sha256": "7f7c7d548b2474232b9928d4660c406229d2c1f3b7d228ec9e1922d270c6e1cc"
+    }
+  ],
+  "evidence_refs": [],
+  "edges": [
+    {
+      "id": "EDGE-INTENT-REQ-TRACE-001",
+      "type": "INTENT_TO_REQUIREMENT",
+      "from": "INTENT-FOUNDATION-20260815",
+      "to": "REQ-TRACE-001",
+      "edge_sha256": "bfac13802d0c63eb3776d205f95a60413d1cc369646696219243555ed0c4e882"
+    },
+    {
+      "id": "EDGE-REQ-DEC-TRACE-001",
+      "type": "REQUIREMENT_TO_DECISION",
+      "from": "REQ-TRACE-001",
+      "to": "DEC-TRACE-001",
+      "edge_sha256": "09266a73023421d5e6c52c25c7ae6112f830536a6972b83bfe8f95c9dbbd76aa"
+    },
+    {
+      "id": "EDGE-DEC-CAP-TRACE-001",
+      "type": "DECISION_TO_CAPABILITY",
+      "from": "DEC-TRACE-001",
+      "to": "CAPREF-DECISION_REQUIREMENT_TRACEABILITY",
+      "edge_sha256": "35d19c6c92d1473f994dc6ef276a11ff17832d6e4755e88e548baf0ad93b2c67"
+    },
+    {
+      "id": "EDGE-CAP-WORK-TRACE-001",
+      "type": "CAPABILITY_TO_WORK",
+      "from": "CAPREF-DECISION_REQUIREMENT_TRACEABILITY",
+      "to": "WORKREF-TRACE-001",
+      "edge_sha256": "52ccdb5ef1529cf4d9eb68ff7cb6e421b1878bd12421826403b6474dab003ec1"
+    }
+  ],
+  "graph_sha256": "34f6129fa8b16295685f4a1fd05c052a34cef3350ba30bd6bd08ef09c5b6253e"
+}
