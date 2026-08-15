@@ -1,0 +1,86 @@
+name: GOV-017 materialize and verify
+
+on:
+  push:
+    branches:
+      - agent/materialize-gov017-20260816-a1
+
+permissions:
+  contents: write
+
+env:
+  BASE_SHA: 47413d3d70ab8ece6ef9c73b4f79df108e606175
+  EXPECTED_TREE: 2509b3728d37c31d2b45ea299727463b130ca1f1
+  FEATURE_BRANCH: agent/gov017-standing-proof
+
+jobs:
+  materialize:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 12
+    steps:
+      - name: Checkout disposable transport
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd
+        with:
+          fetch-depth: 0
+
+      - name: Restore exact safe candidate
+        shell: bash
+        run: |
+          set -euo pipefail
+          cp .github/gov017.patch.gz.b64 /tmp/gov017.patch.gz.b64
+          REMOTE_MAIN="$(git ls-remote origin refs/heads/main | awk '{print $1}')"
+          test "${REMOTE_MAIN}" = "${BASE_SHA}"
+          git checkout --detach "${BASE_SHA}"
+          base64 -d /tmp/gov017.patch.gz.b64 | gzip -d > /tmp/gov017.patch
+          git apply --index --whitespace=error-all /tmp/gov017.patch
+          test "$(git diff --cached --name-only | wc -l | tr -d ' ')" = "3"
+          git diff --cached --name-only | grep -Fx '.github/pull_request_template.md'
+          git diff --cached --name-only | grep -Fx 'MANIFEST.json'
+          git diff --cached --name-only | grep -Fx 'SHA256SUMS.txt'
+          test "$(git write-tree)" = "${EXPECTED_TREE}"
+
+      - name: Verify framework and standing-policy positive case
+        shell: bash
+        run: |
+          set -euo pipefail
+          python .adwf/scripts/docs_freshness.py
+          python .adwf/scripts/compile_policy.py
+          python .adwf/scripts/generate_manifest.py --check
+          python .adwf/scripts/validate_framework.py
+          python .adwf/tests/test_standing_owner_authorization.py
+          python .adwf/tests/test_trust.py
+          python .adwf/tests/test_generated_projection_trust.py
+          python .adwf/tests/test_trusted_controller.py
+          python .adwf/adwf.py self-test
+          git diff --cached --check
+
+      - name: Commit and prove BASE standing authorization
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name 'ADWF GOV-017 Materializer'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git commit -m 'GOV-017: align PR template with human-by-exception authorization'
+          python - "${BASE_SHA}" HEAD <<'PY'
+          import json,sys
+          from pathlib import Path
+          root=Path('.').resolve(); sys.path.insert(0,str(root/'.adwf'))
+          from lib.trust import classify_git_diff
+          result=classify_git_diff(root,sys.argv[1],sys.argv[2])
+          print(json.dumps(result,ensure_ascii=False,sort_keys=True))
+          assert result['result']=='ALLOW', result
+          assert result['authorization_mode']=='STANDING_OWNER_POLICY', result
+          assert result['standing_policy']['revision']==1, result
+          assert result['human_required'] is False, result
+          assert result['weakening']==[], result
+          assert result['manual_required_files']==[], result
+          PY
+          test "$(git rev-parse HEAD^{tree})" = "${EXPECTED_TREE}"
+
+      - name: Publish atomic feature branch
+        shell: bash
+        run: |
+          set -euo pipefail
+          REMOTE_MAIN="$(git ls-remote origin refs/heads/main | awk '{print $1}')"
+          test "${REMOTE_MAIN}" = "${BASE_SHA}"
+          git push origin "HEAD:refs/heads/${FEATURE_BRANCH}"
