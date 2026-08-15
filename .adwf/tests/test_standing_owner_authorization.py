@@ -10,6 +10,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT / ".adwf"))
 from lib.trust import classify_diff, standing_authorization_policy_metadata
+from scripts import publish_trusted_gate as GATE
 from scripts.publish_trusted_gate import evaluate_trusted_gate
 
 
@@ -123,10 +124,11 @@ class StandingPolicyClassificationTests(unittest.TestCase):
 
 
 class FakeGateClient:
-    def __init__(self, files, *, policy=None, base_current=True, body="", permission="admin"):
+    def __init__(self, files, *, policy=None, base_current=True, body="", permission="admin", wrapped_base64=False, malformed_base64=False, content_failure=False):
         self.repo = "o/r"; self.files = files; self.policy = policy or current_policy()
         self.base_sha = "a" * 40; self.head_sha = "b" * 40
         self.base_current = base_current; self.body = body; self.permission = permission
+        self.wrapped_base64 = wrapped_base64; self.malformed_base64 = malformed_base64; self.content_failure = content_failure
     def get(self, path):
         return {"id": 1, "head_sha": self.head_sha, "name": "ADWF PR", "event": "pull_request", "status": "completed", "conclusion": "success", "pull_requests": [{"number": 7}]}
     def check_runs(self, sha):
@@ -138,11 +140,15 @@ class FakeGateClient:
     def pulls(self):
         return [self.pull(7)]
     def content(self, path, ref=None):
+        if self.content_failure: raise ValueError("SIMULATED_PROVIDER_CONTENT_FAILURE")
         if path == ".adwf/policies/trust-boundary.json":
             text = json.dumps(self.policy)
         else:
             text = "VALUE = 1\n" if ref == self.base_sha else "VALUE = 2\n"
-        return {"type": "file", "encoding": "base64", "content": base64.b64encode(text.encode()).decode()}
+        encoded = base64.b64encode(text.encode()).decode()
+        if self.malformed_base64: encoded = encoded[:-1] + "!"
+        if self.wrapped_base64: encoded = "\n".join(encoded[i:i+60] for i in range(0, len(encoded), 60)) + "\n"
+        return {"type": "file", "encoding": "base64", "content": encoded}
     def git_ref(self, branch):
         return {"object": {"sha": self.base_sha if self.base_current else "c" * 40}}
     def pull_reviews(self, number): return []
@@ -163,6 +169,28 @@ class StandingTrustedControllerTests(unittest.TestCase):
         self.assertEqual(result["reasons"], [])
         self.assertTrue(result["governance"]["verified"])
         self.assertEqual(result["governance"]["approval"]["mode"], "STANDING_OWNER_POLICY")
+
+    def test_github_wrapped_base64_is_accepted_for_provider_reconstruction(self):
+        result = evaluate_trusted_gate(FakeGateClient(self._safe_files(), wrapped_base64=True), "o/r", {"id": 1, "head_sha": "b" * 40})
+        self.assertEqual(result["reasons"], [])
+        classification = result["governance"]["classification"]
+        self.assertTrue(classification["classification_verified"])
+        self.assertEqual(classification["authorization_mode"], "STANDING_OWNER_POLICY")
+
+    def test_malformed_provider_base64_fails_as_unverified_classification_not_drift(self):
+        result = evaluate_trusted_gate(FakeGateClient(self._safe_files(), malformed_base64=True), "o/r", {"id": 1, "head_sha": "b" * 40})
+        self.assertIn("TRUST_BOUNDARY_CLASSIFICATION_NOT_VERIFIED", result["reasons"])
+        self.assertNotIn("TRUST_POLICY_BASE_DRIFT", result["reasons"])
+        self.assertEqual(result["governance"]["reason_codes"], ["GOVERNANCE_TRUST_CLASSIFICATION_NOT_VERIFIED"])
+        self.assertIs(result["governance"]["classification"]["classification_verified"], False)
+
+    def test_provider_classification_exception_is_not_projected_as_observed_base_drift(self):
+        result = evaluate_trusted_gate(FakeGateClient(self._safe_files(), content_failure=True), "o/r", {"id": 1, "head_sha": "b" * 40})
+        self.assertIn("TRUST_BOUNDARY_CLASSIFICATION_NOT_VERIFIED", result["reasons"])
+        self.assertNotIn("TRUST_POLICY_BASE_DRIFT", result["reasons"])
+        projection = result["governance"]["classification"]
+        self.assertIsNone(projection["base_current"])
+        self.assertEqual(projection["error_type"], "ValueError")
 
     def test_base_drift_invalidates_standing_authorization(self):
         result = evaluate_trusted_gate(FakeGateClient(self._safe_files(), base_current=False), "o/r", {"id": 1, "head_sha": "b" * 40})

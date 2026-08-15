@@ -24,7 +24,7 @@
         "skills/**"
       ],
       "mode": "manual-governance",
-      "source_digest": "bffa683a6ffc67ec2f3163764d6aaf07458eed5839cc1ded0d3cb1d39612f8eb",
+      "source_digest": "47e120df586c50617c8d1369b8d4c8e1a4621bdb5819684aa21dbf25d5e2808c",
       "reviewed_at": "2026-08-13T00:00:00Z",
       "valid_until": "2026-11-13T00:00:00Z"
     },
@@ -37,7 +37,7 @@
         ".adwf/scripts/**"
       ],
       "mode": "architecture",
-      "source_digest": "976e33a6f8d8ba87ff2777ad91445483595e9bded3edb6423861b9df2c673025",
+      "source_digest": "87fb04f596a0b09709859fc8d968ddf098b2f0da37e15ffee754b524a0c8907e",
       "reviewed_at": "2026-08-13T00:00:00Z",
       "valid_until": "2026-11-13T00:00:00Z"
     },

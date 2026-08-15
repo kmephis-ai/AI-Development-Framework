@@ -87,7 +87,8 @@ def _github_blob(client:GitHubClient,path:str,sha:str)->str:
     payload=client.content(normalize_repo_path(path),ref=_exact_sha(sha,'BLOB_SHA_INVALID'))
     if payload.get('type') not in {None,'file'}:raise ValueError('GITHUB_BLOB_NOT_FILE')
     if payload.get('encoding')!='base64':raise ValueError('GITHUB_BLOB_ENCODING_INVALID')
-    try:raw=base64.b64decode(str(payload.get('content') or ''),validate=True)
+    encoded=''.join(str(payload.get('content') or '').split())
+    try:raw=base64.b64decode(encoded,validate=True)
     except (binascii.Error,ValueError) as exc:raise ValueError('GITHUB_BLOB_BASE64_INVALID') from exc
     if len(raw)>2*1024*1024:raise ValueError('GITHUB_BLOB_INSPECTION_LIMIT')
     return raw.decode('utf-8',errors='replace')
@@ -123,7 +124,7 @@ def _provider_trust_classification(client:GitHubClient,pr:dict[str,Any])->dict[s
     result.update({
         'base_sha':base_sha,'head_sha':head_sha,'base_ref':base_ref,
         'current_base_sha':current_sha,'base_current':current_sha==base_sha,
-        'source':'GITHUB_PROVIDER_API',
+        'classification_verified':True,'source':'GITHUB_PROVIDER_API',
     })
     return result
 
@@ -149,18 +150,27 @@ def evaluate_trusted_gate(client:GitHubClient,repo:str,workflow_run:dict[str,Any
         pr=client.pull(pr_number)
         if str((pr.get('head') or {}).get('sha') or '')!=sha:reasons.append('PR_HEAD_MOVED')
         try:classification=_provider_trust_classification(client,pr)
-        except (ProviderContractError,TimeoutError,json.JSONDecodeError,ValueError):
-            classification={'result':'BLOCK','human_required':False,'authorization_mode':'NORMAL','protected_files':[],'reason_codes':['TRUST_CLASSIFICATION_NOT_VERIFIED'],'base_current':False}
+        except (ProviderContractError,TimeoutError,json.JSONDecodeError,ValueError) as exc:
+            classification={
+                'result':'BLOCK','human_required':False,'authorization_mode':'NORMAL','protected_files':[],
+                'reason_codes':['TRUST_CLASSIFICATION_NOT_VERIFIED'],'classification_verified':False,
+                'base_current':None,'source':None,'error_type':type(exc).__name__,
+            }
         governance['classification']={
             key:classification.get(key) for key in (
                 'result','authorization_mode','reason_codes','manual_required_files','inspection_unverified_files',
-                'standing_policy','base_sha','head_sha','base_ref','current_base_sha','base_current','source'
+                'standing_policy','base_sha','head_sha','base_ref','current_base_sha','base_current',
+                'classification_verified','source','error_type'
             )
         }
         governance['files']=classification.get('protected_files') or []
         governance['required']=bool(governance['files']) or classification.get('result')=='BLOCK'
         if governance['required']:
-            if not classification.get('base_current'):
+            if classification.get('classification_verified') is not True:
+                governance['verified']=False
+                governance_reasons.append('GOVERNANCE_TRUST_CLASSIFICATION_NOT_VERIFIED')
+                reasons.append('TRUST_BOUNDARY_CLASSIFICATION_NOT_VERIFIED')
+            elif classification.get('base_current') is not True:
                 governance['verified']=False
                 governance_reasons.append('GOVERNANCE_BASE_DRIFT_REQUIRES_REBASE')
                 reasons.append('TRUST_POLICY_BASE_DRIFT')
