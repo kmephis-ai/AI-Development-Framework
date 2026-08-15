@@ -27,6 +27,15 @@ _DANGEROUS_TRUE_KEYS = re.compile(
 _AUTONOMY = {f"A{index}": index for index in range(5)}
 _RISK = {f"R{index}": index for index in range(5)}
 _INTEGRITY_PROJECTIONS = {"MANIFEST.json", "SHA256SUMS.txt", ".gitattributes"}
+# Deterministic projections are trust-sensitive evidence, but they are not
+# authoritative self-modifying sources. They may accompany feature/docs changes
+# only through an R4/GOV human-gated PR; authoritative protected sources remain
+# forbidden in the same PR as feature files.
+_GENERATED_TRUST_PROJECTIONS = {
+    "MANIFEST.json",
+    "SHA256SUMS.txt",
+    ".adwf/docs-registry.json",
+}
 
 
 def normalize_repo_path(value: str) -> str:
@@ -183,6 +192,8 @@ def classify_diff(changed_files: Iterable[Any], policy: dict[str, Any]) -> dict[
         return {"result": "BLOCK", "reason_codes": ["EMPTY_DIFF"], "changed_files": []}
 
     protected: list[str] = []
+    generated_projections: list[str] = []
+    authoritative_protected: list[str] = []
     feature: list[str] = []
     weakening: list[dict[str, Any]] = []
     for record in records:
@@ -193,6 +204,10 @@ def classify_diff(changed_files: Iterable[Any], policy: dict[str, Any]) -> dict[
             is_protected_path(candidate, patterns) for candidate in candidates
         ):
             protected.append(record["path"])
+            if record["path"] in _GENERATED_TRUST_PROJECTIONS:
+                generated_projections.append(record["path"])
+            else:
+                authoritative_protected.append(record["path"])
             detected = detect_gate_weakening(
                 record["path"], record.get("old_text"), record.get("new_text"), status=record["status"]
             )
@@ -202,7 +217,7 @@ def classify_diff(changed_files: Iterable[Any], policy: dict[str, Any]) -> dict[
             feature.append(record["path"])
 
     reasons: list[str] = []
-    if protected and feature:
+    if authoritative_protected and feature:
         reasons.append("TRUST_CHANGE_MIXED_WITH_FEATURE")
     if weakening:
         reasons.append("GATE_WEAKENING_DETECTED")
@@ -213,7 +228,7 @@ def classify_diff(changed_files: Iterable[Any], policy: dict[str, Any]) -> dict[
     if policy.get("self_modification_in_feature_pr") != "FORBIDDEN":
         reasons.append("BASE_TRUST_POLICY_INVALID")
 
-    if "BASE_TRUST_POLICY_INVALID" in reasons or (protected and feature):
+    if "BASE_TRUST_POLICY_INVALID" in reasons or (authoritative_protected and feature):
         result = "BLOCK"
     elif protected:
         result = "HUMAN_REQUIRED"
@@ -224,6 +239,8 @@ def classify_diff(changed_files: Iterable[Any], policy: dict[str, Any]) -> dict[
         "reason_codes": list(dict.fromkeys(reasons)),
         "changed_files": sorted(record["path"] for record in records),
         "protected_files": sorted(set(protected)),
+        "generated_projection_files": sorted(set(generated_projections)),
+        "authoritative_protected_files": sorted(set(authoritative_protected)),
         "feature_files": sorted(set(feature)),
         "weakening": weakening,
         "required_risk": "R4" if protected else None,
