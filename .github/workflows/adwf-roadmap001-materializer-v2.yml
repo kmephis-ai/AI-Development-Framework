@@ -1,0 +1,89 @@
+name: ADWF ROADMAP-001 Materializer v2
+
+on:
+  push:
+    branches:
+      - agent/local-mirror-roadmap001-20260815-a1
+
+permissions:
+  contents: write
+
+env:
+  BASE_SHA: 676e5ded2cce37f15540cd1462fdff7b57e4ca3f
+  TARGET_BRANCH: agent/roadmap-001-dag-outcome-truth
+  EXPECTED_B64_SHA256: 5f749b7f4e378fd249c22a6e1d7714629b32eb5c1608f4874c251e0df8b15fe9
+  EXPECTED_PATCH_SHA256: 57c5e164b9832f38e5ab79e57214a86b65e3850c26aa3a854eac5a4ec48382ef
+  EXPECTED_TREE: 5a6a1b868df82b3ac61e4e6535530e5d8d397ae3
+
+jobs:
+  materialize:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - name: Checkout transport branch
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd
+        with:
+          fetch-depth: 1
+          persist-credentials: false
+
+      - name: Recover and verify embedded payload
+        shell: bash
+        run: |
+          set -euo pipefail
+          sed -n "/<<'PAYLOAD'/{n;p;q;}" .github/workflows/adwf-local-mirror-roadmap001.yml | tr -d '\r\n' > /tmp/roadmap001.patch.gz.b64
+          test "$(sha256sum /tmp/roadmap001.patch.gz.b64 | awk '{print $1}')" = "${EXPECTED_B64_SHA256}"
+          base64 -d /tmp/roadmap001.patch.gz.b64 | gunzip > /tmp/roadmap001.patch
+          test "$(sha256sum /tmp/roadmap001.patch | awk '{print $1}')" = "${EXPECTED_PATCH_SHA256}"
+
+      - name: Checkout exact target branch
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd
+        with:
+          ref: ${{ env.TARGET_BRANCH }}
+          fetch-depth: 0
+          path: target
+
+      - uses: actions/setup-python@a309ff8b426b58ec0e2a45f0f869d46889d02405
+        with:
+          python-version: '3.12'
+
+      - name: Apply exact payload
+        shell: bash
+        working-directory: target
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "${BASE_SHA}"
+          git apply --check /tmp/roadmap001.patch
+          git apply /tmp/roadmap001.patch
+          git diff --check
+
+      - name: Verify ROADMAP-001 implementation
+        shell: bash
+        working-directory: target
+        run: |
+          set -euo pipefail
+          python -m unittest .adwf.tests.test_roadmap_truth
+          python -m unittest .adwf.tests.test_v15_executive
+          python -m unittest .adwf.tests.test_adversarial
+          python -m unittest .adwf.tests.test_reconciliation
+          python .adwf/scripts/generate_docs_registry.py --check
+          python .adwf/scripts/generate_skill_registry.py --check
+          python .adwf/scripts/generate_manifest.py --check
+          python .adwf/scripts/validate_framework.py
+          python .adwf/scripts/validate_docs.py
+          python .adwf/scripts/validate_ci_static.py
+          python .adwf/scripts/validate_capability_truth.py
+          python .adwf/adwf.py self-test
+
+      - name: Verify exact tree, commit, and push target branch
+        shell: bash
+        working-directory: target
+        run: |
+          set -euo pipefail
+          git add -A
+          ACTUAL_TREE="$(git write-tree)"
+          echo "actual_tree=${ACTUAL_TREE}"
+          test "${ACTUAL_TREE}" = "${EXPECTED_TREE}"
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git commit -m "ROADMAP-001: add DAG and verified outcome truth"
+          git push origin "HEAD:${TARGET_BRANCH}"
