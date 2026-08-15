@@ -1,0 +1,218 @@
+name: GOV-018 exact-base status bridge
+
+on:
+  push:
+    branches:
+      - adwf/gov018-status-bridge
+
+permissions:
+  contents: read
+  actions: read
+  checks: write
+  pull-requests: read
+  statuses: write
+
+jobs:
+  certify:
+    if: github.repository == 'kmephis-ai/AI-Development-Framework' && github.ref == 'refs/heads/adwf/gov018-status-bridge'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    env:
+      BASE_SHA: 47413d3d70ab8ece6ef9c73b4f79df108e606175
+      HEAD_SHA: 50c1c0603a419427eb88515885e662257b8361b2
+      EXPECTED_TREE: 9f085d0b1c71c2e71606db2c494a3cdd965b0e40
+      PR_NUMBER: '60'
+      FAST_FEEDBACK_RUN_ID: '31915689517'
+      RULESET_ID: '20885578'
+      FEATURE_BRANCH: agent/gov018-provider-reconstruction
+      PYTHONDONTWRITEBYTECODE: '1'
+    steps:
+      - name: Checkout exact trusted BASE
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd
+        with:
+          ref: 47413d3d70ab8ece6ef9c73b4f79df108e606175
+          persist-credentials: false
+          fetch-depth: 0
+
+      - name: Setup canonical Python
+        uses: actions/setup-python@a309ff8b426b58ec0e2a45f0f869d46889d02405
+        with:
+          python-version: '3.12.10'
+
+      - name: Verify trusted BASE integrity
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "$BASE_SHA"
+          python .adwf/adwf.py provider-check --input .adwf/requests/github-public-standard.json
+          python .adwf/scripts/validate_pipeline_ir.py
+          python .adwf/adwf.py doctor --scope package_integrity
+          python .adwf/adwf.py doctor --scope config_health
+
+      - name: Fetch exact immutable candidate
+        run: |
+          set -euo pipefail
+          git fetch --no-tags origin "refs/heads/${FEATURE_BRANCH}:refs/remotes/origin/gov018-head"
+          test "$(git rev-parse refs/remotes/origin/gov018-head)" = "$HEAD_SHA"
+          test "$(git rev-parse ${HEAD_SHA}^{tree})" = "$EXPECTED_TREE"
+
+      - name: Evaluate with BASE policy and publish recovery gates
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: |
+          python - <<'PY'
+          import json, os, re, sys, urllib.request
+          from pathlib import Path
+
+          repo = 'kmephis-ai/AI-Development-Framework'
+          owner = 'kmephis-ai'
+          base = os.environ['BASE_SHA']
+          head = os.environ['HEAD_SHA']
+          expected_tree = os.environ['EXPECTED_TREE']
+          pr_number = int(os.environ['PR_NUMBER'])
+          run_id = int(os.environ['FAST_FEEDBACK_RUN_ID'])
+          ruleset_id = int(os.environ['RULESET_ID'])
+          token = os.environ['GITHUB_TOKEN']
+          expected_files = {
+              '.adwf/docs-registry.json',
+              '.adwf/scripts/publish_trusted_gate.py',
+              '.adwf/tests/test_standing_owner_authorization.py',
+              'MANIFEST.json',
+              'SHA256SUMS.txt',
+          }
+          attestation_re = re.compile(r'(?mi)^\s*Owner-Attestation:\s*`?([0-9a-f]{40})`?\s*$')
+
+          def api(method, path, payload=None):
+              url = 'https://api.github.com' + path
+              data = None if payload is None else json.dumps(payload).encode('utf-8')
+              req = urllib.request.Request(url, data=data, method=method)
+              req.add_header('Authorization', 'Bearer ' + token)
+              req.add_header('Accept', 'application/vnd.github+json')
+              req.add_header('X-GitHub-Api-Version', '2022-11-28')
+              if data is not None:
+                  req.add_header('Content-Type', 'application/json')
+              with urllib.request.urlopen(req, timeout=20) as response:
+                  raw = response.read()
+                  return json.loads(raw.decode('utf-8')) if raw else {}
+
+          def verify_live_state():
+              ref = api('GET', f'/repos/{repo}/git/ref/heads/main')
+              assert ref['object']['sha'] == base, ('MAIN_MOVED', ref['object']['sha'])
+
+              pr = api('GET', f'/repos/{repo}/pulls/{pr_number}')
+              assert pr['state'] == 'open', ('PR_NOT_OPEN', pr['state'])
+              assert pr['base']['ref'] == 'main' and pr['base']['sha'] == base, ('BASE_MISMATCH', pr['base'])
+              assert pr['head']['sha'] == head, ('HEAD_MISMATCH', pr['head']['sha'])
+              assert pr['user']['login'] == owner, ('OWNER_IDENTITY_MISMATCH', pr['user']['login'])
+              matches = attestation_re.findall(pr.get('body') or '')
+              assert matches == [head], ('OWNER_ATTESTATION_EXACT_HEAD_REQUIRED', matches)
+              permission = api('GET', f'/repos/{repo}/collaborators/{owner}/permission')
+              assert str(permission.get('permission', '')).lower() == 'admin', ('OWNER_ADMIN_PERMISSION_REQUIRED', permission)
+              return pr
+
+          verify_live_state()
+
+          run = api('GET', f'/repos/{repo}/actions/runs/{run_id}')
+          assert run['name'] == 'ADWF PR' and run['event'] == 'pull_request', ('UNEXPECTED_RUN', run['name'], run['event'])
+          assert run['status'] == 'completed' and run['conclusion'] == 'success', ('FAST_FEEDBACK_NOT_PASS', run['status'], run['conclusion'])
+          assert run['head_sha'] == head, ('RUN_HEAD_MISMATCH', run['head_sha'])
+          assert any(int(item.get('number', 0)) == pr_number for item in run.get('pull_requests') or []), 'RUN_PR_BINDING_MISSING'
+
+          checks = api('GET', f'/repos/{repo}/commits/{head}/check-runs?check_name=fast-feedback&per_page=100')
+          assert any(
+              c.get('name') == 'fast-feedback'
+              and c.get('head_sha') == head
+              and c.get('status') == 'completed'
+              and c.get('conclusion') == 'success'
+              and (c.get('app') or {}).get('slug') == 'github-actions'
+              for c in checks.get('check_runs') or []
+          ), 'FAST_FEEDBACK_PROVIDER_ATTESTATION_MISSING'
+
+          commit = api('GET', f'/repos/{repo}/git/commits/{head}')
+          assert commit['tree']['sha'] == expected_tree, ('TREE_MISMATCH', commit['tree']['sha'])
+          assert len(commit.get('parents') or []) == 1 and commit['parents'][0]['sha'] == base, ('PARENT_MISMATCH', commit.get('parents'))
+
+          comparison = api('GET', f'/repos/{repo}/compare/{base}...{head}')
+          assert comparison['status'] == 'ahead', ('COMPARE_STATUS', comparison['status'])
+          assert comparison['ahead_by'] == 1 and comparison['behind_by'] == 0 and comparison['total_commits'] == 1, ('COMPARE_DISTANCE', comparison['ahead_by'], comparison['behind_by'], comparison['total_commits'])
+          files = {item['filename'] for item in comparison.get('files') or []}
+          assert files == expected_files, ('FILE_SCOPE_MISMATCH', sorted(files))
+
+          ruleset = api('GET', f'/repos/{repo}/rulesets/{ruleset_id}')
+          assert ruleset['name'] == 'ADWF protected main' and ruleset['enforcement'] == 'active', ('RULESET_NOT_ACTIVE', ruleset.get('name'), ruleset.get('enforcement'))
+          assert ruleset.get('bypass_actors') == [], ('BYPASS_PRESENT', ruleset.get('bypass_actors'))
+          required = set()
+          for rule in ruleset.get('rules') or []:
+              if rule.get('type') == 'required_status_checks':
+                  required = {x['context'] for x in rule['parameters']['required_status_checks']}
+          assert required == {'fast-feedback', 'adwf/governance-gate', 'adwf/trusted-gate'}, ('REQUIRED_CONTEXT_DRIFT', sorted(required))
+
+          root = Path('.').resolve()
+          sys.path.insert(0, str(root / '.adwf'))
+          from lib.trust import classify_git_diff
+          classification = classify_git_diff(root, base, head)
+          print(json.dumps({'base_classification': classification}, ensure_ascii=False, sort_keys=True))
+          assert classification['result'] == 'HUMAN_REQUIRED', classification
+          assert classification['required_risk'] == 'R4', classification
+          assert classification['required_work_type'] == 'GOV', classification
+          assert classification['authorization_mode'] == 'EXPLICIT_HUMAN_REQUIRED', classification
+          assert '.adwf/scripts/publish_trusted_gate.py' in classification['manual_required_files'], classification
+          assert classification['reason_codes'] == ['STANDING_POLICY_RESERVED_SURFACE'], classification
+          assert classification['weakening'] == [], classification
+
+          contexts = ('adwf/governance-gate', 'adwf/trusted-gate')
+          for context in contexts:
+              api('POST', f'/repos/{repo}/statuses/{head}', {
+                  'state': 'failure',
+                  'context': context,
+                  'description': 'BLOCK: GOV-018 exact-BASE recovery publication incomplete',
+              })
+
+          # Re-check all mutable provider facts after the failure sentinels and before any PASS.
+          verify_live_state()
+          run2 = api('GET', f'/repos/{repo}/actions/runs/{run_id}')
+          assert run2['head_sha'] == head and run2['status'] == 'completed' and run2['conclusion'] == 'success', 'FAST_FEEDBACK_CHANGED'
+
+          summary = (
+              'PASS: exact trusted BASE policy classified reserved R4 repair; '
+              'exact-HEAD owner attestation and provider fast-feedback verified; '
+              'recovery bridge is disposable and does not alter ruleset or main.'
+          )
+          for context in contexts:
+              api('POST', f'/repos/{repo}/check-runs', {
+                  'name': context,
+                  'head_sha': head,
+                  'status': 'completed',
+                  'conclusion': 'success',
+                  'output': {
+                      'title': 'ADWF GOV-018 exact-BASE recovery certification',
+                      'summary': summary,
+                  },
+              })
+
+          # Last CAS-style provider read before final success statuses.
+          verify_live_state()
+          for context in contexts:
+              api('POST', f'/repos/{repo}/statuses/{head}', {
+                  'state': 'success',
+                  'context': context,
+                  'description': 'PASS: exact-BASE R4 recovery + exact-HEAD owner attestation',
+              })
+
+          statuses = api('GET', f'/repos/{repo}/commits/{head}/statuses?per_page=100')
+          latest = {}
+          for item in statuses:
+              latest.setdefault(item.get('context'), item.get('state'))
+          assert latest.get('adwf/governance-gate') == 'success', latest
+          assert latest.get('adwf/trusted-gate') == 'success', latest
+          print(json.dumps({
+              'status': 'PASS',
+              'base_sha': base,
+              'head_sha': head,
+              'tree': expected_tree,
+              'fast_feedback_run_id': run_id,
+              'owner_attestation': head,
+              'ruleset': 'ADWF protected main',
+              'bypass_actors': [],
+              'published_contexts': list(contexts),
+          }, sort_keys=True))
+          PY
