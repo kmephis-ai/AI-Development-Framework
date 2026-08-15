@@ -1,0 +1,107 @@
+name: GOV-018 materialize and verify
+
+on:
+  push:
+    branches:
+      - agent/materialize-gov018-20260816-a1
+
+permissions:
+  contents: write
+
+env:
+  BASE_SHA: 47413d3d70ab8ece6ef9c73b4f79df108e606175
+  EXPECTED_TREE: 9f085d0b1c71c2e71606db2c494a3cdd965b0e40
+  FEATURE_BRANCH: agent/gov018-provider-reconstruction
+
+jobs:
+  materialize:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - name: Checkout disposable transport
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd
+        with:
+          fetch-depth: 0
+
+      - name: Restore exact repair candidate
+        shell: bash
+        run: |
+          set -euo pipefail
+          cp .github/gov018.patch.gz.b64 /tmp/gov018.patch.gz.b64
+          REMOTE_MAIN="$(git ls-remote origin refs/heads/main | awk '{print $1}')"
+          test "${REMOTE_MAIN}" = "${BASE_SHA}"
+          git checkout --detach "${BASE_SHA}"
+          base64 -d /tmp/gov018.patch.gz.b64 | gzip -d > /tmp/gov018.patch
+          test "$(sha256sum /tmp/gov018.patch | awk '{print $1}')" = "2b0b9fe607a12317dd0550e9d52bef58f8a9021b7205c10e1f03887280960772"
+          git apply --index --whitespace=error-all /tmp/gov018.patch
+          test "$(git diff --cached --name-only | wc -l | tr -d ' ')" = "5"
+          git diff --cached --name-only | grep -Fx '.adwf/docs-registry.json'
+          git diff --cached --name-only | grep -Fx '.adwf/scripts/publish_trusted_gate.py'
+          git diff --cached --name-only | grep -Fx '.adwf/tests/test_standing_owner_authorization.py'
+          git diff --cached --name-only | grep -Fx 'MANIFEST.json'
+          git diff --cached --name-only | grep -Fx 'SHA256SUMS.txt'
+          test "$(git write-tree)" = "${EXPECTED_TREE}"
+
+      - name: Commit immutable candidate
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name 'ADWF GOV-018 Materializer'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git commit -m 'GOV-018: repair trusted provider reconstruction'
+          test "$(git rev-parse HEAD^{tree})" = "${EXPECTED_TREE}"
+          echo "CANDIDATE_SHA=$(git rev-parse HEAD)" >> "$GITHUB_ENV"
+
+      - name: Prove BASE policy requires explicit human authorization
+        shell: bash
+        run: |
+          set -euo pipefail
+          git worktree add --detach /tmp/gov018-base "${BASE_SHA}"
+          cd /tmp/gov018-base
+          python - "${BASE_SHA}" "${CANDIDATE_SHA}" <<'PY'
+          import json,sys
+          from pathlib import Path
+          root=Path('.').resolve();sys.path.insert(0,str(root/'.adwf'))
+          from lib.trust import classify_git_diff
+          result=classify_git_diff(root,sys.argv[1],sys.argv[2])
+          print(json.dumps(result,ensure_ascii=False,sort_keys=True))
+          assert result['result']=='HUMAN_REQUIRED',result
+          assert result['required_risk']=='R4',result
+          assert result['required_work_type']=='GOV',result
+          assert result['authorization_mode']=='EXPLICIT_HUMAN_REQUIRED',result
+          assert '.adwf/scripts/publish_trusted_gate.py' in result['manual_required_files'],result
+          assert result['weakening']==[],result
+          PY
+
+      - name: Verify focused reconstruction and publication contracts
+        shell: bash
+        run: |
+          set -euo pipefail
+          python .adwf/tests/test_standing_owner_authorization.py
+          python .adwf/tests/test_trusted_controller.py
+          python .adwf/tests/test_trusted_gate_publication.py
+          python .adwf/scripts/docs_freshness.py
+          python .adwf/scripts/generate_manifest.py --check
+          python .adwf/scripts/validate_framework.py
+          git diff --check
+
+      - name: Verify full framework without mutating candidate tree
+        shell: bash
+        run: |
+          set -euo pipefail
+          python .adwf/adwf.py self-test
+          git reset --hard "${CANDIDATE_SHA}"
+          test "$(git rev-parse HEAD^{tree})" = "${EXPECTED_TREE}"
+          python .adwf/scripts/validate_framework.py
+          python .adwf/scripts/generate_manifest.py --check
+          git diff --check
+
+      - name: Publish atomic feature branch
+        shell: bash
+        run: |
+          set -euo pipefail
+          REMOTE_MAIN="$(git ls-remote origin refs/heads/main | awk '{print $1}')"
+          test "${REMOTE_MAIN}" = "${BASE_SHA}"
+          test "$(git rev-parse HEAD)" = "${CANDIDATE_SHA}"
+          test "$(git rev-parse HEAD^{tree})" = "${EXPECTED_TREE}"
+          git push origin "${CANDIDATE_SHA}:refs/heads/${FEATURE_BRANCH}"
