@@ -30,12 +30,15 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          sha256sum .adwf-transport/aiwork001.part1 .adwf-transport/aiwork001.part2 .adwf-transport/aiwork001.part3 .adwf-transport/aiwork001.part4
-          cat .adwf-transport/aiwork001.part1 .adwf-transport/aiwork001.part2 .adwf-transport/aiwork001.part3 .adwf-transport/aiwork001.part4 | tr -d '\r\n' > /tmp/aiwork001.clean.b64
-          echo "combined=$(sha256sum /tmp/aiwork001.clean.b64 | awk '{print $1}')"
+          test "$(sha256sum .adwf-transport/aiwork001.part1a | awk '{print $1}')" = "8e25bc69cdcb6be391d5ee515657a9840875616b46f225a3acfed262ccf076e6"
+          test "$(sha256sum .adwf-transport/aiwork001.part1b | awk '{print $1}')" = "9315721b4fb629c89df08a8a8eda6c4d222688d89eb0ef3cb82188562b9e4dd9"
+          test "$(sha256sum .adwf-transport/aiwork001.part1c | awk '{print $1}')" = "54a58489281df47ae0f001ba4ae1bb0d7a00eb8f0fc5f7eab046cf179eea7e94"
+          test "$(sha256sum .adwf-transport/aiwork001.part2 | awk '{print $1}')" = "06cf831d7ba1c9e559ff32167e83e617f0c95254ba7f2284ecd7d91612388ff5"
+          test "$(sha256sum .adwf-transport/aiwork001.part3 | awk '{print $1}')" = "c5c8e0078ec34a9f3c826b5a2cef9bfa24c6ac0028c7b66b99efda02f6240020"
+          test "$(sha256sum .adwf-transport/aiwork001.part4 | awk '{print $1}')" = "e68f6a2ed3ef9eb38af5218a7e6fa9da673e2e94f2778b2b253913bf05a3c3cf"
+          cat .adwf-transport/aiwork001.part1a .adwf-transport/aiwork001.part1b .adwf-transport/aiwork001.part1c .adwf-transport/aiwork001.part2 .adwf-transport/aiwork001.part3 .adwf-transport/aiwork001.part4 | tr -d '\r\n' > /tmp/aiwork001.clean.b64
           test "$(sha256sum /tmp/aiwork001.clean.b64 | awk '{print $1}')" = "${EXPECTED_B64_SHA256}"
           base64 -d /tmp/aiwork001.clean.b64 | gunzip > /tmp/aiwork001.patch
-          echo "patch=$(sha256sum /tmp/aiwork001.patch | awk '{print $1}')"
           test "$(sha256sum /tmp/aiwork001.patch | awk '{print $1}')" = "${EXPECTED_PATCH_SHA256}"
 
       - name: Checkout exact target branch
