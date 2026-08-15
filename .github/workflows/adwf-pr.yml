@@ -1,3 +1,4 @@
+# GOV-006 synchronize trigger; removed by owner-bound materialization
 name: ADWF PR
 
 on:
