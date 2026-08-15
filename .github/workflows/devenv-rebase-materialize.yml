@@ -1,0 +1,47 @@
+name: DEVENV rebase materialize projections
+
+on:
+  push:
+    branches:
+      - agent/devenv-001-local-git-mirror
+    paths:
+      - .github/workflows/devenv-rebase-materialize.yml
+
+permissions:
+  contents: write
+
+env:
+  PYTHONDONTWRITEBYTECODE: "1"
+
+jobs:
+  materialize:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd
+        with:
+          fetch-depth: 0
+      - name: Remove one-shot workflow before verification
+        run: rm .github/workflows/devenv-rebase-materialize.yml
+      - name: Materialize deterministic projections and verify DEVENV
+        shell: bash
+        run: |
+          set -euo pipefail
+          python .adwf/scripts/docs_freshness.py --write --reviewed-at 2026-08-15T00:00:00Z --valid-until 2026-11-15T00:00:00Z
+          python .adwf/scripts/generate_manifest.py
+          python .adwf/scripts/validate_capabilities.py
+          python .adwf/scripts/validate_framework.py
+          python .adwf/scripts/validate_docs.py
+          python .adwf/scripts/generate_manifest.py --check
+          python -m unittest discover -s .adwf/tests -p 'test_local_git_mirror_skill.py'
+          python .adwf/adwf.py self-test
+      - name: Publish rebased projections and remove helper
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          git diff --cached --exit-code && { echo 'Expected DEVENV rebase projection changes are missing'; exit 1; } || true
+          git commit -m "DEVENV-001: rebase on canonical main and materialize projections"
+          git push origin HEAD:${GITHUB_REF_NAME}

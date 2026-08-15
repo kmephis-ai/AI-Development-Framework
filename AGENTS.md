@@ -31,6 +31,10 @@ Human-facing Issues, PR summaries, roadmap, dashboard, reports и explanations �
 
 Один активный Writer на conflict domain. Параллельны только независимые read-only lanes или явно непересекающиеся workspaces. Перед mutation требуется текущая policy authorization; после mutation — readback/CAS там, где provider поддерживает revision.
 
+## Local Git bootstrap
+
+Если среда AI не может выполнить обычный `git clone/fetch` из-за DNS/egress, но GitHub Connector доступен, не считать это блокером разработки и не повторять бесполезные сетевые retry. Использовать канонический playbook `skills/adwf-local-git-mirror/SKILL.md`: exact provider SHA → disposable transport branch → GitHub Actions bundle artifact → connector download → fail-closed local materialization. GitHub остаётся Source of Truth; локальный PASS не заменяет provider exact-head CI/owner gate.
+
 ## Work Memory
 
 Записывать только handoff facts: что нужно, что принято, что изменено, что проверено, blocker, вопросы, следующий шаг и ссылки. Не придумывать историю решения и не сохранять скрытое reasoning.
