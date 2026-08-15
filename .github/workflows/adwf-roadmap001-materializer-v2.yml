@@ -61,10 +61,10 @@ jobs:
         working-directory: target
         run: |
           set -euo pipefail
-          python -m unittest .adwf.tests.test_roadmap_truth
-          python -m unittest .adwf.tests.test_v15_executive
-          python -m unittest .adwf.tests.test_adversarial
-          python -m unittest .adwf.tests.test_reconciliation
+          python .adwf/tests/test_roadmap_truth.py
+          python .adwf/tests/test_v15_executive.py
+          python .adwf/tests/test_adversarial.py
+          python .adwf/tests/test_reconciliation.py
           python .adwf/scripts/generate_docs_registry.py --check
           python .adwf/scripts/generate_skill_registry.py --check
           python .adwf/scripts/generate_manifest.py --check
