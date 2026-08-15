@@ -9,19 +9,7 @@ import sys
 
 ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT / ".adwf"))
-from lib.docs_freshness import check_docs, source_digest, updated_registry  # noqa: E402
-from lib.strict_json import load as strict_json_load  # noqa: E402
-
-
-def _print_expected_digests(root: Path, errors: list[str]) -> None:
-    stale = {error.split(":", 1)[1] for error in errors if error.startswith("DOCUMENT_STALE:") and ":" in error}
-    if not stale:
-        return
-    registry = strict_json_load(root / ".adwf/docs-registry.json")
-    for item in registry.get("documents", []):
-        path = str(item.get("path", ""))
-        if path in stale:
-            print(f"- EXPECTED_SOURCE_DIGEST:{path}:{source_digest(root, item.get('watched', []))}")
+from lib.docs_freshness import check_docs, updated_registry  # noqa: E402
 
 
 def main() -> int:
@@ -48,7 +36,6 @@ def main() -> int:
         print("DOCS FRESHNESS: STALE")
         for error in errors:
             print(f"- {error}")
-        _print_expected_digests(root, errors)
         return 1
     print("DOCS FRESHNESS: PASS")
     return 0

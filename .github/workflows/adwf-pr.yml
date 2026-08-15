@@ -1,11 +1,10 @@
-# GOV-006 synchronize trigger; removed by owner-bound materialization
 name: ADWF PR
 
 on:
   pull_request:
     types: [opened, synchronize, reopened, edited, ready_for_review]
 permissions:
-  contents: write
+  contents: read
 env:
   PYTHONDONTWRITEBYTECODE: "1"
 concurrency:
@@ -24,48 +23,6 @@ jobs:
       - uses: actions/setup-python@a309ff8b426b58ec0e2a45f0f869d46889d02405
         with:
           python-version: "3.12.10"
-      - name: TEMP FND-001 owner-bound final materialization
-        env:
-          GH_TOKEN: ${{ github.token }}
-          ADWF_BASE_SHA: ${{ github.event.pull_request.base.sha }}
-          ADWF_HEAD_SHA: ${{ github.event.pull_request.head.sha }}
-          ADWF_HEAD_BRANCH: ${{ github.head_ref }}
-          ADWF_PR_BODY: ${{ github.event.pull_request.body }}
-        run: |
-          python - <<'PY'
-          import os
-          marker = "Owner-Attestation: `" + os.environ["ADWF_HEAD_SHA"] + "`"
-          if marker not in os.environ.get("ADWF_PR_BODY", ""):
-              print("FND-001 materialization: exact-HEAD owner attestation absent; no write")
-              raise SystemExit(0)
-          PY
-          if ! python - <<'PY'
-          import os
-          marker = "Owner-Attestation: `" + os.environ["ADWF_HEAD_SHA"] + "`"
-          raise SystemExit(0 if marker in os.environ.get("ADWF_PR_BODY", "") else 1)
-          PY
-          then
-            exit 0
-          fi
-          git show "${ADWF_BASE_SHA}:.github/workflows/adwf-pr.yml" > .github/workflows/adwf-pr.yml
-          python .adwf/scripts/docs_freshness.py --write
-          python .adwf/scripts/generate_manifest.py
-          python .adwf/scripts/validate_capabilities.py
-          python .adwf/scripts/validate_framework.py
-          python .adwf/scripts/validate_docs.py
-          python .adwf/scripts/generate_manifest.py --check
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add .github/workflows/adwf-pr.yml .adwf/docs-registry.json MANIFEST.json SHA256SUMS.txt
-          git diff --cached --check
-          if git diff --cached --quiet; then
-            echo "FND-001 materialization: no generated changes"
-            exit 0
-          fi
-          git commit -m "FND-001: materialize canonical generated projections"
-          git push "https://x-access-token:${GH_TOKEN}@github.com/${GITHUB_REPOSITORY}.git" HEAD:"refs/heads/${ADWF_HEAD_BRANCH}"
-          echo "FND-001 materialization: pushed final generated commit; current run is superseded"
-          exit 0
       - name: Route change impact first
         id: impact
         run: python .adwf/scripts/impact_router.py --base "${{ github.event.pull_request.base.sha }}" --head "${{ github.event.pull_request.head.sha }}"
