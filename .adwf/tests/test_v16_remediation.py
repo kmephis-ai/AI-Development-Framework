@@ -178,6 +178,7 @@ class V16RemediationTests(unittest.TestCase):
         by_id={x['id']:x for x in trace['capabilities']}
         self.assertEqual(by_id['TRUSTED_GATE']['status'],'IMPLEMENTED')
         self.assertEqual(by_id['WINDOWS_HOSTED_SMOKE']['status'],'LIVE_NOT_VERIFIED')
-        self.assertEqual(by_id['DURABLE_FULL_LOOP']['status'],'OPTIONAL_ADAPTER')
+        self.assertEqual(by_id['DURABLE_FULL_LOOP']['status'],'LIVE_NOT_VERIFIED')
+        self.assertEqual(by_id['DURABLE_FULL_LOOP']['execution_mode'],'OPTIONAL_ADAPTER')
 
 if __name__=='__main__':unittest.main()

@@ -10,6 +10,7 @@ from __future__ import annotations
 from pathlib import Path
 import re
 import sys
+from typing import Any
 
 ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT / ".adwf"))
@@ -24,9 +25,81 @@ IMPLEMENTED_STATES = {"PARTIAL", "IMPLEMENTED", "LIVE_NOT_VERIFIED", "LIVE_VERIF
 LIVE_REF = re.compile(r"^(?:provider|runtime|github|evidence):[A-Za-z0-9._:/#-]+$")
 
 
-def _path_exists(value: str) -> bool:
-    path = ROOT / value
+def _path_exists(value: str, root: Path = ROOT) -> bool:
+    path = root / value
     return path.is_file() or path.is_dir()
+
+
+def validate_truth_payload(
+    trace: dict[str, Any],
+    *,
+    schema: dict[str, Any] | None = None,
+    root: Path = ROOT,
+    expected_version: str | None = None,
+) -> list[str]:
+    """Validate capability truth semantics independently from storage.
+
+    JSON Schema owns structural validation. This function owns cross-field and
+    evidence semantics that the intentionally small ADWF schema engine does not
+    encode, including the rule that test/source evidence cannot imply a live
+    verification claim.
+    """
+    errors: list[str] = []
+    if schema is not None:
+        errors.extend(f"SCHEMA:{item.path}:{item.code}" for item in validate(trace, schema))
+
+    version = expected_version
+    if version is None and (root / "VERSION").is_file():
+        version = (root / "VERSION").read_text(encoding="utf-8").strip()
+    if version is not None and trace.get("framework_version") != version:
+        errors.append("CAPABILITY_VERSION_DRIFT")
+    if trace.get("schema_version") != 2 or trace.get("truth_model_version") != 2:
+        errors.append("CAPABILITY_TRUTH_MODEL_VERSION_INVALID")
+    if trace.get("role") != "CANONICAL_CAPABILITY_TRUTH":
+        errors.append("CAPABILITY_TRUTH_ROLE_INVALID")
+
+    seen: set[str] = set()
+    for cap in trace.get("capabilities") or []:
+        cid = str(cap.get("id") or "")
+        if cid in seen:
+            errors.append("CAPABILITY_DUPLICATE:" + cid)
+        seen.add(cid)
+        status = str(cap.get("status") or "")
+        if status not in TRUTH_STATUSES:
+            errors.append("CAPABILITY_STATUS_INVALID:" + cid)
+        for field in ("entrypoints", "production_paths", "verification"):
+            values = cap.get(field) or []
+            if status in IMPLEMENTED_STATES and not values:
+                errors.append(f"CAPABILITY_{field.upper()}_EMPTY:{cid}")
+            for rel in values:
+                if not _path_exists(str(rel), root):
+                    errors.append(f"CAPABILITY_PATH_MISSING:{cid}:{rel}")
+        live_boundary = str(cap.get("live_boundary") or "").strip()
+        live_evidence = cap.get("live_evidence") or []
+        if status in {"LIVE_NOT_VERIFIED", "LIVE_VERIFIED"} and not live_boundary:
+            errors.append("CAPABILITY_LIVE_BOUNDARY_MISSING:" + cid)
+        if status == "LIVE_VERIFIED":
+            if not live_evidence:
+                errors.append("CAPABILITY_LIVE_EVIDENCE_MISSING:" + cid)
+            for ref in live_evidence:
+                value = str(ref)
+                if not LIVE_REF.fullmatch(value):
+                    errors.append("CAPABILITY_LIVE_EVIDENCE_INVALID:" + cid + ":" + value)
+                if "test_" in value:
+                    errors.append("CAPABILITY_TEST_EVIDENCE_CANNOT_BE_LIVE:" + cid)
+        elif live_evidence:
+            errors.append("CAPABILITY_LIVE_EVIDENCE_WITHOUT_LIVE_VERIFIED:" + cid)
+
+    required = {
+        "TRUSTED_GATE", "DURABLE_FULL_LOOP", "OWNER_WAKEUP_CONTINUE", "SINGLE_SSOT",
+        "ACTIVE_TASK_IDENTITY", "EXACT_SHA_PREVIEW", "TRANSACTIONAL_AUTO_RELEASE",
+        "PROJECT_PACKS", "PUBLIC_SAFE_RUNTIME_LEDGER", "RULESET_READBACK",
+        "PIPELINE_IR_GENERATION", "PERFORMANCE_PLANE", "AGENT_RETURN_WAKEUP",
+        "DELIVERY_OBSERVATION", "WINDOWS_HOSTED_SMOKE",
+    }
+    if not required.issubset(seen):
+        errors.append("CAPABILITY_REQUIRED_MISSING:" + ",".join(sorted(required - seen)))
+    return errors
 
 
 def main() -> int:
@@ -50,56 +123,7 @@ def main() -> int:
 
     trace = load(ROOT / ".adwf/capability-traceability.json")
     schema = load(ROOT / ".adwf/schemas/capability-traceability.schema.json")
-    errors.extend(f"SCHEMA:{item.path}:{item.code}" for item in validate(trace, schema))
-    version = (ROOT / "VERSION").read_text(encoding="utf-8").strip()
-    if trace.get("framework_version") != version:
-        errors.append("CAPABILITY_VERSION_DRIFT")
-    if trace.get("schema_version") != 2 or trace.get("truth_model_version") != 2:
-        errors.append("CAPABILITY_TRUTH_MODEL_VERSION_INVALID")
-    if trace.get("role") != "CANONICAL_CAPABILITY_TRUTH":
-        errors.append("CAPABILITY_TRUTH_ROLE_INVALID")
-
-    seen: set[str] = set()
-    for cap in trace.get("capabilities") or []:
-        cid = str(cap.get("id") or "")
-        if cid in seen:
-            errors.append("CAPABILITY_DUPLICATE:" + cid)
-        seen.add(cid)
-        status = str(cap.get("status") or "")
-        if status not in TRUTH_STATUSES:
-            errors.append("CAPABILITY_STATUS_INVALID:" + cid)
-        for field in ("entrypoints", "production_paths", "verification"):
-            values = cap.get(field) or []
-            if status in IMPLEMENTED_STATES and not values:
-                errors.append(f"CAPABILITY_{field.upper()}_EMPTY:{cid}")
-            for rel in values:
-                if not _path_exists(str(rel)):
-                    errors.append(f"CAPABILITY_PATH_MISSING:{cid}:{rel}")
-        live_boundary = str(cap.get("live_boundary") or "").strip()
-        live_evidence = cap.get("live_evidence") or []
-        if status in {"LIVE_NOT_VERIFIED", "LIVE_VERIFIED"} and not live_boundary:
-            errors.append("CAPABILITY_LIVE_BOUNDARY_MISSING:" + cid)
-        if status == "LIVE_VERIFIED":
-            if not live_evidence:
-                errors.append("CAPABILITY_LIVE_EVIDENCE_MISSING:" + cid)
-            for ref in live_evidence:
-                value = str(ref)
-                if not LIVE_REF.fullmatch(value):
-                    errors.append("CAPABILITY_LIVE_EVIDENCE_INVALID:" + cid + ":" + value)
-                if value.startswith(".adwf/") or "test_" in value:
-                    errors.append("CAPABILITY_TEST_EVIDENCE_CANNOT_BE_LIVE:" + cid)
-        elif live_evidence:
-            errors.append("CAPABILITY_LIVE_EVIDENCE_WITHOUT_LIVE_VERIFIED:" + cid)
-
-    required = {
-        "TRUSTED_GATE", "DURABLE_FULL_LOOP", "OWNER_WAKEUP_CONTINUE", "SINGLE_SSOT",
-        "ACTIVE_TASK_IDENTITY", "EXACT_SHA_PREVIEW", "TRANSACTIONAL_AUTO_RELEASE",
-        "PROJECT_PACKS", "PUBLIC_SAFE_RUNTIME_LEDGER", "RULESET_READBACK",
-        "PIPELINE_IR_GENERATION", "PERFORMANCE_PLANE", "AGENT_RETURN_WAKEUP",
-        "DELIVERY_OBSERVATION", "WINDOWS_HOSTED_SMOKE",
-    }
-    if not required.issubset(seen):
-        errors.append("CAPABILITY_REQUIRED_MISSING:" + ",".join(sorted(required - seen)))
+    errors.extend(validate_truth_payload(trace, schema=schema, root=ROOT))
 
     control = (ROOT / ".github/workflows/adwf-control.yml").read_text(encoding="utf-8")
     for needle in (

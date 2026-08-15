@@ -9,6 +9,7 @@ ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT / ".adwf"))
 from lib.contracts import validate
 from lib.cost_guard import ALLOWED_CLASSIFICATIONS, CAPABILITY_STATUSES
+from scripts.validate_capabilities import validate_truth_payload
 
 
 class CapabilityCostContractTests(unittest.TestCase):
@@ -49,7 +50,9 @@ class CapabilityCostContractTests(unittest.TestCase):
         candidate["capabilities"][0]["status"] = "LIVE_VERIFIED"
         candidate["capabilities"][0]["live_boundary"] = "provider readback required"
         candidate["capabilities"][0]["live_evidence"] = []
-        self.assertTrue(validate(candidate, schema))
+        self.assertEqual(validate(candidate, schema), [])
+        errors = validate_truth_payload(candidate, schema=schema, root=ROOT)
+        self.assertIn("CAPABILITY_LIVE_EVIDENCE_MISSING:TRUSTED_GATE", errors)
 
     def test_current_catalog_does_not_promote_test_evidence_to_live_verified(self):
         truth = json.loads((ROOT / ".adwf/capability-traceability.json").read_text(encoding="utf-8"))
