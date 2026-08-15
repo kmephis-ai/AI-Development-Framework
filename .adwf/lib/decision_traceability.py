@@ -361,6 +361,8 @@ def project_traceability(graph: dict[str, Any], root: str | Path, *, now: dateti
 
 def validate_revision_transition(previous: dict[str, Any], current: dict[str, Any]) -> list[str]:
     """Existing records/references/edges are immutable; supersession is additive."""
+    if current == previous:
+        return []
     errors: list[str] = []
     if int(current.get("revision", 0)) <= int(previous.get("revision", 0)):
         errors.append("TRACE_REVISION_NOT_INCREASING")
@@ -376,23 +378,38 @@ def validate_revision_transition(previous: dict[str, Any], current: dict[str, An
 
 
 def _git_previous_graph(root: Path) -> dict[str, Any] | None:
-    """Best-effort base readback for CI/local mutation detection; absence is bootstrap."""
+    """Read the preceding graph revision; current HEAD is never its own predecessor."""
     candidates: list[str] = []
+    head: str | None = None
+    try:
+        process = subprocess.run(
+            ["git", "rev-parse", "HEAD"], cwd=root, capture_output=True, text=True, check=False, timeout=5
+        )
+        if process.returncode == 0 and re.fullmatch(r"[0-9a-f]{40}", process.stdout.strip()):
+            head = process.stdout.strip()
+    except (OSError, subprocess.TimeoutExpired):
+        pass
+
+    def add_candidate(value: str | None) -> None:
+        if value and re.fullmatch(r"[0-9a-f]{40}", value) and value != head:
+            candidates.append(value)
+
     env_base = __import__("os").environ.get("ADWF_BASE_SHA")
-    if env_base and re.fullmatch(r"[0-9a-f]{40}", env_base):
-        candidates.append(env_base)
+    add_candidate(env_base)
     try:
         process = subprocess.run(
             ["git", "merge-base", "HEAD", "origin/main"], cwd=root, capture_output=True, text=True, check=False, timeout=5
         )
-        if process.returncode == 0 and re.fullmatch(r"[0-9a-f]{40}", process.stdout.strip()):
-            candidates.append(process.stdout.strip())
+        if process.returncode == 0:
+            add_candidate(process.stdout.strip())
     except (OSError, subprocess.TimeoutExpired):
         pass
     try:
-        process = subprocess.run(["git", "rev-parse", "HEAD^"], cwd=root, capture_output=True, text=True, check=False, timeout=5)
-        if process.returncode == 0 and re.fullmatch(r"[0-9a-f]{40}", process.stdout.strip()):
-            candidates.append(process.stdout.strip())
+        process = subprocess.run(
+            ["git", "rev-parse", "HEAD^"], cwd=root, capture_output=True, text=True, check=False, timeout=5
+        )
+        if process.returncode == 0:
+            add_candidate(process.stdout.strip())
     except (OSError, subprocess.TimeoutExpired):
         pass
     for revision in dict.fromkeys(candidates):

@@ -11,7 +11,7 @@
         ".github/workflows/**"
       ],
       "mode": "generated-status-block+manual",
-      "source_digest": "3eabd914f11d8b4855185e85cca5508d6a66dcabbc398d89d6c93f658503b4ea",
+      "source_digest": "0295215320708288438ff7f5f943828c310daffaa9f4339a555a7903636a3d00",
       "reviewed_at": "2026-08-13T00:00:00Z",
       "valid_until": "2026-11-13T00:00:00Z"
     },
@@ -24,7 +24,7 @@
         "skills/**"
       ],
       "mode": "manual-governance",
-      "source_digest": "4f1f87646e817587802b807da7180abe90ad0fe7c6850d763d934119ecb67aa0",
+      "source_digest": "ba923d0358e0b232323f7c417e4e6ce9bc8e1d5db10af44dd8749bb89444159d",
       "reviewed_at": "2026-08-13T00:00:00Z",
       "valid_until": "2026-11-13T00:00:00Z"
     },
@@ -65,7 +65,7 @@
         ".adwf/scripts/validate_capabilities.py"
       ],
       "mode": "implementation-certification",
-      "source_digest": "c13037bab82ed8cfc9b38bce62024bd6172299a4719e85355d714c5eb9326262",
+      "source_digest": "59858b54aebe2d09821f67dd2080710fe0fe3216fcda283f180a0d76923489a9",
       "reviewed_at": "2026-08-13T00:00:00Z",
       "valid_until": "2026-11-13T00:00:00Z"
     },
@@ -153,7 +153,7 @@
         ".adwf/roadmap.json"
       ],
       "mode": "governance",
-      "source_digest": "e2ddd4445ac506ce6666ece9bbabad33ceefd6b2da69f4af6737e915961f95ee",
+      "source_digest": "d6df6c6006218ca40cd00063672047d7f3b5df49ab223470acb933f075d5e57b",
       "reviewed_at": "2026-08-13T00:00:00Z",
       "valid_until": "2026-11-13T00:00:00Z"
     }
