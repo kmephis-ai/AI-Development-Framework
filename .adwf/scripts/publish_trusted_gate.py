@@ -115,7 +115,31 @@ def evaluate_trusted_gate(client:GitHubClient,repo:str,workflow_run:dict[str,Any
 
 
 def _publish(client:GitHubClient,name:str,sha:str,passed:bool,title:str,summary:str)->None:
-    client.post(f'/repos/{client.repo}/check-runs',{'name':name,'head_sha':sha,'status':'completed','conclusion':'success' if passed else 'failure','output':{'title':title,'summary':summary[:65000]}})
+    """Publish one trusted decision fail-closed through both provider transports.
+
+    A failure sentinel is written to Commit Status API before any positive Check
+    Run can exist. Then the rich Check Run is published and only the final write
+    replaces the sentinel with the actual status. Therefore any partial provider
+    failure leaves the exact-SHA required context red rather than partially green.
+    """
+    conclusion='success' if passed else 'failure'
+    client.post(f'/repos/{client.repo}/statuses/{sha}',{
+        'state':'failure',
+        'context':name,
+        'description':'BLOCK: trusted gate publication incomplete',
+    })
+    client.post(f'/repos/{client.repo}/check-runs',{
+        'name':name,
+        'head_sha':sha,
+        'status':'completed',
+        'conclusion':conclusion,
+        'output':{'title':title,'summary':summary[:65000]},
+    })
+    client.post(f'/repos/{client.repo}/statuses/{sha}',{
+        'state':conclusion,
+        'context':name,
+        'description':summary[:140],
+    })
 
 
 def workflow_run_from_event(client:GitHubClient,event:dict[str,Any])->dict[str,Any]:
