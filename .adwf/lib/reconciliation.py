@@ -12,6 +12,7 @@ from .adwf_core import issue_quality
 from .evidence import parse_time
 from .issue_contract import parse_issue_form, parse_issue_marker, parse_pr_contract
 from .metrics import summarize_ci
+from .roadmap_view import critical_path_scores, derive_verified_progress, validate_roadmap_graph
 from .workspaces import OCCUPYING
 
 STATE_LABELS = {
@@ -143,11 +144,20 @@ def reconcile_snapshot(
     duplicates = sorted(name for name, count in roadmap_seen.items() if count != 1)
     if duplicates:
         errors.append("ROADMAP_ID_NOT_ONE_TO_ONE:" + ",".join(duplicates))
+    graph = validate_roadmap_graph(work_items)
+    for finding in graph["errors"]:
+        errors.append("ROADMAP_GRAPH:" + finding)
     state_by_roadmap = {item["roadmap_id"]: item["state"] for item in work_items}
+    verified_done = {roadmap_id for roadmap_id, state_name in state_by_roadmap.items() if state_name == "DONE"}
+    scores = critical_path_scores(work_items, verified_done) if graph["status"] == "PASS" else {}
     for item in work_items:
-        actual_resolved = all(state_by_roadmap.get(dependency) == "DONE" for dependency in item["dependencies"])
+        actual_resolved = graph["status"] == "PASS" and all(
+            state_by_roadmap.get(dependency) == "DONE" for dependency in item["dependencies"]
+        )
         if item["dependencies_resolved"] is not actual_resolved:
             errors.append(f"DEPENDENCY_STATUS_MISMATCH:{item['roadmap_id']}")
+        item["dependencies_resolved"] = actual_resolved
+        item["critical_path_score"] = scores.get(item["roadmap_id"], 0)
 
     counts = {name: 0 for name in ("READY", "IN_PROGRESS", "REVIEW", "VERIFICATION", "BLOCKED", "HUMAN_REQUIRED")}
     for item in work_items:
@@ -241,4 +251,11 @@ def reconcile_snapshot(
     output["owner_decisions"] = decisions
     output["last_reconciled_at"] = observed_at
     output["last_verified_at"] = observed_at if not errors else None
+    progress = derive_verified_progress(work_items, output, now=now)
+    output["progress"] = {
+        "implementation": progress["implementation"],
+        "verification": progress["verification"],
+        "product_readiness": progress["product_readiness"],
+        "verification_gap": progress["verification_gap"],
+    }
     return output

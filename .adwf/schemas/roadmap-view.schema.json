@@ -1,1 +1,36 @@
-{"$schema":"https://json-schema.org/draft/2020-12/schema","type":"object","required":["schema_version","goals","summary"],"properties":{"schema_version":{"const":1},"goals":{"type":"array"},"summary":{"type":"object","required":["total","implemented","verified","product_done","blocked"]}},"additionalProperties":false}
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "goals", "summary"],
+  "properties": {
+    "schema_version": {"const": 1},
+    "goals": {"type": "array"},
+    "summary": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "total", "implemented", "verified", "product_done", "outcome_ready",
+        "verification_gap", "evidence_fresh", "product_health_verified", "false_progress",
+        "blocked", "active", "graph_status", "graph_errors", "ready_frontier", "critical_path"
+      ],
+      "properties": {
+        "total": {"type": "integer", "minimum": 0},
+        "implemented": {"type": "number", "minimum": 0, "maximum": 1},
+        "verified": {"type": "number", "minimum": 0, "maximum": 1},
+        "product_done": {"type": "number", "minimum": 0, "maximum": 1},
+        "outcome_ready": {"type": "number", "minimum": 0, "maximum": 1},
+        "verification_gap": {"type": "number", "minimum": 0, "maximum": 1},
+        "evidence_fresh": {"type": "boolean"},
+        "product_health_verified": {"type": "boolean"},
+        "false_progress": {"type": "boolean"},
+        "blocked": {"type": "integer", "minimum": 0},
+        "active": {"type": ["object", "null"]},
+        "graph_status": {"enum": ["PASS", "FAIL"]},
+        "graph_errors": {"type": "array", "items": {"type": "string"}, "uniqueItems": true},
+        "ready_frontier": {"type": "array", "items": {"type": "string"}, "uniqueItems": true},
+        "critical_path": {"type": "array", "items": {"type": "string"}, "uniqueItems": true}
+      }
+    }
+  }
+}
