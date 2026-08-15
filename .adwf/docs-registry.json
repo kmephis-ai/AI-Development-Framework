@@ -11,7 +11,7 @@
         ".github/workflows/**"
       ],
       "mode": "generated-status-block+manual",
-      "source_digest": "95cf34445ea680236ece92759d9be37fc0d82cc005467986f687a2061100a84b",
+      "source_digest": "3eabd914f11d8b4855185e85cca5508d6a66dcabbc398d89d6c93f658503b4ea",
       "reviewed_at": "2026-08-13T00:00:00Z",
       "valid_until": "2026-11-13T00:00:00Z"
     },
@@ -24,7 +24,7 @@
         "skills/**"
       ],
       "mode": "manual-governance",
-      "source_digest": "48740468bbab66567076ac5009f1c014c15162ba343cd11b0b4d181f0a1200f1",
+      "source_digest": "4f1f87646e817587802b807da7180abe90ad0fe7c6850d763d934119ecb67aa0",
       "reviewed_at": "2026-08-13T00:00:00Z",
       "valid_until": "2026-11-13T00:00:00Z"
     },
@@ -37,7 +37,7 @@
         ".adwf/scripts/**"
       ],
       "mode": "architecture",
-      "source_digest": "80d8271efa70b7722a3e5d24889ce3dc738850625695ea37b44b34905be4d8d8",
+      "source_digest": "a5e929e46994a5c4cfcf60173d13d04373532deb746f2bd361d30185f26590d0",
       "reviewed_at": "2026-08-13T00:00:00Z",
       "valid_until": "2026-11-13T00:00:00Z"
     },
@@ -65,7 +65,7 @@
         ".adwf/scripts/validate_capabilities.py"
       ],
       "mode": "implementation-certification",
-      "source_digest": "8aa1916bea002225909d444b35bfe18dd251414bc014ae9e9de8a4222884dc41",
+      "source_digest": "c13037bab82ed8cfc9b38bce62024bd6172299a4719e85355d714c5eb9326262",
       "reviewed_at": "2026-08-13T00:00:00Z",
       "valid_until": "2026-11-13T00:00:00Z"
     },
@@ -138,6 +138,22 @@
       ],
       "mode": "governance",
       "source_digest": "252af6d74df0e9aee929aad28fe3f56ad33a6a6e7a4180cf2dc3f89180d9f4b5",
+      "reviewed_at": "2026-08-13T00:00:00Z",
+      "valid_until": "2026-11-13T00:00:00Z"
+    },
+    {
+      "path": "docs/governance/DECISION_REQUIREMENT_TRACEABILITY.md",
+      "watched": [
+        ".adwf/decision-requirement-traceability.json",
+        ".adwf/lib/decision_traceability.py",
+        ".adwf/schemas/decision-requirement-traceability.schema.json",
+        ".adwf/scripts/validate_traceability.py",
+        ".adwf/tests/test_decision_traceability.py",
+        ".adwf/capability-traceability.json",
+        ".adwf/roadmap.json"
+      ],
+      "mode": "governance",
+      "source_digest": "e2ddd4445ac506ce6666ece9bbabad33ceefd6b2da69f4af6737e915961f95ee",
       "reviewed_at": "2026-08-13T00:00:00Z",
       "valid_until": "2026-11-13T00:00:00Z"
     }
