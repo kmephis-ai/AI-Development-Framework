@@ -1,11 +1,14 @@
 {
   "$schema": "./schemas/capability-traceability.schema.json",
-  "schema_version": 1,
+  "schema_version": 2,
+  "truth_model_version": 2,
+  "role": "CANONICAL_CAPABILITY_TRUTH",
   "framework_version": "1.6.0",
   "capabilities": [
     {
       "id": "TRUSTED_GATE",
       "status": "IMPLEMENTED",
+      "execution_mode": "CORE",
       "owner_claim_ru": "Доверенный gate не разрешает PR самостоятельно ослабить собственные правила проверки.",
       "entrypoints": [
         ".adwf/scripts/publish_trusted_gate.py"
@@ -17,11 +20,13 @@
       ],
       "verification": [
         ".adwf/tests/test_v16_remediation.py"
-      ]
+      ],
+      "live_evidence": []
     },
     {
       "id": "DURABLE_FULL_LOOP",
-      "status": "OPTIONAL_ADAPTER",
+      "status": "LIVE_NOT_VERIFIED",
+      "execution_mode": "OPTIONAL_ADAPTER",
       "owner_claim_ru": "Runtime Supervisor исполняет детерминированные фазы, а EXECUTE/RECOVERY ожидают сменный Creative Agent adapter, если он не настроен.",
       "entrypoints": [
         ".adwf/adwf.py",
@@ -35,11 +40,13 @@
       "verification": [
         ".adwf/tests/test_v16_remediation.py"
       ],
-      "live_boundary": "Полностью unattended генерация кода требует отдельно подключённый разрешённый Creative Agent; отсутствие adapter возвращает WAITING_AGENT, а не ложный PASS."
+      "live_boundary": "Полностью unattended генерация кода требует отдельно подключённый разрешённый Creative Agent; отсутствие adapter возвращает WAITING_AGENT, а не ложный PASS.",
+      "live_evidence": []
     },
     {
       "id": "OWNER_WAKEUP_CONTINUE",
       "status": "IMPLEMENTED",
+      "execution_mode": "CORE",
       "owner_claim_ru": "Старт задачи и кнопка ПРОДОЛЖИТЬ связаны с durable run и будят trusted controller.",
       "entrypoints": [
         ".adwf/adwf.py",
@@ -52,11 +59,13 @@
       ],
       "verification": [
         ".adwf/tests/test_v16_remediation.py"
-      ]
+      ],
+      "live_evidence": []
     },
     {
       "id": "SINGLE_SSOT",
       "status": "IMPLEMENTED",
+      "execution_mode": "CORE",
       "owner_claim_ru": "Durable Orchestrator является единственным authoritative workflow state; остальные состояния являются контекстом или проекциями.",
       "entrypoints": [
         ".github/workflows/adwf-control.yml"
@@ -69,11 +78,13 @@
       "verification": [
         ".adwf/scripts/validate_pipeline_ir.py",
         ".adwf/tests/test_v16_remediation.py"
-      ]
+      ],
+      "live_evidence": []
     },
     {
       "id": "ACTIVE_TASK_IDENTITY",
       "status": "IMPLEMENTED",
+      "execution_mode": "CORE",
       "owner_claim_ru": "Новая задача не перезаписывает Brief/Work Memory уже активного run и ставится в очередь.",
       "entrypoints": [
         ".adwf/adwf.py"
@@ -84,11 +95,13 @@
       ],
       "verification": [
         ".adwf/tests/test_v16_remediation.py"
-      ]
+      ],
+      "live_evidence": []
     },
     {
       "id": "EXACT_SHA_PREVIEW",
       "status": "IMPLEMENTED",
+      "execution_mode": "CORE",
       "owner_claim_ru": "Preview принимается только с доказанной привязкой к exact revision.",
       "entrypoints": [
         ".adwf/adwf.py",
@@ -102,11 +115,13 @@
       ],
       "verification": [
         ".adwf/tests/test_v16_remediation.py"
-      ]
+      ],
+      "live_evidence": []
     },
     {
       "id": "TRANSACTIONAL_AUTO_RELEASE",
       "status": "IMPLEMENTED",
+      "execution_mode": "CORE",
       "owner_claim_ru": "Auto release сначала готовит согласованный version-bump transaction и не выпускает архив с противоречивой внутренней версией.",
       "entrypoints": [
         ".adwf/adwf.py",
@@ -118,11 +133,13 @@
       ],
       "verification": [
         ".adwf/tests/test_v16_remediation.py"
-      ]
+      ],
+      "live_evidence": []
     },
     {
       "id": "PROJECT_PACKS",
       "status": "IMPLEMENTED",
+      "execution_mode": "CORE",
       "owner_claim_ru": "Project Pack не только определяется, но и детерминированно материализует runtime/build/preview configuration через governance flow.",
       "entrypoints": [
         ".adwf/adwf.py",
@@ -135,11 +152,13 @@
       ],
       "verification": [
         ".adwf/tests/test_v16_remediation.py"
-      ]
+      ],
+      "live_evidence": []
     },
     {
       "id": "PUBLIC_SAFE_RUNTIME_LEDGER",
       "status": "IMPLEMENTED",
+      "execution_mode": "CORE",
       "owner_claim_ru": "Многодневный public checkpoint хранит только безопасную проекцию и привязан к защищённому внешнему anchor.",
       "entrypoints": [
         ".adwf/scripts/github_runtime_sync.py"
@@ -151,11 +170,13 @@
       ],
       "verification": [
         ".adwf/tests/test_v16_remediation.py"
-      ]
+      ],
+      "live_evidence": []
     },
     {
       "id": "RULESET_READBACK",
       "status": "LIVE_NOT_VERIFIED",
+      "execution_mode": "CORE",
       "owner_claim_ru": "Canonical GitHub rulesets создаются и проверяются через provider readback с no-bypass и source-bound required checks.",
       "entrypoints": [
         ".adwf/scripts/github_bootstrap.py"
@@ -168,11 +189,13 @@
       "verification": [
         ".adwf/tests/test_v16_remediation.py"
       ],
-      "live_boundary": "Фактическое создание и readback GitHub rulesets нельзя подтвердить локальным ZIP; требуется живой public repository."
+      "live_boundary": "Фактическое создание и readback GitHub rulesets нельзя подтверждать только локальным тестом; требуется явная provider evidence reference.",
+      "live_evidence": []
     },
     {
       "id": "PIPELINE_IR_GENERATION",
       "status": "IMPLEMENTED",
+      "execution_mode": "CORE",
       "owner_claim_ru": "GitHub workflow projections генерируются из Pipeline IR и ручной drift блокируется.",
       "entrypoints": [
         ".adwf/scripts/generate_pipeline.py"
@@ -188,11 +211,13 @@
       "verification": [
         ".adwf/scripts/validate_pipeline_ir.py",
         ".adwf/tests/test_v16_remediation.py"
-      ]
+      ],
+      "live_evidence": []
     },
     {
       "id": "PERFORMANCE_PLANE",
       "status": "LIVE_NOT_VERIFIED",
+      "execution_mode": "CORE",
       "owner_claim_ru": "Trusted collector формирует per-impact/per-pack метрики и regression budgets, но зелёный статус требует достаточной живой выборки.",
       "entrypoints": [
         ".adwf/scripts/github_metrics_collector.py"
@@ -205,11 +230,13 @@
       "verification": [
         ".adwf/tests/test_v16_remediation.py"
       ],
-      "live_boundary": "Не менее требуемого числа живых CI samples; provider queue показывается отдельно."
+      "live_boundary": "LIVE_VERIFIED требует свежую provider/runtime evidence reference для достаточного окна живых CI samples; test fixture не считается live evidence.",
+      "live_evidence": []
     },
     {
       "id": "AGENT_RETURN_WAKEUP",
-      "status": "OPTIONAL_ADAPTER",
+      "status": "LIVE_NOT_VERIFIED",
+      "execution_mode": "OPTIONAL_ADAPTER",
       "owner_claim_ru": "Agent result принимается только через bounded inbox contract и затем возвращается в Runtime Supervisor.",
       "entrypoints": [
         ".adwf/scripts/publish_agent_request.py",
@@ -222,11 +249,13 @@
       "verification": [
         ".adwf/tests/test_v16_remediation.py"
       ],
-      "live_boundary": "Конкретный ChatGPT/Codex/Claude adapter остаётся заменяемым и не входит в mandatory FREE_ONLY correctness path."
+      "live_boundary": "Конкретный Creative Agent adapter должен дать отдельную live evidence reference; adapter не входит в mandatory FREE_ONLY correctness path.",
+      "live_evidence": []
     },
     {
       "id": "DELIVERY_OBSERVATION",
-      "status": "OPTIONAL_ADAPTER",
+      "status": "LIVE_NOT_VERIFIED",
+      "execution_mode": "OPTIONAL_ADAPTER",
       "owner_claim_ru": "Delivery contract проверяет exact source/artifact observation; reference adapter не выдаётся за production hosting.",
       "entrypoints": [
         ".adwf/scripts/reference_delivery.py"
@@ -238,11 +267,13 @@
       "verification": [
         ".adwf/tests/test_v16_remediation.py"
       ],
-      "live_boundary": "Production-specific deploy adapter выбирается проектом; NONE при required delivery блокирует цикл."
+      "live_boundary": "Production-specific delivery требует отдельную runtime/provider evidence reference; reference adapter подтверждает contract, но не production hosting.",
+      "live_evidence": []
     },
     {
       "id": "WINDOWS_HOSTED_SMOKE",
       "status": "LIVE_NOT_VERIFIED",
+      "execution_mode": "CORE",
       "owner_claim_ru": "Canonical workflow содержит functional HTTP smoke на Linux и Windows hosted runners.",
       "entrypoints": [
         ".github/workflows/adwf-platform-smoke.yml"
@@ -255,7 +286,8 @@
       "verification": [
         ".adwf/tests/test_v16_remediation.py"
       ],
-      "live_boundary": "Linux smoke проверяется локально; Windows hosted certification возможна только после запуска workflow в GitHub."
+      "live_boundary": "LIVE_VERIFIED требует ссылку на успешный exact-revision hosted run; наличие workflow и unit test само по себе недостаточно.",
+      "live_evidence": []
     }
   ]
 }
