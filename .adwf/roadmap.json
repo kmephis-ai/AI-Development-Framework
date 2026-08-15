@@ -78,6 +78,14 @@
             "AIWORK-001"
           ],
           "product_impact": false
+        },
+        {
+          "roadmap_id": "LIFECYCLE-001",
+          "title_ru": "Managed Surface Contract v1 — project must outlive framework",
+          "dependencies": [
+            "TRACE-001"
+          ],
+          "product_impact": false
         }
       ]
     }

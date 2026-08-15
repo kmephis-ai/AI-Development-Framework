@@ -168,6 +168,17 @@
       "acceptance_evidence": [
         ".adwf/tests/test_ai_work_contracts.py"
       ]
+    },
+    {
+      "id": "managed_surface_contract",
+      "title": "Consumer managed-surface ownership and safe detach planning",
+      "implementation_status": "IMPLEMENTED",
+      "cost_status": "FREE_VERIFIED",
+      "mandatory": true,
+      "requires_paid_ai_api": false,
+      "acceptance_evidence": [
+        ".adwf/tests/test_managed_surface.py"
+      ]
     }
   ]
 }

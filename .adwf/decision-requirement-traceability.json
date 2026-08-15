@@ -2,7 +2,7 @@
   "$schema": ".adwf/schemas/decision-requirement-traceability.schema.json",
   "schema_version": 1,
   "role": "CANONICAL_DECISION_REQUIREMENT_TRACEABILITY",
-  "revision": 1,
+  "revision": 2,
   "records": [
     {
       "id": "INTENT-FOUNDATION-20260815",
@@ -36,6 +36,28 @@
       "source_path": null,
       "source_sha256": null,
       "record_sha256": "8f8b5835db73dc71e842ad5c5019b3fba3238628cbd74485c114edd3de08346e"
+    },
+    {
+      "id": "REQ-LIFECYCLE-001",
+      "kind": "REQUIREMENT",
+      "version": 1,
+      "status": "ACTIVE",
+      "title_ru": "Consumer project должен переживать ADWF",
+      "statement_ru": "ADWF обязан отличать свои managed surfaces от shared и consumer-owned файлов; adoption/update/detach не могут молча перезаписывать или удалять неизвестные, изменённые или пользовательские данные.",
+      "source_path": null,
+      "source_sha256": null,
+      "record_sha256": "4f9bba12660534ce54b61d8a13c166ace1a2d10ab560ab73a0fc655f9f6326c1"
+    },
+    {
+      "id": "DEC-LIFECYCLE-001",
+      "kind": "DECISION",
+      "version": 1,
+      "status": "ACCEPTED",
+      "title_ru": "Package inventory остаётся SSOT, consumer ownership задаётся отдельным тонким contract",
+      "statement_ru": "Переиспользовать MANIFEST.json/SHA256SUMS.txt как единственный inventory release-файлов и добавить только ownership policy + read-only adoption/snapshot/detach semantics; destructive apply не входит в v1.",
+      "source_path": null,
+      "source_sha256": null,
+      "record_sha256": "6b71630ceebfb404a9a3b7e2e385a674a4a9e6099b2da4136bfee931f7e813b3"
     }
   ],
   "capability_refs": [
@@ -43,6 +65,11 @@
       "id": "CAPREF-DECISION_REQUIREMENT_TRACEABILITY",
       "capability_id": "DECISION_REQUIREMENT_TRACEABILITY",
       "ref_sha256": "7c2284b047ac44ac280d138266a4e64b1a32edb7d2a768a0bee99fb570133ec4"
+    },
+    {
+      "id": "CAPREF-MANAGED-SURFACE-CONTRACT",
+      "capability_id": "MANAGED_SURFACE_CONTRACT",
+      "ref_sha256": "64ea9428a747adceaa185fe673782f49f8437371a527856382f3b638ed1124e9"
     }
   ],
   "work_unit_refs": [
@@ -52,6 +79,13 @@
       "issue_number": 42,
       "ai_work_package_id": null,
       "ref_sha256": "7f7c7d548b2474232b9928d4660c406229d2c1f3b7d228ec9e1922d270c6e1cc"
+    },
+    {
+      "id": "WORKREF-LIFECYCLE-001",
+      "roadmap_id": "LIFECYCLE-001",
+      "issue_number": 47,
+      "ai_work_package_id": null,
+      "ref_sha256": "3dfb6e27acbe1ccb6346aee2cf3abcfa291cc4ec8c95510a0eaeaface335ca31"
     }
   ],
   "evidence_refs": [],
@@ -83,7 +117,35 @@
       "from": "CAPREF-DECISION_REQUIREMENT_TRACEABILITY",
       "to": "WORKREF-TRACE-001",
       "edge_sha256": "52ccdb5ef1529cf4d9eb68ff7cb6e421b1878bd12421826403b6474dab003ec1"
+    },
+    {
+      "id": "EDGE-INTENT-REQ-LIFECYCLE-001",
+      "type": "INTENT_TO_REQUIREMENT",
+      "from": "INTENT-FOUNDATION-20260815",
+      "to": "REQ-LIFECYCLE-001",
+      "edge_sha256": "7f9fae492a7f91f5a15b112c514ca8145779e09db4a8bdf62223cceaf61ccdfd"
+    },
+    {
+      "id": "EDGE-REQ-DEC-LIFECYCLE-001",
+      "type": "REQUIREMENT_TO_DECISION",
+      "from": "REQ-LIFECYCLE-001",
+      "to": "DEC-LIFECYCLE-001",
+      "edge_sha256": "5d525f51a08e690d7906f66338ab8166894f2df6f38e9bfad4740efd5f2e8686"
+    },
+    {
+      "id": "EDGE-DEC-CAP-LIFECYCLE-001",
+      "type": "DECISION_TO_CAPABILITY",
+      "from": "DEC-LIFECYCLE-001",
+      "to": "CAPREF-MANAGED-SURFACE-CONTRACT",
+      "edge_sha256": "bd3492b0fb8be2ce595bedf6ed1706313bc54279169e8a3cbba864933b2e6610"
+    },
+    {
+      "id": "EDGE-CAP-WORK-LIFECYCLE-001",
+      "type": "CAPABILITY_TO_WORK",
+      "from": "CAPREF-MANAGED-SURFACE-CONTRACT",
+      "to": "WORKREF-LIFECYCLE-001",
+      "edge_sha256": "4dce56544586f0b9add4757da1eaad22a87f69d85e7874e625d0eb09051a666f"
     }
   ],
-  "graph_sha256": "34f6129fa8b16295685f4a1fd05c052a34cef3350ba30bd6bd08ef09c5b6253e"
+  "graph_sha256": "d4626442c5105382da6ff1916211903eea4e99abf072a6a6d3be7fafca641d23"
 }

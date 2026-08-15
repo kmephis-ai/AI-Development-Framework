@@ -329,6 +329,26 @@
       ],
       "live_boundary": "LIVE_VERIFIED требует реальную downstream evidence-связь для consumer/work outcome; canonical graph TRACE-001 намеренно остаётся INCOMPLETE до post-merge evidence.",
       "live_evidence": []
+    },
+    {
+      "id": "MANAGED_SURFACE_CONTRACT",
+      "status": "LIVE_NOT_VERIFIED",
+      "execution_mode": "CORE",
+      "owner_claim_ru": "ADWF отличает framework-private, shared-guarded и consumer-owned поверхности и строит fail-closed adoption/detach plan без удаления пользовательских файлов.",
+      "entrypoints": [
+        ".adwf/scripts/validate_managed_surface.py"
+      ],
+      "production_paths": [
+        ".adwf/lib/managed_surface.py",
+        ".adwf/managed-surface-policy.json",
+        "MANIFEST.json",
+        "SHA256SUMS.txt"
+      ],
+      "verification": [
+        ".adwf/tests/test_managed_surface.py"
+      ],
+      "live_boundary": "LIVE_VERIFIED требует evidence от реального consumer repository: adoption snapshot и detach/recovery outcome с доказательством сохранности consumer-owned data; unit/CI tests подтверждают implementation, но не live consumer truth.",
+      "live_evidence": []
     }
   ]
 }
