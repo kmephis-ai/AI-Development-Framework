@@ -23,7 +23,7 @@
         ".gitlab-ci.yml"
       ],
       "mode": "manual-governance",
-      "source_digest": "8d874013bd7c652d775f01e42f497ddf527f4cfbcd04289b5ab0bcd2e1e71a5c",
+      "source_digest": "4917d00957b376441f70d17bd92ebad7f97b1800cc33966bc0db15877257fbeb",
       "reviewed_at": "2026-08-13T00:00:00Z",
       "valid_until": "2026-11-13T00:00:00Z"
     },
@@ -36,7 +36,7 @@
         ".adwf/scripts/**"
       ],
       "mode": "architecture",
-      "source_digest": "e38ba02c082ae736cd52cb2ef1a33edc965b1e5d7e69a095bc2e51a41b5d28d4",
+      "source_digest": "5ff90b23140e1762e83cfb8e3da8855083aa00e9454ef5303b6373495fe9f10c",
       "reviewed_at": "2026-08-13T00:00:00Z",
       "valid_until": "2026-11-13T00:00:00Z"
     },
