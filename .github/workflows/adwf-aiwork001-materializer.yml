@@ -1,0 +1,92 @@
+name: ADWF AIWORK-001 Materializer
+
+on:
+  push:
+    branches:
+      - agent/local-mirror-aiwork001-20260815-a1
+
+permissions:
+  contents: write
+
+env:
+  BASE_SHA: fdbe95f7722bd0c11a7c1c6b1bd3d8ac7c7226aa
+  TARGET_BRANCH: agent/aiwork-001-work-contracts
+  EXPECTED_B64_SHA256: d618a7af7902c4dbee85f081d02a3bc316e12fc5024800e0eb2724513760f7b4
+  EXPECTED_PATCH_SHA256: d9a5eabbd36c0428ccc44a1e3ea8a91806d5d86818e40b59662ca6e816b5041a
+  EXPECTED_TREE: 44672b5129a5550c8745a89498d2d5780991fc49
+
+jobs:
+  materialize:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - name: Checkout transport branch
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd
+        with:
+          fetch-depth: 1
+          persist-credentials: false
+
+      - name: Recover and verify staged payload
+        shell: bash
+        run: |
+          set -euo pipefail
+          cat .adwf-transport/aiwork001.part1 .adwf-transport/aiwork001.part2 .adwf-transport/aiwork001.part3 .adwf-transport/aiwork001.part4 | tr -d '\r\n' > /tmp/aiwork001.clean.b64
+          test "$(sha256sum /tmp/aiwork001.clean.b64 | awk '{print $1}')" = "${EXPECTED_B64_SHA256}"
+          base64 -d /tmp/aiwork001.clean.b64 | gunzip > /tmp/aiwork001.patch
+          test "$(sha256sum /tmp/aiwork001.patch | awk '{print $1}')" = "${EXPECTED_PATCH_SHA256}"
+
+      - name: Checkout exact target branch
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd
+        with:
+          ref: ${{ env.TARGET_BRANCH }}
+          fetch-depth: 0
+          path: target
+
+      - uses: actions/setup-python@a309ff8b426b58ec0e2a45f0f869d46889d02405
+        with:
+          python-version: '3.12'
+
+      - name: Apply exact payload
+        shell: bash
+        working-directory: target
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "${BASE_SHA}"
+          git apply --check /tmp/aiwork001.patch
+          git apply /tmp/aiwork001.patch
+          git diff --check
+
+      - name: Verify AIWORK-001 implementation
+        shell: bash
+        working-directory: target
+        run: |
+          set -euo pipefail
+          python .adwf/tests/test_ai_work_contracts.py
+          python .adwf/tests/test_v15_executive.py
+          python .adwf/tests/test_v16_remediation.py
+          python .adwf/tests/test_durable_orchestrator.py
+          python .adwf/tests/test_reconciliation.py
+          python .adwf/tests/test_adversarial.py
+          python .adwf/scripts/docs_freshness.py
+          python .adwf/scripts/generate_skill_registry.py --check
+          python .adwf/scripts/generate_manifest.py --check
+          python .adwf/scripts/validate_framework.py
+          python .adwf/scripts/validate_docs.py
+          python .adwf/scripts/validate_ci.py
+          python .adwf/scripts/validate_capabilities.py
+          python .adwf/scripts/validate_skills.py
+          python .adwf/adwf.py self-test
+
+      - name: Verify exact tree, commit, and push target branch
+        shell: bash
+        working-directory: target
+        run: |
+          set -euo pipefail
+          git add -A
+          ACTUAL_TREE="$(git write-tree)"
+          echo "actual_tree=${ACTUAL_TREE}"
+          test "${ACTUAL_TREE}" = "${EXPECTED_TREE}"
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git commit -m "AIWORK-001: add first-class AI work contracts"
+          git push origin "HEAD:${TARGET_BRANCH}"
