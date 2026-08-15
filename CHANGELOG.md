@@ -6,7 +6,7 @@
 - Added canonical phase executors, owner/controller wakeup, single Durable Orchestrator SSOT.
 - Exact-revision Playwright attestation, public-safe anchored runtime ledger, staged ruleset/bootstrap and Project Pack materialization.
 - Transactional semantic release, generated Pipeline IR workflows, live performance evidence and reference delivery/observation adapter.
-- Windows/Linux functional smoke retained; live provider certification remains fail-closed until first GitHub cycle.
+- Canonical GitHub repository completed live control-plane certification, including hosted Windows/Linux smoke, protected ruleset readback, solo-maintainer exact-HEAD R4 authorization and dual Check Run/Commit Status trusted gates with fail-closed publication; product deployment health remains separate evidence.
 
 
 ## 1.5.0 — Executive Autopilot

@@ -7,20 +7,20 @@
 Канонический обязательный профиль — `FREE_PUBLIC_GITHUB`: public GitHub repository, standard GitHub-hosted runners, mandatory AI/API calls = `0`, автоматический денежный бюджет обязательного контура = `$0`, larger runners = `BLOCK`, self-hosted runner не нужен.
 
 <!-- ADWF:STATUS:START -->
-## Что доказано самим пакетом
+## Что доказано
 
-- Framework: `1.6.0`
-- Package Integrity: `VERIFIED` только при совпадении manifest/checksums
-- Configuration: `VERIFIED` только при валидных policy/schema/generated projections
-- Control Plane: `NOT_VERIFIED`, пока нет живого GitHub API readback
-- Product Health: `NOT_VERIFIED`, пока нет exact deployed revision и observation
+- Framework package: `1.6.0`.
+- Package Integrity: `VERIFIED` только при совпадении manifest/checksums.
+- Configuration: `VERIFIED` только при валидных policy/schema/generated projections.
+- Canonical GitHub Control Plane: live-certified через GOV-004 на `main@e4bc0a8eef368cfcee6bd2abc3e4d6c8d5bae5cb`; перед релизом или эксплуатационным решением текущий статус всегда перечитывается из GitHub, а не выводится из этой строки.
+- Product Health: отдельное product/deployment evidence. Сертификация самого framework repository не превращает подключённый продукт в `HEALTHY` автоматически.
 
-`NOT_VERIFIED` — честное неизвестное состояние, а не ошибка.
+Локальный ZIP сам по себе не создаёт live provider evidence. Если live readback недоступен или устарел, `NOT_VERIFIED` остаётся правильным fail-closed состоянием.
 <!-- ADWF:STATUS:END -->
 
 ## Что исправлено относительно v1.5
 
-1. **Trust-boundary gate.** Trusted controller сам читает PR diff через GitHub API. Изменение workflows/evaluators/policy не может получить `adwf/trusted-gate` только потому, что PR запустил ослабленную собственную проверку. Governance change требует отдельного exact-HEAD approval repository admin, отличного от автора PR.
+1. **Trust-boundary gate.** Trusted controller сам читает PR diff через GitHub API. Изменение workflows/evaluators/policy не может получить `adwf/trusted-gate` только потому, что PR запустил ослабленную собственную проверку. Governance change требует отдельной exact-HEAD human R4 authorization. В multi-admin repository это может быть независимый approved review repository admin; в solo-maintainer режиме используется SHA-bound `Owner-Attestation` с provider-verified admin identity. Trusted gate публикует одно решение одновременно как audit-friendly Check Run и ruleset-consumable Commit Status; failure sentinel сохраняет fail-closed состояние при частичном provider failure. Adversarial AI review дополняет доказательства, но не заменяет owner attestation.
 2. **Единый Runtime Supervisor.** Для каждой durable phase существует один executor в `ActionExecutorRegistry` либо явный `HUMAN_REQUIRED`. Legacy `orchestrate_event.py` исключён из production control workflow.
 3. **Owner Intent действительно будит controller.** `start` сначала проверяет active run, затем создаёт Brief/Run/Work Memory; connected GitHub path создаёт Issue, safe checkpoint и trusted workflow dispatch.
 4. **«ПРОДОЛЖИТЬ» действительно продолжает.** Provider-authenticated owner decision записывает exact-SHA result для `OWNER_ACCEPTANCE`, запускает Supervisor и будит trusted controller.
@@ -33,7 +33,7 @@
 11. **Pipeline IR — generator SSOT для GitHub workflows.** Ручной drift generated workflows блокируется `generate_pipeline.py --check`.
 12. **Performance Plane живой.** Trusted collector собирает execution/queue/TTFF/flake/superseded cancellation, sample window, per-impact и per-pack projections. Недостаточная выборка остаётся `NOT_VERIFIED`.
 13. **Delivery adapter contract.** `REFERENCE_LOCAL` доказывает promotion→artifact digest→observation без ложного заявления production hosting. `COMMAND` больше не доверяет `exit 0`: проектный adapter обязан вернуть exact-SHA structured attestation, artifact digest, provider readback и evidence refs.
-14. **Windows/Linux functional smoke.** Hosted workflow реально импортирует CLI, запускает loopback Portal и проверяет HTTP 200/content на обеих ОС. До первого живого GitHub run Windows certification остаётся `NOT_VERIFIED_LIVE`.
+14. **Windows/Linux functional smoke.** Канонический GitHub repository прошёл hosted functional smoke на Ubuntu и Windows для сертифицированного `main`. Любая другая установка ADWF должна получить собственное live evidence и не наследует этот статус автоматически.
 15. **Capability Traceability.** `.adwf/capability-traceability.json` связывает каждое крупное заявление с CLI/UI entrypoint, production path, verification и честной live boundary. `validate_capabilities.py` блокирует релиз при исчезновении заявленного production wiring.
 
 ## Канонический путь владельца
@@ -76,7 +76,9 @@ python .adwf/adwf.py doctor --scope package_integrity
 
 ## Граница заявлений
 
-Локальный ZIP не может доказать live GitHub ruleset, hosted Windows run, реальный provider identity, production deployment или 30-дневную эксплуатацию. Поэтому v1.6 может закрыть кодовые разрывы аудита, но `Control Plane`/`Product Health` остаются `NOT_VERIFIED` до живого reference cycle.
+Локальный ZIP не может доказать текущее состояние GitHub rulesets, hosted runners, provider identity, deployment или длительную эксплуатацию. Для канонического repository live control-plane certification подтверждена на `main@e4bc0a8eef368cfcee6bd2abc3e4d6c8d5bae5cb`; это evidence привязано к repository/revision и перед последующим решением должно подтверждаться свежим provider readback. `Product Health` остаётся отдельным product/deployment состоянием и не выводится из сертификации framework control plane.
+
+Checked-in `CONTROL_CENTER.md`/`CONTROL_CENTER.html` — package/bootstrap projection, сгенерированная из доступного ей state/evidence на момент материализации. Она не должна использоваться как замена свежему GitHub Runtime Ledger/Actions/ruleset readback для оценки live control plane.
 
 ## Документация
 
@@ -85,6 +87,7 @@ python .adwf/adwf.py doctor --scope package_integrity
 - [ADWS.md](ADWS.md) — рабочий стандарт.
 - [SECURITY.md](SECURITY.md) — trust/privacy/secrets.
 - [docs/QUICKSTART_V1_6.md](docs/QUICKSTART_V1_6.md) — владелец без Git/CLI.
+- [docs/RELEASE_READINESS_V1_6.md](docs/RELEASE_READINESS_V1_6.md) — граница технической готовности и owner LICENSE decision.
 - [docs/architecture/EXECUTIVE_AUTOPILOT_V1_6.md](docs/architecture/EXECUTIVE_AUTOPILOT_V1_6.md) — connected model.
 - [docs/migration/V1_5_TO_V1_6.md](docs/migration/V1_5_TO_V1_6.md) — транзакционная миграция.
 - [docs/V1_6_IMPLEMENTATION_REPORT.md](docs/V1_6_IMPLEMENTATION_REPORT.md) — finding→fix traceability.
