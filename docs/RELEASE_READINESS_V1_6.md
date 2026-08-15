@@ -4,9 +4,9 @@
 
 ## Сертифицированный baseline канонического repository
 
-После завершения GOV-004 сертифицированный канонический baseline — `main@e4bc0a8eef368cfcee6bd2abc3e4d6c8d5bae5cb`.
+Последний явно зафиксированный live-certified baseline **до этой documentation-транзакции** — `main@e4bc0a8eef368cfcee6bd2abc3e4d6c8d5bae5cb`, полученный после GOV-004. Merge этого документа создаст новый `main`, поэтому его актуальное состояние всегда должно подтверждаться свежим provider readback, а не выводиться из указанного здесь исторического SHA.
 
-Для этого состояния live GitHub evidence подтвердило:
+Для baseline `e4bc0a8eef368cfcee6bd2abc3e4d6c8d5bae5cb` live GitHub evidence подтвердило:
 
 - `ADWF protected main` active, без bypass, с обязательными `fast-feedback`, `adwf/governance-gate`, `adwf/trusted-gate` от GitHub Actions;
 - immutable runtime-anchor tag ruleset active;
@@ -58,11 +58,11 @@ ADWF и ИИ **не выбирают лицензию автоматически
 ### Техническая часть
 
 - [x] Canonical repository live control-plane certification завершена через GOV-004.
-- [x] Main ruleset активен с `bypass_actors=[]`.
-- [x] Hosted Windows/Linux smoke подтверждён на текущем certified baseline.
-- [x] Exact-HEAD trusted/governance checks подтверждены без bypass.
+- [x] Main ruleset активен с `bypass_actors=[]` на последнем подтверждённом provider readback.
+- [x] Hosted Windows/Linux smoke подтверждён на зафиксированном certified baseline.
+- [x] Exact-HEAD trusted/governance checks подтверждены без bypass для зафиксированного certified baseline.
 - [x] External release path fail-closed при отсутствии `LICENSE`.
-- [ ] Documentation truth PR объединён в `main`.
+- [x] Documentation truth определён REL-001A/GOV-005; факт его присутствия в текущем `main` проверяется provider readback непосредственно перед release.
 - [ ] Third-party attribution preflight завершён.
 - [ ] Reproducible release dry-run выполнен на финальном exact HEAD без публикации.
 - [ ] Финальный provider readback непосредственно перед release подтверждён.
@@ -71,4 +71,4 @@ ADWF и ИИ **не выбирают лицензию автоматически
 
 - [ ] Выбрать юридическую модель распространения и конкретный `LICENSE` либо принять решение не выпускать external release.
 
-Только после выполнения технических пунктов и отдельного решения владельца может быть подготовлен owner-confirmed external release transaction. Tag/GitHub Release до этого не создаются.
+Только после выполнения технических пунктов, свежего provider readback и отдельного решения владельца может быть подготовлен owner-confirmed external release transaction. Tag/GitHub Release до этого не создаются.
