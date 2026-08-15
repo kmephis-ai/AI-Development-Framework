@@ -59,9 +59,12 @@ def collect(client:GitHubClient,event:dict)->dict:
         fast_jobs.append(job)
     if len(fast_jobs)!=1:return {'status':'NOT_VERIFIED','reason':'SINGLE_FAST_FEEDBACK_JOB_REQUIRED','matches':len(fast_jobs),'head_sha':sha}
     job=fast_jobs[0];state=_preview_step_state(job)
-    if state in {'SKIPPED','MISSING'}:
+    if state=='SKIPPED':
         return {'status':'NOT_APPLICABLE','reason':'PREVIEW_STEP_NOT_RUN','head_sha':sha,'workflow_run_id':rid,'job_id':job.get('id')}
-    if state!='SUCCESS':return {'status':'NOT_VERIFIED','reason':'PREVIEW_STEP_NOT_SUCCESSFUL','head_sha':sha,'workflow_run_id':rid,'job_id':job.get('id')}
+    if state=='FAILED_OR_UNKNOWN':return {'status':'NOT_VERIFIED','reason':'PREVIEW_STEP_NOT_SUCCESSFUL','head_sha':sha,'workflow_run_id':rid,'job_id':job.get('id')}
+    # MISSING is not equivalent to SKIPPED. When provider step metadata is absent,
+    # require the exact signed marker from the successful job log. If log readback
+    # is unavailable, the provider call fails and certification remains fail-closed.
     jid=job.get('id')
     if not isinstance(jid,int):return {'status':'NOT_VERIFIED','reason':'PREVIEW_JOB_ID_INVALID','head_sha':sha}
     marker=_decode(client.job_logs(jid))
