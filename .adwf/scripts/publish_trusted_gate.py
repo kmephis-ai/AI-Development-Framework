@@ -115,15 +115,19 @@ def evaluate_trusted_gate(client:GitHubClient,repo:str,workflow_run:dict[str,Any
 
 
 def _publish(client:GitHubClient,name:str,sha:str,passed:bool,title:str,summary:str)->None:
-    """Publish one trusted decision through both provider gate transports.
+    """Publish one trusted decision fail-closed through both provider transports.
 
-    Checks API is retained as rich audit evidence. Commit Status API carries the
-    same exact-SHA decision into branch rulesets without depending on which
-    historical GitHub Actions check suite receives a programmatic check run.
-    The check run is written first: if either provider write fails, the caller
-    fails closed and the required status cannot become a complete false PASS.
+    A failure sentinel is written to Commit Status API before any positive Check
+    Run can exist. Then the rich Check Run is published and only the final write
+    replaces the sentinel with the actual status. Therefore any partial provider
+    failure leaves the exact-SHA required context red rather than partially green.
     """
     conclusion='success' if passed else 'failure'
+    client.post(f'/repos/{client.repo}/statuses/{sha}',{
+        'state':'failure',
+        'context':name,
+        'description':'BLOCK: trusted gate publication incomplete',
+    })
     client.post(f'/repos/{client.repo}/check-runs',{
         'name':name,
         'head_sha':sha,
