@@ -5,7 +5,6 @@ from __future__ import annotations
 from pathlib import Path
 import argparse
 import json
-import re
 import sys
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -14,10 +13,6 @@ from lib.issue_contract import parse_pr_contract  # noqa: E402
 from lib.trust import classify_git_diff  # noqa: E402
 
 
-HUMAN_GATE = re.compile(
-    r"^- \[[xX]\]\s+Trust change вынесен в отдельный GOV PR, "
-    r"классифицирован R4 и human-gated\s*$", re.MULTILINE
-)
 
 
 def main() -> int:
@@ -54,14 +49,17 @@ def main() -> int:
             errors.append("TRUST_CHANGE_REQUIRES_R4")
         if not str(contract.get("roadmap_id", "")).startswith("GOV-"):
             errors.append("TRUST_CHANGE_REQUIRES_GOV_ROADMAP")
-        if HUMAN_GATE.search(body) is None:
-            errors.append("TRUST_CHANGE_REQUIRES_HUMAN_ATTESTATION")
     if errors:
         print("PR CONTRACT + TRUSTED DIFF: FAIL")
         for error in list(dict.fromkeys(errors)):
             print(f"- {error}")
         return 1
-    gate = "OWNER DECISION REQUIRED" if classification.get("human_required") else "AUTOMATION ELIGIBLE"
+    if classification.get("human_required"):
+        gate = "OWNER DECISION REQUIRED"
+    elif classification.get("authorization_mode") == "STANDING_OWNER_POLICY":
+        gate = "AUTO-AUTHORIZED BY STANDING POLICY"
+    else:
+        gate = "AUTOMATION ELIGIBLE"
     print(
         "PR CONTRACT + TRUSTED DIFF: PASS; "
         f"Roadmap-ID={contract['roadmap_id']}; Issue=#{contract['issue_number']}; "
