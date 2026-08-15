@@ -10,6 +10,9 @@ on:
 permissions:
   contents: write
 
+env:
+  MIRROR_ARTIFACT_NAME: adwf-local-mirror-bundle
+
 jobs:
   build-bundle:
     runs-on: ubuntu-24.04
@@ -24,16 +27,18 @@ jobs:
         run: |
           set -euo pipefail
           rm -rf mirror
-          mkdir -p mirror/chunks
+          mkdir -p mirror/chunks mirror/artifact
 
           git bundle create /tmp/repository.bundle --all
           git bundle verify /tmp/repository.bundle > mirror/bundle-verify.txt 2>&1
 
           BUNDLE_SHA256="$(sha256sum /tmp/repository.bundle | awk '{print $1}')"
           BUNDLE_BYTES="$(wc -c < /tmp/repository.bundle | tr -d ' ')"
+          cp /tmp/repository.bundle mirror/artifact/repository.bundle
+          printf '%s  %s\n' "${BUNDLE_SHA256}" "repository.bundle" > mirror/artifact/SHA256SUMS.txt
+
           base64 -w0 /tmp/repository.bundle > /tmp/repository.bundle.b64
           B64_BYTES="$(wc -c < /tmp/repository.bundle.b64 | tr -d ' ')"
-
           split -b 45000 -d -a 4 --additional-suffix=.b64part /tmp/repository.bundle.b64 mirror/chunks/part-
           PARTS="$(find mirror/chunks -type f -name 'part-*.b64part' | wc -l | tr -d ' ')"
 
@@ -47,9 +52,19 @@ jobs:
             "bundle_bytes": ${BUNDLE_BYTES},
             "base64_bytes": ${B64_BYTES},
             "chunk_bytes": 45000,
-            "parts": ${PARTS}
+            "parts": ${PARTS},
+            "artifact_name": "${MIRROR_ARTIFACT_NAME}"
           }
           EOF
+
+      - name: Upload bundle artifact
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: ${{ env.MIRROR_ARTIFACT_NAME }}
+          path: mirror/artifact/
+          if-no-files-found: error
+          retention-days: 1
+          compression-level: 0
 
       - name: Publish transport chunks to bootstrap branch
         shell: bash
