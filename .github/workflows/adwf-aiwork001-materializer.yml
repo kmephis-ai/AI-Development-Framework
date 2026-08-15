@@ -30,9 +30,12 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
+          sha256sum .adwf-transport/aiwork001.part1 .adwf-transport/aiwork001.part2 .adwf-transport/aiwork001.part3 .adwf-transport/aiwork001.part4
           cat .adwf-transport/aiwork001.part1 .adwf-transport/aiwork001.part2 .adwf-transport/aiwork001.part3 .adwf-transport/aiwork001.part4 | tr -d '\r\n' > /tmp/aiwork001.clean.b64
+          echo "combined=$(sha256sum /tmp/aiwork001.clean.b64 | awk '{print $1}')"
           test "$(sha256sum /tmp/aiwork001.clean.b64 | awk '{print $1}')" = "${EXPECTED_B64_SHA256}"
           base64 -d /tmp/aiwork001.clean.b64 | gunzip > /tmp/aiwork001.patch
+          echo "patch=$(sha256sum /tmp/aiwork001.patch | awk '{print $1}')"
           test "$(sha256sum /tmp/aiwork001.patch | awk '{print $1}')" = "${EXPECTED_PATCH_SHA256}"
 
       - name: Checkout exact target branch
