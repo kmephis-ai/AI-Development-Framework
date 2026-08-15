@@ -20,7 +20,8 @@
       "watched": [
         ".adwf/**",
         ".github/workflows/**",
-        ".gitlab-ci.yml"
+        ".gitlab-ci.yml",
+        "skills/**"
       ],
       "mode": "manual-governance",
       "source_digest": "b5cefbac985bb70777c95ad4520ff9967414153bdaf639066d1b186b12ffce8f",
