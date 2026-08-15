@@ -19,11 +19,10 @@ jobs:
         with:
           ref: ${{ github.event.pull_request.head.sha }}
           persist-credentials: false
-          fetch-depth: 2
+          fetch-depth: 0
       - uses: actions/setup-python@a309ff8b426b58ec0e2a45f0f869d46889d02405
         with:
-          python-version: "3.12.13"
-          cache: false
+          python-version: "3.12.10"
       - name: Route change impact first
         id: impact
         run: python .adwf/scripts/impact_router.py --base "${{ github.event.pull_request.base.sha }}" --head "${{ github.event.pull_request.head.sha }}"

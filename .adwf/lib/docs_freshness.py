@@ -55,21 +55,21 @@ def files_for_pattern(root: str | Path, pattern: str) -> list[Path]:
     for path in candidates:
         if _included(base, path):
             result.add(path)
-    return sorted(result)
+    return sorted(result, key=lambda item: item.relative_to(base).as_posix())
 
 
 def _files(root: Path, patterns: list[str]) -> list[Path]:
     result: set[Path] = set()
     for pattern in patterns:
         result.update(files_for_pattern(root, pattern))
-    return sorted(result)
+    return sorted(result, key=lambda item: item.relative_to(root).as_posix())
 
 
 def source_digest(root: str | Path, patterns: list[str]) -> str:
     base = Path(root).resolve()
     digest = hashlib.sha256()
     for path in _files(base, patterns):
-        relative = str(path.relative_to(base)).encode("utf-8")
+        relative = path.relative_to(base).as_posix().encode("utf-8")
         digest.update(len(relative).to_bytes(4, "big"))
         digest.update(relative)
         raw = path.read_bytes()

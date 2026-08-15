@@ -91,7 +91,7 @@ def validate_github(path: Path, action_lock: dict) -> list[str]:
     if path.name == "adwf-pr.yml":
         if "ref: ${{ github.event.pull_request.head.sha }}" not in text:
             errors.append(f"{path.name}:PR_CHECKOUT_NOT_EXACT_HEAD")
-        if not re.search(r"fetch-depth:\s*(?:2|[3-9]|[1-9][0-9]+)", text):
+        if not re.search(r"fetch-depth:\s*(?:0|2|[3-9]|[1-9][0-9]+)", text):
             errors.append(f"{path.name}:BASE_DIFF_HISTORY_UNAVAILABLE")
         if '--base-sha "$ADWF_BASE_SHA" --head-sha "$ADWF_HEAD_SHA"' not in text:
             errors.append(f"{path.name}:TRUST_DIFF_SHA_BINDING_MISSING")

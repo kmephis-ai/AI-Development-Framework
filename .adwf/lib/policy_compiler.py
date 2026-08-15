@@ -76,7 +76,7 @@ def compile_policy(root: str | Path) -> tuple[dict[str, Any], list[str]]:
         config = _load(base / ".adwf/config.json")
         profile_name = str(config.get("profile", ""))
         profile_path = base / ".adwf/profiles" / f"{profile_name}.json"
-        source_names.append(str(profile_path.relative_to(base)))
+        source_names.append(profile_path.relative_to(base).as_posix())
         profile = _load(profile_path)
         policies = {Path(name).stem: _load(base / name) for name in POLICY_FILES}
         providers = _load(base / ".adwf/providers.json")

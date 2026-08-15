@@ -275,11 +275,14 @@ def _atomic_json(path: Path, value: dict[str, Any]) -> None:
             handle.flush()
             os.fsync(handle.fileno())
         os.replace(temporary, path)
-        directory_fd = os.open(path.parent, os.O_RDONLY)
-        try:
-            os.fsync(directory_fd)
-        finally:
-            os.close(directory_fd)
+        # Directory fsync is a POSIX durability hardening step. Windows does
+        # not support opening a directory with os.open in this form.
+        if os.name != "nt":
+            directory_fd = os.open(path.parent, os.O_RDONLY)
+            try:
+                os.fsync(directory_fd)
+            finally:
+                os.close(directory_fd)
     finally:
         if os.path.exists(temporary):
             os.unlink(temporary)
@@ -352,11 +355,15 @@ def append_evidence_event(
             handle.write(line)
             handle.flush()
             os.fsync(handle.fileno())
-        directory_fd = os.open(log_path.parent, os.O_RDONLY)
-        try:
-            os.fsync(directory_fd)
-        finally:
-            os.close(directory_fd)
+        # POSIX directory fsync hardens rename/append durability. Windows does not
+        # support opening a directory with os.open in this form; the file itself
+        # has already been flushed and fsynced above.
+        if os.name != "nt":
+            directory_fd = os.open(log_path.parent, os.O_RDONLY)
+            try:
+                os.fsync(directory_fd)
+            finally:
+                os.close(directory_fd)
         raw = _event_log_bytes([*events, event])
         _atomic_json(index_path, project_evidence_index([*events, event], raw))
         return event

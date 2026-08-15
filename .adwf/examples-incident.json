@@ -11,7 +11,7 @@
   "owner_summary_ru": "Проверка регистрации остановилась до публикации результата.",
   "symptom_original": "Тест регистрации получил ожидаемый ответ слишком поздно.",
   "impact": {"customer_visible": false, "summary_ru": "Новая версия не опубликована."},
-  "environment": {"runtime": "python", "runtime_version": "3.12.13", "tool": "unittest", "tool_version": "stdlib"},
+  "environment": {"runtime": "python", "runtime_version": "3.12.10", "tool": "unittest", "tool_version": "stdlib"},
   "fingerprint": {
     "algorithm": "sha256-v1",
     "hash": "1e3dd962e3735608ae1e60ee03ec379736272abf79fdedd7559fedb68260c074",

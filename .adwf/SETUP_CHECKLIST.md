@@ -3,7 +3,7 @@
 - [ ] Package Integrity и strict schemas подтверждены.
 - [ ] Project name/type/runtime_product/default branch и Node 24 для Node-проекта настроены.
 - [ ] Active autonomy = A1; A4 automatic = false.
-- [ ] Раздельные untrusted/main/trusted runner labels/tags и Python 3.12.13 проверены.
+- [ ] Раздельные untrusted/main/trusted runner labels/tags и Python 3.12.10 проверены.
 - [ ] Hosted quota providers и AI/API mandatory checks выключены.
 - [ ] Repository visibility и FREE_ONLY capability classification подтверждены свежими facts; larger runners выключены.
 - [ ] Project commands представлены arrays; обязательные PR/main/unit и runtime smoke/Golden Paths gates не пусты.

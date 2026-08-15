@@ -5,6 +5,7 @@ from __future__ import annotations
 import argparse
 import hashlib
 import json
+import os
 import subprocess
 import sys
 from pathlib import Path
@@ -263,7 +264,12 @@ def cmd_provider(args) -> int:
 
 
 def run_tests(pattern: str) -> int:
-    process = subprocess.run([sys.executable, "-m", "unittest", "discover", "-s", str(ROOT / ".adwf/tests"), "-p", pattern, "-v"], check=False)
+    env = {**os.environ, "PYTHONUTF8": "1", "PYTHONIOENCODING": "utf-8"}
+    process = subprocess.run(
+        [sys.executable, "-m", "unittest", "discover", "-s", str(ROOT / ".adwf/tests"), "-p", pattern, "-v"],
+        check=False,
+        env=env,
+    )
     return process.returncode
 
 

@@ -84,7 +84,7 @@
     "private_work_memory": "LOCAL_OR_OWNER_CONTROLLED"
   },
   "runtime": {
-    "python_exact": "3.12.13"
+    "python_exact": "3.12.10"
   },
   "trust_boundary": {
     "default_branch_classifier": true,

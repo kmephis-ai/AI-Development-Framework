@@ -24,7 +24,8 @@ def main() -> int:
         return 1
     target = ROOT / ".adwf/effective-policy.json"
     if args.write:
-        target.write_text(json.dumps(compiled, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+        with target.open("w", encoding="utf-8", newline="\n") as handle:
+            handle.write(json.dumps(compiled, ensure_ascii=False, indent=2) + "\n")
         print(f"EFFECTIVE POLICY: WRITTEN {compiled['policy_hash']}")
         return 0
     errors = check_compiled_policy(ROOT)

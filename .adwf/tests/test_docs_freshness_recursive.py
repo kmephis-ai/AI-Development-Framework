@@ -45,6 +45,15 @@ class RecursiveDocsFreshnessTests(unittest.TestCase):
             (root / "src/deep/module.py").write_text("VALUE = 2\n", encoding="utf-8")
             self.assertIn("DOCUMENT_STALE:guide.md", check_docs(root, now=now))
 
+    def test_file_order_is_posix_canonical_not_host_platform_order(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            (root / "src").mkdir()
+            (root / "src/Zeta.txt").write_text("Z\n", encoding="utf-8")
+            (root / "src/alpha.txt").write_text("a\n", encoding="utf-8")
+            observed = [path.relative_to(root).as_posix() for path in files_for_pattern(root, "src/**")]
+            self.assertEqual(observed, ["src/Zeta.txt", "src/alpha.txt"])
+
     def test_runtime_files_are_not_document_sources(self):
         with tempfile.TemporaryDirectory() as temporary:
             root = self._repository(temporary)

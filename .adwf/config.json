@@ -75,7 +75,7 @@
   },
   "runtime": {
     "node_major": 24,
-    "python_exact": "3.12.13",
+    "python_exact": "3.12.10",
     "enforce_node_for_node_projects": true
   },
   "commands": {

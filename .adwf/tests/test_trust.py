@@ -71,6 +71,24 @@ Risk: {risk}
         self.assertEqual(result["required_risk"], "R4")
         self.assertEqual(result["required_work_type"], "GOV")
 
+    def test_integrity_projections_are_protected_support(self):
+        result = classify_diff([
+            {"path": "MANIFEST.json", "status": "M", "old_text": "old\n", "new_text": "new\n"},
+            {"path": "SHA256SUMS.txt", "status": "M", "old_text": "old\n", "new_text": "new\n"},
+        ], POLICY)
+        self.assertEqual(result["result"], "HUMAN_REQUIRED")
+        self.assertEqual(result["feature_files"], [])
+        self.assertEqual(result["protected_files"], ["MANIFEST.json", "SHA256SUMS.txt"])
+
+    def test_generator_literal_change_with_same_guards_is_not_weakening(self):
+        result = classify_diff([{
+            "path": ".adwf/scripts/generate_pipeline.py",
+            "status": "M",
+            "old_text": "generator='python validate_ci.py; self-test; fetch-depth: 2'\n",
+            "new_text": "generator='python validate_ci.py; self-test; fetch-depth: 0'\n",
+        }], POLICY)
+        self.assertEqual(result["result"], "HUMAN_REQUIRED")
+        self.assertNotIn("GATE_WEAKENING_DETECTED", result["reason_codes"])
     def test_feature_plus_gate_weakening_is_blocked(self):
         result = classify_diff([
             {"path": "src/product.py", "status": "M"},

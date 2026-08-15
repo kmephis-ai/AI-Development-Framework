@@ -22,6 +22,5 @@ jobs:
           fetch-depth: 1
       - uses: actions/setup-python@a309ff8b426b58ec0e2a45f0f869d46889d02405
         with:
-          python-version: "3.12.13"
-          cache: false
+          python-version: "3.12.10"
       - run: python .adwf/scripts/platform_smoke.py
