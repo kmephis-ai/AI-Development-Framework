@@ -92,6 +92,9 @@ def main() -> int:
     manifest = subprocess.run([sys.executable, str(ROOT / ".adwf/scripts/generate_manifest.py"), "--check"], cwd=ROOT, capture_output=True, text=True, check=False)
     if manifest.returncode:
         errors.append("MANIFEST_OR_SHA256SUMS_STALE")
+        for line in manifest.stdout.splitlines():
+            if line.startswith("MANIFEST_REPAIR_ZLIB_B64:"):
+                errors.append("DIAGNOSTIC:" + line)
     if errors:
         print("ADWF STRUCTURE: FAIL")
         for error in errors:
