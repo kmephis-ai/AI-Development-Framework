@@ -1,4 +1,5 @@
 name: TRACE-001 Materialize Verified Candidate
+# transport-revision: 3
 
 on:
   push:
