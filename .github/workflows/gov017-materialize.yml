@@ -61,7 +61,8 @@ jobs:
           git config user.name 'ADWF GOV-017 Materializer'
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
           git commit -m 'GOV-017: align PR template with human-by-exception authorization'
-          python - "${BASE_SHA}" HEAD <<'PY'
+          CANDIDATE_SHA="$(git rev-parse HEAD)"
+          python - "${BASE_SHA}" "${CANDIDATE_SHA}" <<'PY'
           import json,sys
           from pathlib import Path
           root=Path('.').resolve(); sys.path.insert(0,str(root/'.adwf'))
