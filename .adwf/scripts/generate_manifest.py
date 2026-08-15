@@ -41,7 +41,7 @@ def expected_sums(root:Path)->str:
 def atomic_text(path:Path,text:str)->None:
     fd,tmp=tempfile.mkstemp(prefix=path.name+'.',dir=path.parent)
     try:
-        with os.fdopen(fd,'w',encoding='utf-8') as h:h.write(text);h.flush();os.fsync(h.fileno())
+        with os.fdopen(fd,'w',encoding='utf-8',newline='\n') as h:h.write(text);h.flush();os.fsync(h.fileno())
         os.replace(tmp,path)
     finally:
         if os.path.exists(tmp):os.unlink(tmp)

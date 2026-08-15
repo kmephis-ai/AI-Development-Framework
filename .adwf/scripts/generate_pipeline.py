@@ -23,7 +23,8 @@ def main()->int:
         path=ROOT/rel
         if args.check:
             if not path.is_file() or path.read_text(encoding='utf-8')!=text:errors.append('PIPELINE_PROJECTION_STALE:'+rel)
-        else:path.write_text(text,encoding='utf-8')
+        else:
+            with path.open('w',encoding='utf-8',newline='\n') as h:h.write(text)
     if args.check:
         print('PIPELINE GENERATOR: '+('PASS' if not errors else 'FAIL '+','.join(errors)));return 1 if errors else 0
     print('PIPELINE PROJECTIONS generated');return 0

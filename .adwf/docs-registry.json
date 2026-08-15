@@ -11,7 +11,7 @@
         ".github/workflows/**"
       ],
       "mode": "generated-status-block+manual",
-      "source_digest": "3319fa115ec850112e13bdccc17468de576cd3e8cb9fcfdcdfa152579cce3278",
+      "source_digest": "3c986f8eba5a27908d99af64d527fac34e9009b4531f80f3d6ba8a6c95fcf505",
       "reviewed_at": "2026-08-13T00:00:00Z",
       "valid_until": "2026-11-13T00:00:00Z"
     },
@@ -23,7 +23,7 @@
         ".gitlab-ci.yml"
       ],
       "mode": "manual-governance",
-      "source_digest": "9324ca61085919e6ae2fcfe7e455eeeac1eaf114a01b1ff3bae92bebbe7613a2",
+      "source_digest": "e5508f9c3ed5e22246656715df67b3f11a77839f34423cbbcd8f534eaae27dbb",
       "reviewed_at": "2026-08-13T00:00:00Z",
       "valid_until": "2026-11-13T00:00:00Z"
     },
@@ -36,7 +36,7 @@
         ".adwf/scripts/**"
       ],
       "mode": "architecture",
-      "source_digest": "6f08b0ba0449f8e04b843b471b10def60f73d092d8398e756f357b2c2c3949b9",
+      "source_digest": "395c2c9bd17e47eebb787fe2ba7e602180fd7d83d33ab04bb6bd931b524ace6a",
       "reviewed_at": "2026-08-13T00:00:00Z",
       "valid_until": "2026-11-13T00:00:00Z"
     },
@@ -64,7 +64,7 @@
         ".adwf/scripts/validate_capabilities.py"
       ],
       "mode": "implementation-certification",
-      "source_digest": "f0d49669ce3d7b4b404317d4ec3417c0accb87d36aab9f9490d9aa50d6bb0546",
+      "source_digest": "6a4ef6d2336611330e4944389ee6106a3482e2ae394b7c52ba764b68f069748c",
       "reviewed_at": "2026-08-13T00:00:00Z",
       "valid_until": "2026-11-13T00:00:00Z"
     },

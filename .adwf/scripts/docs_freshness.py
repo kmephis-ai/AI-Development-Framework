@@ -27,7 +27,8 @@ def main() -> int:
         except (OSError, ValueError, KeyError, json.JSONDecodeError) as exc:
             print(f"DOCS FRESHNESS: WRITE BLOCKED:{type(exc).__name__}")
             return 1
-        path.write_text(json.dumps(value, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+        with path.open("w", encoding="utf-8", newline="\n") as handle:
+            handle.write(json.dumps(value, ensure_ascii=False, indent=2) + "\n")
         print("DOCS FRESHNESS: WRITTEN")
         return 0
     errors = check_docs(root)
