@@ -11,9 +11,9 @@
         ".github/workflows/**"
       ],
       "mode": "generated-status-block+manual",
-      "source_digest": "2f07748583c3f2a4e518b3f6b3dd37d6e8b2194cdb8b0d7064cf06f7fc380fc5",
-      "reviewed_at": "2026-08-15T00:00:00Z",
-      "valid_until": "2026-11-15T00:00:00Z"
+      "source_digest": "26bb8632730b35341ecba4edc963639537afae0b51f4cb586903496eb3bbfe10",
+      "reviewed_at": "2026-08-13T00:00:00Z",
+      "valid_until": "2026-11-13T00:00:00Z"
     },
     {
       "path": "AGENTS.md",
@@ -25,8 +25,8 @@
       ],
       "mode": "manual-governance",
       "source_digest": "23a8fdc5709d6c0906cef51d0cc594260d5ef91a2a57b4707397eeb87826c2cc",
-      "reviewed_at": "2026-08-15T00:00:00Z",
-      "valid_until": "2026-11-15T00:00:00Z"
+      "reviewed_at": "2026-08-13T00:00:00Z",
+      "valid_until": "2026-11-13T00:00:00Z"
     },
     {
       "path": "docs/architecture/CI_CD_ARCHITECTURE.md",
@@ -38,8 +38,8 @@
       ],
       "mode": "architecture",
       "source_digest": "a14c3c5b6247e4145082f3b335b8df69edcf4a8457151433d69eb92e9d288a5a",
-      "reviewed_at": "2026-08-15T00:00:00Z",
-      "valid_until": "2026-11-15T00:00:00Z"
+      "reviewed_at": "2026-08-13T00:00:00Z",
+      "valid_until": "2026-11-13T00:00:00Z"
     },
     {
       "path": "CONTROL_CENTER.md",
@@ -50,8 +50,8 @@
       ],
       "mode": "generated",
       "source_digest": "bf76d0c9ddcd11614474038c97c363480abdaa7bba2d46f2f65af1b6a1bed5f7",
-      "reviewed_at": "2026-08-15T00:00:00Z",
-      "valid_until": "2026-11-15T00:00:00Z"
+      "reviewed_at": "2026-08-13T00:00:00Z",
+      "valid_until": "2026-11-13T00:00:00Z"
     },
     {
       "path": "docs/V1_6_IMPLEMENTATION_REPORT.md",
@@ -66,8 +66,8 @@
       ],
       "mode": "implementation-certification",
       "source_digest": "389b51871fb45ebcd089330904ae5ff5d205c99baccf9461ce1a582e7c1c7fbe",
-      "reviewed_at": "2026-08-15T00:00:00Z",
-      "valid_until": "2026-11-15T00:00:00Z"
+      "reviewed_at": "2026-08-13T00:00:00Z",
+      "valid_until": "2026-11-13T00:00:00Z"
     },
     {
       "path": "docs/operations/OWNER_AI_GUIDE.md",
@@ -79,8 +79,8 @@
       ],
       "mode": "owner-guide",
       "source_digest": "825bce6785f2038c6acd5cf1e48eb9a914a18fed713efa8eb2be6e28d104e2ed",
-      "reviewed_at": "2026-08-15T00:00:00Z",
-      "valid_until": "2026-11-15T00:00:00Z"
+      "reviewed_at": "2026-08-13T00:00:00Z",
+      "valid_until": "2026-11-13T00:00:00Z"
     },
     {
       "path": "docs/governance/RECOVERY_PLAYBOOK.md",
@@ -92,8 +92,8 @@
       ],
       "mode": "governance",
       "source_digest": "68f0c11d641d731c0a6560fe566f0aeb307aed37ed5bd812cf1773ef4ca7b3e4",
-      "reviewed_at": "2026-08-15T00:00:00Z",
-      "valid_until": "2026-11-15T00:00:00Z"
+      "reviewed_at": "2026-08-13T00:00:00Z",
+      "valid_until": "2026-11-13T00:00:00Z"
     },
     {
       "path": "docs/operations/FREE_LIMITS_AND_NOTIFICATIONS.md",
@@ -105,24 +105,8 @@
       ],
       "mode": "provider-facts",
       "source_digest": "61094eb026194041ef8d6e7dd8a0efc3c17182b12bbb3313cc6460ce342d60a9",
-      "reviewed_at": "2026-08-15T00:00:00Z",
-      "valid_until": "2026-11-15T00:00:00Z"
-    },
-    {
-      "path": "docs/operations/SKILL_OPERATING_LAYER.md",
-      "watched": [
-        ".adwf/lib/skill_layer.py",
-        ".adwf/scripts/validate_skills.py",
-        ".adwf/scripts/generate_skill_registry.py",
-        ".adwf/scripts/eval_skills.py",
-        ".adwf/scripts/vendor_skill.py",
-        ".adwf/schemas/skill*.json",
-        ".adwf/skill-legacy-allowlist.json"
-      ],
-      "mode": "skill-governance",
-      "source_digest": "6b79258e5425995e1a04824e543d163756715fc9cf5711c564363bf2e0ecc3d2",
-      "reviewed_at": "2026-08-15T00:00:00Z",
-      "valid_until": "2026-11-15T00:00:00Z"
+      "reviewed_at": "2026-08-13T00:00:00Z",
+      "valid_until": "2026-11-13T00:00:00Z"
     }
   ]
 }

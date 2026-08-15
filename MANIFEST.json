@@ -3,8 +3,8 @@
   "version": "1.6.0",
   "schema_version": 3,
   "scope": "FRAMEWORK_OWNED_TRUST_BOUNDARY",
-  "file_count_excluding_manifests": 361,
-  "total_bytes_excluding_manifests": 1494403,
+  "file_count_excluding_manifests": 360,
+  "total_bytes_excluding_manifests": 1487729,
   "files": [
     ".adwf/SETUP_CHECKLIST.md",
     ".adwf/actions-lock.json",
@@ -351,7 +351,6 @@
     "docs/operations/FREE_LIMITS_AND_NOTIFICATIONS.md",
     "docs/operations/GITHUB_PROJECT_LAYOUT.md",
     "docs/operations/OWNER_AI_GUIDE.md",
-    "docs/operations/SKILL_OPERATING_LAYER.md",
     "docs/templates/ADR_TEMPLATE.md",
     "docs/templates/ARCHITECTURE_TEMPLATE.md",
     "docs/templates/CHANGELOG_TEMPLATE.md",
