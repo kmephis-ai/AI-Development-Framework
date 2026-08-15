@@ -3,38 +3,40 @@
 The classification is loaded only from trusted/default-branch code. A PR may
 modify a copy of this module in its own head, but the trusted controller never
 executes that copy when deciding whether the PR may be trusted.
+
+This list is intentionally a conservative superset of the base trust policy.
+Generated projections remain trust-boundary evidence here even though the PR
+classifier may allow them to accompany normal docs/feature changes under R4.
 """
 from __future__ import annotations
 from fnmatch import fnmatch
 from typing import Iterable
 
 TRUST_BOUNDARY_PATTERNS = (
+    ".adwf/**",
     ".github/workflows/adwf-*",
-    ".adwf/scripts/publish_trusted_gate.py",
-    ".adwf/scripts/validate_*.py",
-    ".adwf/scripts/generate_pipeline.py",
-    ".adwf/lib/policy.py",
-    ".adwf/lib/policy_runtime.py",
-    ".adwf/lib/policy_compiler.py",
-    ".adwf/lib/trusted_context.py",
-    ".adwf/lib/assurance.py",
-    ".adwf/lib/evidence*.py",
-    ".adwf/lib/cost_guard.py",
-    ".adwf/lib/github_rulesets.py",
-    ".adwf/lib/trust_boundary.py",
-    ".adwf/policies/**",
-    ".adwf/providers.json",
-    ".adwf/pipeline-ir.json",
-    ".adwf/schemas/pipeline-ir.schema.json",
-    ".adwf/schemas/config*.schema.json",
+    "AGENTS.md",
+    "ADWS.md",
+    "SPECIFICATION.md",
+    ".gitlab-ci.yml",
+    "SECURITY.md",
+    "docs/governance/**",
+    "MANIFEST.json",
+    "SHA256SUMS.txt",
+    ".gitattributes",
 )
+
+
+def _normalize(path: str) -> str:
+    normalized = str(path).replace("\\", "/")
+    return normalized[2:] if normalized.startswith("./") else normalized
 
 
 def _match(path: str, pattern: str) -> bool:
     # fnmatch handles '*' but not a special globstar contract consistently
     # across platforms, so treat '/**' as an explicit recursive prefix.
-    normalized = str(path).replace("\\", "/").lstrip("./")
-    pat = pattern.replace("\\", "/").lstrip("./")
+    normalized = _normalize(path)
+    pat = _normalize(pattern)
     if pat.endswith("/**"):
         return normalized == pat[:-3] or normalized.startswith(pat[:-2])
     return fnmatch(normalized, pat)
@@ -45,7 +47,7 @@ def is_trust_boundary_path(path: str) -> bool:
 
 
 def classify_changed_files(paths: Iterable[str]) -> dict:
-    changed = sorted({str(p).replace("\\", "/").lstrip("./") for p in paths if str(p).strip()})
+    changed = sorted({_normalize(p) for p in paths if str(p).strip()})
     protected = [p for p in changed if is_trust_boundary_path(p)]
     return {
         "changed_files": changed,
