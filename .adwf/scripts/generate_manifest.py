@@ -29,15 +29,16 @@ def is_framework_owned(root:Path,path:Path)->bool:
     return False
 
 def source_files(root:Path)->list[Path]:
-    return sorted(path for path in root.rglob('*') if path.is_file() and is_framework_owned(root,path)
+    return sorted((path for path in root.rglob('*') if path.is_file() and is_framework_owned(root,path)
                   and not EXCLUDED_PARTS.intersection(path.relative_to(root).parts) and path.name not in EXCLUDED_NAMES
-                  and path.suffix!='.pyc' and not path.name.endswith('.lock'))
+                  and path.suffix!='.pyc' and not path.name.endswith('.lock')),
+                  key=lambda item:item.relative_to(root).as_posix())
 def expected_manifest(root:Path)->dict:
     files=source_files(root); version=(root/'VERSION').read_text(encoding='utf-8').strip()
     return {'framework':'AI Development Framework','version':version,'schema_version':3,'scope':'FRAMEWORK_OWNED_TRUST_BOUNDARY',
-            'file_count_excluding_manifests':len(files),'total_bytes_excluding_manifests':sum(p.stat().st_size for p in files),'files':[str(p.relative_to(root)).replace('\\','/') for p in files]}
+            'file_count_excluding_manifests':len(files),'total_bytes_excluding_manifests':sum(p.stat().st_size for p in files),'files':[p.relative_to(root).as_posix() for p in files]}
 def expected_sums(root:Path)->str:
-    files=source_files(root)+[root/'MANIFEST.json']; return ''.join(f"{digest(p)}  {str(p.relative_to(root)).replace(os.sep,'/')}\n" for p in sorted(files))
+    files=source_files(root)+[root/'MANIFEST.json']; return ''.join(f"{digest(p)}  {p.relative_to(root).as_posix()}\n" for p in sorted(files,key=lambda item:item.relative_to(root).as_posix()))
 def atomic_text(path:Path,text:str)->None:
     fd,tmp=tempfile.mkstemp(prefix=path.name+'.',dir=path.parent)
     try:
