@@ -3,30 +3,27 @@
 The classification is loaded only from trusted/default-branch code. A PR may
 modify a copy of this module in its own head, but the trusted controller never
 executes that copy when deciding whether the PR may be trusted.
+
+This list is intentionally a conservative superset of the base trust policy.
+Generated projections remain trust-boundary evidence here even though the PR
+classifier may allow them to accompany normal docs/feature changes under R4.
 """
 from __future__ import annotations
 from fnmatch import fnmatch
 from typing import Iterable
 
 TRUST_BOUNDARY_PATTERNS = (
+    ".adwf/**",
     ".github/workflows/adwf-*",
-    ".adwf/scripts/publish_trusted_gate.py",
-    ".adwf/scripts/validate_*.py",
-    ".adwf/scripts/generate_pipeline.py",
-    ".adwf/lib/policy.py",
-    ".adwf/lib/policy_runtime.py",
-    ".adwf/lib/policy_compiler.py",
-    ".adwf/lib/trusted_context.py",
-    ".adwf/lib/assurance.py",
-    ".adwf/lib/evidence*.py",
-    ".adwf/lib/cost_guard.py",
-    ".adwf/lib/github_rulesets.py",
-    ".adwf/lib/trust_boundary.py",
-    ".adwf/policies/**",
-    ".adwf/providers.json",
-    ".adwf/pipeline-ir.json",
-    ".adwf/schemas/pipeline-ir.schema.json",
-    ".adwf/schemas/config*.schema.json",
+    "AGENTS.md",
+    "ADWS.md",
+    "SPECIFICATION.md",
+    ".gitlab-ci.yml",
+    "SECURITY.md",
+    "docs/governance/**",
+    "MANIFEST.json",
+    "SHA256SUMS.txt",
+    ".gitattributes",
 )
 
 

@@ -1,0 +1,60 @@
+name: GOV-003 deterministic projection repair
+
+on:
+  push:
+    branches:
+      - gov/003-generated-projection-deadlock
+
+permissions:
+  contents: write
+
+env:
+  PYTHONDONTWRITEBYTECODE: "1"
+
+concurrency:
+  group: gov-003-deterministic-projection-repair
+  cancel-in-progress: false
+
+jobs:
+  repair:
+    if: github.repository == 'kmephis-ai/AI-Development-Framework'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: true
+          fetch-depth: 0
+      - uses: actions/setup-python@a309ff8b426b58ec0e2a45f0f869d46889d02405
+        with:
+          python-version: "3.12.10"
+      - name: Bind to event SHA and remove one-shot workflow
+        run: |
+          test "$(git rev-parse HEAD)" = "$GITHUB_SHA"
+          test "$GITHUB_REF" = "refs/heads/gov/003-generated-projection-deadlock"
+          rm .github/workflows/adwf-gov003-repair.yml
+      - name: Rebuild deterministic projections
+        run: |
+          python .adwf/scripts/docs_freshness.py --write --reviewed-at "2026-08-15T10:32:00Z" --valid-until "2026-11-15T10:32:00Z"
+          python .adwf/scripts/generate_manifest.py
+      - name: Validate repaired working tree
+        run: |
+          python .adwf/scripts/validate_ci.py
+          python .adwf/adwf.py provider-check --input .adwf/requests/github-public-standard.json
+          python .adwf/scripts/validate_framework.py
+          python .adwf/scripts/validate_pipeline_ir.py
+          python .adwf/adwf.py doctor --scope package_integrity
+          python .adwf/adwf.py doctor --scope config_health
+          python .adwf/adwf.py self-test
+          python .adwf/scripts/validate_docs.py
+          python .adwf/scripts/generate_manifest.py --check
+          git diff --check
+      - name: Commit exact deterministic repair to feature branch
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          git diff --cached --quiet && { echo "No deterministic repair changes produced"; exit 1; }
+          git commit -m "Complete GOV-003 trusted projection repair"
+          git push origin "HEAD:refs/heads/gov/003-generated-projection-deadlock"
