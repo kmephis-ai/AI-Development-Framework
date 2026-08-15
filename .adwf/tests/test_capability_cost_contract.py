@@ -1,4 +1,6 @@
+import copy
 import json
+import subprocess
 import sys
 import unittest
 from pathlib import Path
@@ -17,12 +19,55 @@ class CapabilityCostContractTests(unittest.TestCase):
     def test_all_capabilities_have_a_valid_cost_contract(self):
         schema = json.loads((ROOT / ".adwf/schemas/capability.schema.json").read_text(encoding="utf-8"))
         catalog = json.loads((ROOT / ".adwf/capabilities.json").read_text(encoding="utf-8"))
+        self.assertEqual(catalog["truth_model_version"], 2)
+        self.assertEqual(catalog["catalog_role"], "COST_AND_IMPLEMENTATION_SUMMARY")
+        self.assertEqual(catalog["canonical_truth"], ".adwf/capability-traceability.json")
         for capability in catalog["capabilities"]:
             with self.subTest(capability=capability["id"]):
                 self.assertEqual(validate(capability, schema), [])
+                self.assertNotIn("state", capability)
+                self.assertNotEqual(capability["implementation_status"], "LIVE_VERIFIED")
                 self.assertIn(capability["cost_status"], CAPABILITY_STATUSES)
                 if capability["mandatory"]:
                     self.assertFalse(capability["requires_paid_ai_api"])
+
+    def test_capability_truth_v2_is_canonical_and_optional_adapter_is_orthogonal(self):
+        schema = json.loads((ROOT / ".adwf/schemas/capability-traceability.schema.json").read_text(encoding="utf-8"))
+        truth = json.loads((ROOT / ".adwf/capability-traceability.json").read_text(encoding="utf-8"))
+        self.assertEqual(validate(truth, schema), [])
+        self.assertEqual(truth["schema_version"], 2)
+        self.assertEqual(truth["truth_model_version"], 2)
+        self.assertEqual(truth["role"], "CANONICAL_CAPABILITY_TRUTH")
+        optional = [item for item in truth["capabilities"] if item["execution_mode"] == "OPTIONAL_ADAPTER"]
+        self.assertTrue(optional)
+        self.assertTrue(all(item["status"] != "OPTIONAL_ADAPTER" for item in optional))
+
+    def test_live_verified_requires_real_live_evidence(self):
+        schema = json.loads((ROOT / ".adwf/schemas/capability-traceability.schema.json").read_text(encoding="utf-8"))
+        truth = json.loads((ROOT / ".adwf/capability-traceability.json").read_text(encoding="utf-8"))
+        candidate = copy.deepcopy(truth)
+        candidate["capabilities"][0]["status"] = "LIVE_VERIFIED"
+        candidate["capabilities"][0]["live_boundary"] = "provider readback required"
+        candidate["capabilities"][0]["live_evidence"] = []
+        self.assertTrue(validate(candidate, schema))
+
+    def test_current_catalog_does_not_promote_test_evidence_to_live_verified(self):
+        truth = json.loads((ROOT / ".adwf/capability-traceability.json").read_text(encoding="utf-8"))
+        self.assertFalse(any(item["status"] == "LIVE_VERIFIED" for item in truth["capabilities"]))
+        for item in truth["capabilities"]:
+            if item["status"] == "LIVE_NOT_VERIFIED":
+                self.assertTrue(item["live_boundary"])
+                self.assertEqual(item["live_evidence"], [])
+
+    def test_capability_truth_validator_passes(self):
+        result = subprocess.run(
+            [sys.executable, str(ROOT / ".adwf/scripts/validate_capabilities.py")],
+            cwd=ROOT,
+            capture_output=True,
+            text=True,
+            check=False,
+        )
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
 
     def test_enabled_providers_are_zero_money_eligible_and_no_mandatory_ai(self):
         for name, provider in self.registry["providers"].items():
