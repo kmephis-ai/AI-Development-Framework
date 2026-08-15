@@ -157,6 +157,17 @@
       "acceptance_evidence": [
         ".adwf/tests/test_setup_assistant.py"
       ]
+    },
+    {
+      "id": "ai_work_contracts",
+      "title": "Exact-base bounded AIWorkPackage and AIWorkResult contracts",
+      "implementation_status": "IMPLEMENTED",
+      "cost_status": "FREE_VERIFIED",
+      "mandatory": true,
+      "requires_paid_ai_api": false,
+      "acceptance_evidence": [
+        ".adwf/tests/test_ai_work_contracts.py"
+      ]
     }
   ]
 }

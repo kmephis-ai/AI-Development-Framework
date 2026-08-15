@@ -16,6 +16,7 @@ from .strict_json import loads as strict_loads
 from .trusted_context import compile_trusted_context
 from .work_memory import WorkMemoryStore
 from .action_executors import ActionExecutorRegistry,ExecutorWait
+from .ai_work_contracts import CREATIVE_PHASES, compile_work_package
 from .durable_projection import sync_project_state
 from .github_auth import detect_repository, discover_token
 
@@ -30,14 +31,18 @@ class SupervisorStatus:
 
 class ActionEnvelopeStore:
     def __init__(self,root:str|Path):
-        self.base=Path(root).resolve()/'.adwf-runtime'/'supervisor';(self.base/'requests').mkdir(parents=True,exist_ok=True);(self.base/'results').mkdir(parents=True,exist_ok=True)
+        self.root=Path(root).resolve();self.base=self.root/'.adwf-runtime'/'supervisor';(self.base/'requests').mkdir(parents=True,exist_ok=True);(self.base/'results').mkdir(parents=True,exist_ok=True)
     def request_path(self,key:str)->Path:return self.base/'requests'/f'{key}.json'
     def result_path(self,key:str)->Path:return self.base/'results'/f'{key}.json'
     def ensure_request(self,state:dict[str,Any])->tuple[str,Path]:
         key=_key(state['run_id'],state['phase'],int(state['revision']));path=self.request_path(key)
         if not path.exists():
-            payload={'schema_version':2,'idempotency_key':key,'run_id':state['run_id'],'revision':state['revision'],'brief_id':state['roadmap_id'],'phase':state['phase'],'capability':ACTION_BY_PHASE[state['phase']],
+            payload={'schema_version':3,'idempotency_key':key,'run_id':state['run_id'],'revision':state['revision'],'brief_id':state['roadmap_id'],'phase':state['phase'],'capability':ACTION_BY_PHASE[state['phase']],
               'subject_sha':state.get('subject_sha'),'delivery_sha':state.get('delivery_sha'),'preview_digest':state.get('preview_digest'),'risk':state['risk'],'work_type':state['work_type'],'monetary_budget_usd':0,'created_at':_now()}
+            if state['phase'] in CREATIVE_PHASES:
+                memory=WorkMemoryStore(self.root).load()
+                package=compile_work_package(state,memory)
+                payload['work_package']=package;payload['work_package_digest']=package['package_digest']
             self._atomic(path,payload)
         return key,path
     def _atomic(self,path:Path,value:dict[str,Any])->None:

@@ -1,14 +1,16 @@
-"""GitHub-visible handoff and bounded return channel for Creative Agents.
+"""GitHub-visible bounded handoff and return channel for Creative Agents.
 
-Requests and results are low-trust work products, never evidence or authority.
-The trusted Runtime Supervisor validates all subsequent provider facts.
+Public requests expose only a safe AIWorkPackage projection. Agent returns are
+low-trust claims that must bind to the exact package; trusted Runtime Supervisor
+and provider evidence remain the authority for phase advancement.
 """
 from __future__ import annotations
 from typing import Any
-import hashlib,json,re
+import hashlib,json
 from .github_provider import GitHubClient
+from .ai_work_contracts import CREATIVE_PHASES, canonicalize_low_trust_claim, compile_work_package
 
-TITLE='[ADWF] Agent Inbox';REQUEST_PREFIX='<!-- ADWF-AGENT-REQUEST v2 -->\n```json\n';RESULT_PREFIX='<!-- ADWF-AGENT-RESULT v2 -->\n```json\n';SUFFIX='\n```';CREATIVE_PHASES={'EXECUTE','RECOVERY'}
+TITLE='[ADWF] Agent Inbox';REQUEST_PREFIX='<!-- ADWF-AGENT-REQUEST v3 -->\n```json\n';RESULT_PREFIX='<!-- ADWF-AGENT-RESULT v3 -->\n```json\n';SUFFIX='\n```'
 
 def _parse(body:str,prefix:str)->dict[str,Any]|None:
     if not body.startswith(prefix) or not body.endswith(SUFFIX):return None
@@ -26,15 +28,24 @@ class GitHubAgentInbox:
     def publish(self,envelope:dict[str,Any],work_memory:dict[str,Any]|None)->dict[str,Any]:
         phase=str(envelope.get('phase') or '')
         if phase not in CREATIVE_PHASES:return {'status':'NOT_REQUIRED','phase':phase}
+        package=envelope.get('work_package')
+        if not isinstance(package,dict):
+            compatibility_state={'run_id':envelope.get('run_id'),'roadmap_id':envelope.get('brief_id') or (work_memory or {}).get('brief_id') or 'LEGACY',
+                                 'issue_id':envelope.get('issue_id') or 'PENDING','revision':envelope.get('revision',0),'phase':phase,
+                                 'work_type':envelope.get('work_type') or 'feature','risk':envelope.get('risk') or 'R1','subject_sha':envelope.get('subject_sha')}
+            package=compile_work_package(compatibility_state,work_memory)
+        elif envelope.get('work_package_digest')!=package.get('package_digest'):
+            raise ValueError('AGENT_REQUEST_WORK_PACKAGE_INVALID')
         safe_memory={k:(work_memory or {}).get(k) for k in ('brief_id','run_id','status','next_action_ru')}
-        payload={'schema_version':2,'idempotency_key':envelope.get('idempotency_key'),'run_id':envelope.get('run_id'),'revision':envelope.get('revision'),'brief_id':envelope.get('brief_id'),'phase':phase,'capability':envelope.get('capability'),'subject_sha':envelope.get('subject_sha'),'risk':envelope.get('risk'),'monetary_budget_usd':0,'work_memory_projection':safe_memory,
+        projection={k:package.get(k) for k in ('package_id','package_digest','base_sha','phase','work_type','risk','allowed_write_surfaces','forbidden_write_surfaces','required_evidence','monetary_budget_usd')}
+        payload={'schema_version':3,'idempotency_key':envelope.get('idempotency_key'),'run_id':envelope.get('run_id'),'revision':envelope.get('revision'),'brief_id':envelope.get('brief_id'),'phase':phase,'capability':envelope.get('capability'),'subject_sha':envelope.get('subject_sha'),'risk':envelope.get('risk'),'monetary_budget_usd':0,'work_package_projection':projection,'work_memory_projection':safe_memory,
                  'security_note':'LOW_TRUST_WORK_REQUEST_NOT_AUTHORIZATION_OR_EVIDENCE'}
         digest=hashlib.sha256(json.dumps(payload,sort_keys=True,separators=(',',':'),ensure_ascii=False).encode()).hexdigest();payload['request_digest']=digest
         issue=self.ensure_issue();existing=self.client.issue_comments(int(issue['number']))
         if any(digest in str(c.get('body') or '') for c in existing):return {'status':'ALREADY_PUBLISHED','issue_number':issue['number'],'request_digest':digest}
         comment=self.client.add_issue_comment(int(issue['number']),REQUEST_PREFIX+json.dumps(payload,ensure_ascii=False,sort_keys=True,separators=(',',':'))+SUFFIX)
         if not comment.get('id'):raise ValueError('AGENT_INBOX_READBACK_MISSING')
-        return {'status':'PUBLISHED','issue_number':issue['number'],'comment_id':comment['id'],'request_digest':digest}
+        return {'status':'PUBLISHED','issue_number':issue['number'],'comment_id':comment['id'],'request_digest':digest,'package_digest':package['package_digest']}
     def results(self)->list[dict[str,Any]]:
         issue=self.ensure_issue();out=[]
         for comment in self.client.issue_comments(int(issue['number'])):
@@ -43,17 +54,18 @@ class GitHubAgentInbox:
         return out
 
 def validate_agent_result(value:dict[str,Any],*,request:dict[str,Any])->dict[str,Any]:
-    allowed={'schema_version','idempotency_key','run_id','phase','outcome','subject_sha','branch','reason_codes','summary_ru','request_digest','provider_comment_id','provider_actor','provider_created_at'}
+    allowed={'schema_version','idempotency_key','run_id','phase','outcome','subject_sha','head_sha','branch','reason_codes','summary_ru',
+             'package_id','package_digest','base_sha','changed_paths','verification_claims','evidence_claims','provider_comment_id','provider_actor','provider_created_at'}
     unknown=set(value)-allowed
     if unknown:raise ValueError('AGENT_RESULT_FIELDS_FORBIDDEN:'+','.join(sorted(unknown)))
-    if value.get('schema_version')!=2:raise ValueError('AGENT_RESULT_SCHEMA')
+    if value.get('schema_version')!=3:raise ValueError('AGENT_RESULT_SCHEMA')
     for field in ('idempotency_key','run_id','phase'):
         if value.get(field)!=request.get(field):raise ValueError('AGENT_RESULT_BINDING_MISMATCH:'+field)
     if value.get('phase') not in CREATIVE_PHASES:raise ValueError('AGENT_RESULT_PHASE_FORBIDDEN')
-    if value.get('outcome') not in {'PASS','FAIL','HUMAN_REQUIRED','RETRY'}:raise ValueError('AGENT_RESULT_OUTCOME_INVALID')
-    sha=value.get('subject_sha')
-    if value.get('outcome')=='PASS' and value.get('phase')=='EXECUTE' and (not isinstance(sha,str) or re.fullmatch(r'[0-9a-f]{40}',sha) is None):raise ValueError('AGENT_EXECUTE_COMMIT_SHA_REQUIRED')
+    package=request.get('work_package')
+    if not isinstance(package,dict) or request.get('work_package_digest')!=package.get('package_digest'):raise ValueError('AGENT_RESULT_WORK_PACKAGE_MISSING')
+    work_result=canonicalize_low_trust_claim(value,package=package)
     branch=value.get('branch')
     if branch is not None and (not isinstance(branch,str) or not branch.startswith('adwf/') or len(branch)>180):raise ValueError('AGENT_BRANCH_INVALID')
-    return {'phase':value['phase'],'outcome':value['outcome'],'idempotency_key':value['idempotency_key'],'subject_sha':sha,'preview_digest':None,'evidence_refs':[],
-            'reason_codes':list(value.get('reason_codes') or []),'transient':value.get('outcome')=='RETRY','cost_usd':0,'metadata':{'source':'LOW_TRUST_AGENT_RESULT','provider_comment_id':value.get('provider_comment_id'),'provider_actor':value.get('provider_actor'),'branch':branch,'summary_ru':str(value.get('summary_ru') or '')[:1000]}}
+    return {'phase':value['phase'],'outcome':work_result['outcome'],'idempotency_key':value['idempotency_key'],'subject_sha':work_result.get('head_sha'),'preview_digest':None,'evidence_refs':[],
+            'reason_codes':work_result['reason_codes'],'transient':work_result['outcome']=='RETRY','cost_usd':0,'metadata':{'source':'LOW_TRUST_AGENT_RESULT','provider_comment_id':value.get('provider_comment_id'),'provider_actor':value.get('provider_actor'),'branch':branch,'summary_ru':work_result['summary_ru'],'ai_work_result':work_result}}

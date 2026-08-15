@@ -1,0 +1,29 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "ADWF AIWorkResult v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["$schema", "schema_version", "result_id", "result_digest", "package_id", "package_digest", "run_id", "roadmap_id", "issue_id", "phase", "base_sha", "outcome", "head_sha", "changed_paths", "verification_claims", "evidence_claims", "reason_codes", "summary_ru", "cost_usd", "created_at"],
+  "properties": {
+    "$schema": {"const": ".adwf/schemas/ai-work-result.schema.json"},
+    "schema_version": {"const": 1},
+    "result_id": {"type": "string", "pattern": "^AIWR-[0-9a-f]{24}$"},
+    "result_digest": {"type": "string", "format": "sha256"},
+    "package_id": {"type": "string", "pattern": "^AIWP-[0-9a-f]{24}$"},
+    "package_digest": {"type": "string", "format": "sha256"},
+    "run_id": {"type": "string", "minLength": 3},
+    "roadmap_id": {"type": "string", "minLength": 1},
+    "issue_id": {"type": "string", "minLength": 1},
+    "phase": {"enum": ["EXECUTE", "RECOVERY"]},
+    "base_sha": {"type": "string", "pattern": "^[0-9a-f]{40}$"},
+    "outcome": {"enum": ["PASS", "FAIL", "HUMAN_REQUIRED", "RETRY"]},
+    "head_sha": {"type": ["string", "null"], "pattern": "^[0-9a-f]{40}$"},
+    "changed_paths": {"type": "array", "uniqueItems": true, "items": {"type": "string", "minLength": 1}},
+    "verification_claims": {"type": "array", "uniqueItems": true, "items": {"type": "string", "minLength": 1}},
+    "evidence_claims": {"type": "array", "uniqueItems": true, "items": {"type": "string", "minLength": 1}},
+    "reason_codes": {"type": "array", "uniqueItems": true, "items": {"type": "string", "minLength": 1}},
+    "summary_ru": {"type": "string", "maxLength": 1000},
+    "cost_usd": {"const": 0},
+    "created_at": {"type": "string", "format": "date-time"}
+  }
+}

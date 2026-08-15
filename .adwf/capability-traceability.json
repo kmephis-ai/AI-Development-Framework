@@ -288,6 +288,29 @@
       ],
       "live_boundary": "LIVE_VERIFIED требует ссылку на успешный exact-revision hosted run; наличие workflow и unit test само по себе недостаточно.",
       "live_evidence": []
+    },
+    {
+      "id": "AI_WORK_CONTRACTS",
+      "status": "LIVE_NOT_VERIFIED",
+      "execution_mode": "CORE",
+      "owner_claim_ru": "Creative AI получает exact-base bounded work package, а его PASS остаётся low-trust claim до независимой trusted/provider verification.",
+      "entrypoints": [
+        ".adwf/scripts/publish_agent_request.py",
+        ".adwf/scripts/consume_agent_result.py"
+      ],
+      "production_paths": [
+        ".adwf/lib/ai_work_contracts.py",
+        ".adwf/lib/runtime_supervisor.py",
+        ".adwf/lib/action_executors.py",
+        ".adwf/lib/github_agent_inbox.py"
+      ],
+      "verification": [
+        ".adwf/tests/test_ai_work_contracts.py",
+        ".adwf/tests/test_v15_executive.py",
+        ".adwf/tests/test_v16_remediation.py"
+      ],
+      "live_boundary": "LIVE_VERIFIED требует реального creative executor/consumer result, привязанного к AIWorkPackage, и downstream trusted exact-SHA evidence; локальные contract tests подтверждают implementation, но не live adapter truth.",
+      "live_evidence": []
     }
   ]
 }

@@ -47,6 +47,7 @@ def main() -> int:
         ".adwf/lib/controller_wakeup.py", ".adwf/lib/pack_materializer.py", ".adwf/lib/performance_evidence.py", ".adwf/lib/delivery_adapters.py",
         ".adwf/lib/release_transaction.py", ".adwf/lib/preview_engine.py", ".adwf/capability-traceability.json", ".adwf/scripts/validate_capabilities.py", ".adwf/roadmap.json",
         ".adwf/lib/skill_layer.py", ".adwf/scripts/validate_skills.py", ".adwf/scripts/generate_skill_registry.py", ".adwf/scripts/eval_skills.py", ".adwf/scripts/vendor_skill.py",
+        ".adwf/lib/ai_work_contracts.py", ".adwf/schemas/ai-work-package.schema.json", ".adwf/schemas/ai-work-result.schema.json",
         ".adwf/schemas/skill.schema.json", ".adwf/schemas/skill-eval.schema.json", ".adwf/schemas/skill-registry.schema.json", ".adwf/schemas/skill-legacy-allowlist.schema.json", ".adwf/skill-legacy-allowlist.json",
         ".github/workflows/adwf-pr.yml", ".github/workflows/adwf-main.yml",
         ".github/workflows/adwf-control.yml", ".github/workflows/adwf-platform-smoke.yml", ".gitlab-ci.yml",
