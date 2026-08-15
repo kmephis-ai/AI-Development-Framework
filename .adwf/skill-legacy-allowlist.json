@@ -1,0 +1,13 @@
+{
+  "schema_version": 1,
+  "entries": [
+    {
+      "id": "adwf-local-git-mirror",
+      "path": "skills/adwf-local-git-mirror",
+      "package_sha256": "645a1fa1f549a2497415851a5d33fc6a48ed44eb66168794529cba65b0720c11",
+      "reason": "DEVENV-001 predates the SKILL-001 managed package descriptor/eval contract; exact package bytes are frozen until the immediate SKILL-001 content migration lane.",
+      "migration_issue": "SKILL-001/#29",
+      "expires_on": "2026-09-15"
+    }
+  ]
+}
