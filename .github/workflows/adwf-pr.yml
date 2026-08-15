@@ -25,12 +25,28 @@ jobs:
         with:
           python-version: "3.12.10"
       - name: TEMP FND-001 owner-bound final materialization
-        if: ${{ contains(github.event.pull_request.body, format('Owner-Attestation: `{0}`', github.event.pull_request.head.sha)) }}
         env:
           GH_TOKEN: ${{ github.token }}
           ADWF_BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          ADWF_HEAD_SHA: ${{ github.event.pull_request.head.sha }}
           ADWF_HEAD_BRANCH: ${{ github.head_ref }}
+          ADWF_PR_BODY: ${{ github.event.pull_request.body }}
         run: |
+          python - <<'PY'
+          import os
+          marker = "Owner-Attestation: `" + os.environ["ADWF_HEAD_SHA"] + "`"
+          if marker not in os.environ.get("ADWF_PR_BODY", ""):
+              print("FND-001 materialization: exact-HEAD owner attestation absent; no write")
+              raise SystemExit(0)
+          PY
+          if ! python - <<'PY'
+          import os
+          marker = "Owner-Attestation: `" + os.environ["ADWF_HEAD_SHA"] + "`"
+          raise SystemExit(0 if marker in os.environ.get("ADWF_PR_BODY", "") else 1)
+          PY
+          then
+            exit 0
+          fi
           git show "${ADWF_BASE_SHA}:.github/workflows/adwf-pr.yml" > .github/workflows/adwf-pr.yml
           python .adwf/scripts/docs_freshness.py --write
           python .adwf/scripts/generate_manifest.py
