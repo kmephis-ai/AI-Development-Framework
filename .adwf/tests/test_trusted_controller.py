@@ -11,6 +11,9 @@ ROOT = Path(__file__).resolve().parents[2]
 SPEC = importlib.util.spec_from_file_location("orchestrate_event", ROOT / ".adwf/scripts/orchestrate_event.py")
 MODULE = importlib.util.module_from_spec(SPEC)
 SPEC.loader.exec_module(MODULE)
+GATE_SPEC = importlib.util.spec_from_file_location("publish_trusted_gate", ROOT / ".adwf/scripts/publish_trusted_gate.py")
+GATE = importlib.util.module_from_spec(GATE_SPEC)
+GATE_SPEC.loader.exec_module(GATE)
 
 
 class TrustedControllerTests(unittest.TestCase):
@@ -91,6 +94,33 @@ class TrustedControllerTests(unittest.TestCase):
         self.assertFalse(MODULE.lease_times_valid(stale, now=now, stall_timeout_minutes=45))
         self.assertFalse(MODULE.lease_times_valid(future, now=now, stall_timeout_minutes=45))
         self.assertFalse(MODULE.lease_times_valid(expired, now=now, stall_timeout_minutes=45))
+
+    def test_trusted_gate_recovers_merged_pr_by_exact_head_sha(self):
+        sha = "a" * 40
+        client = mock.Mock()
+        client.pulls.return_value = [
+            {"number": 3, "head": {"sha": "b" * 40}},
+            {"number": 7, "head": {"sha": sha}},
+        ]
+        self.assertEqual(GATE._pull_number_for_sha(client, {"pull_requests": []}, sha), 7)
+
+    def test_solo_maintainer_attestation_is_exact_sha_and_admin_bound(self):
+        sha = "a" * 40
+        client = mock.Mock()
+        client.collaborator_permission.return_value = {"permission": "admin"}
+        pr = {"user": {"login": "owner"}, "body": f"Owner-Attestation: {sha}"}
+        result = GATE._owner_exact_head_attestation(client, pr, sha)
+        self.assertTrue(result["verified"])
+        self.assertEqual(result["kind"], "SOLO_MAINTAINER_OWNER_ATTESTATION")
+        stale = GATE._owner_exact_head_attestation(client, pr, "b" * 40)
+        self.assertFalse(stale["verified"])
+
+    def test_solo_maintainer_attestation_requires_admin_identity(self):
+        sha = "a" * 40
+        client = mock.Mock()
+        client.collaborator_permission.return_value = {"permission": "write"}
+        pr = {"user": {"login": "owner"}, "body": f"Owner-Attestation: {sha}"}
+        self.assertFalse(GATE._owner_exact_head_attestation(client, pr, sha)["verified"])
 
 
 if __name__ == "__main__":
