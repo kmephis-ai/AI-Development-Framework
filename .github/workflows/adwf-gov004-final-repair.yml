@@ -28,7 +28,7 @@ jobs:
           test "$(git rev-parse HEAD)" = "$GITHUB_SHA"
           rm .github/workflows/adwf-gov004-final-repair.yml
           python .adwf/scripts/generate_pipeline.py --check
-          python .adwf/scripts/docs_freshness.py --write --reviewed-at "2026-08-15T11:25:00Z" --valid-until "2026-11-15T11:25:00Z"
+          python .adwf/scripts/docs_freshness.py --write --reviewed-at "2026-08-15T11:24:00Z" --valid-until "2026-11-15T11:24:00Z"
           python .adwf/scripts/generate_manifest.py
       - name: Validate intended final tree
         run: |
