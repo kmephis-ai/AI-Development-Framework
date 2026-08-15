@@ -69,7 +69,7 @@ def source_digest(root: str | Path, patterns: list[str]) -> str:
     base = Path(root).resolve()
     digest = hashlib.sha256()
     for path in _files(base, patterns):
-        relative = str(path.relative_to(base)).encode("utf-8")
+        relative = path.relative_to(base).as_posix().encode("utf-8")
         digest.update(len(relative).to_bytes(4, "big"))
         digest.update(relative)
         raw = path.read_bytes()

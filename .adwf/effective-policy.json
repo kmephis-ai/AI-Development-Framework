@@ -127,6 +127,10 @@
       "sha256": "5193ad3ff5d49f659d88f2120d97606dd65639f1cae704bab12255786f5e97da"
     },
     {
+      "path": ".adwf/profiles/FREE_PUBLIC_GITHUB.json",
+      "sha256": "8a25131927ee7ee5e0c64cec619b37dbf1614b28a27670b366320a10e06d27ea"
+    },
+    {
       "path": ".adwf/providers.json",
       "sha256": "3ca5782cc39dae435aa133721ae5b9095d16e9d50ff3d392c26b50792eeef1de"
     },
@@ -137,11 +141,7 @@
     {
       "path": ".adwf/state-machine.json",
       "sha256": "137240ac3c78b754440d653847fd9e6105ced88a51c1dbed704b005b43896e45"
-    },
-    {
-      "path": ".adwf\\profiles\\FREE_PUBLIC_GITHUB.json",
-      "sha256": "8a25131927ee7ee5e0c64cec619b37dbf1614b28a27670b366320a10e06d27ea"
     }
   ],
-  "policy_hash": "fc8fa8933ad82b3e2d094a1db7204d54a88e090a2278d846d53e5388a67af2e8"
+  "policy_hash": "a56fea0bebd1b1a55150b30fc8e82b6836fe6cb5da5395309f5ac3c8dc0dbcad"
 }

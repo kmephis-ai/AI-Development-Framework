@@ -11,7 +11,7 @@
         ".github/workflows/**"
       ],
       "mode": "generated-status-block+manual",
-      "source_digest": "3c986f8eba5a27908d99af64d527fac34e9009b4531f80f3d6ba8a6c95fcf505",
+      "source_digest": "7dd9250e0543f763e35449e87b055043dfd0ee11fa2b8cd8e628996bab7195b5",
       "reviewed_at": "2026-08-13T00:00:00Z",
       "valid_until": "2026-11-13T00:00:00Z"
     },
@@ -23,7 +23,7 @@
         ".gitlab-ci.yml"
       ],
       "mode": "manual-governance",
-      "source_digest": "c4bc4d4c84730860580cdb8334813b8f2b85e7296991190dddc2d4c33ddf45d3",
+      "source_digest": "b2c00d7d7b45fe7ee11647db0fbb22e1575ccb4c9bdbc051abab74ae05b237d9",
       "reviewed_at": "2026-08-13T00:00:00Z",
       "valid_until": "2026-11-13T00:00:00Z"
     },
@@ -36,7 +36,7 @@
         ".adwf/scripts/**"
       ],
       "mode": "architecture",
-      "source_digest": "67e526134ab544a56ce3e64bbb76f80f9226aee050e9029624d8e39d9f7f6a4b",
+      "source_digest": "68c8d8ce6218ee51566041945f2bebafa32bedf1153c89549cdb3ae418792b51",
       "reviewed_at": "2026-08-13T00:00:00Z",
       "valid_until": "2026-11-13T00:00:00Z"
     },
@@ -48,7 +48,7 @@
         ".adwf/evidence-ledger.json"
       ],
       "mode": "generated",
-      "source_digest": "3bbe64412468ad4d0297ab9834694282e7f862cc1c0ec8a732a0fd0c0ecfaddc",
+      "source_digest": "bf76d0c9ddcd11614474038c97c363480abdaa7bba2d46f2f65af1b6a1bed5f7",
       "reviewed_at": "2026-08-13T00:00:00Z",
       "valid_until": "2026-11-13T00:00:00Z"
     },
@@ -64,7 +64,7 @@
         ".adwf/scripts/validate_capabilities.py"
       ],
       "mode": "implementation-certification",
-      "source_digest": "6a4ef6d2336611330e4944389ee6106a3482e2ae394b7c52ba764b68f069748c",
+      "source_digest": "ae299de3205882b999596df348738cac31b640992223244b7e99455d955fe237",
       "reviewed_at": "2026-08-13T00:00:00Z",
       "valid_until": "2026-11-13T00:00:00Z"
     },
@@ -77,7 +77,7 @@
         ".github/ISSUE_TEMPLATE/bug-report.yml"
       ],
       "mode": "owner-guide",
-      "source_digest": "f69616b5f12d97ff3478055fa2dcc8cf190780b1db381ffb435afe766aafbdce",
+      "source_digest": "825bce6785f2038c6acd5cf1e48eb9a914a18fed713efa8eb2be6e28d104e2ed",
       "reviewed_at": "2026-08-13T00:00:00Z",
       "valid_until": "2026-11-13T00:00:00Z"
     },
@@ -90,7 +90,7 @@
         ".adwf/schemas/repair-recipe.schema.json"
       ],
       "mode": "governance",
-      "source_digest": "c7e13ff6b2edbefad866fec2959ef0adf94f91e62705ada0db84344c21c4928b",
+      "source_digest": "68f0c11d641d731c0a6560fe566f0aeb307aed37ed5bd812cf1773ef4ca7b3e4",
       "reviewed_at": "2026-08-13T00:00:00Z",
       "valid_until": "2026-11-13T00:00:00Z"
     },
@@ -103,7 +103,7 @@
         ".adwf/lib/cost_guard.py"
       ],
       "mode": "provider-facts",
-      "source_digest": "785a4cf5dad091c0dc0d0af64272752aabad2f30ada3285f818fa29b3832c057",
+      "source_digest": "61094eb026194041ef8d6e7dd8a0efc3c17182b12bbb3313cc6460ce342d60a9",
       "reviewed_at": "2026-08-13T00:00:00Z",
       "valid_until": "2026-11-13T00:00:00Z"
     }

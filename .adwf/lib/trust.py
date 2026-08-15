@@ -26,7 +26,7 @@ _DANGEROUS_TRUE_KEYS = re.compile(
 )
 _AUTONOMY = {f"A{index}": index for index in range(5)}
 _RISK = {f"R{index}": index for index in range(5)}
-_INTEGRITY_PROJECTIONS = {"MANIFEST.json", "SHA256SUMS.txt"}
+_INTEGRITY_PROJECTIONS = {"MANIFEST.json", "SHA256SUMS.txt", ".gitattributes"}
 
 
 def normalize_repo_path(value: str) -> str:

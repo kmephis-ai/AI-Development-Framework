@@ -31,6 +31,33 @@ class GateClient:
     def collaborator_permission(self,login):return {'permission':'admin'}
 
 class V16RemediationTests(unittest.TestCase):
+    def test_cross_platform_generated_paths_are_posix(self):
+        from lib.policy_compiler import compile_policy
+        compiled, errors = compile_policy(ROOT)
+        self.assertEqual(errors, [])
+        self.assertTrue(all("\\" not in item["path"] for item in compiled["sources"]))
+
+    def test_gitattributes_is_integrity_protected_support(self):
+        from lib.trust import classify_diff
+        policy = {
+            "paths": [".adwf/**", ".github/workflows/adwf-*.yml"],
+            "weakening_is_risk": "R4",
+            "weakening_requires_human": True,
+            "self_modification_in_feature_pr": "FORBIDDEN",
+        }
+        result = classify_diff(
+            [{
+                "path": ".gitattributes",
+                "status": "A",
+                "old_text": None,
+                "new_text": "* text=auto eol=lf\n",
+            }],
+            policy,
+        )
+        self.assertEqual(result["result"], "HUMAN_REQUIRED")
+        self.assertEqual(result["feature_files"], [])
+        self.assertIn(".gitattributes", result["protected_files"])
+
     def test_repository_text_line_endings_are_canonicalized(self):
         attrs=(ROOT/'.gitattributes').read_text(encoding='utf-8')
         self.assertIn('* text=auto eol=lf',attrs)
@@ -147,7 +174,7 @@ class V16RemediationTests(unittest.TestCase):
     def test_capability_claims_are_machine_traceable_to_production_paths(self):
         r=subprocess.run([sys.executable,str(ROOT/'.adwf/scripts/validate_capabilities.py')],cwd=ROOT,capture_output=True,text=True)
         self.assertEqual(r.returncode,0,r.stdout+r.stderr)
-        trace=json.loads((ROOT/'.adwf/capability-traceability.json').read_text())
+        trace=json.loads((ROOT/'.adwf/capability-traceability.json').read_text(encoding='utf-8'))
         by_id={x['id']:x for x in trace['capabilities']}
         self.assertEqual(by_id['TRUSTED_GATE']['status'],'IMPLEMENTED')
         self.assertEqual(by_id['WINDOWS_HOSTED_SMOKE']['status'],'LIVE_NOT_VERIFIED')
