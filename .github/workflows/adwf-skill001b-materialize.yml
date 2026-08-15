@@ -26,11 +26,17 @@ jobs:
         run: |
           set -euo pipefail
           test "$(git merge-base HEAD "${BASE_SHA}")" = "${BASE_SHA}"
-          sha256sum .adwf-runtime-materialize/skill001b.patch.001 \
-                    .adwf-runtime-materialize/skill001b.patch.002 \
-                    .adwf-runtime-materialize/skill001b.patch.003
+          printf '%s  %s\n' 'fc872b0dee637c6af5ef2c251ffdb77f2e3f20bca2c3225b4214c4b6b946cd4f' '.adwf-runtime-materialize/skill001b.patch.001' | sha256sum --check --strict
+          printf '%s  %s\n' '026d5a27eba6042832a597faa86d371d77d9fd58903746a0b824d261841e5f73' '.adwf-runtime-materialize/skill001b.patch.002a' | sha256sum --check --strict
+          printf '%s  %s\n' '572574c07a07875027283d6175fcb8e0f5b2ee703af6c2b89c4803fa5d6b6074' '.adwf-runtime-materialize/skill001b.patch.002b' | sha256sum --check --strict
+          printf '%s  %s\n' '2738af2cc16e51f4c27ce9cf24e2d3a8a474c9052f140562ca0dd2037b9bf8f1' '.adwf-runtime-materialize/skill001b.patch.002c' | sha256sum --check --strict
+          printf '%s  %s\n' '9cfc6a9396611d0152ff661383b0114d3f8d6adee32e2efa2fff501b6a8f7dbc' '.adwf-runtime-materialize/skill001b.patch.002d' | sha256sum --check --strict
+          printf '%s  %s\n' '9a5372e3d46391e7c070ad1f4a9f3b304c4ca21b15a94dd80a0f799bd00cce8d' '.adwf-runtime-materialize/skill001b.patch.003' | sha256sum --check --strict
           cat .adwf-runtime-materialize/skill001b.patch.001 \
-              .adwf-runtime-materialize/skill001b.patch.002 \
+              .adwf-runtime-materialize/skill001b.patch.002a \
+              .adwf-runtime-materialize/skill001b.patch.002b \
+              .adwf-runtime-materialize/skill001b.patch.002c \
+              .adwf-runtime-materialize/skill001b.patch.002d \
               .adwf-runtime-materialize/skill001b.patch.003 > /tmp/skill001b.patch.b64
           printf '%s  %s\n' "${PAYLOAD_SHA256}" /tmp/skill001b.patch.b64 | sha256sum --check --strict
           base64 --decode /tmp/skill001b.patch.b64 | gzip --decompress > /tmp/skill001b.patch
