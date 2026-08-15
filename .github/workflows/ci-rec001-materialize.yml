@@ -1,0 +1,95 @@
+name: CI-REC-001 materialize and verify
+
+on:
+  push:
+    branches:
+      - agent/materialize-ci-rec001-20260816-a1
+
+permissions:
+  contents: write
+
+jobs:
+  materialize:
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Checkout transport branch
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd
+        with:
+          fetch-depth: 0
+
+      - name: Checkout exact feature baseline
+        shell: bash
+        run: |
+          set -euo pipefail
+          TRANSPORT_SHA="$GITHUB_SHA"
+          git fetch origin agent/ci-rec001-platform-smoke-recovery
+          git checkout -B agent/ci-rec001-platform-smoke-recovery origin/agent/ci-rec001-platform-smoke-recovery
+          test "$(git rev-parse HEAD)" = 'ae6798cbb899ec5b587ec106fa5cb842b2e8e251'
+          echo "TRANSPORT_SHA=$TRANSPORT_SHA" >> "$GITHUB_ENV"
+
+      - name: Materialize repair payload
+        shell: bash
+        run: |
+          set -euo pipefail
+          git show "$TRANSPORT_SHA:.transport/ci-rec001/platform_smoke.py" > .adwf/scripts/platform_smoke.py
+          git show "$TRANSPORT_SHA:.transport/ci-rec001/test_platform_smoke.py" > .adwf/tests/test_platform_smoke.py
+          python .adwf/scripts/docs_freshness.py --write
+          python .adwf/scripts/generate_manifest.py
+          git diff --check
+
+      - name: Validate repair before publish
+        shell: bash
+        run: |
+          set -euo pipefail
+          python -m unittest discover -s .adwf/tests -p 'test_platform_smoke.py' -v
+          python .adwf/scripts/docs_freshness.py
+          python .adwf/scripts/generate_manifest.py --check
+          python .adwf/scripts/validate_framework.py
+          python .adwf/adwf.py self-test
+          git diff --check
+          python - <<'PY'
+          import subprocess
+          required={'.adwf/scripts/platform_smoke.py','.adwf/tests/test_platform_smoke.py','MANIFEST.json','SHA256SUMS.txt'}
+          allowed=required|{'.adwf/docs-registry.json'}
+          tracked=set(subprocess.check_output(['git','diff','--name-only'],text=True).splitlines())
+          untracked=set(subprocess.check_output(['git','ls-files','--others','--exclude-standard'],text=True).splitlines())
+          actual=tracked|untracked
+          if not required.issubset(actual):
+              raise SystemExit('MISSING_REQUIRED_DIFF:'+repr(sorted(required-actual)))
+          if not actual.issubset(allowed):
+              raise SystemExit('UNEXPECTED_DIFF:'+repr(sorted(actual-allowed)))
+          print('CI_REC001_DIFF_GUARD: PASS',sorted(actual))
+          PY
+
+      - name: Commit and push only after validation PASS
+        shell: bash
+        run: |
+          set -euo pipefail
+          git add .adwf/scripts/platform_smoke.py .adwf/tests/test_platform_smoke.py MANIFEST.json SHA256SUMS.txt
+          if ! git diff --quiet -- .adwf/docs-registry.json; then git add .adwf/docs-registry.json; fi
+          git diff --cached --check
+          git config user.name 'ADWF CI-REC-001 Materializer'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git commit -m 'CI-REC-001: repair Windows platform smoke readiness'
+          git push origin HEAD:agent/ci-rec001-platform-smoke-recovery
+
+  platform-smoke-candidate:
+    needs: materialize
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-24.04, windows-2022]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - name: Checkout exact feature candidate
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd
+        with:
+          ref: agent/ci-rec001-platform-smoke-recovery
+          persist-credentials: false
+          fetch-depth: 1
+      - name: Set up Python
+        uses: actions/setup-python@a309ff8b426b58ec0e2a45f0f869d46889d02405
+        with:
+          python-version: '3.12.10'
+      - name: Run functional platform smoke
+        run: python .adwf/scripts/platform_smoke.py
