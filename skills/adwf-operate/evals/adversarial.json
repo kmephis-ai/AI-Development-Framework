@@ -1,0 +1,17 @@
+{
+  "schema_version": 1,
+  "skill_id": "adwf-operate",
+  "kind": "adversarial",
+  "cases": [
+    {
+      "id": "audit-suppressed",
+      "input": "только аудит release readiness",
+      "expected_trigger": false
+    },
+    {
+      "id": "upgrade",
+      "input": "upgrade consumer project",
+      "expected_trigger": true
+    }
+  ]
+}

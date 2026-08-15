@@ -11,7 +11,7 @@
         ".github/workflows/**"
       ],
       "mode": "generated-status-block+manual",
-      "source_digest": "26bb8632730b35341ecba4edc963639537afae0b51f4cb586903496eb3bbfe10",
+      "source_digest": "0f4096e3aeb5a3afe2fce8848487af1e327b48d63dc74acf78a2bd1383496ec9",
       "reviewed_at": "2026-08-13T00:00:00Z",
       "valid_until": "2026-11-13T00:00:00Z"
     },
@@ -24,7 +24,7 @@
         "skills/**"
       ],
       "mode": "manual-governance",
-      "source_digest": "23a8fdc5709d6c0906cef51d0cc594260d5ef91a2a57b4707397eeb87826c2cc",
+      "source_digest": "fe69f9a7d69d109c16d131649b55fc7e46c605f51888dcd1ed80f703d0d7e7e2",
       "reviewed_at": "2026-08-13T00:00:00Z",
       "valid_until": "2026-11-13T00:00:00Z"
     },
@@ -105,6 +105,23 @@
       ],
       "mode": "provider-facts",
       "source_digest": "61094eb026194041ef8d6e7dd8a0efc3c17182b12bbb3313cc6460ce342d60a9",
+      "reviewed_at": "2026-08-13T00:00:00Z",
+      "valid_until": "2026-11-13T00:00:00Z"
+    },
+    {
+      "path": "docs/operations/SKILL_OPERATING_LAYER.md",
+      "watched": [
+        "skills/**",
+        ".adwf/lib/skill_layer.py",
+        ".adwf/schemas/skill.schema.json",
+        ".adwf/schemas/skill-eval.schema.json",
+        ".adwf/schemas/skill-registry.schema.json",
+        ".adwf/scripts/validate_skills.py",
+        ".adwf/scripts/eval_skills.py",
+        ".adwf/scripts/generate_skill_registry.py"
+      ],
+      "mode": "operations",
+      "source_digest": "b73efed85abf805badba59d14e7328e81a3613d39892d641b8c4eb2d686cf566",
       "reviewed_at": "2026-08-13T00:00:00Z",
       "valid_until": "2026-11-13T00:00:00Z"
     }

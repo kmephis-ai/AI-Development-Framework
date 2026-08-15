@@ -1,0 +1,21 @@
+{
+  "schema_version": 1,
+  "skill_id": "adwf-session-bootstrap",
+  "kind": "success-cases",
+  "cases": [
+    {
+      "id": "provider-first",
+      "required_phrases": [
+        "Прочитай live default branch",
+        "durable handoff facts",
+        "явно вычисли delta"
+      ]
+    },
+    {
+      "id": "no-hidden",
+      "required_phrases": [
+        "Hidden reasoning, credentials и секреты в handoff не входят"
+      ]
+    }
+  ]
+}

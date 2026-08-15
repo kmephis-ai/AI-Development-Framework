@@ -1,0 +1,15 @@
+{
+  "schema_version": 1,
+  "skill_id": "adwf-develop",
+  "kind": "success-cases",
+  "cases": [
+    {
+      "id": "router-boundary",
+      "required_phrases": [
+        "Сначала классифицируй intent",
+        "Router не заменяет deterministic policy",
+        "минимально необходимый leaf Skill"
+      ]
+    }
+  ]
+}

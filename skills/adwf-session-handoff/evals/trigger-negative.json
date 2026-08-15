@@ -1,0 +1,22 @@
+{
+  "schema_version": 1,
+  "skill_id": "adwf-session-handoff",
+  "kind": "trigger-negative",
+  "cases": [
+    {
+      "id": "cot",
+      "input": "полный chain of thought для архива",
+      "expected_trigger": false
+    },
+    {
+      "id": "secrets",
+      "input": "секреты и токены перенеси в заметку",
+      "expected_trigger": false
+    },
+    {
+      "id": "summary",
+      "input": "кратко перескажи статью",
+      "expected_trigger": false
+    }
+  ]
+}

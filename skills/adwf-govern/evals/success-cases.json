@@ -1,0 +1,15 @@
+{
+  "schema_version": 1,
+  "skill_id": "adwf-govern",
+  "kind": "success-cases",
+  "cases": [
+    {
+      "id": "truth-boundary",
+      "required_phrases": [
+        "Evidence не возникает из уверенного текста агента",
+        "Unknown остаётся unknown/blocking",
+        "deterministic механизмами ADWF"
+      ]
+    }
+  ]
+}

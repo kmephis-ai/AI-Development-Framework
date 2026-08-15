@@ -1,0 +1,22 @@
+{
+  "schema_version": 1,
+  "skill_id": "adwf-session-bootstrap",
+  "kind": "trigger-positive",
+  "cases": [
+    {
+      "id": "new-session",
+      "input": "Новая сессия: продолжи разработку с текущего GitHub",
+      "expected_trigger": true
+    },
+    {
+      "id": "restore-state",
+      "input": "Нужно восстановить состояние проекта после потери контекста",
+      "expected_trigger": true
+    },
+    {
+      "id": "bootstrap-en",
+      "input": "Run session bootstrap for this repository",
+      "expected_trigger": true
+    }
+  ]
+}

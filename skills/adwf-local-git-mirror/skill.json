@@ -1,0 +1,52 @@
+{
+  "schema_version": 1,
+  "id": "adwf-local-git-mirror",
+  "kind": "leaf",
+  "lifecycle": "ACTIVE",
+  "origin": {
+    "kind": "first_party"
+  },
+  "description": "Восстанавливает настоящий локальный Git workspace на exact GitHub SHA через Connector и короткоживущий Actions bundle transport при недоступном direct Git.",
+  "entrypoint": "SKILL.md",
+  "routing": {
+    "startup_visible": false,
+    "routed_by": [
+      "adwf-develop",
+      "adwf-operate"
+    ],
+    "routes": [],
+    "trigger_terms": [
+      "локальный git недоступен",
+      "git clone недоступен",
+      "could not resolve host github.com",
+      "local git mirror"
+    ],
+    "negative_terms": [
+      "git работает напрямую",
+      "не использовать github"
+    ]
+  },
+  "effects": {
+    "shell": true,
+    "filesystem": "write",
+    "network": "none",
+    "secrets": "none"
+  },
+  "external_domains": [
+    "github.com"
+  ],
+  "dependencies": [],
+  "evals": {
+    "trigger_positive": "evals/trigger-positive.json",
+    "trigger_negative": "evals/trigger-negative.json",
+    "success_cases": "evals/success-cases.json",
+    "adversarial": "evals/adversarial.json"
+  },
+  "quality": {
+    "min_no_trigger_precision": 1.0
+  },
+  "context_budget": {
+    "max_description_chars": 320,
+    "max_skill_md_chars": 16000
+  }
+}

@@ -1,0 +1,22 @@
+{
+  "schema_version": 1,
+  "skill_id": "adwf-govern",
+  "kind": "trigger-positive",
+  "cases": [
+    {
+      "id": "audit",
+      "input": "Проведи аудит evidence и governance",
+      "expected_trigger": true
+    },
+    {
+      "id": "security",
+      "input": "security review текущего изменения",
+      "expected_trigger": true
+    },
+    {
+      "id": "trace",
+      "input": "Проверь traceability требований",
+      "expected_trigger": true
+    }
+  ]
+}

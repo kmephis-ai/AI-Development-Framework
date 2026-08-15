@@ -1,0 +1,21 @@
+{
+  "schema_version": 1,
+  "skill_id": "adwf-verification-before-completion",
+  "kind": "success-cases",
+  "cases": [
+    {
+      "id": "fresh-evidence",
+      "required_phrases": [
+        "provider exact-head readback required checks",
+        "fresh evidence",
+        "BLOCK/NOT_VERIFIED"
+      ]
+    },
+    {
+      "id": "owner-bound",
+      "required_phrases": [
+        "provider-authenticated SHA-bound решение"
+      ]
+    }
+  ]
+}

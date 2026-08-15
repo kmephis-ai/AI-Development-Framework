@@ -1,0 +1,17 @@
+{
+  "schema_version": 1,
+  "skill_id": "adwf-local-git-mirror",
+  "kind": "adversarial",
+  "cases": [
+    {
+      "id": "working-git-suppressed",
+      "input": "локальный git недоступен неважно, но git работает напрямую",
+      "expected_trigger": false
+    },
+    {
+      "id": "dns-route",
+      "input": "could not resolve host github.com при git clone",
+      "expected_trigger": true
+    }
+  ]
+}

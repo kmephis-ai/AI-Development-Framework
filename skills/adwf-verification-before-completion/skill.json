@@ -1,0 +1,51 @@
+{
+  "schema_version": 1,
+  "id": "adwf-verification-before-completion",
+  "kind": "leaf",
+  "lifecycle": "ACTIVE",
+  "origin": {
+    "kind": "first_party"
+  },
+  "description": "Запрещает DONE/PASS без fresh exact-head evidence: запускает релевантные deterministic tests, provider readback и product/runtime proof по impact.",
+  "entrypoint": "SKILL.md",
+  "routing": {
+    "startup_visible": false,
+    "routed_by": [
+      "adwf-develop",
+      "adwf-govern"
+    ],
+    "routes": [],
+    "trigger_terms": [
+      "verification before completion",
+      "перед завершением",
+      "перед done",
+      "перед pass",
+      "проверь перед merge"
+    ],
+    "negative_terms": [
+      "без проверки",
+      "просто объяви готово"
+    ]
+  },
+  "effects": {
+    "shell": false,
+    "filesystem": "none",
+    "network": "none",
+    "secrets": "none"
+  },
+  "external_domains": [],
+  "dependencies": [],
+  "evals": {
+    "trigger_positive": "evals/trigger-positive.json",
+    "trigger_negative": "evals/trigger-negative.json",
+    "success_cases": "evals/success-cases.json",
+    "adversarial": "evals/adversarial.json"
+  },
+  "quality": {
+    "min_no_trigger_precision": 1.0
+  },
+  "context_budget": {
+    "max_description_chars": 320,
+    "max_skill_md_chars": 12000
+  }
+}

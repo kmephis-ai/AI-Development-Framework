@@ -1,0 +1,22 @@
+{
+  "schema_version": 1,
+  "skill_id": "adwf-develop",
+  "kind": "trigger-positive",
+  "cases": [
+    {
+      "id": "develop-ru",
+      "input": "Продолжи разработку текущего work unit",
+      "expected_trigger": true
+    },
+    {
+      "id": "debug-en",
+      "input": "Need systematic debugging of this implementation",
+      "expected_trigger": true
+    },
+    {
+      "id": "session-ru",
+      "input": "Новая сессия должна восстановить состояние проекта",
+      "expected_trigger": true
+    }
+  ]
+}

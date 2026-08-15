@@ -1,0 +1,22 @@
+{
+  "schema_version": 1,
+  "skill_id": "adwf-local-git-mirror",
+  "kind": "trigger-positive",
+  "cases": [
+    {
+      "id": "dns-fail",
+      "input": "git clone недоступен: Could not resolve host github.com",
+      "expected_trigger": true
+    },
+    {
+      "id": "local-mirror",
+      "input": "Нужен local git mirror через Connector",
+      "expected_trigger": true
+    },
+    {
+      "id": "clone-unavailable",
+      "input": "git clone недоступен из этой среды",
+      "expected_trigger": true
+    }
+  ]
+}

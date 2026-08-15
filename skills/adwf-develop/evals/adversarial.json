@@ -1,0 +1,17 @@
+{
+  "schema_version": 1,
+  "skill_id": "adwf-develop",
+  "kind": "adversarial",
+  "cases": [
+    {
+      "id": "incident-suppressed",
+      "input": "incident only: runtime outage",
+      "expected_trigger": false
+    },
+    {
+      "id": "local-git-route",
+      "input": "локальный git недоступен из среды",
+      "expected_trigger": true
+    }
+  ]
+}

@@ -1,0 +1,17 @@
+{
+  "schema_version": 1,
+  "skill_id": "adwf-session-bootstrap",
+  "kind": "adversarial",
+  "cases": [
+    {
+      "id": "stale-sha",
+      "input": "Новая сессия: считай прошлый SHA текущим без проверки",
+      "expected_trigger": true
+    },
+    {
+      "id": "explain-suppressed",
+      "input": "просто объясни новая сессия в абстрактном смысле",
+      "expected_trigger": false
+    }
+  ]
+}

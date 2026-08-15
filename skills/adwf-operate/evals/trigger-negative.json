@@ -1,0 +1,22 @@
+{
+  "schema_version": 1,
+  "skill_id": "adwf-operate",
+  "kind": "trigger-negative",
+  "cases": [
+    {
+      "id": "audit",
+      "input": "только аудит архитектуры",
+      "expected_trigger": false
+    },
+    {
+      "id": "feature",
+      "input": "pure code implementation новой формы",
+      "expected_trigger": false
+    },
+    {
+      "id": "letter",
+      "input": "напиши деловое письмо",
+      "expected_trigger": false
+    }
+  ]
+}
