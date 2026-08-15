@@ -1,6 +1,7 @@
 import importlib.util
 import io
 import json
+import tempfile
 import unittest
 from contextlib import redirect_stdout
 from datetime import datetime, timezone
@@ -14,6 +15,12 @@ SPEC.loader.exec_module(MODULE)
 GATE_SPEC = importlib.util.spec_from_file_location("publish_trusted_gate", ROOT / ".adwf/scripts/publish_trusted_gate.py")
 GATE = importlib.util.module_from_spec(GATE_SPEC)
 GATE_SPEC.loader.exec_module(GATE)
+PREVIEW_SPEC = importlib.util.spec_from_file_location("collect_preview_attestation", ROOT / ".adwf/scripts/collect_preview_attestation.py")
+PREVIEW = importlib.util.module_from_spec(PREVIEW_SPEC)
+PREVIEW_SPEC.loader.exec_module(PREVIEW)
+BOOTSTRAP_SPEC = importlib.util.spec_from_file_location("github_bootstrap_lib", ROOT / ".adwf/lib/github_bootstrap.py")
+BOOTSTRAP = importlib.util.module_from_spec(BOOTSTRAP_SPEC)
+BOOTSTRAP_SPEC.loader.exec_module(BOOTSTRAP)
 
 
 class TrustedControllerTests(unittest.TestCase):
@@ -121,6 +128,37 @@ class TrustedControllerTests(unittest.TestCase):
         client.collaborator_permission.return_value = {"permission": "write"}
         pr = {"user": {"login": "owner"}, "body": f"Owner-Attestation: {sha}"}
         self.assertFalse(GATE._owner_exact_head_attestation(client, pr, sha)["verified"])
+
+    def test_preview_skip_is_not_applicable_without_job_log_access(self):
+        sha = "a" * 40
+        client = mock.Mock()
+        client.check_runs.return_value = [
+            {"name": name, "head_sha": sha, "status": "completed", "conclusion": "success", "app": {"slug": "github-actions", "id": 15368}}
+            for name in ("fast-feedback", "adwf/governance-gate", "adwf/trusted-gate")
+        ]
+        client.jobs.return_value = [{
+            "id": 123, "name": "fast-feedback", "status": "completed", "conclusion": "success",
+            "steps": [{"name": PREVIEW.PREVIEW_STEP, "conclusion": "skipped"}],
+        }]
+        event = {"workflow_run": {"name": "ADWF PR", "event": "pull_request", "status": "completed", "conclusion": "success", "head_sha": sha, "id": 55}}
+        result = PREVIEW.collect(client, event)
+        self.assertEqual(result["status"], "NOT_APPLICABLE")
+        self.assertEqual(result["reason"], "PREVIEW_STEP_NOT_RUN")
+        client.job_logs.assert_not_called()
+
+    def test_framework_self_host_does_not_require_product_pack(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            (root / ".adwf").mkdir()
+            (root / ".adwf/config.json").write_text(json.dumps({"project": {"type": "framework", "runtime_product": False}}), encoding="utf-8")
+            self.assertTrue(BOOTSTRAP._framework_self_host(root))
+            (root / ".adwf/config.json").write_text(json.dumps({"project": {"type": "service", "runtime_product": True}}), encoding="utf-8")
+            self.assertFalse(BOOTSTRAP._framework_self_host(root))
+
+    def test_control_workflow_does_not_mask_certification_critical_steps(self):
+        text = (ROOT / ".github/workflows/adwf-control.yml").read_text(encoding="utf-8")
+        critical = text.split("- name: Publish trusted exact-HEAD and governance gates", 1)[1].split("- name: Convert failed CI provider event into durable result", 1)[0]
+        self.assertNotIn("continue-on-error: true", critical)
 
 
 if __name__ == "__main__":
