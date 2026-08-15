@@ -3,8 +3,8 @@
   "version": "1.6.0",
   "schema_version": 3,
   "scope": "FRAMEWORK_OWNED_TRUST_BOUNDARY",
-  "file_count_excluding_manifests": 344,
-  "total_bytes_excluding_manifests": 1399289,
+  "file_count_excluding_manifests": 349,
+  "total_bytes_excluding_manifests": 1423068,
   "files": [
     ".adwf/SETUP_CHECKLIST.md",
     ".adwf/actions-lock.json",
@@ -247,6 +247,7 @@
     ".adwf/tests/test_knowledge_contracts.py",
     ".adwf/tests/test_label_sync.py",
     ".adwf/tests/test_leases.py",
+    ".adwf/tests/test_local_git_mirror_skill.py",
     ".adwf/tests/test_manifest_ordering.py",
     ".adwf/tests/test_metrics.py",
     ".adwf/tests/test_migration.py",
@@ -349,6 +350,10 @@
     "docs/templates/STATUS_REPORT_TEMPLATE.md",
     "examples/reference-app/README.md",
     "examples/reference-app/index.html",
-    "labels.json"
+    "labels.json",
+    "skills/adwf-local-git-mirror/SKILL.md",
+    "skills/adwf-local-git-mirror/resources/bootstrap-workflow-fallback.yml.template",
+    "skills/adwf-local-git-mirror/resources/bootstrap-workflow.yml.template",
+    "skills/adwf-local-git-mirror/scripts/materialize_bundle.py"
   ]
 }
