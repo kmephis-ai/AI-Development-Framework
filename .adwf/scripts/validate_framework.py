@@ -49,6 +49,7 @@ def main() -> int:
         ".adwf/lib/skill_layer.py", ".adwf/scripts/validate_skills.py", ".adwf/scripts/generate_skill_registry.py", ".adwf/scripts/eval_skills.py", ".adwf/scripts/vendor_skill.py",
         ".adwf/lib/ai_work_contracts.py", ".adwf/schemas/ai-work-package.schema.json", ".adwf/schemas/ai-work-result.schema.json",
         ".adwf/lib/decision_traceability.py", ".adwf/schemas/decision-requirement-traceability.schema.json", ".adwf/decision-requirement-traceability.json", ".adwf/scripts/validate_traceability.py",
+        ".adwf/lib/managed_surface.py", ".adwf/managed-surface-policy.json", ".adwf/schemas/managed-surface-policy.schema.json", ".adwf/schemas/managed-surface-snapshot.schema.json", ".adwf/schemas/managed-surface-plan.schema.json", ".adwf/scripts/validate_managed_surface.py",
         ".adwf/schemas/skill.schema.json", ".adwf/schemas/skill-eval.schema.json", ".adwf/schemas/skill-registry.schema.json", ".adwf/schemas/skill-legacy-allowlist.schema.json", ".adwf/skill-legacy-allowlist.json",
         ".github/workflows/adwf-pr.yml", ".github/workflows/adwf-main.yml",
         ".github/workflows/adwf-control.yml", ".github/workflows/adwf-platform-smoke.yml", ".gitlab-ci.yml",
@@ -65,6 +66,7 @@ def main() -> int:
         (".adwf/roadmap.json", ".adwf/schemas/roadmap.schema.json"),
         (".adwf/capability-traceability.json", ".adwf/schemas/capability-traceability.schema.json"),
         (".adwf/decision-requirement-traceability.json", ".adwf/schemas/decision-requirement-traceability.schema.json"),
+        (".adwf/managed-surface-policy.json", ".adwf/schemas/managed-surface-policy.schema.json"),
         (".adwf/skill-legacy-allowlist.json", ".adwf/schemas/skill-legacy-allowlist.schema.json"),
     ]
     for data_name, schema_name in pairs:
@@ -89,7 +91,7 @@ def main() -> int:
     process = subprocess.run([sys.executable, str(ROOT / ".adwf/scripts/validate_ci.py")], cwd=ROOT, capture_output=True, text=True, check=False)
     if process.returncode:
         errors.extend(line for line in process.stdout.splitlines() if line.startswith("- "))
-    for script in ("compile_policy.py", "generate_labels.py", "docs_freshness.py", "validate_docs.py", "validate_pipeline_ir.py", "validate_capabilities.py", "validate_traceability.py", "validate_skills.py"):
+    for script in ("compile_policy.py", "generate_labels.py", "docs_freshness.py", "validate_docs.py", "validate_pipeline_ir.py", "validate_capabilities.py", "validate_traceability.py", "validate_managed_surface.py", "validate_skills.py"):
         process = subprocess.run([sys.executable, str(ROOT / ".adwf/scripts" / script)], cwd=ROOT, capture_output=True, text=True, check=False)
         if process.returncode:
             errors.append(f"GENERATED_OR_FRESHNESS_CHECK_FAILED:{script}")

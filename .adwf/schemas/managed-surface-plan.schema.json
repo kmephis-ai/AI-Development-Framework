@@ -1,0 +1,36 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "ADWF Managed Surface Plan v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["$schema", "schema_version", "kind", "status", "source_revision", "source_manifest_sha256", "entries", "blockers", "write_performed"],
+  "properties": {
+    "$schema": {"const": ".adwf/schemas/managed-surface-plan.schema.json"},
+    "schema_version": {"const": 1},
+    "kind": {"enum": ["ADOPTION", "DETACH"]},
+    "status": {"enum": ["READY", "BLOCK"]},
+    "source_revision": {"type": "string", "pattern": "^[0-9a-f]{40}$"},
+    "source_manifest_sha256": {"type": "string", "format": "sha256"},
+    "entries": {
+      "type": "array",
+      "uniqueItems": true,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["path", "ownership", "target_state", "target_sha256", "action"],
+        "properties": {
+          "path": {"type": "string", "minLength": 1},
+          "ownership": {"enum": ["FRAMEWORK_PRIVATE", "SHARED_GUARDED", "CONSUMER_OWNED"]},
+          "source_sha256": {"type": "string", "format": "sha256"},
+          "installed_sha256": {"type": "string", "format": "sha256"},
+          "managed_by_adwf": {"type": "boolean"},
+          "target_state": {"enum": ["ABSENT", "EXACT", "COLLISION", "SYMLINK", "NON_FILE"]},
+          "target_sha256": {"type": ["string", "null"], "format": "sha256"},
+          "action": {"enum": ["CREATE_PLANNED", "KEEP_EXACT", "BLOCK", "PRESERVE_PREEXISTING", "PRESERVE_SHARED", "PRESERVE_CONSUMER", "ALREADY_ABSENT", "REMOVE_ELIGIBLE", "PRESERVE_BLOCK"]}
+        }
+      }
+    },
+    "blockers": {"type": "array", "uniqueItems": true, "items": {"type": "string", "minLength": 1}},
+    "write_performed": {"const": false}
+  }
+}

@@ -1,0 +1,32 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "ADWF Managed Surface Policy v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "$schema",
+    "schema_version",
+    "role",
+    "source_inventory",
+    "source_checksums",
+    "default_manifest_ownership",
+    "default_unlisted_ownership",
+    "shared_guarded_paths",
+    "snapshot_schema",
+    "plan_schema",
+    "invariants"
+  ],
+  "properties": {
+    "$schema": {"const": ".adwf/schemas/managed-surface-policy.schema.json"},
+    "schema_version": {"const": 1},
+    "role": {"const": "MANAGED_SURFACE_POLICY"},
+    "source_inventory": {"const": "MANIFEST.json"},
+    "source_checksums": {"const": "SHA256SUMS.txt"},
+    "default_manifest_ownership": {"const": "FRAMEWORK_PRIVATE"},
+    "default_unlisted_ownership": {"const": "CONSUMER_OWNED"},
+    "shared_guarded_paths": {"type": "array", "uniqueItems": true, "items": {"type": "string", "minLength": 1}},
+    "snapshot_schema": {"const": ".adwf/schemas/managed-surface-snapshot.schema.json"},
+    "plan_schema": {"const": ".adwf/schemas/managed-surface-plan.schema.json"},
+    "invariants": {"type": "array", "minItems": 4, "uniqueItems": true, "items": {"type": "string", "minLength": 3}}
+  }
+}
