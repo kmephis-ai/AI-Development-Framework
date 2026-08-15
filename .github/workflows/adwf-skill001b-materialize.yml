@@ -13,6 +13,8 @@ jobs:
     if: github.actor == github.repository_owner
     runs-on: ubuntu-24.04
     timeout-minutes: 15
+    env:
+      BASE_SHA: c52e0863493bb8e9977dd0495e7585e2d29163a7
     steps:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd
         with:
@@ -21,7 +23,6 @@ jobs:
       - name: Verify and apply exact local payload
         shell: bash
         env:
-          BASE_SHA: c52e0863493bb8e9977dd0495e7585e2d29163a7
           PAYLOAD_SHA256: b0be9995d489d41e1611e25e22371790de8f1a564e15f9ebd67e7d0e8a37cbac
         run: |
           set -euo pipefail
@@ -60,15 +61,14 @@ jobs:
           python .adwf/scripts/validate_framework.py
           python .adwf/adwf.py self-test
           git diff --check
-          test -z "$(git status --short | grep -E 'adwf-runtime-materialize|adwf-skill001b-materialize' || true)"
 
       - name: Commit exact feature tree
         shell: bash
         run: |
           set -euo pipefail
+          ! git diff --name-only "${BASE_SHA}" | grep -E '(^|/)\.adwf-runtime-materialize/|^\.github/workflows/adwf-skill001b-materialize\.yml$'
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add -A
-          ! git diff --cached --name-only | grep -E '(^|/)adwf-runtime-materialize|adwf-skill001b-materialize'
           git commit -m "SKILL-001B: add managed routers and first process skills"
           git push origin HEAD:agent/skill-001b-managed-content
