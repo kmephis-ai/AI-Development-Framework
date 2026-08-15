@@ -1,0 +1,22 @@
+{
+  "schema_version": 1,
+  "skill_id": "adwf-develop",
+  "kind": "trigger-negative",
+  "cases": [
+    {
+      "id": "release-only",
+      "input": "release only: подготовить выпуск без разработки",
+      "expected_trigger": false
+    },
+    {
+      "id": "generic-mail",
+      "input": "составь письмо поставщику",
+      "expected_trigger": false
+    },
+    {
+      "id": "weather",
+      "input": "какая погода завтра",
+      "expected_trigger": false
+    }
+  ]
+}

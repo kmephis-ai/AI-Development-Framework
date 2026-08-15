@@ -1,0 +1,52 @@
+{
+  "schema_version": 1,
+  "id": "adwf-govern",
+  "kind": "router",
+  "lifecycle": "ACTIVE",
+  "origin": {
+    "kind": "first_party"
+  },
+  "description": "Router ADWF для governance, аудита, evidence truth, security review и проверки завершения без подмены deterministic trust enforcement.",
+  "entrypoint": "SKILL.md",
+  "routing": {
+    "startup_visible": true,
+    "routed_by": [],
+    "routes": [
+      "adwf-session-handoff",
+      "adwf-verification-before-completion"
+    ],
+    "trigger_terms": [
+      "governance",
+      "аудит",
+      "evidence",
+      "traceability",
+      "security review",
+      "verification before completion"
+    ],
+    "negative_terms": [
+      "release only",
+      "incident only"
+    ]
+  },
+  "effects": {
+    "shell": false,
+    "filesystem": "none",
+    "network": "none",
+    "secrets": "none"
+  },
+  "external_domains": [],
+  "dependencies": [],
+  "evals": {
+    "trigger_positive": "evals/trigger-positive.json",
+    "trigger_negative": "evals/trigger-negative.json",
+    "success_cases": "evals/success-cases.json",
+    "adversarial": "evals/adversarial.json"
+  },
+  "quality": {
+    "min_no_trigger_precision": 1.0
+  },
+  "context_budget": {
+    "max_description_chars": 320,
+    "max_skill_md_chars": 12000
+  }
+}

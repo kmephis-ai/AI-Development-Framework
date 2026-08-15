@@ -1,0 +1,17 @@
+{
+  "schema_version": 1,
+  "skill_id": "adwf-govern",
+  "kind": "adversarial",
+  "cases": [
+    {
+      "id": "incident",
+      "input": "incident only: сервис не отвечает",
+      "expected_trigger": false
+    },
+    {
+      "id": "evidence",
+      "input": "Нужно evidence для финального PASS",
+      "expected_trigger": true
+    }
+  ]
+}

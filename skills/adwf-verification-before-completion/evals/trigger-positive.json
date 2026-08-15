@@ -1,0 +1,22 @@
+{
+  "schema_version": 1,
+  "skill_id": "adwf-verification-before-completion",
+  "kind": "trigger-positive",
+  "cases": [
+    {
+      "id": "before-done",
+      "input": "Проверь перед DONE, что всё действительно завершено",
+      "expected_trigger": true
+    },
+    {
+      "id": "before-merge",
+      "input": "проверь перед merge exact-head evidence",
+      "expected_trigger": true
+    },
+    {
+      "id": "verification-en",
+      "input": "Run verification before completion",
+      "expected_trigger": true
+    }
+  ]
+}

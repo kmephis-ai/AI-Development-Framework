@@ -1,0 +1,137 @@
+{
+  "schema_version": 1,
+  "generated": true,
+  "startup_routers": [
+    "adwf-develop",
+    "adwf-govern",
+    "adwf-operate"
+  ],
+  "skills": [
+    {
+      "id": "adwf-develop",
+      "kind": "router",
+      "lifecycle": "ACTIVE",
+      "path": "skills/adwf-develop",
+      "entrypoint": "SKILL.md",
+      "descriptor_sha256": "39428377fe210fb2ea959d9825f27c94c32888f0c138acf3314a44becfd90adc",
+      "package_sha256": "f22d8d7db909011253452d48e52c4fd540d32c72c3a51f6656550f24091d6340",
+      "startup_visible": true,
+      "routed_by": [],
+      "routes": [
+        "adwf-local-git-mirror",
+        "adwf-session-bootstrap",
+        "adwf-session-handoff",
+        "adwf-verification-before-completion"
+      ],
+      "security_status": "PASS",
+      "eval_status": "PASS",
+      "no_trigger_precision": 1.0
+    },
+    {
+      "id": "adwf-govern",
+      "kind": "router",
+      "lifecycle": "ACTIVE",
+      "path": "skills/adwf-govern",
+      "entrypoint": "SKILL.md",
+      "descriptor_sha256": "7ddeadba2e9a6dd16a5e250b6a262479852ac81c85445b262e8cbef13dc42007",
+      "package_sha256": "03e76b5869f53dfd14f288c5502afc70b0da1e54862e534675c5413684e44492",
+      "startup_visible": true,
+      "routed_by": [],
+      "routes": [
+        "adwf-session-handoff",
+        "adwf-verification-before-completion"
+      ],
+      "security_status": "PASS",
+      "eval_status": "PASS",
+      "no_trigger_precision": 1.0
+    },
+    {
+      "id": "adwf-local-git-mirror",
+      "kind": "leaf",
+      "lifecycle": "ACTIVE",
+      "path": "skills/adwf-local-git-mirror",
+      "entrypoint": "SKILL.md",
+      "descriptor_sha256": "20f299aa1d3901055731edefa66fa02cd63aa13a49988f7924f46c000f791ce3",
+      "package_sha256": "87b2a4f06c3ef1ca443d6764b68e937228721b77cfdf591a6586309f2f942e86",
+      "startup_visible": false,
+      "routed_by": [
+        "adwf-develop",
+        "adwf-operate"
+      ],
+      "routes": [],
+      "security_status": "PASS",
+      "eval_status": "PASS",
+      "no_trigger_precision": 1.0
+    },
+    {
+      "id": "adwf-operate",
+      "kind": "router",
+      "lifecycle": "ACTIVE",
+      "path": "skills/adwf-operate",
+      "entrypoint": "SKILL.md",
+      "descriptor_sha256": "2a3eaf1bbf0550b41a3a65ec7d922f2a5387e4aaf24d04ab53c2fe85694badf6",
+      "package_sha256": "eac6a8187846b990bab0d5db1b9489c85062614c51e2d258b17142de81878cec",
+      "startup_visible": true,
+      "routed_by": [],
+      "routes": [
+        "adwf-local-git-mirror"
+      ],
+      "security_status": "PASS",
+      "eval_status": "PASS",
+      "no_trigger_precision": 1.0
+    },
+    {
+      "id": "adwf-session-bootstrap",
+      "kind": "leaf",
+      "lifecycle": "ACTIVE",
+      "path": "skills/adwf-session-bootstrap",
+      "entrypoint": "SKILL.md",
+      "descriptor_sha256": "3e346a9e8b234dbe2bfba15d7568b7040a7325647dd93cf6de59e2b80de25b85",
+      "package_sha256": "98ddf43ecf4f2620804106292034e5349b8d22d3a50f3cbdcd39859ba8752e8e",
+      "startup_visible": false,
+      "routed_by": [
+        "adwf-develop"
+      ],
+      "routes": [],
+      "security_status": "PASS",
+      "eval_status": "PASS",
+      "no_trigger_precision": 1.0
+    },
+    {
+      "id": "adwf-session-handoff",
+      "kind": "leaf",
+      "lifecycle": "ACTIVE",
+      "path": "skills/adwf-session-handoff",
+      "entrypoint": "SKILL.md",
+      "descriptor_sha256": "98ba3f4c11e3292ebac9ef481c19538a3e66fb6f181d9e97bfa8993e03b5ae78",
+      "package_sha256": "113649b71e01c6c974df0a67233b3b0e2ae7a85867ed4e6213797a5ff9d3470c",
+      "startup_visible": false,
+      "routed_by": [
+        "adwf-develop",
+        "adwf-govern"
+      ],
+      "routes": [],
+      "security_status": "PASS",
+      "eval_status": "PASS",
+      "no_trigger_precision": 1.0
+    },
+    {
+      "id": "adwf-verification-before-completion",
+      "kind": "leaf",
+      "lifecycle": "ACTIVE",
+      "path": "skills/adwf-verification-before-completion",
+      "entrypoint": "SKILL.md",
+      "descriptor_sha256": "95b701e042a48d6b04cf98a805cca4366119ce0a85ee46f51e5cde3eba084a16",
+      "package_sha256": "a5d811679545774a6b3acad044c0625c138a63d1c29e1a01db4f7f46da7d8adb",
+      "startup_visible": false,
+      "routed_by": [
+        "adwf-develop",
+        "adwf-govern"
+      ],
+      "routes": [],
+      "security_status": "PASS",
+      "eval_status": "PASS",
+      "no_trigger_precision": 1.0
+    }
+  ]
+}

@@ -1,0 +1,21 @@
+{
+  "schema_version": 1,
+  "skill_id": "adwf-local-git-mirror",
+  "kind": "success-cases",
+  "cases": [
+    {
+      "id": "exact-sha",
+      "required_phrases": [
+        "exact source SHA",
+        "git bundle verify",
+        "git fsck"
+      ]
+    },
+    {
+      "id": "no-secrets",
+      "required_phrases": [
+        "Never put PATs, OAuth tokens, connector credentials, or secrets"
+      ]
+    }
+  ]
+}

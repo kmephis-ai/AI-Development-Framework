@@ -1,0 +1,22 @@
+{
+  "schema_version": 1,
+  "skill_id": "adwf-govern",
+  "kind": "trigger-negative",
+  "cases": [
+    {
+      "id": "release",
+      "input": "release only: опубликовать версию",
+      "expected_trigger": false
+    },
+    {
+      "id": "recipe",
+      "input": "дай рецепт ужина",
+      "expected_trigger": false
+    },
+    {
+      "id": "coding",
+      "input": "реализуй CSS компонент",
+      "expected_trigger": false
+    }
+  ]
+}

@@ -1,0 +1,22 @@
+{
+  "schema_version": 1,
+  "skill_id": "adwf-session-bootstrap",
+  "kind": "trigger-negative",
+  "cases": [
+    {
+      "id": "explain",
+      "input": "просто объясни что такое GitHub",
+      "expected_trigger": false
+    },
+    {
+      "id": "offline",
+      "input": "без доступа к проекту придумай пример",
+      "expected_trigger": false
+    },
+    {
+      "id": "shopping",
+      "input": "подбери холодильник",
+      "expected_trigger": false
+    }
+  ]
+}

@@ -1,0 +1,49 @@
+{
+  "schema_version": 1,
+  "id": "adwf-session-bootstrap",
+  "kind": "leaf",
+  "lifecycle": "ACTIVE",
+  "origin": {
+    "kind": "first_party"
+  },
+  "description": "Восстанавливает новую AI-сессию из live provider truth, exact SHA, активных writer-транзакций и durable handoff facts без доверия к старому chat state.",
+  "entrypoint": "SKILL.md",
+  "routing": {
+    "startup_visible": false,
+    "routed_by": [
+      "adwf-develop"
+    ],
+    "routes": [],
+    "trigger_terms": [
+      "новая сессия",
+      "session bootstrap",
+      "восстановить состояние проекта",
+      "продолжить с текущего github"
+    ],
+    "negative_terms": [
+      "просто объясни",
+      "без доступа к проекту"
+    ]
+  },
+  "effects": {
+    "shell": false,
+    "filesystem": "none",
+    "network": "none",
+    "secrets": "none"
+  },
+  "external_domains": [],
+  "dependencies": [],
+  "evals": {
+    "trigger_positive": "evals/trigger-positive.json",
+    "trigger_negative": "evals/trigger-negative.json",
+    "success_cases": "evals/success-cases.json",
+    "adversarial": "evals/adversarial.json"
+  },
+  "quality": {
+    "min_no_trigger_precision": 1.0
+  },
+  "context_budget": {
+    "max_description_chars": 320,
+    "max_skill_md_chars": 12000
+  }
+}

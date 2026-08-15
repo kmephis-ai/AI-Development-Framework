@@ -1,0 +1,50 @@
+{
+  "schema_version": 1,
+  "id": "adwf-session-handoff",
+  "kind": "leaf",
+  "lifecycle": "ACTIVE",
+  "origin": {
+    "kind": "first_party"
+  },
+  "description": "Создаёт durable handoff между AI-сессиями: только проверяемые факты, exact refs, evidence, blockers и next action без secrets и hidden reasoning.",
+  "entrypoint": "SKILL.md",
+  "routing": {
+    "startup_visible": false,
+    "routed_by": [
+      "adwf-develop",
+      "adwf-govern"
+    ],
+    "routes": [],
+    "trigger_terms": [
+      "handoff",
+      "передать сессию",
+      "сводк",
+      "durable handoff"
+    ],
+    "negative_terms": [
+      "полный chain of thought",
+      "секреты и токены"
+    ]
+  },
+  "effects": {
+    "shell": false,
+    "filesystem": "none",
+    "network": "none",
+    "secrets": "none"
+  },
+  "external_domains": [],
+  "dependencies": [],
+  "evals": {
+    "trigger_positive": "evals/trigger-positive.json",
+    "trigger_negative": "evals/trigger-negative.json",
+    "success_cases": "evals/success-cases.json",
+    "adversarial": "evals/adversarial.json"
+  },
+  "quality": {
+    "min_no_trigger_precision": 1.0
+  },
+  "context_budget": {
+    "max_description_chars": 320,
+    "max_skill_md_chars": 12000
+  }
+}

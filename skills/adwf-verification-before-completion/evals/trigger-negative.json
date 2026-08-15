@@ -1,0 +1,22 @@
+{
+  "schema_version": 1,
+  "skill_id": "adwf-verification-before-completion",
+  "kind": "trigger-negative",
+  "cases": [
+    {
+      "id": "skip",
+      "input": "без проверки просто закрывай задачу",
+      "expected_trigger": false
+    },
+    {
+      "id": "claim",
+      "input": "просто объяви готово без evidence",
+      "expected_trigger": false
+    },
+    {
+      "id": "unrelated",
+      "input": "объясни принцип SemVer",
+      "expected_trigger": false
+    }
+  ]
+}

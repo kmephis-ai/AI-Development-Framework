@@ -1,0 +1,22 @@
+{
+  "schema_version": 1,
+  "skill_id": "adwf-local-git-mirror",
+  "kind": "trigger-negative",
+  "cases": [
+    {
+      "id": "direct-works",
+      "input": "git работает напрямую, используй обычный clone",
+      "expected_trigger": false
+    },
+    {
+      "id": "no-github",
+      "input": "не использовать github для этой локальной папки",
+      "expected_trigger": false
+    },
+    {
+      "id": "generic-git",
+      "input": "что такое git branch",
+      "expected_trigger": false
+    }
+  ]
+}

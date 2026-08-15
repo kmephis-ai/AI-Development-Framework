@@ -1,0 +1,22 @@
+{
+  "schema_version": 1,
+  "skill_id": "adwf-operate",
+  "kind": "trigger-positive",
+  "cases": [
+    {
+      "id": "release",
+      "input": "Подготовь release по каноническому процессу",
+      "expected_trigger": true
+    },
+    {
+      "id": "incident",
+      "input": "incident: runtime перестал отвечать",
+      "expected_trigger": true
+    },
+    {
+      "id": "rollback",
+      "input": "Нужен rollback неудачного обновления",
+      "expected_trigger": true
+    }
+  ]
+}

@@ -1,0 +1,15 @@
+{
+  "schema_version": 1,
+  "skill_id": "adwf-operate",
+  "kind": "success-cases",
+  "cases": [
+    {
+      "id": "operate-boundary",
+      "required_phrases": [
+        "FREE_ONLY",
+        "core ADWF procedures",
+        "deterministic policy"
+      ]
+    }
+  ]
+}

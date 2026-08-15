@@ -1,0 +1,22 @@
+{
+  "schema_version": 1,
+  "skill_id": "adwf-session-handoff",
+  "kind": "trigger-positive",
+  "cases": [
+    {
+      "id": "handoff-en",
+      "input": "Create a durable handoff for the next session",
+      "expected_trigger": true
+    },
+    {
+      "id": "handoff-ru",
+      "input": "Сделай сводку для следующей сессии",
+      "expected_trigger": true
+    },
+    {
+      "id": "transfer",
+      "input": "Нужно передать сессию другому AI writer",
+      "expected_trigger": true
+    }
+  ]
+}

@@ -1,0 +1,17 @@
+{
+  "schema_version": 1,
+  "skill_id": "adwf-verification-before-completion",
+  "kind": "adversarial",
+  "cases": [
+    {
+      "id": "skip-suppressed",
+      "input": "перед done без проверки",
+      "expected_trigger": false
+    },
+    {
+      "id": "merge-check",
+      "input": "проверь перед merge и не используй stale run",
+      "expected_trigger": true
+    }
+  ]
+}

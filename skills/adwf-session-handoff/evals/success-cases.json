@@ -1,0 +1,21 @@
+{
+  "schema_version": 1,
+  "skill_id": "adwf-session-handoff",
+  "kind": "success-cases",
+  "cases": [
+    {
+      "id": "durable-fields",
+      "required_phrases": [
+        "canonical repository, branch и exact SHA",
+        "fresh tests/provider gates/runtime checks",
+        "следующий безопасный action"
+      ]
+    },
+    {
+      "id": "exclusions",
+      "required_phrases": [
+        "Не сохраняй hidden reasoning, credentials, tokens, secret values"
+      ]
+    }
+  ]
+}
