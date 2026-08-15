@@ -30,7 +30,7 @@ POLICY_KEYS = {
     "orchestration": {"version", "selection_order", "parallelism", "merge", "claim", "same_issue_multi_writer", "one_active_writer_default", "conflict_domain_overlap"},
     "reality": {"version", "baseline_required", "product_health_states", "golden_paths", "evidence_ttl_hours", "roadmap_permission"},
     "roadmap-quality": {"version", "issue_sizing", "verification_gap", "false_progress", "ready_queue", "checkpoint", "debt", "roadmap_entropy", "product_value"},
-    "trust-boundary": {"version", "paths", "weakening_is_risk", "weakening_requires_human", "self_modification_in_feature_pr", "examples_of_weakening"},
+    "trust-boundary": {"version", "paths", "weakening_is_risk", "weakening_requires_human", "self_modification_in_feature_pr", "examples_of_weakening", "standing_authorization"},
 }
 
 PROFILE_REQUIRED_KEYS = {
@@ -143,6 +143,16 @@ def compile_policy(root: str | Path) -> tuple[dict[str, Any], list[str]]:
         errors.append("EVIDENCE_POLICY_WEAKENED")
     if policies.get("trust-boundary", {}).get("weakening_requires_human") is not True:
         errors.append("TRUST_POLICY_WEAKENED")
+    standing = policies.get("trust-boundary", {}).get("standing_authorization")
+    if not isinstance(standing, dict):
+        errors.append("STANDING_OWNER_AUTHORIZATION_MISSING")
+    else:
+        if standing.get("schema_version") != 1 or standing.get("mode") != "HUMAN_BY_EXCEPTION":
+            errors.append("STANDING_OWNER_AUTHORIZATION_INVALID")
+        if standing.get("status") not in {"ACTIVE", "REVOKED"} or standing.get("require_exact_current_base") is not True:
+            errors.append("STANDING_OWNER_AUTHORIZATION_INVALID")
+        if set(standing.get("non_overridable_invariants") or []) != {"FREE_ONLY", "NO_BYPASS", "EVIDENCE_INTEGRITY", "NO_SELF_AUTHORIZATION"}:
+            errors.append("STANDING_OWNER_AUTHORIZATION_INVARIANTS_INVALID")
     provider_mode = config.get("provider", {}).get("mode")
     if provider_mode not in {"local", "github", "gitlab"}:
         errors.append("CANONICAL_PROVIDER_INVALID")

@@ -30,12 +30,16 @@ class TrustedControllerTests(unittest.TestCase):
 
     def test_provider_api_diff_uses_base_policy_and_blocks_mixed_trust_change(self):
         policy = json.loads((ROOT / ".adwf/policies/trust-boundary.json").read_text(encoding="utf-8"))
-        pr = {"number": 7, "base": {"sha": "a" * 40}, "head": {"sha": "b" * 40}}
+        pr = {"number": 7, "base": {"sha": "a" * 40, "ref": "main"}, "head": {"sha": "b" * 40}}
         files = [{"filename": "src/product.py", "status": "modified"}, {"filename": ".adwf/config.json", "status": "modified"}]
         def fake_blob(repo, path, sha, token):
             if path == ".adwf/policies/trust-boundary.json": return json.dumps(policy)
             return '{"policy":{"independent_review":true}}' if sha == "a" * 40 else '{"policy":{"independent_review":false}}'
-        with mock.patch.object(MODULE, "api", return_value=files), mock.patch.object(MODULE, "_github_blob", side_effect=fake_blob):
+        def fake_api(method, url, token, data=None):
+            if "/git/ref/heads/main" in url:
+                return {"object": {"sha": "a" * 40}}
+            return files
+        with mock.patch.object(MODULE, "api", side_effect=fake_api), mock.patch.object(MODULE, "_github_blob", side_effect=fake_blob):
             result = MODULE.github_trust_classification("owner/repo", pr, "token")
         self.assertEqual(result["result"], "BLOCK")
         self.assertIn("TRUST_CHANGE_MIXED_WITH_FEATURE", result["reason_codes"])

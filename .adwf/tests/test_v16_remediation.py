@@ -22,11 +22,17 @@ from unittest import mock
 from lib.runtime_supervisor import RuntimeSupervisor
 
 class GateClient:
-    def __init__(self,files,approved=False):self.files=files;self.approved=approved;self.repo='o/r'
+    def __init__(self,files,approved=False):
+        self.files=files;self.approved=approved;self.repo='o/r'
+        self.policy=json.loads((ROOT/'.adwf/policies/trust-boundary.json').read_text(encoding='utf-8'))
     def get(self,path):return {'id':1,'head_sha':'a'*40,'name':'ADWF PR','event':'pull_request','status':'completed','conclusion':'success','pull_requests':[{'number':7}]}
     def check_runs(self,sha):return [{'name':'fast-feedback','head_sha':sha,'status':'completed','conclusion':'success','app':{'slug':'github-actions','id':123}}]
-    def pull(self,n):return {'number':n,'head':{'sha':'a'*40},'user':{'login':'author'}}
-    def pull_files(self,n):return [{'filename':x} for x in self.files]
+    def pull(self,n):return {'number':n,'base':{'sha':'b'*40,'ref':'main'},'head':{'sha':'a'*40},'user':{'login':'author'}}
+    def pull_files(self,n):return [{'filename':x,'status':'modified'} for x in self.files]
+    def content(self,path,ref=None):
+        text=json.dumps(self.policy) if path=='.adwf/policies/trust-boundary.json' else 'guard = True\n'
+        return {'type':'file','encoding':'base64','content':base64.b64encode(text.encode()).decode()}
+    def git_ref(self,branch):return {'object':{'sha':'b'*40}}
     def pull_reviews(self,n):return [{'state':'APPROVED','commit_id':'a'*40,'user':{'login':'owner'},'id':2}] if self.approved else []
     def collaborator_permission(self,login):return {'permission':'admin'}
 

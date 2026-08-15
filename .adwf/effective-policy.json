@@ -124,7 +124,7 @@
     },
     {
       "path": ".adwf/policies/trust-boundary.json",
-      "sha256": "5193ad3ff5d49f659d88f2120d97606dd65639f1cae704bab12255786f5e97da"
+      "sha256": "15c7bb8d80b8e454dfadaff2b30bdbc533d76fb7ac6962aee454b3e32840f6dc"
     },
     {
       "path": ".adwf/profiles/FREE_PUBLIC_GITHUB.json",
@@ -143,5 +143,5 @@
       "sha256": "137240ac3c78b754440d653847fd9e6105ced88a51c1dbed704b005b43896e45"
     }
   ],
-  "policy_hash": "a56fea0bebd1b1a55150b30fc8e82b6836fe6cb5da5395309f5ac3c8dc0dbcad"
+  "policy_hash": "8fb9e2baa6aae69f9d0e1a813ae6e63359cb3b57bfba9f5f2ecb06b8c2760379"
 }

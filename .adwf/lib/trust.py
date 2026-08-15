@@ -9,6 +9,7 @@ from .strict_json import loads as strict_loads
 from datetime import datetime, timezone
 from pathlib import Path, PurePosixPath
 from typing import Any, Iterable
+import hashlib
 import json
 import re
 import subprocess
@@ -81,6 +82,59 @@ def is_protected_path(path: str, protected_patterns: Iterable[str]) -> bool:
             # all patterns and fails closed before classification.
             continue
     return False
+
+def is_trust_sensitive_path(path: str, protected_patterns: Iterable[str]) -> bool:
+    """Return whether a path needs trusted content inspection."""
+    normalized = normalize_repo_path(path)
+    return normalized in _INTEGRITY_PROJECTIONS or is_protected_path(normalized, protected_patterns)
+
+
+def standing_authorization_policy_metadata(policy: dict[str, Any]) -> dict[str, Any]:
+    """Validate and fingerprint the standing owner authorization from BASE policy.
+
+    Absence is a valid legacy state and intentionally falls back to explicit
+    human authorization.  An invalid present policy is fail-closed.
+    """
+    value = policy.get("standing_authorization")
+    if value is None:
+        return {"present": False, "valid": True, "status": "LEGACY", "digest": None, "revision": None}
+    if not isinstance(value, dict):
+        return {"present": True, "valid": False, "status": "INVALID", "digest": None, "revision": None}
+    required = {
+        "schema_version", "revision", "status", "mode", "issued_by", "scope",
+        "require_exact_current_base", "manual_required_paths",
+        "non_overridable_invariants", "revocation",
+    }
+    allowed = required
+    valid = set(value) == allowed
+    valid = valid and value.get("schema_version") == 1
+    valid = valid and isinstance(value.get("revision"), int) and value.get("revision", 0) >= 1
+    valid = valid and value.get("status") in {"ACTIVE", "REVOKED"}
+    valid = valid and value.get("mode") == "HUMAN_BY_EXCEPTION"
+    valid = valid and value.get("issued_by") == "REPOSITORY_OWNER"
+    valid = valid and value.get("scope") == "PULL_REQUEST_TRUST_CHANGES"
+    valid = valid and value.get("require_exact_current_base") is True
+    manual = value.get("manual_required_paths")
+    valid = valid and isinstance(manual, list) and bool(manual) and len(manual) == len(set(map(str, manual)))
+    if valid:
+        try:
+            for pattern in manual:
+                _glob_regex(str(pattern))
+        except ValueError:
+            valid = False
+    invariants = value.get("non_overridable_invariants")
+    valid = valid and isinstance(invariants, list) and set(invariants) == {
+        "FREE_ONLY", "NO_BYPASS", "EVIDENCE_INTEGRITY", "NO_SELF_AUTHORIZATION"
+    }
+    valid = valid and value.get("revocation") == "HUMAN_GATED_BASE_POLICY_CHANGE"
+    digest = hashlib.sha256(
+        json.dumps(value, ensure_ascii=False, sort_keys=True, separators=(",", ":")).encode("utf-8")
+    ).hexdigest() if valid else None
+    return {
+        "present": True, "valid": bool(valid), "status": value.get("status") if valid else "INVALID",
+        "digest": digest, "revision": value.get("revision") if valid else None,
+        "manual_required_paths": list(manual) if valid else [],
+    }
 
 
 def _walk_changes(old: Any, new: Any, prefix: str = "$") -> list[str]:
@@ -228,12 +282,61 @@ def classify_diff(changed_files: Iterable[Any], policy: dict[str, Any]) -> dict[
     if policy.get("self_modification_in_feature_pr") != "FORBIDDEN":
         reasons.append("BASE_TRUST_POLICY_INVALID")
 
-    if "BASE_TRUST_POLICY_INVALID" in reasons or (authoritative_protected and feature):
+    standing = standing_authorization_policy_metadata(policy)
+    if standing["present"] and not standing["valid"]:
+        reasons.append("BASE_STANDING_AUTHORIZATION_POLICY_INVALID")
+
+    inspection_unverified: list[str] = []
+    protected_records = [record for record in records if record["path"] in protected]
+    for record in protected_records:
+        code = str(record["status"])[0]
+        old_ok = code == "A" or record.get("old_text") is not None
+        new_ok = code == "D" or record.get("new_text") is not None
+        if not (old_ok and new_ok):
+            inspection_unverified.append(record["path"])
+
+    manual_required: list[str] = []
+    if standing.get("valid") and standing.get("present"):
+        manual_patterns = standing.get("manual_required_paths") or []
+        for path in protected:
+            if any(_glob_regex(str(pattern)).fullmatch(path) for pattern in manual_patterns):
+                manual_required.append(path)
+
+    standing_auto = bool(
+        protected
+        and standing.get("valid")
+        and standing.get("status") == "ACTIVE"
+        and not weakening
+        and not manual_required
+        and not inspection_unverified
+        and not (authoritative_protected and feature)
+    )
+    if standing.get("status") == "REVOKED" and protected:
+        reasons.append("STANDING_AUTHORIZATION_REVOKED")
+    if manual_required:
+        reasons.append("STANDING_POLICY_RESERVED_SURFACE")
+    if inspection_unverified:
+        reasons.append("PROTECTED_CONTENT_NOT_VERIFIED")
+
+    if (
+        "BASE_TRUST_POLICY_INVALID" in reasons
+        or "BASE_STANDING_AUTHORIZATION_POLICY_INVALID" in reasons
+        or (authoritative_protected and feature)
+    ):
         result = "BLOCK"
+    elif protected and standing_auto:
+        result = "ALLOW"
     elif protected:
         result = "HUMAN_REQUIRED"
     else:
         result = "ALLOW"
+
+    if result == "HUMAN_REQUIRED":
+        authorization_mode = "EXPLICIT_HUMAN_REQUIRED"
+    elif standing_auto:
+        authorization_mode = "STANDING_OWNER_POLICY"
+    else:
+        authorization_mode = "NORMAL"
     return {
         "result": result,
         "reason_codes": list(dict.fromkeys(reasons)),
@@ -243,9 +346,19 @@ def classify_diff(changed_files: Iterable[Any], policy: dict[str, Any]) -> dict[
         "authoritative_protected_files": sorted(set(authoritative_protected)),
         "feature_files": sorted(set(feature)),
         "weakening": weakening,
-        "required_risk": "R4" if protected else None,
-        "required_work_type": "GOV" if protected else None,
-        "human_required": bool(protected),
+        "inspection_unverified_files": sorted(set(inspection_unverified)),
+        "manual_required_files": sorted(set(manual_required)),
+        "required_risk": "R4" if result == "HUMAN_REQUIRED" else None,
+        "required_work_type": "GOV" if result == "HUMAN_REQUIRED" else None,
+        "human_required": result == "HUMAN_REQUIRED",
+        "authorization_mode": authorization_mode,
+        "standing_policy": {
+            "present": standing.get("present"),
+            "valid": standing.get("valid"),
+            "status": standing.get("status"),
+            "revision": standing.get("revision"),
+            "digest": standing.get("digest"),
+        },
     }
 
 
@@ -319,7 +432,7 @@ def git_diff_records(
         normalized = normalize_repo_path(path)
         old_normalized = normalize_repo_path(old_path) if old_path else normalized
         inspect_content = protected_patterns is None or any(
-            is_protected_path(candidate, protected_patterns)
+            is_trust_sensitive_path(candidate, protected_patterns)
             for candidate in (normalized, old_normalized)
         )
         old_text = None

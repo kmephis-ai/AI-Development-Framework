@@ -41,7 +41,6 @@ ROADMAP_LABELS = {
 }
 TARGET_STATE = {"roadmap:review": "REVIEW", "roadmap:verification": "VERIFICATION", "recovery:active": "RECOVERY"}
 SHA = re.compile(r"^[0-9a-f]{40}$")
-HUMAN_GATE_TEXT = "Trust change вынесен в отдельный GOV PR, классифицирован R4 и human-gated"
 
 
 def _github_headers(token: str, *, etag: str | None = None) -> dict[str, str]:
@@ -160,7 +159,22 @@ def github_trust_classification(repo: str, pr: dict, token: str) -> dict:
             "new_text": new_text,
         })
     result = classify_diff(records, policy)
-    result.update({"base_sha": base_sha, "head_sha": head_sha, "source": "GITHUB_PROVIDER_API"})
+    base_ref = str((pr.get("base") or {}).get("ref") or "")
+    if not base_ref:
+        raise ValueError("PR_BASE_REF_INVALID")
+    ref = api("GET", f"https://api.github.com/repos/{repo}/git/ref/heads/{urllib.parse.quote(base_ref, safe='')}", token)
+    current_base_sha = _exact_sha((ref.get("object") or {}).get("sha"), "CURRENT_BASE_SHA_INVALID")
+    base_current = current_base_sha == base_sha
+    if result.get("authorization_mode") == "STANDING_OWNER_POLICY" and not base_current:
+        result["result"] = "BLOCK"
+        result["human_required"] = False
+        result["authorization_mode"] = "NORMAL"
+        result["reason_codes"] = list(dict.fromkeys([*result.get("reason_codes", []), "TRUST_POLICY_BASE_DRIFT"]))
+    result.update({
+        "base_sha": base_sha, "head_sha": head_sha, "base_ref": base_ref,
+        "current_base_sha": current_base_sha, "base_current": base_current,
+        "source": "GITHUB_PROVIDER_API",
+    })
     return result
 
 
@@ -321,9 +335,8 @@ def main() -> int:
     trust_config = _trusted_reviews_config(config)
     reviews_cache: list[dict] | None = None
     if trust_classification.get("human_required"):
-        body = pr.get("body") if isinstance(pr.get("body"), str) else ""
-        if contract.get("risk") != "R4" or not str(contract.get("roadmap_id", "")).startswith("GOV-") or HUMAN_GATE_TEXT not in body:
-            raise SystemExit("TRUST_CHANGE_REQUIRES_R4_GOV_HUMAN_GATE")
+        if contract.get("risk") != "R4" or not str(contract.get("roadmap_id", "")).startswith("GOV-"):
+            raise SystemExit("TRUST_CHANGE_REQUIRES_R4_GOV")
         reviews_cache = api("GET", f"https://api.github.com/repos/{repo}/pulls/{number}/reviews?per_page=100", token)
         if not isinstance(reviews_cache, list) or len(reviews_cache) >= 100:
             raise SystemExit("TRUST_REVIEW_SET_INCONCLUSIVE")
