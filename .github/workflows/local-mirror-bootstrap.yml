@@ -1,0 +1,62 @@
+name: Local Mirror Bootstrap
+
+on:
+  push:
+    branches:
+      - agent/local-mirror-bootstrap-20260815
+    paths-ignore:
+      - "mirror/**"
+
+permissions:
+  contents: write
+
+jobs:
+  build-bundle:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd
+        with:
+          fetch-depth: 0
+
+      - name: Build transport bundle
+        shell: bash
+        run: |
+          set -euo pipefail
+          rm -rf mirror
+          mkdir -p mirror/chunks
+
+          git bundle create /tmp/repository.bundle --all
+          git bundle verify /tmp/repository.bundle > mirror/bundle-verify.txt 2>&1
+
+          BUNDLE_SHA256="$(sha256sum /tmp/repository.bundle | awk '{print $1}')"
+          BUNDLE_BYTES="$(wc -c < /tmp/repository.bundle | tr -d ' ')"
+          base64 -w0 /tmp/repository.bundle > /tmp/repository.bundle.b64
+          B64_BYTES="$(wc -c < /tmp/repository.bundle.b64 | tr -d ' ')"
+
+          split -b 45000 -d -a 4 --additional-suffix=.b64part /tmp/repository.bundle.b64 mirror/chunks/part-
+          PARTS="$(find mirror/chunks -type f -name 'part-*.b64part' | wc -l | tr -d ' ')"
+
+          cat > mirror/manifest.json <<EOF
+          {
+            "schema_version": 1,
+            "source_repository": "${GITHUB_REPOSITORY}",
+            "source_ref": "${GITHUB_REF}",
+            "source_sha": "${GITHUB_SHA}",
+            "bundle_sha256": "${BUNDLE_SHA256}",
+            "bundle_bytes": ${BUNDLE_BYTES},
+            "base64_bytes": ${B64_BYTES},
+            "chunk_bytes": 45000,
+            "parts": ${PARTS}
+          }
+          EOF
+
+      - name: Publish transport chunks to bootstrap branch
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add mirror
+          git commit -m "chore: publish local mirror transport [mirror-output]"
+          git push origin HEAD:${GITHUB_REF_NAME}
