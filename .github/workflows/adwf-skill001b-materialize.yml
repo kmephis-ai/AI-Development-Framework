@@ -26,6 +26,9 @@ jobs:
         run: |
           set -euo pipefail
           test "$(git merge-base HEAD "${BASE_SHA}")" = "${BASE_SHA}"
+          sha256sum .adwf-runtime-materialize/skill001b.patch.001 \
+                    .adwf-runtime-materialize/skill001b.patch.002 \
+                    .adwf-runtime-materialize/skill001b.patch.003
           cat .adwf-runtime-materialize/skill001b.patch.001 \
               .adwf-runtime-materialize/skill001b.patch.002 \
               .adwf-runtime-materialize/skill001b.patch.003 > /tmp/skill001b.patch.b64
