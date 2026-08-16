@@ -1,0 +1,57 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "ADWF Project Execution Evidence v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "$schema", "schema_version", "role", "execution_id", "purpose", "head_sha", "tree_sha",
+    "pack_id", "pack_digest", "environment_policy", "environment_names", "secret_like_inherited",
+    "declared_network", "network_enforcement", "data_write_policy", "canonical_source_integrity",
+    "commands", "outcome", "reason_codes", "created_at", "evidence_sha256"
+  ],
+  "properties": {
+    "$schema": {"const": ".adwf/schemas/project-execution-evidence.schema.json"},
+    "schema_version": {"const": 1},
+    "role": {"const": "PROJECT_EXECUTION_EVIDENCE"},
+    "execution_id": {"type": "string", "pattern": "^PEX-[0-9a-f]{32}$"},
+    "purpose": {"type": "string", "minLength": 1, "maxLength": 64},
+    "head_sha": {"type": "string", "pattern": "^[0-9a-f]{40}$"},
+    "tree_sha": {"type": "string", "pattern": "^[0-9a-f]{40}$"},
+    "pack_id": {"type": "string", "minLength": 1, "maxLength": 32},
+    "pack_digest": {"type": "string", "format": "sha256"},
+    "environment_policy": {"const": "PROCESS_MINIMAL"},
+    "environment_names": {
+      "type": "array", "uniqueItems": true, "items": {"type": "string", "minLength": 1, "maxLength": 64}
+    },
+    "secret_like_inherited": {"const": false},
+    "declared_network": {"enum": ["NONE", "LOOPBACK", "PACKAGE_REGISTRY", "PACKAGE_REGISTRY_AND_LOOPBACK"]},
+    "network_enforcement": {"const": "DECLARATION_ONLY_NOT_ENFORCED"},
+    "data_write_policy": {"const": "DISPOSABLE_INDEPENDENT_GIT_CLONE"},
+    "canonical_source_integrity": {"enum": ["PASS", "BLOCK"]},
+    "commands": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "name", "kind", "argv_sha256", "returncode", "safety_status", "reason_codes",
+          "tracked_mutation_count", "untracked_output_count"
+        ],
+        "properties": {
+          "name": {"type": "string", "minLength": 1, "maxLength": 64},
+          "kind": {"enum": ["PACK_COMMAND", "FRAMEWORK_TOOL"]},
+          "argv_sha256": {"type": "string", "format": "sha256"},
+          "returncode": {"type": "integer", "minimum": -2147483648, "maximum": 2147483647},
+          "safety_status": {"enum": ["PASS", "BLOCK"]},
+          "reason_codes": {"type": "array", "uniqueItems": true, "items": {"type": "string", "minLength": 1, "maxLength": 128}},
+          "tracked_mutation_count": {"type": "integer", "minimum": 0},
+          "untracked_output_count": {"type": "integer", "minimum": 0}
+        }
+      }
+    },
+    "outcome": {"enum": ["PASS", "BLOCK"]},
+    "reason_codes": {"type": "array", "uniqueItems": true, "items": {"type": "string", "minLength": 1, "maxLength": 128}},
+    "created_at": {"type": "string", "minLength": 20, "maxLength": 64},
+    "evidence_sha256": {"type": "string", "format": "sha256"}
+  }
+}

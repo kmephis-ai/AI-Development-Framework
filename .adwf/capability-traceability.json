@@ -358,6 +358,28 @@
       ],
       "live_boundary": "LIVE_VERIFIED требует evidence от реального consumer repository: transactional adoption + durable snapshot и последующий guarded detach/recovery outcome с доказательством сохранности shared/pre-existing/consumer-owned data; synthetic/unit/CI tests подтверждают implementation, но не live consumer truth.",
       "live_evidence": []
+    },
+    {
+      "id": "PROJECT_RUNTIME_SAFETY",
+      "status": "LIVE_NOT_VERIFIED",
+      "execution_mode": "CORE",
+      "owner_claim_ru": "Consumer Project Pack commands привязаны к exact validated pack digest, получают минимальное child environment и исполняются в независимом exact-revision Git clone без автоматического переноса записей обратно в canonical project tree.",
+      "entrypoints": [
+        ".adwf/scripts/run_project_gates.py",
+        ".adwf/scripts/run_preview.py"
+      ],
+      "production_paths": [
+        ".adwf/lib/project_execution.py",
+        ".adwf/lib/preview_engine.py",
+        ".adwf/schemas/project-execution-evidence.schema.json"
+      ],
+      "verification": [
+        ".adwf/tests/test_project_execution_safety.py",
+        ".adwf/tests/test_project_pack_sdk.py",
+        ".adwf/tests/test_v15_executive.py"
+      ],
+      "live_boundary": "LIVE_VERIFIED требует real consumer/provider evidence, привязанное к exact pack digest и source revision. Portable v1 доказывает direct env minimization и canonical-tree isolation, но network остаётся DECLARATION_ONLY_NOT_ENFORCED и не выдаётся за OS/domain sandbox.",
+      "live_evidence": []
     }
   ]
 }
