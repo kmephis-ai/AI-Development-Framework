@@ -33,7 +33,12 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          cp .github/lifecycle002.patch.gz.b64 /tmp/lifecycle002.patch.gz.b64
+          cat .github/lifecycle002.patch.part00 \
+              .github/lifecycle002.patch.part01 \
+              .github/lifecycle002.patch.part02 \
+              .github/lifecycle002.patch.part03 \
+              .github/lifecycle002.patch.part04 \
+              .github/lifecycle002.patch.part05 > /tmp/lifecycle002.patch.gz.b64
           REMOTE_MAIN="$(git ls-remote origin refs/heads/main | awk '{print $1}')"
           test "$REMOTE_MAIN" = "$BASE_SHA"
           git checkout --detach "$BASE_SHA"
