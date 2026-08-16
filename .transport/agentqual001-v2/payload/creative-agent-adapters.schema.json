@@ -1,6 +1,5 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://adwf.local/schemas/creative-agent-adapters.schema.json",
   "type": "object",
   "required": [
     "$schema",
@@ -11,12 +10,8 @@
   ],
   "additionalProperties": false,
   "properties": {
-    "$schema": {
-      "const": ".adwf/schemas/creative-agent-adapters.schema.json"
-    },
-    "schema_version": {
-      "const": 1
-    },
+    "$schema": {"const": ".adwf/schemas/creative-agent-adapters.schema.json"},
+    "schema_version": {"const": 1},
     "qualification_profile": {
       "type": "object",
       "required": ["id", "version", "digest"],
@@ -33,22 +28,9 @@
       "items": {
         "type": "object",
         "required": [
-          "id",
-          "version",
-          "kind",
-          "invocation_mode",
-          "supported_phases",
-          "command",
-          "authority",
-          "monetary_budget_usd",
-          "timeout_seconds",
-          "result_channel",
-          "package_schema",
-          "result_schema",
-          "qualification_report",
-          "qualification_profile_id",
-          "qualification_profile_version",
-          "qualification_profile_digest"
+          "id", "version", "kind", "invocation_mode", "supported_phases", "command", "authority",
+          "monetary_budget_usd", "timeout_seconds", "result_channel", "package_schema", "result_schema",
+          "qualification_report", "qualification_profile_id", "qualification_profile_version", "qualification_profile_digest"
         ],
         "additionalProperties": false,
         "properties": {
