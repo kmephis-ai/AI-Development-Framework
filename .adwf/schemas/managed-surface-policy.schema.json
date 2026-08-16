@@ -14,6 +14,7 @@
     "shared_guarded_paths",
     "snapshot_schema",
     "plan_schema",
+    "transaction_schema",
     "invariants"
   ],
   "properties": {
@@ -27,6 +28,7 @@
     "shared_guarded_paths": {"type": "array", "uniqueItems": true, "items": {"type": "string", "minLength": 1}},
     "snapshot_schema": {"const": ".adwf/schemas/managed-surface-snapshot.schema.json"},
     "plan_schema": {"const": ".adwf/schemas/managed-surface-plan.schema.json"},
+    "transaction_schema": {"const": ".adwf/schemas/managed-surface-transaction.schema.json"},
     "invariants": {"type": "array", "minItems": 4, "uniqueItems": true, "items": {"type": "string", "minLength": 3}}
   }
 }

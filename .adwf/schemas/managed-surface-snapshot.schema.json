@@ -24,6 +24,9 @@
           "managed_by_adwf": {"type": "boolean"}
         }
       }
-    }
+    },
+    "transaction_id": {"type": "string", "format": "sha256"},
+    "plan_sha256": {"type": "string", "format": "sha256"},
+    "consumer_root_sha256": {"type": "string", "format": "sha256"}
   }
 }

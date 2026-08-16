@@ -1,0 +1,147 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "ADWF Managed Surface Adoption Transaction v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "$schema",
+    "schema_version",
+    "role",
+    "transaction_id",
+    "status",
+    "source_revision",
+    "source_manifest_sha256",
+    "plan_sha256",
+    "consumer_root_sha256",
+    "attempts",
+    "entries",
+    "created_dirs",
+    "snapshot_path",
+    "snapshot_sha256",
+    "last_error",
+    "journal_sha256"
+  ],
+  "properties": {
+    "$schema": {
+      "const": ".adwf/schemas/managed-surface-transaction.schema.json"
+    },
+    "schema_version": {
+      "const": 1
+    },
+    "role": {
+      "const": "MANAGED_SURFACE_ADOPTION_TRANSACTION"
+    },
+    "transaction_id": {
+      "type": "string",
+      "format": "sha256"
+    },
+    "status": {
+      "enum": [
+        "PLANNED",
+        "APPLYING",
+        "RECOVERY_REQUIRED",
+        "RECOVERY_BLOCKED",
+        "COMMITTED",
+        "ROLLED_BACK"
+      ]
+    },
+    "source_revision": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{40}$"
+    },
+    "source_manifest_sha256": {
+      "type": "string",
+      "format": "sha256"
+    },
+    "plan_sha256": {
+      "type": "string",
+      "format": "sha256"
+    },
+    "consumer_root_sha256": {
+      "type": "string",
+      "format": "sha256"
+    },
+    "attempts": {
+      "type": "integer"
+    },
+    "entries": {
+      "type": "array",
+      "uniqueItems": true,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "path",
+          "source_sha256",
+          "planned_action",
+          "state",
+          "staging_path"
+        ],
+        "properties": {
+          "path": {
+            "type": "string",
+            "minLength": 1
+          },
+          "source_sha256": {
+            "type": "string",
+            "format": "sha256"
+          },
+          "planned_action": {
+            "enum": [
+              "CREATE_PLANNED",
+              "KEEP_EXACT"
+            ]
+          },
+          "state": {
+            "enum": [
+              "PENDING",
+              "STAGING",
+              "CREATED",
+              "VERIFIED",
+              "PRESERVED",
+              "ROLLED_BACK",
+              "RECOVERY_BLOCKED"
+            ]
+          },
+          "staging_path": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        }
+      }
+    },
+    "created_dirs": {
+      "type": "array",
+      "uniqueItems": true,
+      "items": {
+        "type": "string",
+        "minLength": 1
+      }
+    },
+    "snapshot_path": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "snapshot_sha256": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "format": "sha256"
+    },
+    "last_error": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "journal_sha256": {
+      "type": "string",
+      "format": "sha256"
+    }
+  }
+}

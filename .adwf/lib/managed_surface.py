@@ -222,7 +222,14 @@ def plan_adoption(
     return plan
 
 
-def snapshot_from_adoption_plan(plan: dict[str, Any], framework_root: str | Path) -> dict[str, Any]:
+def snapshot_from_adoption_plan(
+    plan: dict[str, Any],
+    framework_root: str | Path,
+    *,
+    transaction_id: str | None = None,
+    plan_sha256: str | None = None,
+    consumer_root_sha256: str | None = None,
+) -> dict[str, Any]:
     """Create expected post-adoption ownership snapshot from a non-blocked plan.
 
     Only paths that were absent before adoption become ADWF-managed. Pre-existing
@@ -250,6 +257,15 @@ def snapshot_from_adoption_plan(plan: dict[str, Any], framework_root: str | Path
         "source_manifest_sha256": plan["source_manifest_sha256"],
         "entries": entries,
     }
+    optional = {
+        "transaction_id": transaction_id,
+        "plan_sha256": plan_sha256,
+        "consumer_root_sha256": consumer_root_sha256,
+    }
+    supplied = {key: value for key, value in optional.items() if value is not None}
+    if supplied and len(supplied) != len(optional):
+        raise ManagedSurfaceError("SNAPSHOT_TRANSACTION_BINDING_INCOMPLETE")
+    snapshot.update(supplied)
     _validate_snapshot(snapshot, root)
     return snapshot
 
@@ -372,6 +388,9 @@ def validate_canonical_contract(root: str | Path) -> dict[str, Any]:
         "READ_ONLY_PLANNER_V1",
         "DRIFT_BLOCKS_DESTRUCTIVE_DETACH",
         "SHARED_GUARDED_PRESERVED",
+        "TRANSACTIONAL_ADOPTION_APPLY_V1",
+        "EXPLICIT_APPLY_ONLY",
+        "NO_OVERWRITE_EXISTING_CONSUMER_PATH",
     }
     invariants = set(policy.get("invariants") or [])
     missing = sorted(required - invariants)

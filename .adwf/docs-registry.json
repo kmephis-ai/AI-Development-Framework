@@ -11,9 +11,9 @@
         ".github/workflows/**"
       ],
       "mode": "generated-status-block+manual",
-      "source_digest": "2420dfbb4efa635fa08402c0dc4ffa41337e523672258834c56923675e85fc96",
-      "reviewed_at": "2026-08-13T00:00:00Z",
-      "valid_until": "2026-11-13T00:00:00Z"
+      "source_digest": "11dc4fb6fbd50d01f474ae2632141e9df31f624e0df20fd0164f5dca207d7477",
+      "reviewed_at": "2026-08-16T00:29:37Z",
+      "valid_until": "2026-11-16T00:35:00Z"
     },
     {
       "path": "AGENTS.md",
@@ -24,9 +24,9 @@
         "skills/**"
       ],
       "mode": "manual-governance",
-      "source_digest": "47e120df586c50617c8d1369b8d4c8e1a4621bdb5819684aa21dbf25d5e2808c",
-      "reviewed_at": "2026-08-13T00:00:00Z",
-      "valid_until": "2026-11-13T00:00:00Z"
+      "source_digest": "5dc252edb5c22ea23bc0e399824cb49421a5561ad2cc8cfe1330c98183ebebe2",
+      "reviewed_at": "2026-08-16T00:29:37Z",
+      "valid_until": "2026-11-16T00:35:00Z"
     },
     {
       "path": "docs/architecture/CI_CD_ARCHITECTURE.md",
@@ -37,9 +37,9 @@
         ".adwf/scripts/**"
       ],
       "mode": "architecture",
-      "source_digest": "87fb04f596a0b09709859fc8d968ddf098b2f0da37e15ffee754b524a0c8907e",
-      "reviewed_at": "2026-08-13T00:00:00Z",
-      "valid_until": "2026-11-13T00:00:00Z"
+      "source_digest": "438b8ab0939d2d6336f2bc15c736dc008adcf684e74a3a89127fe14d86c143e2",
+      "reviewed_at": "2026-08-16T00:29:37Z",
+      "valid_until": "2026-11-16T00:35:00Z"
     },
     {
       "path": "CONTROL_CENTER.md",
@@ -65,9 +65,9 @@
         ".adwf/scripts/validate_capabilities.py"
       ],
       "mode": "implementation-certification",
-      "source_digest": "929043c86be23158724cdba2d47b919dd206d4aba9d3c8a6863ce6e998d4ddde",
-      "reviewed_at": "2026-08-13T00:00:00Z",
-      "valid_until": "2026-11-13T00:00:00Z"
+      "source_digest": "2496afe059b25c7f1de79540f2c8d34bde0935a677aadbf2ca1d53f103f1aab0",
+      "reviewed_at": "2026-08-16T00:29:37Z",
+      "valid_until": "2026-11-16T00:35:00Z"
     },
     {
       "path": "docs/operations/OWNER_AI_GUIDE.md",
@@ -153,9 +153,9 @@
         ".adwf/roadmap.json"
       ],
       "mode": "governance",
-      "source_digest": "5003f121e7029647b289530a4922901ce68869bb9680a502a38aae5af940a3a1",
-      "reviewed_at": "2026-08-13T00:00:00Z",
-      "valid_until": "2026-11-13T00:00:00Z"
+      "source_digest": "277b5ea22a071e4d47b864939ebfb285f406e987631e5ee57eb01018cce10a83",
+      "reviewed_at": "2026-08-16T00:29:37Z",
+      "valid_until": "2026-11-16T00:35:00Z"
     }
   ]
 }
