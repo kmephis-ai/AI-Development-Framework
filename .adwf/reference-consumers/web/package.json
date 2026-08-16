@@ -1,0 +1,14 @@
+{
+  "name": "adwf-reference-web-consumer",
+  "private": true,
+  "version": "1.0.0",
+  "dependencies": {
+    "react": "0.0.0-reference"
+  },
+  "scripts": {
+    "lint": "node scripts/check.mjs lint",
+    "test": "node scripts/check.mjs test",
+    "build": "node scripts/check.mjs build",
+    "dev": "node server.mjs"
+  }
+}

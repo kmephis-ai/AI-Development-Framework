@@ -403,6 +403,25 @@
       ],
       "live_boundary": "LIVE_VERIFIED требует downstream evidence от реального adopted consumer repository: profile bootstrap, effective runtime execution и guarded detach с сохранением consumer profile. Synthetic/unit/CI подтверждают implementation, но не live consumer truth.",
       "live_evidence": []
+    },
+    {
+      "id": "REFERENCE_WEB_CONFORMANCE",
+      "status": "LIVE_NOT_VERIFIED",
+      "execution_mode": "CORE",
+      "owner_claim_ru": "ADWF может прогнать отдельный synthetic standard-web consumer через transactional adoption, sealed consumer profile/React Project Pack, isolated gates, exact-revision preview и guarded detach с machine-verifiable aggregate report без подмены reference evidence живой downstream проверкой.",
+      "entrypoints": [
+        ".adwf/scripts/reference_web_conformance.py"
+      ],
+      "production_paths": [
+        ".adwf/lib/reference_conformance.py",
+        ".adwf/schemas/reference-conformance-report.schema.json",
+        ".adwf/reference-consumers/web"
+      ],
+      "verification": [
+        ".adwf/tests/test_reference_web_conformance.py"
+      ],
+      "live_boundary": "REFERENCE_CONFORMANCE_REPORT доказывает встроенный synthetic/reference harness и exact evidence binding. LIVE_VERIFIED требует отдельного реального downstream web consumer repository/provider cycle; reference fixture, CI и provider-side synthetic run не являются такой live evidence. Shared-guarded merge и generalized re-adoption/upgrade epoch semantics beyond the distinct-plan reference path остаются отдельными lifecycle capabilities.",
+      "live_evidence": []
     }
   ]
 }
