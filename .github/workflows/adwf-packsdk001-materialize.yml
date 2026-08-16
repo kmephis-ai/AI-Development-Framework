@@ -1,0 +1,148 @@
+name: ADWF PACKSDK-001 Materializer
+
+on:
+  push:
+    branches:
+      - agent/materialize-packsdk001-20260816-2bcfa03e
+
+permissions:
+  contents: write
+
+env:
+  PYTHONDONTWRITEBYTECODE: "1"
+  BASE_SHA: 19242d3f1a46534e4c30700ce0a285c16a024977
+  FEATURE_REF: agent/packsdk-001-formal-contract
+  VALIDATED_REF: agent/validated-packsdk001-20260816-2bcfa03e
+  EXPECTED_TREE: 32f2d10a60d6e5bd04953a567b1ca2e82e1ab420
+  EXPECTED_PATCH_SHA256: 2bcfa03ee6181a1a875548e2c195b98ad8aab2cf0463d68c2cd5f2a9c01c8b5f
+
+jobs:
+  materialize:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-python@a309ff8b426b58ec0e2a45f0f869d46889d02405
+        with:
+          python-version: "3.12.10"
+
+      - name: Reconstruct and verify exact candidate
+        shell: bash
+        run: |
+          set -euo pipefail
+          remote_main="$(git ls-remote origin refs/heads/main | awk '{print $1}')"
+          remote_feature="$(git ls-remote origin "refs/heads/${FEATURE_REF}" | awk '{print $1}')"
+          test "${remote_main}" = "${BASE_SHA}"
+          test "${remote_feature}" = "${BASE_SHA}"
+
+          cat .transport/packsdk001/chunk-* > /tmp/candidate.patch.b64
+          base64 -d /tmp/candidate.patch.b64 | gzip -d > /tmp/candidate.patch
+          patch_sha="$(sha256sum /tmp/candidate.patch | awk '{print $1}')"
+          test "${patch_sha}" = "${EXPECTED_PATCH_SHA256}"
+
+          git worktree add --detach /tmp/candidate "${BASE_SHA}"
+          git -C /tmp/candidate apply --index /tmp/candidate.patch
+
+          git -C /tmp/candidate diff --cached --name-only | LC_ALL=C sort > /tmp/actual-files
+          cat > /tmp/expected-files <<'EOF'
+          .adwf/capability-traceability.json
+          .adwf/decision-requirement-traceability.json
+          .adwf/docs-registry.json
+          .adwf/lib/pack_materializer.py
+          .adwf/lib/project_packs.py
+          .adwf/packs/angular.json
+          .adwf/packs/fastapi.json
+          .adwf/packs/go.json
+          .adwf/packs/node.json
+          .adwf/packs/python.json
+          .adwf/packs/react.json
+          .adwf/packs/vue.json
+          .adwf/roadmap.json
+          .adwf/schemas/config.schema.json
+          .adwf/schemas/project-pack.schema.json
+          .adwf/scripts/validate_framework.py
+          .adwf/scripts/validate_project_packs.py
+          .adwf/tests/test_project_pack_sdk.py
+          MANIFEST.json
+          SHA256SUMS.txt
+          docs/governance/PROJECT_PACK_SDK.md
+          EOF
+          sed -i 's/^          //' /tmp/expected-files
+          LC_ALL=C sort -o /tmp/expected-files /tmp/expected-files
+          diff -u /tmp/expected-files /tmp/actual-files
+          test "$(wc -l < /tmp/actual-files | tr -d ' ')" = "21"
+
+          tree_sha="$(git -C /tmp/candidate write-tree)"
+          test "${tree_sha}" = "${EXPECTED_TREE}"
+
+          git -C /tmp/candidate config user.name "ADWF PACKSDK-001 Materializer"
+          git -C /tmp/candidate config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git -C /tmp/candidate commit -m "PACKSDK-001: formal project pack contract"
+          candidate_sha="$(git -C /tmp/candidate rev-parse HEAD)"
+          test "$(git -C /tmp/candidate rev-parse HEAD^)" = "${BASE_SHA}"
+          test "$(git -C /tmp/candidate rev-parse HEAD^{tree})" = "${EXPECTED_TREE}"
+          echo "CANDIDATE_SHA=${candidate_sha}" >> "$GITHUB_ENV"
+
+      - name: Classify with exact trusted BASE
+        shell: bash
+        run: |
+          set -euo pipefail
+          git worktree add --detach /tmp/base "${BASE_SHA}"
+          BASE_WT=/tmp/base BASE_SHA="${BASE_SHA}" CANDIDATE_SHA="${CANDIDATE_SHA}" python - <<'PY'
+          import json, os, sys
+          root = os.environ["BASE_WT"]
+          sys.path.insert(0, os.path.join(root, ".adwf"))
+          from lib.trust import classify_git_diff
+          result = classify_git_diff(root, os.environ["BASE_SHA"], os.environ["CANDIDATE_SHA"])
+          print(json.dumps(result, ensure_ascii=False, sort_keys=True))
+          assert result.get("result") == "ALLOW", result
+          assert result.get("authorization_mode") == "STANDING_OWNER_POLICY", result
+          assert result.get("human_required") is False, result
+          assert result.get("weakening") == [], result
+          assert result.get("manual_required_files") == [], result
+          assert result.get("reason_codes") == [], result
+          PY
+
+      - name: Focused Project Pack SDK and truth validation
+        shell: bash
+        run: |
+          set -euo pipefail
+          cd /tmp/candidate
+          python .adwf/tests/test_project_pack_sdk.py -q
+          python .adwf/tests/test_v15_executive.py -q
+          python .adwf/tests/test_v16_remediation.py -q
+          python .adwf/scripts/validate_project_packs.py
+          python .adwf/scripts/validate_traceability.py
+          python .adwf/scripts/validate_capabilities.py
+          python .adwf/scripts/docs_freshness.py
+          python .adwf/scripts/validate_docs.py
+          python .adwf/scripts/validate_framework.py
+          python .adwf/scripts/generate_manifest.py --check
+          git diff --check "${BASE_SHA}"...HEAD
+
+      - name: Full ADWF self-test and immutable tree guard
+        shell: bash
+        run: |
+          set -euo pipefail
+          cd /tmp/candidate
+          python .adwf/adwf.py self-test
+          test -z "$(git status --porcelain --untracked-files=no)"
+          test "$(git rev-parse HEAD^{tree})" = "${EXPECTED_TREE}"
+          test "$(git rev-parse HEAD^)" = "${BASE_SHA}"
+
+      - name: Publish validated immutable candidate ref
+        shell: bash
+        run: |
+          set -euo pipefail
+          remote_main="$(git ls-remote origin refs/heads/main | awk '{print $1}')"
+          remote_feature="$(git ls-remote origin "refs/heads/${FEATURE_REF}" | awk '{print $1}')"
+          test "${remote_main}" = "${BASE_SHA}"
+          test "${remote_feature}" = "${BASE_SHA}"
+          test -z "$(git ls-remote origin "refs/heads/${VALIDATED_REF}" | awk '{print $1}')"
+          git push origin "${CANDIDATE_SHA}:refs/heads/${VALIDATED_REF}"
+          published="$(git ls-remote origin "refs/heads/${VALIDATED_REF}" | awk '{print $1}')"
+          test "${published}" = "${CANDIDATE_SHA}"
+          printf 'validated_candidate=%s\nexpected_tree=%s\npatch_sha256=%s\n' \
+            "${CANDIDATE_SHA}" "${EXPECTED_TREE}" "${EXPECTED_PATCH_SHA256}" >> "$GITHUB_STEP_SUMMARY"
