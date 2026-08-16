@@ -986,6 +986,7 @@ def _validate_detach_recovery_provenance(
         item = journal_by_path[rel]
         immutable = {
             "installed_sha256": snap["installed_sha256"],
+            "preserved_sha256": snap.get("preserved_sha256"),
             "ownership": snap["ownership"],
             "managed_by_adwf": snap["managed_by_adwf"],
         }
@@ -1096,6 +1097,7 @@ def _new_detach_transaction(
             {
                 "path": item["path"],
                 "installed_sha256": item["installed_sha256"],
+                "preserved_sha256": item.get("preserved_sha256"),
                 "ownership": item["ownership"],
                 "managed_by_adwf": item["managed_by_adwf"],
                 "planned_action": action,
@@ -1152,6 +1154,7 @@ def _assert_detach_journal_identity(
         stored = by_path[item["path"]]
         immutable = {
             "installed_sha256": item["installed_sha256"],
+            "preserved_sha256": item.get("preserved_sha256"),
             "ownership": item["ownership"],
             "managed_by_adwf": item["managed_by_adwf"],
             "planned_action": item["action"],
@@ -1368,10 +1371,16 @@ def _verify_detach_committed(target_root: Path, journal: dict[str, Any]) -> None
     if journal.get("status") != "COMMITTED":
         raise ManagedSurfaceError("DETACH_TRANSACTION_NOT_COMMITTED")
     for entry in journal["entries"]:
-        if entry["planned_action"] in {"REMOVE_ELIGIBLE", "ALREADY_ABSENT"}:
+        action = entry["planned_action"]
+        if action in {"REMOVE_ELIGIBLE", "ALREADY_ABSENT"}:
             state, _ = _target_state(target_root / entry["path"], entry["installed_sha256"])
             if state != "ABSENT":
                 raise ManagedSurfaceError("DETACH_COMMITTED_TARGET_REAPPEARED:" + entry["path"])
+        elif action == "PRESERVE_PREEXISTING":
+            expected = entry.get("preserved_sha256") or entry["installed_sha256"]
+            state, _ = _target_state(target_root / entry["path"], expected)
+            if state != "EXACT":
+                raise ManagedSurfaceError("DETACH_COMMITTED_PREEXISTING_DRIFT:" + entry["path"])
         quarantine = target_root / entry["quarantine_path"] if entry.get("quarantine_path") else None
         if quarantine is not None and quarantine.exists():
             raise ManagedSurfaceError("DETACH_COMMITTED_QUARANTINE_REMAINS:" + entry["path"])

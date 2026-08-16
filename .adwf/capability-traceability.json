@@ -338,7 +338,7 @@
       "id": "MANAGED_SURFACE_CONTRACT",
       "status": "LIVE_NOT_VERIFIED",
       "execution_mode": "CORE",
-      "owner_claim_ru": "ADWF отличает framework-private, shared-guarded и consumer-owned поверхности; существующие отличающиеся regular-file SHARED_GUARDED paths adoption сохраняет как exact-digest verification-only без write/ownership authority, а guarded detach удаляет только provenance-bound exact managed private paths.",
+      "owner_claim_ru": "ADWF отличает framework-private, shared-guarded и consumer-owned поверхности; pre-existing preserved bytes имеют отдельный exact preserved_sha256 provenance и никогда не получают write/delete authority.",
       "entrypoints": [
         ".adwf/scripts/validate_managed_surface.py"
       ],
@@ -448,7 +448,7 @@
       "id": "CONSUMER_FRAMEWORK_UPGRADE_PLANNING",
       "status": "LIVE_NOT_VERIFIED",
       "execution_mode": "CORE",
-      "owner_claim_ru": "ADWF строит self-sealed exact-revision read-only compatibility result и upgrade plan A→B, сохраняя consumer/shared/pre-existing ownership fail-closed и не выдавая planning READY за безопасный mutating upgrade.",
+      "owner_claim_ru": "ADWF строит self-sealed exact-revision read-only compatibility/upgrade plan A→B и различает package identity от exact preserved consumer preimage для non-managed paths.",
       "entrypoints": [
         ".adwf/scripts/plan_consumer_upgrade.py"
       ],
@@ -470,7 +470,7 @@
       "id": "CONSUMER_FRAMEWORK_UPGRADE_TRANSACTION",
       "status": "LIVE_NOT_VERIFIED",
       "execution_mode": "CORE",
-      "owner_claim_ru": "ADWF применяет sealed READY upgrade plan A→B как durable fail-closed filesystem transaction с exact quarantine provenance, rollback/recovery и без mutation authority над shared/pre-existing/consumer-owned content.",
+      "owner_claim_ru": "ADWF применяет sealed READY upgrade plan A→B как durable fail-closed transaction; preserved pre-existing bytes проверяются по immutable preserved_sha256 и никогда не становятся mutation authority.",
       "entrypoints": [
         ".adwf/scripts/apply_consumer_upgrade.py"
       ],

@@ -23,7 +23,7 @@ from .consumer_upgrade import (
 )
 from .contracts import validate
 from .file_lock import exclusive_file_lock
-from .managed_surface import ManagedSurfaceError, _validate_snapshot, load_source_inventory
+from .managed_surface import SHA256, ManagedSurfaceError, _validate_snapshot, load_source_inventory
 from .managed_surface_transaction import TransactionStore as AdoptionTransactionStore, _fsync_directory
 from .strict_json import load as strict_load
 
@@ -375,7 +375,8 @@ def _preflight(
             if not (source_sha and target_sha == source_sha and item.get("source_ownership") == "SHARED_GUARDED" and item.get("target_ownership") == "SHARED_GUARDED" and current_state == "FILE" and current_sha == source_sha):
                 raise ConsumerUpgradeError("UPGRADE_APPLY_SHARED_PRESERVE_INVALID:" + rel)
         elif action == "PRESERVE_PREEXISTING":
-            if not (source_sha and target_sha == source_sha and source_snap and source_snap.get("managed_by_adwf") is False and current_state == "FILE" and current_sha == source_sha):
+            preserved = (source_snap or {}).get("preserved_sha256") or source_sha
+            if not (source_sha and target_sha == source_sha and source_snap and source_snap.get("managed_by_adwf") is False and current_state == "FILE" and current_sha == preserved):
                 raise ConsumerUpgradeError("UPGRADE_APPLY_PREEXISTING_PRESERVE_INVALID:" + rel)
 
     rollback = plan["rollback_prerequisites"]
@@ -406,12 +407,19 @@ def _target_snapshot(
             managed = True
         else:
             managed = bool((snap.get(rel) or {}).get("managed_by_adwf"))
-        entries.append({
+        entry = {
             "path": rel,
             "ownership": item["target_ownership"],
             "installed_sha256": item["target_sha256"],
             "managed_by_adwf": managed,
-        })
+        }
+        if not managed:
+            source_snap = snap.get(rel) or {}
+            preserved = source_snap.get("preserved_sha256") or source_snap.get("installed_sha256")
+            if not isinstance(preserved, str) or not SHA256.fullmatch(preserved):
+                raise ConsumerUpgradeError("UPGRADE_TARGET_SNAPSHOT_PRESERVED_DIGEST_REQUIRED:" + rel)
+            entry["preserved_sha256"] = preserved
+        entries.append(entry)
     value = {
         "$schema": ".adwf/schemas/managed-surface-snapshot.schema.json",
         "schema_version": 1,
@@ -459,6 +467,7 @@ def _new_journal(
     txid: str, profile_payload: bytes,
 ) -> dict[str, Any]:
     profile_changed = compatibility["profile"]["source_sha256"] != compatibility["profile"]["target_sha256"]
+    source_snapshot = _source_snapshot_map(snapshot)
     value = {
         "$schema": TRANSACTION_SCHEMA, "schema_version": 1, "role": "CONSUMER_FRAMEWORK_UPGRADE_TRANSACTION",
         "transaction_id": txid, "status": "PLANNED",
@@ -470,6 +479,10 @@ def _new_journal(
         "entries": [{
             "path": item["path"], "planned_action": item["action"],
             "source_sha256": item["source_sha256"], "target_sha256": item["target_sha256"],
+            "preserved_sha256": (
+                (source_snapshot.get(item["path"]) or {}).get("preserved_sha256")
+                or (source_snapshot.get(item["path"]) or {}).get("installed_sha256")
+            ) if item["action"] == "PRESERVE_PREEXISTING" else None,
             "state": "PENDING", "staging_path": None,
             "quarantine_path": _quarantine_rel(txid, item["path"]) if item["action"] in {"REPLACE_PLANNED", "REMOVE_PLANNED"} else None,
         } for item in plan["entries"]],
@@ -503,7 +516,7 @@ def _assert_journal_identity(journal: dict[str, Any], compatibility: dict[str, A
         raise ConsumerUpgradeError("UPGRADE_TRANSACTION_ENTRY_SET_MISMATCH")
     for rel, expected_item in expected_by_path.items():
         actual = actual_by_path[rel]
-        for key in ("planned_action", "source_sha256", "target_sha256", "quarantine_path"):
+        for key in ("planned_action", "source_sha256", "target_sha256", "preserved_sha256", "quarantine_path"):
             if actual.get(key) != expected_item.get(key):
                 raise ConsumerUpgradeError("UPGRADE_TRANSACTION_ENTRY_IMMUTABLE_MISMATCH:" + rel + ":" + key)
     for key in ("path", "source_profile_sha256", "target_profile_sha256", "source_file_sha256", "target_file_sha256", "quarantine_path"):
@@ -654,10 +667,10 @@ def _apply_entry(source_root: Path, target_root: Path, consumer: Path, journal: 
     rel = entry["path"]; action = entry["planned_action"]; target = consumer / rel
     source_sha = entry["source_sha256"]; target_sha = entry["target_sha256"]
     if action in VERIFY_ACTIONS:
-        expected = source_sha
+        expected = entry.get("preserved_sha256") if action == "PRESERVE_PREEXISTING" else source_sha
         _assert_existing_parent_chain(consumer, rel)
         state, digest = _path_state(consumer, rel)
-        if state != "FILE" or digest != expected or target_sha != expected:
+        if state != "FILE" or digest != expected or target_sha != source_sha:
             raise ConsumerUpgradeError("UPGRADE_PRESERVED_PATH_DRIFT:" + rel)
         entry["state"] = "PRESERVED"; store.save(journal); return
     if entry["state"] == "VERIFIED":
@@ -781,7 +794,7 @@ def _verify_committed(source_root: Path, target_root: Path, consumer: Path, stor
     _verify_revision(source_root, journal["source_revision"]); _verify_revision(target_root, journal["target_revision"])
     for entry in journal["entries"]:
         action = entry["planned_action"]; state, digest = _path_state(consumer, entry["path"])
-        expected = entry["target_sha256"]
+        expected = entry.get("preserved_sha256") if action == "PRESERVE_PREEXISTING" else entry["target_sha256"]
         if action == "REMOVE_PLANNED":
             if state != "ABSENT": raise ConsumerUpgradeError("UPGRADE_COMMITTED_TARGET_DRIFT:" + entry["path"])
         elif state != "FILE" or digest != expected:
@@ -901,7 +914,8 @@ def _recover_locked(source_root: Path, target_root: Path, consumer: Path, store:
         rel = entry["path"]; action = entry["planned_action"]; target = consumer / rel
         if action in VERIFY_ACTIONS:
             state, digest = _state(target)
-            if state != "FILE" or digest != entry["source_sha256"]:
+            expected = entry.get("preserved_sha256") if action == "PRESERVE_PREEXISTING" else entry["source_sha256"]
+            if state != "FILE" or digest != expected:
                 blockers.append("UPGRADE_RECOVERY_PRESERVED_DRIFT:" + rel)
             else: entry["state"] = "ROLLED_BACK"
             continue
@@ -999,8 +1013,10 @@ def apply_upgrade(
                 state, digest = _state(consumer / entry["path"])
                 if entry["planned_action"] == "REMOVE_PLANNED":
                     if state != "ABSENT": raise ConsumerUpgradeError("UPGRADE_FINAL_B_POSTCONDITION:" + entry["path"])
-                elif state != "FILE" or digest != entry["target_sha256"]:
-                    raise ConsumerUpgradeError("UPGRADE_FINAL_B_POSTCONDITION:" + entry["path"])
+                else:
+                    expected = entry.get("preserved_sha256") if entry["planned_action"] == "PRESERVE_PREEXISTING" else entry["target_sha256"]
+                    if state != "FILE" or digest != expected:
+                        raise ConsumerUpgradeError("UPGRADE_FINAL_B_POSTCONDITION:" + entry["path"])
             try:
                 loaded = load_consumer_profile(consumer, target_root, required=True)
             except ConsumerProfileError as exc:

@@ -18,6 +18,7 @@ from lib.managed_surface import (  # noqa: E402
     plan_adoption,
     plan_detach,
     snapshot_from_adoption_plan,
+    _validate_snapshot,
     validate_canonical_contract,
 )
 
@@ -316,6 +317,34 @@ class ManagedSurfaceTests(unittest.TestCase):
             temp.cleanup()
             target.cleanup()
 
+
+    def test_14_preserved_snapshot_separates_package_and_consumer_digest(self) -> None:
+        temp, source = self.minimal_source(); target = tempfile.TemporaryDirectory()
+        try:
+            shared = Path(target.name, "README.md")
+            shared.write_text("consumer-owned shared\n", encoding="utf-8")
+            plan = plan_adoption(source, target.name, source_revision="d" * 40)
+            self.assertEqual(plan["status"], "READY")
+            snapshot = snapshot_from_adoption_plan(plan, source)
+            item = next(x for x in snapshot["entries"] if x["path"] == "README.md")
+            self.assertFalse(item["managed_by_adwf"])
+            self.assertEqual(item["installed_sha256"], hashlib.sha256((source / "README.md").read_bytes()).hexdigest())
+            self.assertEqual(item["preserved_sha256"], hashlib.sha256(shared.read_bytes()).hexdigest())
+            self.assertNotEqual(item["installed_sha256"], item["preserved_sha256"])
+        finally:
+            temp.cleanup(); target.cleanup()
+
+    def test_15_managed_entry_cannot_forge_preserved_digest(self) -> None:
+        temp, source = self.minimal_source(); target = tempfile.TemporaryDirectory()
+        try:
+            plan = plan_adoption(source, target.name, source_revision="e" * 40)
+            snapshot = snapshot_from_adoption_plan(plan, source)
+            item = next(x for x in snapshot["entries"] if x["managed_by_adwf"] is True)
+            item["preserved_sha256"] = item["installed_sha256"]
+            with self.assertRaisesRegex(ManagedSurfaceError, "SNAPSHOT_MANAGED_PRESERVED_DIGEST_FORBIDDEN"):
+                _validate_snapshot(snapshot, source)
+        finally:
+            temp.cleanup(); target.cleanup()
 
 if __name__ == "__main__":
     unittest.main()

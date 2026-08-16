@@ -23,10 +23,19 @@
     "journal_sha256"
   ],
   "properties": {
-    "$schema": {"const": ".adwf/schemas/managed-surface-detach-transaction.schema.json"},
-    "schema_version": {"const": 1},
-    "role": {"const": "MANAGED_SURFACE_DETACH_TRANSACTION"},
-    "transaction_id": {"type": "string", "format": "sha256"},
+    "$schema": {
+      "const": ".adwf/schemas/managed-surface-detach-transaction.schema.json"
+    },
+    "schema_version": {
+      "const": 1
+    },
+    "role": {
+      "const": "MANAGED_SURFACE_DETACH_TRANSACTION"
+    },
+    "transaction_id": {
+      "type": "string",
+      "format": "sha256"
+    },
     "status": {
       "enum": [
         "PLANNED",
@@ -37,13 +46,34 @@
         "ROLLED_BACK"
       ]
     },
-    "adoption_transaction_id": {"type": "string", "format": "sha256"},
-    "source_revision": {"type": "string", "pattern": "^[0-9a-f]{40}$"},
-    "source_manifest_sha256": {"type": "string", "format": "sha256"},
-    "snapshot_sha256": {"type": "string", "format": "sha256"},
-    "plan_sha256": {"type": "string", "format": "sha256"},
-    "consumer_root_sha256": {"type": "string", "format": "sha256"},
-    "attempts": {"type": "integer", "minimum": 0},
+    "adoption_transaction_id": {
+      "type": "string",
+      "format": "sha256"
+    },
+    "source_revision": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{40}$"
+    },
+    "source_manifest_sha256": {
+      "type": "string",
+      "format": "sha256"
+    },
+    "snapshot_sha256": {
+      "type": "string",
+      "format": "sha256"
+    },
+    "plan_sha256": {
+      "type": "string",
+      "format": "sha256"
+    },
+    "consumer_root_sha256": {
+      "type": "string",
+      "format": "sha256"
+    },
+    "attempts": {
+      "type": "integer",
+      "minimum": 0
+    },
     "entries": {
       "type": "array",
       "uniqueItems": true,
@@ -53,6 +83,7 @@
         "required": [
           "path",
           "installed_sha256",
+          "preserved_sha256",
           "ownership",
           "managed_by_adwf",
           "planned_action",
@@ -60,10 +91,24 @@
           "quarantine_path"
         ],
         "properties": {
-          "path": {"type": "string", "minLength": 1},
-          "installed_sha256": {"type": "string", "format": "sha256"},
-          "ownership": {"enum": ["FRAMEWORK_PRIVATE", "SHARED_GUARDED", "CONSUMER_OWNED"]},
-          "managed_by_adwf": {"type": "boolean"},
+          "path": {
+            "type": "string",
+            "minLength": 1
+          },
+          "installed_sha256": {
+            "type": "string",
+            "format": "sha256"
+          },
+          "ownership": {
+            "enum": [
+              "FRAMEWORK_PRIVATE",
+              "SHARED_GUARDED",
+              "CONSUMER_OWNED"
+            ]
+          },
+          "managed_by_adwf": {
+            "type": "boolean"
+          },
           "planned_action": {
             "enum": [
               "PRESERVE_PREEXISTING",
@@ -86,21 +131,47 @@
               "RECOVERY_BLOCKED"
             ]
           },
-          "quarantine_path": {"type": ["string", "null"]}
+          "quarantine_path": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "preserved_sha256": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "sha256"
+          }
         }
       }
     },
     "provenance_dirs": {
       "type": "array",
       "uniqueItems": true,
-      "items": {"type": "string", "minLength": 1}
+      "items": {
+        "type": "string",
+        "minLength": 1
+      }
     },
     "removed_dirs": {
       "type": "array",
       "uniqueItems": true,
-      "items": {"type": "string", "minLength": 1}
+      "items": {
+        "type": "string",
+        "minLength": 1
+      }
     },
-    "last_error": {"type": ["string", "null"]},
-    "journal_sha256": {"type": "string", "format": "sha256"}
+    "last_error": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "journal_sha256": {
+      "type": "string",
+      "format": "sha256"
+    }
   }
 }

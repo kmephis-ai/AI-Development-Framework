@@ -2,7 +2,7 @@
   "$schema": ".adwf/schemas/decision-requirement-traceability.schema.json",
   "schema_version": 1,
   "role": "CANONICAL_DECISION_REQUIREMENT_TRACEABILITY",
-  "revision": 13,
+  "revision": 14,
   "records": [
     {
       "id": "INTENT-FOUNDATION-20260815",
@@ -245,6 +245,17 @@
       "source_path": null,
       "source_sha256": null,
       "record_sha256": "f66fd1ce9e1ae67275274285231dc1784d94d06e5fe1ea0e8fa836d5e719fe29"
+    },
+    {
+      "id": "DEC-LIFECYCLE-007",
+      "kind": "DECISION",
+      "version": 1,
+      "status": "ACCEPTED",
+      "title_ru": "Package digest и preserved consumer preimage являются разными provenance facts",
+      "statement_ru": "Для managed_by_adwf=false snapshot сохраняет exact preserved_sha256 фактических consumer bytes отдельно от installed_sha256 package identity; detach и upgrade planning/apply/rollback используют preserved digest только для verification и никогда не получают из него write/delete authority.",
+      "source_path": null,
+      "source_sha256": null,
+      "record_sha256": "05459d5e536e0b89a7ad3638d86b069dc9678b79f69626fff08f33785b0e5559"
     }
   ],
   "capability_refs": [
@@ -385,6 +396,13 @@
       "issue_number": 87,
       "ai_work_package_id": null,
       "ref_sha256": "9ed66bad5a9beed0d9b7a3a6c78b619400a7f95cc617fa8bab3e7c5695523404"
+    },
+    {
+      "id": "WORKREF-LIFECYCLE-007",
+      "roadmap_id": "LIFECYCLE-007",
+      "issue_number": 90,
+      "ai_work_package_id": null,
+      "ref_sha256": "36e31766befd4bfd8ae5137416a90ff585536d73c138db5e45a5fdd23cfc3196"
     }
   ],
   "evidence_refs": [],
@@ -710,7 +728,63 @@
       "from": "CAPREF-MANAGED-SURFACE-CONTRACT",
       "to": "WORKREF-LIFECYCLE-006",
       "edge_sha256": "e52acd279fde1b7377b7e8b49f19a3ec38a43a9f16d0316be8d14b8654e4d7be"
+    },
+    {
+      "id": "EDGE-REQ-LIFECYCLE-007",
+      "type": "REQUIREMENT_TO_DECISION",
+      "from": "REQ-LIFECYCLE-001",
+      "to": "DEC-LIFECYCLE-007",
+      "edge_sha256": "2f8001ae16027fbb7b6f674a15f050e25020ec2b34632d58259c865d9c697a6c"
+    },
+    {
+      "id": "EDGE-REQ-UPGRADE-LIFECYCLE-007",
+      "type": "REQUIREMENT_TO_DECISION",
+      "from": "REQ-UPGRADE-002",
+      "to": "DEC-LIFECYCLE-007",
+      "edge_sha256": "130a4e0b1b413b99e83287828f0c9ec1bed914b4fbddf3582cc75812d010a5f2"
+    },
+    {
+      "id": "EDGE-DEC-CAP-MANAGED-LIFECYCLE-007",
+      "type": "DECISION_TO_CAPABILITY",
+      "from": "DEC-LIFECYCLE-007",
+      "to": "CAPREF-MANAGED-SURFACE-CONTRACT",
+      "edge_sha256": "f2fc2c8e9b85eec5ed7058a53a01b82f02f9f15a67d15c26a5d49ecc69019dad"
+    },
+    {
+      "id": "EDGE-DEC-CAP-UPLAN-LIFECYCLE-007",
+      "type": "DECISION_TO_CAPABILITY",
+      "from": "DEC-LIFECYCLE-007",
+      "to": "CAPREF-CONSUMER-FRAMEWORK-UPGRADE-PLANNING",
+      "edge_sha256": "812e2f87786099248916dfb165c28279c73770f91f2c68bf7e17622a7055b24d"
+    },
+    {
+      "id": "EDGE-DEC-CAP-UTX-LIFECYCLE-007",
+      "type": "DECISION_TO_CAPABILITY",
+      "from": "DEC-LIFECYCLE-007",
+      "to": "CAPREF-CONSUMER-FRAMEWORK-UPGRADE-TRANSACTION",
+      "edge_sha256": "3f99c423a4e134b2e5978116164508ae748f842c2a875b18072f5447ed535f18"
+    },
+    {
+      "id": "EDGE-CAP-MANAGED-WORK-LIFECYCLE-007",
+      "type": "CAPABILITY_TO_WORK",
+      "from": "CAPREF-MANAGED-SURFACE-CONTRACT",
+      "to": "WORKREF-LIFECYCLE-007",
+      "edge_sha256": "22f715b4350380a4d693203073e5d64f94a7f2d39771d4af13bb51df484dbb8a"
+    },
+    {
+      "id": "EDGE-CAP-UPLAN-WORK-LIFECYCLE-007",
+      "type": "CAPABILITY_TO_WORK",
+      "from": "CAPREF-CONSUMER-FRAMEWORK-UPGRADE-PLANNING",
+      "to": "WORKREF-LIFECYCLE-007",
+      "edge_sha256": "7cb8296c7f227a84e40869f337a5c3bb75284e11e7e016d1e49430e384da26ef"
+    },
+    {
+      "id": "EDGE-CAP-UTX-WORK-LIFECYCLE-007",
+      "type": "CAPABILITY_TO_WORK",
+      "from": "CAPREF-CONSUMER-FRAMEWORK-UPGRADE-TRANSACTION",
+      "to": "WORKREF-LIFECYCLE-007",
+      "edge_sha256": "b787e829b1d1eefeb7d42fe8ed8072fa00deadd8b36c86e561f6216289fcae3e"
     }
   ],
-  "graph_sha256": "fbcecfdf7944e2b909a7d7f18d10f499643973b31f3f32b03e89e213e8ec2479"
+  "graph_sha256": "3fc8086e60e789c8065e0d4a6e029d583edaf77dcacb342b34496e4e97577dae"
 }

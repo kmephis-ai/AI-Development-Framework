@@ -97,7 +97,7 @@ Transaction snapshot содержит optional binding fields `transaction_id`, 
 Консервативное правило provenance:
 
 - путь, который **уже существовал exact** до adoption, не становится автоматически `managed_by_adwf=true`;
-- отличающийся `SHARED_GUARDED`, сохранённый через `PRESERVE_SHARED`, также остаётся `managed_by_adwf=false`; snapshot хранит package identity, но не превращает consumer bytes в ADWF ownership;
+- отличающийся `SHARED_GUARDED`, сохранённый через `PRESERVE_SHARED`, также остаётся `managed_by_adwf=false`; начиная с `LIFECYCLE-007` snapshot хранит **два независимых факта**: `installed_sha256` = exact package identity и `preserved_sha256` = exact фактические consumer bytes. `preserved_sha256` используется только для verification и не превращает consumer bytes в ADWF ownership;
 - ADWF auto-own только файл, который plan видел `ABSENT` и текущая transaction реально создала;
 - failed/partial apply не создаёт committed snapshot.
 

@@ -43,7 +43,7 @@ Planner строит A↔B diff по framework package inventory и отдель
 
 ## Consumer drift и ownership
 
-Каждый source-managed path проверяется против snapshot A. Если фактический consumer файл больше не равен exact installed digest, это drift и planner не пытается угадать намерение владельца.
+Каждый source-managed path проверяется против snapshot A. Для `managed_by_adwf=true` current bytes обязаны совпадать с `installed_sha256` package digest. Для pre-existing preserved path `LIFECYCLE-007` хранит отдельный `preserved_sha256`, и именно он является expected consumer preimage; `installed_sha256` продолжает связывать snapshot с exact package A. Несовпадение соответствующего expected digest считается drift и planner ничего не угадывает.
 
 Pre-existing managed entries сохраняются. Shared-guarded paths сохраняются. Новая версия ADWF не получает silent overwrite authority над такими путями даже тогда, когда target package содержит новый вариант файла.
 
