@@ -98,3 +98,7 @@ Focused suite проверяет commit/idempotence, rollback→retry, stale/for
 ## Unchanged Consumer Profile rollback semantics
 
 Если exact A и B дают byte-identical `.adwf-consumer/profile.json`, transaction journal фиксирует profile как `UNCHANGED`: committed rollback **только проверяет** exact source/target digest и не получает quarantine/restore authority. Отсутствие profile quarantine в этом состоянии является нормой, а не поводом для восстановления. Любой drift такого profile блокирует rollback fail-closed без удаления или перезаписи consumer bytes. Это regression invariant `UPGRADE_FIX-001`.
+
+## External consumer proof boundary — UPGRADE-003
+
+`.adwf/scripts/run_external_consumer_upgrade_proof.py` композирует existing adoption/profile/planning/transaction APIs и выполняет `A → B → rollback A → retry B` только в disposable copy exact clean external Git consumer. Все pre-existing tracked regular bytes проверяются по aggregate preservation set на четырёх границах. Harness/tests не повышают capability до `LIVE_VERIFIED`: нужен отдельный GitHub-hosted exact-candidate/merge provider proof; внешний PrihRash checkout остаётся read-only и не получает ADWF files.

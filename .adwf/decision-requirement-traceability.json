@@ -2,7 +2,7 @@
   "$schema": ".adwf/schemas/decision-requirement-traceability.schema.json",
   "schema_version": 1,
   "role": "CANONICAL_DECISION_REQUIREMENT_TRACEABILITY",
-  "revision": 15,
+  "revision": 16,
   "records": [
     {
       "id": "INTENT-FOUNDATION-20260815",
@@ -256,6 +256,17 @@
       "source_path": null,
       "source_sha256": null,
       "record_sha256": "05459d5e536e0b89a7ad3638d86b069dc9678b79f69626fff08f33785b0e5559"
+    },
+    {
+      "id": "DEC-UPGRADE-003",
+      "kind": "DECISION",
+      "version": 1,
+      "status": "ACCEPTED",
+      "title_ru": "Real external consumer proof исполняется только в disposable provider workspace",
+      "statement_ru": "Проверять exact внешний product snapshot через adoption A → transactional B → committed rollback A → retry B, сохраняя все pre-existing tracked regular bytes; source consumer остаётся read-only, а permanent workflow/ruleset authority для proof не добавляется.",
+      "source_path": null,
+      "source_sha256": null,
+      "record_sha256": "d4822f99511e5478ee6704f71bc65313565a75aa47ac480fa1c10e10f5b990ba"
     }
   ],
   "capability_refs": [
@@ -410,6 +421,13 @@
       "issue_number": 92,
       "ai_work_package_id": null,
       "ref_sha256": "f1250121cd986fe4bdeb55fbea248f546056b43c3d7204ba13046ac50da5e2d8"
+    },
+    {
+      "id": "WORKREF-UPGRADE-003",
+      "roadmap_id": "UPGRADE-003",
+      "issue_number": 86,
+      "ai_work_package_id": null,
+      "ref_sha256": "b6150f57213a950065bf9452e02dc43a5ebe24806890ae5d0c820a227a9f1d73"
     }
   ],
   "evidence_refs": [],
@@ -798,7 +816,42 @@
       "from": "CAPREF-CONSUMER-FRAMEWORK-UPGRADE-TRANSACTION",
       "to": "WORKREF-UPGRADE-FIX-001",
       "edge_sha256": "9a2d2568188448faae0db5c5af64f2744f852d99b0660739cbf3043bf8b3df0b"
+    },
+    {
+      "id": "EDGE-REQ-UPGRADE-003",
+      "type": "REQUIREMENT_TO_DECISION",
+      "from": "REQ-UPGRADE-002",
+      "to": "DEC-UPGRADE-003",
+      "edge_sha256": "b5cbbe525083a712b45dfed7ed84fa0469d1f6e29cd9e40494937def4edda21c"
+    },
+    {
+      "id": "EDGE-DEC-CAP-UPLAN-UPGRADE-003",
+      "type": "DECISION_TO_CAPABILITY",
+      "from": "DEC-UPGRADE-003",
+      "to": "CAPREF-CONSUMER-FRAMEWORK-UPGRADE-PLANNING",
+      "edge_sha256": "4a101689842552107665ca1120d966a39aa28ddff06232100d9af52c4a2c8591"
+    },
+    {
+      "id": "EDGE-DEC-CAP-UTX-UPGRADE-003",
+      "type": "DECISION_TO_CAPABILITY",
+      "from": "DEC-UPGRADE-003",
+      "to": "CAPREF-CONSUMER-FRAMEWORK-UPGRADE-TRANSACTION",
+      "edge_sha256": "457d66a72774f227474fbf7e78567bfc6d4c3ce3e62f9853142c53e88918a901"
+    },
+    {
+      "id": "EDGE-CAP-UPLAN-WORK-UPGRADE-003",
+      "type": "CAPABILITY_TO_WORK",
+      "from": "CAPREF-CONSUMER-FRAMEWORK-UPGRADE-PLANNING",
+      "to": "WORKREF-UPGRADE-003",
+      "edge_sha256": "0601af04e37518e20102f93657e6091a190ee462d8573c71b1db1ade9b44a1a1"
+    },
+    {
+      "id": "EDGE-CAP-UTX-WORK-UPGRADE-003",
+      "type": "CAPABILITY_TO_WORK",
+      "from": "CAPREF-CONSUMER-FRAMEWORK-UPGRADE-TRANSACTION",
+      "to": "WORKREF-UPGRADE-003",
+      "edge_sha256": "a9864e73a875f39938eda4b4412327c04ac1e3f8337d06771448cdb3c81bcee1"
     }
   ],
-  "graph_sha256": "8d505050c602223d75b100b4534818be31d03f96fdaa151f35c83e15caa8657b"
+  "graph_sha256": "ee5ed90b7d6763a2a0703f6289bf118003a3370c2f017502e1c53ca31b1f01a7"
 }

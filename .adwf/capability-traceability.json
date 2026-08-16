@@ -461,9 +461,10 @@
       ],
       "verification": [
         ".adwf/tests/test_consumer_upgrade_core.py",
-        ".adwf/tests/test_consumer_upgrade_adversarial.py"
+        ".adwf/tests/test_consumer_upgrade_adversarial.py",
+        ".adwf/tests/test_external_consumer_upgrade_proof.py"
       ],
-      "live_boundary": "LIVE_VERIFIED запрещён по evidence UPGRADE-001: unit/CI/provider validation доказывают только deterministic planning/compatibility. Safe framework upgrade требует отдельный transactional apply/recovery executor и real consumer exact A→B→rollback→B evidence с сохранностью consumer/shared data.",
+      "live_boundary": "LIVE_VERIFIED запрещён по evidence UPGRADE-001: unit/CI/provider validation доказывают только deterministic planning/compatibility. Safe framework upgrade требует отдельный transactional apply/recovery executor и real consumer exact A→B→rollback→B evidence с сохранностью consumer/shared data; UPGRADE-003 harness/tests сами по себе не являются live evidence — требуется exact provider proof на реальном внешнем consumer snapshot.",
       "live_evidence": []
     },
     {
@@ -480,9 +481,10 @@
       ],
       "verification": [
         ".adwf/tests/test_consumer_upgrade_transaction.py",
-        ".adwf/tests/test_consumer_upgrade_transaction_adversarial.py"
+        ".adwf/tests/test_consumer_upgrade_transaction_adversarial.py",
+        ".adwf/tests/test_external_consumer_upgrade_proof.py"
       ],
-      "live_boundary": "LIVE_VERIFIED запрещён по evidence UPGRADE-002: deterministic/adversarial fixtures доказывают executor/recovery semantics, но не real external consumer exact A→B→rollback→B и не PrihRash adoption readiness.",
+      "live_boundary": "LIVE_VERIFIED запрещён по evidence UPGRADE-002: deterministic/adversarial fixtures доказывают executor/recovery semantics, но не real external consumer exact A→B→rollback→B и не PrihRash adoption readiness; UPGRADE-003 harness/tests сами по себе не являются live evidence — требуется exact provider proof на реальном внешнем consumer snapshot.",
       "live_evidence": []
     }
   ]
