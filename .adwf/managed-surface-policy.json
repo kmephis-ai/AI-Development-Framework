@@ -20,6 +20,7 @@
   "snapshot_schema": ".adwf/schemas/managed-surface-snapshot.schema.json",
   "plan_schema": ".adwf/schemas/managed-surface-plan.schema.json",
   "transaction_schema": ".adwf/schemas/managed-surface-transaction.schema.json",
+  "detach_transaction_schema": ".adwf/schemas/managed-surface-detach-transaction.schema.json",
   "invariants": [
     "PROJECT_MUST_OUTLIVE_FRAMEWORK",
     "READ_ONLY_PLANNER_V1",
@@ -27,6 +28,8 @@
     "SHARED_GUARDED_PRESERVED",
     "TRANSACTIONAL_ADOPTION_APPLY_V1",
     "EXPLICIT_APPLY_ONLY",
-    "NO_OVERWRITE_EXISTING_CONSUMER_PATH"
+    "NO_OVERWRITE_EXISTING_CONSUMER_PATH",
+    "TRANSACTIONAL_GUARDED_DETACH_V1",
+    "DESTRUCTIVE_AUTHORITY_REQUIRES_PROVENANCE"
   ]
 }

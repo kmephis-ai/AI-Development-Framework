@@ -26,6 +26,7 @@ class ManagedSurfaceTransactionTests(unittest.TestCase):
             "managed-surface-policy.schema.json",
             "managed-surface-snapshot.schema.json",
             "managed-surface-plan.schema.json",
+            "managed-surface-detach-transaction.schema.json",
             "managed-surface-transaction.schema.json",
         ):
             (root / ".adwf/schemas" / name).write_text(
@@ -45,6 +46,7 @@ class ManagedSurfaceTransactionTests(unittest.TestCase):
                 ".adwf/private.txt",
                 ".adwf/second.txt",
                 ".adwf/schemas/managed-surface-plan.schema.json",
+                ".adwf/schemas/managed-surface-detach-transaction.schema.json",
                 ".adwf/schemas/managed-surface-policy.schema.json",
                 ".adwf/schemas/managed-surface-snapshot.schema.json",
                 ".adwf/schemas/managed-surface-transaction.schema.json",

@@ -2,7 +2,7 @@
   "$schema": ".adwf/schemas/decision-requirement-traceability.schema.json",
   "schema_version": 1,
   "role": "CANONICAL_DECISION_REQUIREMENT_TRACEABILITY",
-  "revision": 3,
+  "revision": 4,
   "records": [
     {
       "id": "INTENT-FOUNDATION-20260815",
@@ -69,6 +69,17 @@
       "source_path": null,
       "source_sha256": null,
       "record_sha256": "bef41f2b3e25eeddabe328e0b548b56cd7bdb2759865dee103851706cf3e349f"
+    },
+    {
+      "id": "DEC-LIFECYCLE-003",
+      "kind": "DECISION",
+      "version": 1,
+      "status": "ACCEPTED",
+      "title_ru": "Destructive detach разрешён только через provenance-bound quarantine transaction",
+      "statement_ru": "Разрешить explicit guarded detach только из durable transaction-bound adoption snapshot и READY detach plan: удалять лишь exact unchanged FRAMEWORK_PRIVATE managed paths через quarantine-before-purge transaction; shared, pre-existing и consumer-owned data сохраняются, drift/ambiguous recovery блокируются fail-closed.",
+      "source_path": null,
+      "source_sha256": null,
+      "record_sha256": "c61beabbce0b4c2f135752bbfda2fbed79705f174ab9983c7df035a5b4df4ae1"
     }
   ],
   "capability_refs": [
@@ -104,6 +115,13 @@
       "issue_number": 62,
       "ai_work_package_id": null,
       "ref_sha256": "445adb619a4f254255b51cd00109591b0218cd07405d78606d8d3450289663f6"
+    },
+    {
+      "id": "WORKREF-LIFECYCLE-003",
+      "roadmap_id": "LIFECYCLE-003",
+      "issue_number": 64,
+      "ai_work_package_id": null,
+      "ref_sha256": "b902ed92cb6fb7e58b7710f8531e34f7d1e599ec4bcd61a620c2d4712c59cdb8"
     }
   ],
   "evidence_refs": [],
@@ -184,7 +202,28 @@
       "from": "CAPREF-MANAGED-SURFACE-CONTRACT",
       "to": "WORKREF-LIFECYCLE-002",
       "edge_sha256": "d29c9f141b061e209c81e034864d58054835eb0be9330e9ee1145f9aa451a73a"
+    },
+    {
+      "id": "EDGE-REQ-DEC-LIFECYCLE-003",
+      "type": "REQUIREMENT_TO_DECISION",
+      "from": "REQ-LIFECYCLE-001",
+      "to": "DEC-LIFECYCLE-003",
+      "edge_sha256": "29128da0d36e287a556a705f7ab33af3ca10cfef11d8f6935a8d9f64f7672146"
+    },
+    {
+      "id": "EDGE-DEC-CAP-LIFECYCLE-003",
+      "type": "DECISION_TO_CAPABILITY",
+      "from": "DEC-LIFECYCLE-003",
+      "to": "CAPREF-MANAGED-SURFACE-CONTRACT",
+      "edge_sha256": "fbb34d285a91159e7d6d98147def66473dd813b80621a8c01be018c7b7f47a19"
+    },
+    {
+      "id": "EDGE-CAP-WORK-LIFECYCLE-003",
+      "type": "CAPABILITY_TO_WORK",
+      "from": "CAPREF-MANAGED-SURFACE-CONTRACT",
+      "to": "WORKREF-LIFECYCLE-003",
+      "edge_sha256": "4708a72da8c452ccb390c58491ceeb71e4078e508caab7ec9fc963bfcff8a350"
     }
   ],
-  "graph_sha256": "6451255f5d434c7606fd81d31d5663a2c9871ee2229acc36ce07c682dac8c79f"
+  "graph_sha256": "e212a8e6d0e7ad91840454463a94729194f0cc47ed6eb2dc1221df651933f85b"
 }

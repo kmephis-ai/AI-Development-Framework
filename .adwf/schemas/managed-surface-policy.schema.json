@@ -15,6 +15,7 @@
     "snapshot_schema",
     "plan_schema",
     "transaction_schema",
+    "detach_transaction_schema",
     "invariants"
   ],
   "properties": {
@@ -29,6 +30,7 @@
     "snapshot_schema": {"const": ".adwf/schemas/managed-surface-snapshot.schema.json"},
     "plan_schema": {"const": ".adwf/schemas/managed-surface-plan.schema.json"},
     "transaction_schema": {"const": ".adwf/schemas/managed-surface-transaction.schema.json"},
+    "detach_transaction_schema": {"const": ".adwf/schemas/managed-surface-detach-transaction.schema.json"},
     "invariants": {"type": "array", "minItems": 4, "uniqueItems": true, "items": {"type": "string", "minLength": 3}}
   }
 }
