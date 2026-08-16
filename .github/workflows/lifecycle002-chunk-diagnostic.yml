@@ -38,7 +38,10 @@ jobs:
           verify .github/lifecycle002.exact03 4000 97929d072ac76be01514460dbee4ee8c97d88f48ae15b8c743702390f3775b59
           verify .github/lifecycle002.exact04 4000 a182b5b00e1f5e81b349f8d4fafc22fd24f73db50073b5b0fed1612afaade4e3
           verify .github/lifecycle002.exact05 4000 be111b96ba701baa2b7991b4757e939c8684c2e65742874207d4d8891f6b6f1d
-          verify .github/lifecycle002.exact06 4000 f86a6716084f9d58303101dab13863283e3cc8dd8bf9f259203317ac1f03fc36
+          verify .github/lifecycle002.exact06a 1000 7e4ebb6e98a52b2478c8cfc97de599f5e752789fb0654b60ccbc930a444b9ef3
+          verify .github/lifecycle002.exact06b 1000 1918b9abec6f0cb3a6f55d27851538e6be3ffb0d85328508b34007eaa417b481
+          verify .github/lifecycle002.exact06c 1000 f18a8f269b92f4b8545eb2d2f5d37d0ee07229741b1b1e1d7a7c0ba3c1028b1b
+          verify .github/lifecycle002.exact06d 1000 b3425a83b743be9925d1a5030e24c72e1898500a513c409aec1ce917bc264123
           verify .github/lifecycle002.exact07 3232 c2c7f51b8e468abdbb78d779822d4c02cb9534a259f1cf5bcf2e36c67c44cc18
 
           cat .github/lifecycle002.exact00 \
@@ -50,7 +53,10 @@ jobs:
               .github/lifecycle002.exact03 \
               .github/lifecycle002.exact04 \
               .github/lifecycle002.exact05 \
-              .github/lifecycle002.exact06 \
+              .github/lifecycle002.exact06a \
+              .github/lifecycle002.exact06b \
+              .github/lifecycle002.exact06c \
+              .github/lifecycle002.exact06d \
               .github/lifecycle002.exact07 > /tmp/all.b64
           echo "combined bytes=$(wc -c < /tmp/all.b64 | tr -d ' ') sha256=$(sha256sum /tmp/all.b64 | awk '{print $1}')"
           test "$(wc -c < /tmp/all.b64 | tr -d ' ')" = '31232'
