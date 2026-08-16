@@ -36,7 +36,12 @@ jobs:
           test "$(git rev-parse "origin/${TARGET_BRANCH}")" = "${EXPECTED_SOURCE}"
 
           cat \
-            .transport/upgrade001/patch.b64.00 \
+            .transport/upgrade001/patch.b64.00.00 \
+            .transport/upgrade001/patch.b64.00.01 \
+            .transport/upgrade001/patch.b64.00.02 \
+            .transport/upgrade001/patch.b64.00.03 \
+            .transport/upgrade001/patch.b64.00.04 \
+            .transport/upgrade001/patch.b64.00.05 \
             .transport/upgrade001/patch.b64.01 \
             > /tmp/upgrade001.patch.gz.b64
           test "$(wc -c < /tmp/upgrade001.patch.gz.b64 | tr -d ' ')" = "19152"
