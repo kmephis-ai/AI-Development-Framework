@@ -158,6 +158,14 @@
             "ASREF-001"
           ],
           "product_impact": false
+        },
+        {
+          "roadmap_id": "UPGRADE-002",
+          "title_ru": "Transactional Consumer Framework Upgrade Apply + Rollback/Recovery v1",
+          "dependencies": [
+            "UPGRADE-001"
+          ],
+          "product_impact": false
         }
       ]
     }

@@ -2,7 +2,7 @@
   "$schema": ".adwf/schemas/decision-requirement-traceability.schema.json",
   "schema_version": 1,
   "role": "CANONICAL_DECISION_REQUIREMENT_TRACEABILITY",
-  "revision": 11,
+  "revision": 12,
   "records": [
     {
       "id": "INTENT-FOUNDATION-20260815",
@@ -212,6 +212,28 @@
       "source_path": null,
       "source_sha256": null,
       "record_sha256": "aaeb1f2cfd3dfa9cbe756b5928344d907d6eafc3225662510862e10ab261063e"
+    },
+    {
+      "id": "REQ-UPGRADE-002",
+      "kind": "REQUIREMENT",
+      "version": 1,
+      "status": "ACTIVE",
+      "title_ru": "READY upgrade plan должен применяться как exact transactional mutation с доказуемым rollback/recovery",
+      "statement_ru": "Consumer framework upgrade A→B должен revalidate sealed planning evidence перед первой записью, изменять только proven framework-private paths через durable journal/quarantine, восстанавливать exact A после interruption и сохранять foreign/shared/pre-existing content fail-closed.",
+      "source_path": null,
+      "source_sha256": null,
+      "record_sha256": "3a1eedbf0a2be5f823ae3dfdf828ebd47752fca9b9435434495aade91fac6c8f"
+    },
+    {
+      "id": "DEC-UPGRADE-002",
+      "kind": "DECISION",
+      "version": 1,
+      "status": "ACCEPTED",
+      "title_ru": "Upgrade apply использует отдельную durable transaction boundary и не исполняет arbitrary migrations",
+      "statement_ru": "Разрешить explicit apply только для sealed READY UPGRADE-001 plan; CREATE/REPLACE/REMOVE выполнять по closed whitelist с exact provenance, profile и B snapshot включить в transaction boundary, recovery делать conservative, а migration id разрешать только через встроенный versioned test-covered handler.",
+      "source_path": null,
+      "source_sha256": null,
+      "record_sha256": "96e5853e7894fcd635dc60c0aac44af1b0036e289fccc28f63bec2987daa94d4"
     }
   ],
   "capability_refs": [
@@ -254,6 +276,11 @@
       "id": "CAPREF-CONSUMER-FRAMEWORK-UPGRADE-PLANNING",
       "capability_id": "CONSUMER_FRAMEWORK_UPGRADE_PLANNING",
       "ref_sha256": "d79ef273bcb139585edb9a5737c584d1cb85257ca5020c2370d0d8e4c0c2647e"
+    },
+    {
+      "id": "CAPREF-CONSUMER-FRAMEWORK-UPGRADE-TRANSACTION",
+      "capability_id": "CONSUMER_FRAMEWORK_UPGRADE_TRANSACTION",
+      "ref_sha256": "aa3aa789842bf535fb7c6e1ecbd92e3ac84ff5a8620d5b6581a0b8b0e7e7ccb2"
     }
   ],
   "work_unit_refs": [
@@ -333,6 +360,13 @@
       "issue_number": 81,
       "ai_work_package_id": null,
       "ref_sha256": "9f225766dde9fd8b04221a13e466cb222405780c22f445cd5960e9bbb98ce85a"
+    },
+    {
+      "id": "WORKREF-UPGRADE-002",
+      "roadmap_id": "UPGRADE-002",
+      "issue_number": 84,
+      "ai_work_package_id": null,
+      "ref_sha256": "baeb0e3dab3252f1032a382fd625727fa73c5b82c8aef9586a7b4d7a33213e43"
     }
   ],
   "evidence_refs": [],
@@ -609,7 +643,35 @@
       "from": "CAPREF-CONSUMER-FRAMEWORK-UPGRADE-PLANNING",
       "to": "WORKREF-UPGRADE-001",
       "edge_sha256": "b6bf67f65f7b8a215559858dadd943440d193ccefd83a1022cf8bd18ece3184b"
+    },
+    {
+      "id": "EDGE-INTENT-REQ-UPGRADE-002",
+      "type": "INTENT_TO_REQUIREMENT",
+      "from": "INTENT-FOUNDATION-20260815",
+      "to": "REQ-UPGRADE-002",
+      "edge_sha256": "c255f4d006056977d6eb51499cd7ec2ddf0830b9e7f7823706e1f1b358e6be6e"
+    },
+    {
+      "id": "EDGE-REQ-DEC-UPGRADE-002",
+      "type": "REQUIREMENT_TO_DECISION",
+      "from": "REQ-UPGRADE-002",
+      "to": "DEC-UPGRADE-002",
+      "edge_sha256": "9f425d1a919b9d3be607c011a7c76176120cb05cbacf56763b136ce8a1e22d36"
+    },
+    {
+      "id": "EDGE-DEC-CAP-UPGRADE-002",
+      "type": "DECISION_TO_CAPABILITY",
+      "from": "DEC-UPGRADE-002",
+      "to": "CAPREF-CONSUMER-FRAMEWORK-UPGRADE-TRANSACTION",
+      "edge_sha256": "c68cc48205344aa5556c1c290771237c98d0e5cea40a3a2b06181e0ab601daa1"
+    },
+    {
+      "id": "EDGE-CAP-WORK-UPGRADE-002",
+      "type": "CAPABILITY_TO_WORK",
+      "from": "CAPREF-CONSUMER-FRAMEWORK-UPGRADE-TRANSACTION",
+      "to": "WORKREF-UPGRADE-002",
+      "edge_sha256": "e003fdfaa57bd5ebb9a3329ceacea38d707435c0a036c50c6c02b4b50e976daa"
     }
   ],
-  "graph_sha256": "140b80eaf6fe13b927e022666ee8807c495192c027ba3c8c15983051f018e0b9"
+  "graph_sha256": "3493f9777485a55b8eb1f121aa4f11110725556040967670747b9b5c8074eec5"
 }
