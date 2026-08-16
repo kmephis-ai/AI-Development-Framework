@@ -1,0 +1,141 @@
+name: ADWF GOV-020 Provider Readback Repair Certification
+
+on:
+  push:
+    branches:
+      - agent/certify-provider-readback-repair-20260816-700c4fd4
+
+permissions:
+  actions: read
+  contents: write
+
+jobs:
+  certify-and-publish:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    env:
+      BASE_SHA: 027a0091a7854332f5fe42dff2ec8aa5f8e1ffcf
+      EXPECTED_HEAD: 700c4fd4204b70b8ab4f3703c7732d99af128c20
+      EXPECTED_TREE: 00222dc5b45ae3afdad187505036c70aaa92f0c9
+      PATCH_SHA256: 013a3c463577255cc12b1ce83ebb18d2f02946cf90f318b2760fd82281c8bc8b
+      FEATURE_BRANCH: agent/webref-001-provider-readback-repair
+      OLD_PR_RUN_ID: '31942040868'
+      OLD_PR_JOB_ID: '95152529524'
+      OLD_PR_HEAD: 0f9a0335d31472a468936be8ccf1c6622053344a
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd
+        with:
+          fetch-depth: 0
+          persist-credentials: true
+
+      - uses: actions/setup-python@a309ff8b426b58ec0e2a45f0f869d46889d02405
+        with:
+          python-version: '3.12.10'
+
+      - name: Reconstruct exact repair candidate
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git ls-remote origin refs/heads/main | awk '{print $1}')" = "${BASE_SHA}"
+          test "$(git ls-remote origin "refs/heads/${FEATURE_BRANCH}" | awk '{print $1}')" = "${BASE_SHA}"
+          base64 --decode .transport/provider-readback-repair/patch.b64 | gzip --decompress > /tmp/provider-repair.patch
+          test "$(sha256sum /tmp/provider-repair.patch | awk '{print $1}')" = "${PATCH_SHA256}"
+          rm -rf /tmp/provider-repair-candidate /tmp/provider-repair-base
+          git worktree add --detach /tmp/provider-repair-candidate "${BASE_SHA}"
+          git -C /tmp/provider-repair-candidate apply --index /tmp/provider-repair.patch
+          cat > /tmp/expected-files.txt <<'EOF'
+          .adwf/docs-registry.json
+          .adwf/lib/http_transport.py
+          .adwf/scripts/collect_preview_attestation.py
+          .adwf/tests/test_provider_http_mock.py
+          .adwf/tests/test_trusted_controller.py
+          MANIFEST.json
+          SHA256SUMS.txt
+          EOF
+          git -C /tmp/provider-repair-candidate diff --cached --name-only "${BASE_SHA}" > /tmp/actual-files.txt
+          diff -u /tmp/expected-files.txt /tmp/actual-files.txt
+          test "$(git -C /tmp/provider-repair-candidate write-tree)" = "${EXPECTED_TREE}"
+          export GIT_AUTHOR_NAME='ADWF Provider Repair Writer'
+          export GIT_AUTHOR_EMAIL='41898282+github-actions[bot]@users.noreply.github.com'
+          export GIT_AUTHOR_DATE='2026-08-16T10:50:30Z'
+          export GIT_COMMITTER_NAME='ADWF Provider Repair Writer'
+          export GIT_COMMITTER_EMAIL='41898282+github-actions[bot]@users.noreply.github.com'
+          export GIT_COMMITTER_DATE='2026-08-16T10:50:50Z'
+          CANDIDATE="$(printf '%s\n' 'fix(adwf): harden provider redirect log readback' | git -C /tmp/provider-repair-candidate commit-tree "${EXPECTED_TREE}" -p "${BASE_SHA}")"
+          test "${CANDIDATE}" = "${EXPECTED_HEAD}"
+          git -C /tmp/provider-repair-candidate reset --hard "${EXPECTED_HEAD}"
+          test -z "$(git -C /tmp/provider-repair-candidate status --porcelain)"
+          git worktree add --detach /tmp/provider-repair-base "${BASE_SHA}"
+          PYTHONPATH=/tmp/provider-repair-base/.adwf python - <<'PY'
+          import json, os
+          from lib.trust import classify_git_diff
+          r=classify_git_diff('/tmp/provider-repair-candidate',os.environ['BASE_SHA'],os.environ['EXPECTED_HEAD'])
+          open('/tmp/base-classification.json','w').write(json.dumps(r,indent=2,sort_keys=True)+'\n')
+          assert r['result']=='ALLOW',r
+          assert r['authorization_mode']=='STANDING_OWNER_POLICY',r
+          assert r['human_required'] is False,r
+          assert r['manual_required_files']==[],r
+          assert r['weakening']==[],r
+          assert r['reason_codes']==[],r
+          assert r['feature_files']==[],r
+          PY
+
+      - name: Repair regression and full framework certification
+        shell: bash
+        working-directory: /tmp/provider-repair-candidate
+        run: |
+          set -euo pipefail
+          python -m unittest discover -s .adwf/tests -p 'test_provider_http_mock.py' -v
+          python -m unittest discover -s .adwf/tests -p 'test_trusted_controller.py' -v
+          python .adwf/scripts/docs_freshness.py
+          python .adwf/scripts/generate_manifest.py --check
+          python .adwf/scripts/validate_framework.py
+          TERM=xterm python .adwf/adwf.py self-test 2>&1 | tee /tmp/provider-repair-selftest.log
+          grep -Eq 'Ran 433 tests in ' /tmp/provider-repair-selftest.log
+          grep -Fxq 'OK' /tmp/provider-repair-selftest.log
+          test -z "$(git status --porcelain)"
+
+      - name: Reproduce previously failing GitHub job-log readback
+        shell: bash
+        working-directory: /tmp/provider-repair-candidate
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          import json, os, sys
+          sys.path.insert(0,'.adwf')
+          from lib.github_provider import GitHubClient
+          from scripts import collect_preview_attestation as preview
+          client=GitHubClient(os.environ['GITHUB_REPOSITORY'],os.environ['GITHUB_TOKEN'])
+          raw=client.job_logs(int(os.environ['OLD_PR_JOB_ID']))
+          assert b'ADWF_PREVIEW_ATTESTATION_V1=' in raw, 'preview marker missing from downloaded job logs'
+          event={'workflow_run':{'name':'ADWF PR','event':'pull_request','status':'completed','conclusion':'success','head_sha':os.environ['OLD_PR_HEAD'],'id':int(os.environ['OLD_PR_RUN_ID'])}}
+          result=preview.collect(client,event)
+          print(json.dumps(result,sort_keys=True))
+          assert result['status']=='VERIFIED',result
+          assert result['head_sha']==os.environ['OLD_PR_HEAD'],result
+          open('/tmp/provider-readback-proof.json','w').write(json.dumps(result,indent=2,sort_keys=True)+'\n')
+          PY
+
+      - name: Final CAS and repair feature publication
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git -C /tmp/provider-repair-candidate rev-parse HEAD)" = "${EXPECTED_HEAD}"
+          test "$(git -C /tmp/provider-repair-candidate rev-parse HEAD^{tree})" = "${EXPECTED_TREE}"
+          test "$(git ls-remote origin refs/heads/main | awk '{print $1}')" = "${BASE_SHA}"
+          test "$(git ls-remote origin "refs/heads/${FEATURE_BRANCH}" | awk '{print $1}')" = "${BASE_SHA}"
+          git push origin "${EXPECTED_HEAD}:refs/heads/${FEATURE_BRANCH}"
+          test "$(git ls-remote origin "refs/heads/${FEATURE_BRANCH}" | awk '{print $1}')" = "${EXPECTED_HEAD}"
+
+      - name: Upload certification evidence
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: gov020-provider-readback-repair-700c4fd4
+          path: |
+            /tmp/base-classification.json
+            /tmp/provider-repair-selftest.log
+            /tmp/provider-readback-proof.json
+          if-no-files-found: error
+          retention-days: 7
