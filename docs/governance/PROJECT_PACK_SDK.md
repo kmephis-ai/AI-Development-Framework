@@ -33,6 +33,8 @@ Detection is data-driven from the validated definition. v1 permits exactly one p
 
 `PACK_ORDER` remains the deterministic precedence rule when multiple safe definitions match. Unknown pack IDs cannot become executable merely by adding a JSON file; registration order is explicit in code.
 
+`ASREF-001` adds canonical `apps-script` before generic `node`: an `appsscript.json` marker wins even when the data-centric project also has `package.json`. The built-in Apps Script definition is stricter than the generic schema: `network=NONE`, no `install`, no `start` and no preview runtime. Its mandatory reference path therefore does not require `clasp`, Google credentials or deployment.
+
 ## Command contract
 
 Allowed capability names are bounded to:
@@ -85,4 +87,4 @@ The SDK blocks before execution/materialization when a definition contains:
 
 ## Truth boundary
 
-Formal SDK tests prove implementation and exact definition identity. They do **not** prove that React, Apps Script or Wiren Board consumers work end-to-end. `PROJECT_PACKS` remains `LIVE_NOT_VERIFIED` until downstream reference consumer/provider evidence is attached to exact pack digests.
+Formal SDK tests prove implementation and exact definition identity. WEBREF/ASREF add synthetic reference conformance for Web and Apps Script, but they still do **not** constitute real downstream provider/runtime evidence. `PROJECT_PACKS` remains `LIVE_NOT_VERIFIED`; edge/Wiren Board reference conformance and real consumer/provider cycles remain separate proof boundaries.

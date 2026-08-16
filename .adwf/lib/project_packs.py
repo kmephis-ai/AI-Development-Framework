@@ -11,7 +11,7 @@ import re
 from .contracts import validate
 from .strict_json import loads as strict_loads
 
-PACK_ORDER = ("react", "vue", "angular", "fastapi", "node", "python", "go")
+PACK_ORDER = ("apps-script", "react", "vue", "angular", "fastapi", "node", "python", "go")
 COMMAND_NAMES = {"lint", "unit", "integration", "build", "smoke", "golden_paths", "e2e", "install", "start"}
 SHELL_CONTROL = re.compile(r"(?:\r|\n|\x00|`|\$\(|&&|\|\||[;|<>])")
 EXECUTABLE = re.compile(r"^[A-Za-z0-9_.+-]+$")
@@ -88,6 +88,15 @@ def _semantic_findings(value: dict[str, Any], path: Path) -> list[str]:
         errors.append("SAFETY_PACKAGE_NETWORK_REQUIRED")
     if has_preview and network not in {"LOOPBACK", "PACKAGE_REGISTRY_AND_LOOPBACK"}:
         errors.append("SAFETY_LOOPBACK_NETWORK_REQUIRED")
+    if value.get("id") == "apps-script":
+        if detect.get("files") != ["appsscript.json"]:
+            errors.append("APPS_SCRIPT_DETECTION_MARKER_REQUIRED")
+        if network != "NONE":
+            errors.append("APPS_SCRIPT_NETWORK_MUST_BE_NONE")
+        if commands.get("install"):
+            errors.append("APPS_SCRIPT_INSTALL_COMMAND_FORBIDDEN")
+        if commands.get("start") or preview:
+            errors.append("APPS_SCRIPT_PREVIEW_RUNTIME_FORBIDDEN")
     if path.stem != value.get("id"):
         errors.append("PROJECT_PACK_ID_MISMATCH")
     return list(dict.fromkeys(errors))

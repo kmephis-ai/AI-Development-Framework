@@ -65,4 +65,4 @@ Conformance обязана блокироваться или безопасно 
 
 Даже provider-side successful synthetic Web run доказывает implementation/reference conformance, но **не** повышает автоматически `MANAGED_SURFACE_CONTRACT`, `PROJECT_PACKS`, `PROJECT_RUNTIME_SAFETY` или `CONSUMER_PROFILE_OVERLAY` до `LIVE_VERIFIED`. Их live boundary требует отдельный реальный downstream consumer repository/provider evidence cycle.
 
-Также WEBREF-001 не доказывает Apps Script/data-centric и edge/automation классы. Они остаются следующими независимыми conformance units.
+WEBREF-001 сам по себе не доказывает другие consumer classes. `ASREF-001` добавляет отдельный synthetic Apps Script/data-centric proof через тот же report/evidence model; это не превращает Web evidence в Apps Script evidence и не даёт live Google runtime claim. Edge/automation остаётся третьим независимым conformance unit.

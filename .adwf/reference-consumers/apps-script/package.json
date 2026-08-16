@@ -1,0 +1,10 @@
+{
+  "name": "adwf-reference-apps-script-consumer",
+  "private": true,
+  "version": "1.0.0",
+  "scripts": {
+    "lint": "node scripts/check.mjs lint",
+    "test": "node scripts/check.mjs test",
+    "build": "node scripts/check.mjs build"
+  }
+}

@@ -2,7 +2,7 @@
   "$schema": ".adwf/schemas/decision-requirement-traceability.schema.json",
   "schema_version": 1,
   "role": "CANONICAL_DECISION_REQUIREMENT_TRACEABILITY",
-  "revision": 9,
+  "revision": 10,
   "records": [
     {
       "id": "INTENT-FOUNDATION-20260815",
@@ -168,6 +168,28 @@
       "source_path": null,
       "source_sha256": null,
       "record_sha256": "cc5aa430025aebbd4e572611211d0529f45e2a61350d05a0ab3caff7eeab6714"
+    },
+    {
+      "id": "REQ-ASREF-001",
+      "kind": "REQUIREMENT",
+      "version": 1,
+      "status": "ACTIVE",
+      "title_ru": "Apps Script/data-centric consumer должен доказать ADWF lifecycle без обязательного Google provider",
+      "statement_ru": "На отдельном synthetic Apps Script/data-centric consumer необходимо machine-verifiably пройти exact-source adoption, consumer profile/apps-script Project Pack, local-only isolated gates и guarded detach с сохранением consumer-owned scripts/data, не требуя Google credentials/network/deployment и не выдавая local shim за Google runtime evidence.",
+      "source_path": null,
+      "source_sha256": null,
+      "record_sha256": "709f2a872e44b72dc7061f007cc37ec1bfe02cfe4811d04564ae59b25e1b01d2"
+    },
+    {
+      "id": "DEC-ASREF-001",
+      "kind": "DECISION",
+      "version": 1,
+      "status": "ACCEPTED",
+      "title_ru": "Apps Script reference использует существующий Project Pack SDK и общий conformance report",
+      "statement_ru": "Добавить apps-script marker pack с precedence над node, network=NONE и без install/start/preview; representative .gs logic тестировать локально через narrow fake SpreadsheetApp boundary в ProjectExecutionSession. Расширить существующий REFERENCE_CONFORMANCE_REPORT вторым class вместо создания отдельного evidence framework; actual Google runtime/provider остаётся отдельной live boundary.",
+      "source_path": null,
+      "source_sha256": null,
+      "record_sha256": "49832647c2c995857532ce86723cc0fad6a857ce8ac7652e2fbd404fb8b3b7fa"
     }
   ],
   "capability_refs": [
@@ -200,6 +222,11 @@
       "id": "CAPREF-REFERENCE-WEB-CONFORMANCE",
       "capability_id": "REFERENCE_WEB_CONFORMANCE",
       "ref_sha256": "668f3d5a8e0ebd26ea7b29b6605fe225707645f63c2b97d426e94f16e5cad5bf"
+    },
+    {
+      "id": "CAPREF-REFERENCE-APPS-SCRIPT-CONFORMANCE",
+      "capability_id": "REFERENCE_APPS_SCRIPT_CONFORMANCE",
+      "ref_sha256": "ed4aa2c80419a1aae969ae5671489b2916ad0f245713084c986561a2c3d1ca4a"
     }
   ],
   "work_unit_refs": [
@@ -265,6 +292,13 @@
       "issue_number": 75,
       "ai_work_package_id": null,
       "ref_sha256": "92fadfcd13486f1d6e0497110992425b1e373c266fd3679e8d6ec8f852fc6462"
+    },
+    {
+      "id": "WORKREF-ASREF-001",
+      "roadmap_id": "ASREF-001",
+      "issue_number": 80,
+      "ai_work_package_id": null,
+      "ref_sha256": "8b4e15d488d4a475d2ae7ebf13297737dc91af7dbf366a9abc8270b99b016355"
     }
   ],
   "evidence_refs": [],
@@ -485,7 +519,35 @@
       "from": "CAPREF-REFERENCE-WEB-CONFORMANCE",
       "to": "WORKREF-WEBREF-001",
       "edge_sha256": "2e182eead63a419749fa7e4d8b2a9fb214f7f02dd11060c66592839fa79afd20"
+    },
+    {
+      "id": "EDGE-INTENT-REQ-ASREF-001",
+      "type": "INTENT_TO_REQUIREMENT",
+      "from": "INTENT-FOUNDATION-20260815",
+      "to": "REQ-ASREF-001",
+      "edge_sha256": "62e49e63255c49d3e8a0180a81d7671ef804f40ec32a7b158f601827a2f9aaf0"
+    },
+    {
+      "id": "EDGE-REQ-DEC-ASREF-001",
+      "type": "REQUIREMENT_TO_DECISION",
+      "from": "REQ-ASREF-001",
+      "to": "DEC-ASREF-001",
+      "edge_sha256": "efa75bb46d3784d7833091548836a1f3d5ecec5ddc078c60ca490e33978c9f7c"
+    },
+    {
+      "id": "EDGE-DEC-CAP-ASREF-001",
+      "type": "DECISION_TO_CAPABILITY",
+      "from": "DEC-ASREF-001",
+      "to": "CAPREF-REFERENCE-APPS-SCRIPT-CONFORMANCE",
+      "edge_sha256": "49bf2d921ffa69e9025ccfd9a11ba1cf10fb36db97aadf33be406c8bc6cd2670"
+    },
+    {
+      "id": "EDGE-CAP-WORK-ASREF-001",
+      "type": "CAPABILITY_TO_WORK",
+      "from": "CAPREF-REFERENCE-APPS-SCRIPT-CONFORMANCE",
+      "to": "WORKREF-ASREF-001",
+      "edge_sha256": "54791f46fd93c1c96d1396d8ba17eecaf01d4aff03107f0bee9fa055367f46e8"
     }
   ],
-  "graph_sha256": "f226565ecf8e2b328f92d51ebb4a9b36aad305b32d31cb90878db255cab442d1"
+  "graph_sha256": "72beb9346a099ec050a39ad7b4a26833aebda85a60d99dadcd1dff99f0ae9544"
 }
