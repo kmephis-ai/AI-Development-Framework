@@ -121,7 +121,7 @@ jobs:
           assert report['reference_kind']=='SYNTHETIC_REFERENCE_CONSUMER'
           assert report['framework']['source_tree']==os.environ['EXPECTED_TREE']
           assert report['pack']['id']=='apps-script'
-          assert report['pack']['network_enforcement']=='DECLARATION_ONLY', report['pack']
+          assert report['pack']['network_enforcement']=='DECLARATION_ONLY_NOT_ENFORCED', report['pack']
           assert report['preview']['status']=='NOT_APPLICABLE'
           assert report['functional']['status']=='PASS'
           assert report['functional']['mode']=='LOCAL_DETERMINISTIC_APPS_SCRIPT_SHIM'
