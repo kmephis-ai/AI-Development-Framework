@@ -1,0 +1,199 @@
+name: ADWF EDGEREF-001 Exact Candidate Materializer
+
+on:
+  push:
+    branches:
+      - agent/materialize-edgeref001-81da2e96
+
+permissions:
+  contents: write
+  checks: write
+
+env:
+  BASE_SHA: 81da2e96f9e2abac47f23e942c7c1866f34ed6d6
+  BASE_TREE: a5dd370aca67d5ba29e5fc285d1c364f33232edd
+  EXPECTED_TREE: d1f8e37fd16530f872093f3a348cf5ec3a14a83e
+  PATCH_SHA256: 4bd82a6a0b319fedbde18760d21560f00c16670dcebefe65e1b21aecff832674
+  B64_SHA256: 7b51b24f46511d95b0ece7f7f0617147f70aba26af77dff909a0dec780d52e65
+  FEATURE_BRANCH: agent/edgeref-001-reference-edge-controller
+
+jobs:
+  materialize-and-certify:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd
+        with:
+          ref: agent/materialize-edgeref001-81da2e96
+          fetch-depth: 0
+      - uses: actions/setup-python@a309ff8b426b58ec0e2a45f0f869d46889d02405
+        with:
+          python-version: "3.12.10"
+
+      - name: Reconstruct and verify transport
+        shell: bash
+        run: |
+          set -euo pipefail
+          cat .transport/edgeref001/chunk.000 .transport/edgeref001/chunk.001 > /tmp/edgeref001.patch.gz.b64
+          echo "$B64_SHA256  /tmp/edgeref001.patch.gz.b64" | sha256sum -c -
+          base64 -d /tmp/edgeref001.patch.gz.b64 | gzip -dc > /tmp/edgeref001.patch
+          echo "$PATCH_SHA256  /tmp/edgeref001.patch" | sha256sum -c -
+
+      - name: Materialize exact candidate tree
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse "$BASE_SHA^{tree}")" = "$BASE_TREE"
+          rm -rf /tmp/edgeref-candidate /tmp/edgeref-base
+          git worktree add --detach /tmp/edgeref-candidate "$BASE_SHA"
+          cd /tmp/edgeref-candidate
+          test "$(git rev-parse HEAD)" = "$BASE_SHA"
+          test -z "$(git status --porcelain=v1 --untracked-files=all)"
+          git apply --index /tmp/edgeref001.patch
+          git diff --cached --check
+          test "$(git write-tree)" = "$EXPECTED_TREE"
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git commit -q -m "EDGEREF-001: reference edge controller conformance"
+          test "$(git rev-parse HEAD^)" = "$BASE_SHA"
+          test "$(git rev-parse HEAD^{tree})" = "$EXPECTED_TREE"
+          test -z "$(git status --porcelain=v1 --untracked-files=all)"
+          echo "CANDIDATE_SHA=$(git rev-parse HEAD)" >> "$GITHUB_ENV"
+
+      - name: Focused and regression suites
+        shell: bash
+        working-directory: /tmp/edgeref-candidate
+        run: |
+          set -euo pipefail
+          python .adwf/tests/test_project_pack_sdk.py -q
+          python .adwf/tests/test_project_execution_safety.py -q
+          python .adwf/tests/test_consumer_profile.py -q
+          python .adwf/tests/test_reference_web_conformance.py -q
+          python .adwf/tests/test_reference_apps_script_conformance.py -q
+          python .adwf/tests/test_reference_edge_conformance.py -q
+          python .adwf/scripts/validate_capabilities.py
+          python .adwf/scripts/validate_traceability.py
+          python .adwf/scripts/validate_docs.py
+          python .adwf/scripts/validate_ci.py
+          python .adwf/adwf.py doctor --scope package_integrity
+
+      - name: Full synthetic Edge lifecycle proof
+        shell: bash
+        working-directory: /tmp/edgeref-candidate
+        run: |
+          set -euo pipefail
+          python .adwf/scripts/reference_edge_conformance.py --output /tmp/edgeref-report.json > /tmp/edgeref-stdout.json
+          python - <<'PY'
+          import hashlib, json
+          from pathlib import Path
+          report = json.loads(Path('/tmp/edgeref-report.json').read_text(encoding='utf-8'))
+          assert report['outcome'] == 'PASS'
+          assert report['consumer_class'] == 'EDGE_CONTROLLER'
+          assert report['reference_kind'] == 'SYNTHETIC_REFERENCE_CONSUMER'
+          assert report['pack']['id'] == 'edge-controller'
+          assert report['preview']['status'] == 'NOT_APPLICABLE'
+          assert report['preview']['reason'] == 'EDGE_CONTROLLER_NO_BROWSER_PREVIEW'
+          assert report['functional']['mode'] == 'LOCAL_DETERMINISTIC_EDGE_CONTROLLER_SHIM'
+          assert report['functional']['external_network_required'] is False
+          assert report['functional']['device_runtime_executed'] is False
+          assert report['functional']['device_deployment_performed'] is False
+          assert report['functional']['ssh_required'] is False
+          assert report['preservation']['before_sha256'] == report['preservation']['after_detach_sha256']
+          assert report['preservation']['profile_survived'] is True
+          assert report['readoption']['transaction_identity_changed'] is True
+          assert 'REAL_EDGE_DEVICE_RUNTIME_NOT_EXECUTED' in report['limitations']
+          assert 'SSH_OR_DEVICE_DEPLOYMENT_NOT_EXECUTED' in report['limitations']
+          print('EDGE_REPORT_SHA256=' + hashlib.sha256(Path('/tmp/edgeref-report.json').read_bytes()).hexdigest())
+          PY
+
+      - name: Full framework validator
+        shell: bash
+        working-directory: /tmp/edgeref-candidate
+        run: |
+          set -euo pipefail
+          python .adwf/scripts/validate_framework.py
+
+      - name: Exact BASE trust classification
+        shell: bash
+        run: |
+          set -euo pipefail
+          git worktree add --detach /tmp/edgeref-base "$BASE_SHA"
+          BASE_SHA="$BASE_SHA" CANDIDATE_SHA="$CANDIDATE_SHA" python - <<'PY'
+          import json, os, sys
+          sys.path.insert(0, '/tmp/edgeref-base/.adwf')
+          from lib.trust import classify_git_diff
+          result = classify_git_diff('/tmp/edgeref-candidate', os.environ['BASE_SHA'], os.environ['CANDIDATE_SHA'])
+          print(json.dumps(result, ensure_ascii=False, sort_keys=True))
+          assert result.get('result') == 'ALLOW', result
+          assert result.get('authorization_mode') == 'STANDING_OWNER_POLICY', result
+          assert result.get('human_required') is False, result
+          assert (result.get('manual_required_files') or []) == [], result
+          assert (result.get('inspection_unverified_files') or []) == [], result
+          assert (result.get('weakening') or []) == [], result
+          assert (result.get('reason_codes') or []) == [], result
+          PY
+
+      - name: CAS guard and publish exact feature candidate
+        shell: bash
+        run: |
+          set -euo pipefail
+          MAIN_REMOTE="$(git ls-remote origin refs/heads/main | cut -f1)"
+          FEATURE_REMOTE="$(git ls-remote origin "refs/heads/$FEATURE_BRANCH" | cut -f1)"
+          test "$MAIN_REMOTE" = "$BASE_SHA"
+          test "$FEATURE_REMOTE" = "$BASE_SHA"
+          test "$(git -C /tmp/edgeref-candidate rev-parse HEAD)" = "$CANDIDATE_SHA"
+          test "$(git -C /tmp/edgeref-candidate rev-parse HEAD^{tree})" = "$EXPECTED_TREE"
+          git -C /tmp/edgeref-candidate push origin "$CANDIDATE_SHA:refs/heads/$FEATURE_BRANCH"
+
+      - name: Publish exact-head synthetic Edge provider proof
+        shell: bash
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          REPORT_SHA="$(sha256sum /tmp/edgeref-report.json | cut -d' ' -f1)"
+          PACK_DIGEST="$(python - <<'PY'
+          import json, sys
+          from pathlib import Path
+          sys.path.insert(0, '/tmp/edgeref-candidate/.adwf')
+          from lib.project_packs import load_packs
+          print(load_packs('/tmp/edgeref-candidate')['edge-controller']['digest'])
+          PY
+          )"
+          CANDIDATE_SHA="$CANDIDATE_SHA" EXPECTED_TREE="$EXPECTED_TREE" REPORT_SHA="$REPORT_SHA" PACK_DIGEST="$PACK_DIGEST" python - <<'PY'
+          import json, os, urllib.request
+          repo = os.environ['GITHUB_REPOSITORY']
+          token = os.environ['GITHUB_TOKEN']
+          sha = os.environ['CANDIDATE_SHA']
+          payload = {
+              'name': 'adwf/reference-edge-provider-proof',
+              'head_sha': sha,
+              'status': 'completed',
+              'conclusion': 'success',
+              'output': {
+                  'title': 'EDGEREF-001 synthetic Edge provider proof — PASS',
+                  'summary': 'PASS: exact candidate tree passed local-only Edge lifecycle conformance; no real device/provider certification is claimed.',
+                  'text': (
+                      f"candidate_sha={sha} tree={os.environ['EXPECTED_TREE']}\n"
+                      f"report_sha256={os.environ['REPORT_SHA']} pack_digest={os.environ['PACK_DIGEST']}\n"
+                      'consumer_class=EDGE_CONTROLLER reference_kind=SYNTHETIC_REFERENCE_CONSUMER\n'
+                      'device_runtime_executed=false device_deployment_performed=false ssh_required=false external_network_required=false\n'
+                      'authorization=STANDING_OWNER_POLICY weakening=[]'
+                  ),
+              },
+          }
+          req = urllib.request.Request(
+              f'https://api.github.com/repos/{repo}/check-runs',
+              data=json.dumps(payload).encode('utf-8'),
+              method='POST',
+              headers={
+                  'Authorization': f'Bearer {token}',
+                  'Accept': 'application/vnd.github+json',
+                  'X-GitHub-Api-Version': '2022-11-28',
+                  'Content-Type': 'application/json',
+              },
+          )
+          with urllib.request.urlopen(req, timeout=30) as response:
+              created = json.load(response)
+          print(json.dumps({'status':'PASS','candidate_sha':sha,'check_run_id':created.get('id'),'report_sha256':os.environ['REPORT_SHA'],'pack_digest':os.environ['PACK_DIGEST']}, sort_keys=True))
+          PY
