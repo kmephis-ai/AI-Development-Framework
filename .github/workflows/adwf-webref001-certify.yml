@@ -1,0 +1,194 @@
+name: ADWF WEBREF-001 Provider Certification
+
+on:
+  push:
+    branches:
+      - agent/certify-webref001-20260816-0f9a0335
+
+permissions:
+  contents: write
+
+env:
+  BASE_SHA: 027a0091a7854332f5fe42dff2ec8aa5f8e1ffcf
+  EXPECTED_HEAD: 0f9a0335d31472a468936be8ccf1c6622053344a
+  EXPECTED_TREE: 71f99a3959596455ebf59e3f915fe264dc224624
+  PATCH_SHA256: cb6ae17462c65e1f23ccd0056e08c9a7af6b18913d51894819ea5098aa24d8a0
+  FEATURE_BRANCH: agent/webref-001-reference-web-conformance
+
+jobs:
+  certify-and-publish:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd
+        with:
+          fetch-depth: 0
+          persist-credentials: true
+
+      - uses: actions/setup-python@a309ff8b426b58ec0e2a45f0f869d46889d02405
+        with:
+          python-version: '3.12.10'
+
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: '24'
+
+      - name: Reconstruct exact candidate and verify immutable guards
+        shell: bash
+        run: |
+          set -euo pipefail
+          REMOTE_MAIN="$(git ls-remote origin refs/heads/main | awk '{print $1}')"
+          REMOTE_FEATURE="$(git ls-remote origin "refs/heads/${FEATURE_BRANCH}" | awk '{print $1}')"
+          test "${REMOTE_MAIN}" = "${BASE_SHA}"
+          test "${REMOTE_FEATURE}" = "${BASE_SHA}"
+          cat .transport/webref001/chunk-* | base64 --decode | gzip --decompress > /tmp/webref.patch
+          test "$(sha256sum /tmp/webref.patch | awk '{print $1}')" = "${PATCH_SHA256}"
+          rm -rf /tmp/webref-candidate /tmp/webref-base
+          git worktree add --detach /tmp/webref-candidate "${BASE_SHA}"
+          git -C /tmp/webref-candidate apply --index /tmp/webref.patch
+          cat > /tmp/expected-files.txt <<'EOF'
+          .adwf/capability-traceability.json
+          .adwf/decision-requirement-traceability.json
+          .adwf/docs-registry.json
+          .adwf/lib/reference_conformance.py
+          .adwf/reference-consumers/web/WEBREF.md
+          .adwf/reference-consumers/web/consumer-data.json
+          .adwf/reference-consumers/web/index.html
+          .adwf/reference-consumers/web/package.json
+          .adwf/reference-consumers/web/scripts/check.mjs
+          .adwf/reference-consumers/web/server.mjs
+          .adwf/roadmap.json
+          .adwf/schemas/reference-conformance-report.schema.json
+          .adwf/scripts/reference_web_conformance.py
+          .adwf/tests/test_reference_web_conformance.py
+          MANIFEST.json
+          SHA256SUMS.txt
+          docs/governance/REFERENCE_WEB_CONFORMANCE.md
+          EOF
+          git -C /tmp/webref-candidate diff --cached --name-only "${BASE_SHA}" > /tmp/actual-files.txt
+          diff -u /tmp/expected-files.txt /tmp/actual-files.txt
+          TREE="$(git -C /tmp/webref-candidate write-tree)"
+          test "${TREE}" = "${EXPECTED_TREE}"
+          export GIT_AUTHOR_NAME='ADWF WEBREF-001 Writer'
+          export GIT_AUTHOR_EMAIL='41898282+github-actions[bot]@users.noreply.github.com'
+          export GIT_AUTHOR_DATE='1786874864 +0000'
+          export GIT_COMMITTER_NAME='ADWF WEBREF-001 Writer'
+          export GIT_COMMITTER_EMAIL='41898282+github-actions[bot]@users.noreply.github.com'
+          export GIT_COMMITTER_DATE='1786875565 +0000'
+          CANDIDATE="$(printf '%s\n' 'WEBREF-001: add reference web consumer conformance' | git -C /tmp/webref-candidate commit-tree "${TREE}" -p "${BASE_SHA}")"
+          test "${CANDIDATE}" = "${EXPECTED_HEAD}"
+          git -C /tmp/webref-candidate reset --hard "${CANDIDATE}"
+          test -z "$(git -C /tmp/webref-candidate status --porcelain)"
+          git worktree add --detach /tmp/webref-base "${BASE_SHA}"
+          PYTHONPATH=/tmp/webref-base/.adwf python - <<'PY'
+          import json, os
+          from lib.trust import classify_git_diff
+          result = classify_git_diff('/tmp/webref-candidate', os.environ['BASE_SHA'], os.environ['EXPECTED_HEAD'])
+          print(json.dumps(result, ensure_ascii=False, indent=2, sort_keys=True))
+          open('/tmp/base-classification.json','w',encoding='utf-8').write(json.dumps(result,ensure_ascii=False,indent=2,sort_keys=True)+'\n')
+          assert result['result'] == 'ALLOW', result
+          assert result['authorization_mode'] == 'STANDING_OWNER_POLICY', result
+          assert result['human_required'] is False, result
+          assert result['manual_required_files'] == [], result
+          assert result['weakening'] == [], result
+          assert result['reason_codes'] == [], result
+          assert result['feature_files'] == [], result
+          PY
+
+      - name: Focused and structural certification
+        shell: bash
+        working-directory: /tmp/webref-candidate
+        run: |
+          set -euo pipefail
+          python -m unittest discover -s .adwf/tests -p 'test_reference_web_conformance.py' -v
+          python -m unittest discover -s .adwf/tests -p 'test_consumer_profile.py' -v
+          python -m unittest discover -s .adwf/tests -p 'test_project_pack_sdk.py' -v
+          python -m unittest discover -s .adwf/tests -p 'test_project_execution_safety.py' -v
+          python -m unittest discover -s .adwf/tests -p 'test_managed_surface.py' -v
+          python -m unittest discover -s .adwf/tests -p 'test_managed_surface_transaction.py' -v
+          python -m unittest discover -s .adwf/tests -p 'test_managed_surface_detach_transaction.py' -v
+          python .adwf/scripts/validate_traceability.py
+          python .adwf/scripts/validate_capabilities.py
+          python .adwf/scripts/validate_docs.py
+          python .adwf/scripts/docs_freshness.py
+          python .adwf/scripts/generate_manifest.py --check
+          python .adwf/scripts/validate_managed_surface.py
+          python .adwf/scripts/validate_project_packs.py
+          python .adwf/scripts/validate_framework.py
+          TERM=xterm python .adwf/adwf.py self-test | tee /tmp/webref-selftest.log
+          grep -Eq 'Ran 437 tests in ' /tmp/webref-selftest.log
+          grep -Fxq 'OK' /tmp/webref-selftest.log
+          test -z "$(git status --porcelain)"
+
+      - name: LIVE_BROWSER reference Web conformance
+        shell: bash
+        working-directory: /tmp/webref-candidate
+        run: |
+          set -euo pipefail
+          python .adwf/scripts/reference_web_conformance.py --install-playwright --output /tmp/webref-report.json > /tmp/webref-live.log
+          python - <<'PY'
+          import json, os
+          from pathlib import Path
+          from importlib import util
+          import sys
+          sys.path.insert(0, '/tmp/webref-candidate/.adwf')
+          from lib.reference_conformance import LIMITATIONS, validate_reference_conformance_report
+          r=json.load(open('/tmp/webref-report.json',encoding='utf-8'))
+          assert r['outcome']=='PASS', r
+          assert r['reference_kind']=='SYNTHETIC_REFERENCE_CONSUMER', r
+          assert r['framework']['source_sha']==os.environ['EXPECTED_HEAD'], r
+          assert r['framework']['source_tree']==os.environ['EXPECTED_TREE'], r
+          assert r['pack']['id']=='react', r
+          assert r['pack']['network_enforcement']=='DECLARATION_ONLY_NOT_ENFORCED', r
+          assert r['effective_config']['project_type']=='react', r
+          assert r['effective_config']['runtime_product'] is True, r
+          assert r['effective_config']['repository_visibility']=='PRIVATE', r
+          assert r['effective_config']['pack_selected']=='react', r
+          assert r['effective_config']['pack_materialized'] is True, r
+          assert r['effective_config']['pack_digest']==r['pack']['digest'], r
+          assert r['gate_execution']['status']=='PASS', r
+          assert r['gate_execution']['head_sha']==r['consumer']['operational_head'], r
+          assert r['gate_execution']['pack_digest']==r['pack']['digest'], r
+          assert r['preview']['status']=='PASS', r
+          assert r['preview']['capture_mode']=='LIVE_BROWSER', r
+          assert r['preview']['head_sha']==r['consumer']['operational_head'], r
+          assert r['preview']['pack_digest']==r['pack']['digest'], r
+          assert len(r['preview']['screenshot_digests']) >= 2, r
+          assert r['detach']['status']=='COMMITTED', r
+          assert r['readoption']['status']=='COMMITTED', r
+          assert r['readoption']['transaction_identity_changed'] is True, r
+          assert r['readoption']['transaction_id'] != r['adoption']['transaction_id'], r
+          assert r['readoption']['profile_status']=='ALREADY_MATERIALIZED', r
+          assert r['preservation']['profile_survived'] is True, r
+          assert r['preservation']['before_sha256']==r['preservation']['after_detach_sha256'], r
+          assert set(r['limitations'])==set(LIMITATIONS), r
+          assert validate_reference_conformance_report(r, Path('/tmp/webref-candidate')) == [], r
+          print(json.dumps({'status':'PASS','conformance_id':r['conformance_id'],'report_sha256':r['report_sha256'],'preview_digest':r['preview']['preview_digest'],'pack_digest':r['pack']['digest'],'readoption_transaction_id':r['readoption']['transaction_id']},sort_keys=True))
+          PY
+          test -z "$(git status --porcelain)"
+
+      - name: Final CAS and feature publication
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git -C /tmp/webref-candidate rev-parse HEAD)" = "${EXPECTED_HEAD}"
+          test "$(git -C /tmp/webref-candidate rev-parse HEAD^{tree})" = "${EXPECTED_TREE}"
+          REMOTE_MAIN="$(git ls-remote origin refs/heads/main | awk '{print $1}')"
+          REMOTE_FEATURE="$(git ls-remote origin "refs/heads/${FEATURE_BRANCH}" | awk '{print $1}')"
+          test "${REMOTE_MAIN}" = "${BASE_SHA}"
+          test "${REMOTE_FEATURE}" = "${BASE_SHA}"
+          git push origin "${EXPECTED_HEAD}:refs/heads/${FEATURE_BRANCH}"
+          test "$(git ls-remote origin "refs/heads/${FEATURE_BRANCH}" | awk '{print $1}')" = "${EXPECTED_HEAD}"
+
+      - name: Upload WEBREF certification evidence
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: webref001-provider-certification-0f9a0335
+          path: |
+            /tmp/webref-report.json
+            /tmp/webref-live.log
+            /tmp/webref-selftest.log
+            /tmp/base-classification.json
+          if-no-files-found: error
+          retention-days: 7
+          compression-level: 6
