@@ -1,0 +1,139 @@
+name: Materialize ENVSAFE-001 exact candidate
+
+on:
+  push:
+    branches:
+      - agent/materialize-envsafe001-20260816-a2
+
+permissions:
+  contents: write
+
+env:
+  BASE_SHA: 50c582bad5ceb220b7fb7e497c303817cc5afdae
+  EXPECTED_TREE: 749c63048f42ded5426d77eb5ad6175e8c97af14
+  EXPECTED_PATCH_SHA256: df12f2cde90b0bbec8295eebf7985dfddf53c21a0d5c33f5f7f2b2dd19213afb
+  FEATURE_BRANCH: agent/envsafe-001-runtime-envelope
+  PYTHONDONTWRITEBYTECODE: "1"
+
+jobs:
+  materialize:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+          fetch-depth: 0
+
+      - uses: actions/setup-python@a309ff8b426b58ec0e2a45f0f869d46889d02405
+        with:
+          python-version: "3.12.10"
+
+      - name: Reconstruct exact patch and verify BASE
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(find .transport/envsafe001-final -maxdepth 1 -type f -name '*.patchpart' | wc -l)" -eq 8
+          cat .transport/envsafe001-final/*.patchpart > /tmp/envsafe001.patch
+          test "$(sha256sum /tmp/envsafe001.patch | awk '{print $1}')" = "$EXPECTED_PATCH_SHA256"
+          git fetch --force origin main:refs/remotes/origin/main
+          test "$(git rev-parse refs/remotes/origin/main)" = "$BASE_SHA"
+          git cat-file -e "${BASE_SHA}^{commit}"
+
+      - name: Build immutable candidate outside transport tree
+        shell: bash
+        run: |
+          set -euo pipefail
+          git worktree add --detach /tmp/envsafe-candidate "$BASE_SHA"
+          git -C /tmp/envsafe-candidate apply --index --binary /tmp/envsafe001.patch
+          git -C /tmp/envsafe-candidate diff --cached --check
+          cat > /tmp/expected-files.txt <<'EOF'
+          .adwf/capability-traceability.json
+          .adwf/decision-requirement-traceability.json
+          .adwf/docs-registry.json
+          .adwf/lib/preview_engine.py
+          .adwf/lib/project_execution.py
+          .adwf/roadmap.json
+          .adwf/schemas/project-execution-evidence.schema.json
+          .adwf/scripts/run_preview.py
+          .adwf/scripts/run_project_gates.py
+          .adwf/tests/test_project_execution_safety.py
+          MANIFEST.json
+          SHA256SUMS.txt
+          docs/governance/PROJECT_PACK_SDK.md
+          docs/governance/PROJECT_RUNTIME_SAFETY.md
+          EOF
+          git -C /tmp/envsafe-candidate diff --cached --name-only | LC_ALL=C sort > /tmp/actual-files.txt
+          LC_ALL=C sort -o /tmp/expected-files.txt /tmp/expected-files.txt
+          diff -u /tmp/expected-files.txt /tmp/actual-files.txt
+          test "$(wc -l < /tmp/actual-files.txt)" -eq 14
+          test "$(git -C /tmp/envsafe-candidate write-tree)" = "$EXPECTED_TREE"
+          git -C /tmp/envsafe-candidate config user.name "ADWF ENVSAFE-001 Materializer"
+          git -C /tmp/envsafe-candidate config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git -C /tmp/envsafe-candidate commit -m "ENVSAFE-001: enforce project runtime environment and data safety"
+          test "$(git -C /tmp/envsafe-candidate rev-parse HEAD^)" = "$BASE_SHA"
+          test "$(git -C /tmp/envsafe-candidate rev-parse HEAD^{tree})" = "$EXPECTED_TREE"
+          test "$(git -C /tmp/envsafe-candidate diff --binary "$BASE_SHA" HEAD | sha256sum | awk '{print $1}')" = "$EXPECTED_PATCH_SHA256"
+          echo "CANDIDATE_SHA=$(git -C /tmp/envsafe-candidate rev-parse HEAD)" >> "$GITHUB_ENV"
+
+      - name: Classify final diff with exact BASE policy
+        shell: bash
+        run: |
+          set -euo pipefail
+          git worktree add --detach /tmp/envsafe-base "$BASE_SHA"
+          python - <<'PY'
+          import json, os, sys
+          sys.path.insert(0, '/tmp/envsafe-base/.adwf')
+          from lib.trust import classify_git_diff
+          result = classify_git_diff('/tmp/envsafe-candidate', os.environ['BASE_SHA'], os.environ['CANDIDATE_SHA'])
+          print(json.dumps(result, ensure_ascii=False, sort_keys=True))
+          assert result.get('result') == 'ALLOW', result
+          assert result.get('authorization_mode') == 'STANDING_OWNER_POLICY', result
+          assert result.get('human_required') is False, result
+          assert result.get('manual_required_files') == [], result
+          assert result.get('weakening') == [], result
+          assert result.get('reason_codes') == [], result
+          PY
+
+      - name: Focused ENVSAFE and regression tests
+        shell: bash
+        working-directory: /tmp/envsafe-candidate
+        run: |
+          set -euo pipefail
+          python .adwf/tests/test_project_execution_safety.py
+          python .adwf/tests/test_project_pack_sdk.py
+          python .adwf/tests/test_v15_executive.py
+          python -m py_compile .adwf/lib/project_execution.py .adwf/lib/preview_engine.py .adwf/scripts/run_project_gates.py .adwf/scripts/run_preview.py
+
+      - name: Canonical validators and full self-test
+        shell: bash
+        working-directory: /tmp/envsafe-candidate
+        run: |
+          set -euo pipefail
+          python .adwf/scripts/validate_traceability.py
+          python .adwf/scripts/validate_capabilities.py
+          python .adwf/scripts/validate_project_packs.py
+          python .adwf/scripts/docs_freshness.py
+          python .adwf/scripts/generate_manifest.py --check
+          python .adwf/scripts/validate_framework.py
+          python .adwf/scripts/validate_docs.py
+          python .adwf/scripts/validate_ci.py
+          python .adwf/adwf.py self-test
+          git diff --check "$BASE_SHA" HEAD
+          test -z "$(git status --porcelain)"
+          test "$(git rev-parse HEAD^{tree})" = "$EXPECTED_TREE"
+          test "$(git diff --binary "$BASE_SHA" HEAD | sha256sum | awk '{print $1}')" = "$EXPECTED_PATCH_SHA256"
+
+      - name: CAS recheck and atomically publish feature ref
+        shell: bash
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          git fetch --force origin main:refs/remotes/origin/main
+          test "$(git rev-parse refs/remotes/origin/main)" = "$BASE_SHA"
+          remote_feature="$(git ls-remote origin "refs/heads/${FEATURE_BRANCH}" | awk '{print $1}')"
+          test "$remote_feature" = "$BASE_SHA"
+          auth="$(printf 'x-access-token:%s' "$GITHUB_TOKEN" | base64 -w0)"
+          git -C /tmp/envsafe-candidate -c "http.extraheader=AUTHORIZATION: basic ${auth}" push origin "${CANDIDATE_SHA}:refs/heads/${FEATURE_BRANCH}"
