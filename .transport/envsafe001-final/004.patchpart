@@ -1,0 +1,233 @@
++        preview = binding.get("preview") or {}
++        start = commands.get("start") or {}
++        start_command = start.get("command") if start.get("available") is True else None
++        url = preview.get("default_url")
++        if not start_command or not url:
++            print(json.dumps({"status": "NOT_APPLICABLE", "reason": "PROJECT_PACK_HAS_NO_PREVIEW_START", "pack": binding.get("pack")}))
++            return 0
++        install = commands.get("install") or {}
++        with ProjectExecutionSession(ROOT, ROOT, binding, purpose="preview") as session:
++            if install.get("available") is True and install.get("command"):
++                observation = session.run("install", install["command"], pack_bound=True, capture_output=True)
++                if observation.process.returncode or observation.safety_status != "PASS":
++                    raise ProjectExecutionError("PROJECT_PREVIEW_INSTALL_BLOCKED")
++            if session.workspace is None:
++                raise ProjectExecutionError("PROJECT_EXECUTION_SESSION_NOT_STARTED")
++            server = session.popen("start", start_command, pack_bound=True)
++            process_observation = None
++            try:
++                wait(str(url))
++
++                def safe_tool_runner(command: list[str], cwd: Path, timeout: int) -> subprocess.CompletedProcess[str]:
++                    observation = session.run(
++                        "preview-tool", command, pack_bound=False, cwd=cwd, timeout=timeout, capture_output=True,
++                    )
++                    if observation.safety_status != "PASS":
++                        raise ProjectExecutionError("PREVIEW_FRAMEWORK_TOOL_SAFETY_BLOCK")
++                    return observation.process
++
++                output = args.output or str(ROOT / ".adwf-runtime/preview" / session.head_sha[:12])
++                manifest = capture_preview(
++                    session.workspace,
++                    url=str(url),
++                    head_sha=session.head_sha,
++                    baseline_url=args.baseline_url,
++                    output_dir=output,
++                    install=args.install_playwright,
++                    command_runner=safe_tool_runner,
++                    runtime_root=ROOT,
++                )
++            finally:
++                controlled_shutdown = server.poll() is None
++                if controlled_shutdown:
++                    try:
++                        os.killpg(server.pid, signal.SIGTERM)
++                    except Exception:
++                        server.terminate()
++                    try:
++                        server.wait(timeout=5)
++                    except subprocess.TimeoutExpired:
++                        server.kill(); server.wait(timeout=5)
++                process_observation = session.record_process(
++                    "start", start_command, server, pack_bound=True, expected_termination=controlled_shutdown
++                )
++            if process_observation.safety_status != "PASS":
++                raise ProjectExecutionError("PROJECT_PREVIEW_START_SAFETY_BLOCK")
++            marker = {
++                "schema_version": 1,
++                "head_sha": manifest["head_sha"],
++                "preview_digest": manifest["preview_digest"],
++                "attestation_id": manifest["attestation_id"],
++                "source_attestation": manifest["source_attestation"],
++                "runtime_environment": manifest["runtime_environment"],
++                "screenshot_digests": [item.get("sha256") for item in manifest.get("screenshots") or []],
++                "accessibility_status": (manifest.get("accessibility") or {}).get("status"),
++                "project_execution_id": session.execution_id,
++                "pack_digest": binding["pack_digest"],
++                "network_enforcement": "DECLARATION_ONLY_NOT_ENFORCED",
++            }
++            encoded = base64.urlsafe_b64encode(
++                json.dumps(marker, ensure_ascii=False, sort_keys=True, separators=(",", ":")).encode()
++            ).decode().rstrip("=")
++            print(json.dumps(manifest, ensure_ascii=False, indent=2))
++            print("ADWF_PREVIEW_ATTESTATION_V1=" + encoded)
++            return 0
++    except (OSError, ValueError, ProjectExecutionError, subprocess.SubprocessError) as exc:
++        print(json.dumps({"status": "NOT_VERIFIED", "reason": str(exc).split(":", 1)[0]}, ensure_ascii=False))
++        return 5
++
++
++if __name__ == "__main__":
++    raise SystemExit(main())
+diff --git a/.adwf/scripts/run_project_gates.py b/.adwf/scripts/run_project_gates.py
+index beb5810..de52692 100644
+--- a/.adwf/scripts/run_project_gates.py
++++ b/.adwf/scripts/run_project_gates.py
+@@ -1,5 +1,5 @@
+ #!/usr/bin/env python3
+-"""Project gates без shell=True и без плавающего runtime."""
++"""Project gates without shell=True and with consumer runtime safety envelope."""
+ from __future__ import annotations
+ 
+ from pathlib import Path
+@@ -10,6 +10,7 @@ import sys
+ 
+ ROOT = Path(__file__).resolve().parents[2]
+ sys.path.insert(0, str(ROOT / ".adwf"))
++from lib.project_execution import ProjectExecutionError, ProjectExecutionSession, load_bound_project_pack  # noqa: E402
+ from lib.project_gates import GATE_NAMES, gate_configuration_findings  # noqa: E402
+ 
+ ORDER = list(GATE_NAMES)
+@@ -29,16 +30,16 @@ def runtime_checks(config: dict) -> list[str]:
+     return errors
+ 
+ 
+-def main() -> int:
+-    parser = argparse.ArgumentParser()
+-    parser.add_argument("--phase", choices=["pr", "main", "runtime"], default="pr")
+-    args = parser.parse_args()
+-    config = json.loads((ROOT / ".adwf/config.json").read_text(encoding="utf-8"))
+-    failed = runtime_checks(config) + gate_configuration_findings(config, ROOT)
+-    results: dict[str, str] = {}
++def _framework_self_host(config: dict) -> bool:
++    project = config.get("project") or {}
++    return project.get("type") == "framework" and project.get("runtime_product") is False
++
++
++def _legacy_framework_gates(config: dict, phase: str, failed: list[str], results: dict[str, str]) -> None:
++    """The ADWF repository itself has no consumer Project Pack and is not product runtime."""
+     for name in ORDER:
+         gate = config.get("commands", {}).get(name, {})
+-        if args.phase not in gate.get("phases", []):
++        if phase not in gate.get("phases", []):
+             results[name] = "N/A"
+             continue
+         required = gate.get("required") is True
+@@ -52,9 +53,52 @@ def main() -> int:
+         results[name] = "PASS" if process.returncode == 0 else "FAIL"
+         if required and process.returncode:
+             failed.append(f"REQUIRED_GATE_FAILED:{name}")
++
++
++def _consumer_gates(config: dict, phase: str, failed: list[str], results: dict[str, str]) -> None:
++    binding = load_bound_project_pack(ROOT, ROOT)
++    with ProjectExecutionSession(ROOT, ROOT, binding, purpose=f"project-gates:{phase}") as session:
++        for name in ORDER:
++            gate = config.get("commands", {}).get(name, {})
++            if phase not in gate.get("phases", []):
++                results[name] = "N/A"
++                continue
++            required = gate.get("required") is True
++            command = gate.get("command")
++            if not isinstance(command, list) or not command or not all(isinstance(value, str) and value for value in command):
++                results[name] = "NOT_VERIFIED" if required else "N/A"
++                if required:
++                    failed.append(f"REQUIRED_GATE_UNCONFIGURED:{name}")
++                continue
++            current = binding.get("commands", {}).get(name) or {}
++            pack_bound = current.get("available") is True and current.get("command") == command
++            observation = session.run(name, command, pack_bound=pack_bound, capture_output=True)
++            results[name] = "PASS" if observation.process.returncode == 0 and observation.safety_status == "PASS" else "FAIL"
++            if observation.safety_status != "PASS":
++                failed.extend(observation.reason_codes)
++            if required and observation.process.returncode:
++                failed.append(f"REQUIRED_GATE_FAILED:{name}")
++
++
++def main() -> int:
++    parser = argparse.ArgumentParser()
++    parser.add_argument("--phase", choices=["pr", "main", "runtime"], default="pr")
++    args = parser.parse_args()
++    config = json.loads((ROOT / ".adwf/config.json").read_text(encoding="utf-8"))
++    failed = runtime_checks(config) + gate_configuration_findings(config, ROOT)
++    results: dict[str, str] = {}
++    try:
++        if _framework_self_host(config):
++            _legacy_framework_gates(config, args.phase, failed, results)
++        else:
++            _consumer_gates(config, args.phase, failed, results)
++    except (OSError, ProjectExecutionError, subprocess.SubprocessError) as exc:
++        failed.append(str(exc).split(":", 1)[0])
++        for name in ORDER:
++            results.setdefault(name, "NOT_VERIFIED")
+     for name in ORDER:
+         print(f"{name:14} {results[name]}")
+-    for error in failed:
++    for error in list(dict.fromkeys(failed)):
+         print(f"BLOCK: {error}")
+     return 1 if failed else 0
+ 
+diff --git a/.adwf/tests/test_project_execution_safety.py b/.adwf/tests/test_project_execution_safety.py
+new file mode 100644
+index 0000000..3c54194
+--- /dev/null
++++ b/.adwf/tests/test_project_execution_safety.py
+@@ -0,0 +1,181 @@
++from __future__ import annotations
++
++from pathlib import Path
++import copy
++import json
++import os
++import shutil
++import subprocess
++import tempfile
++import unittest
++import sys
++
++ROOT = Path(__file__).resolve().parents[2]
++sys.path.insert(0, str(ROOT / '.adwf'))
++from lib.pack_materializer import materialize_project_pack
++from lib.project_execution import (
++    NETWORK_ENFORCEMENT,
++    ProjectExecutionError,
++    ProjectExecutionSession,
++    load_bound_project_pack,
++    validate_execution_evidence,
++)
++
++
++class ProjectExecutionSafetyTests(unittest.TestCase):
++    def setUp(self):
++        self.temp = tempfile.TemporaryDirectory()
++        self.root = Path(self.temp.name)
++        (self.root / '.adwf/schemas').mkdir(parents=True)
++        (self.root / '.adwf/packs').mkdir(parents=True)
++        for name in ('config.schema.json', 'project-pack.schema.json', 'project-execution-evidence.schema.json'):
++            shutil.copy2(ROOT / '.adwf/schemas' / name, self.root / '.adwf/schemas' / name)
++        for path in (ROOT / '.adwf/packs').glob('*.json'):
++            shutil.copy2(path, self.root / '.adwf/packs' / path.name)
++        shutil.copy2(ROOT / '.adwf/config.json', self.root / '.adwf/config.json')
++        config = json.loads((self.root / '.adwf/config.json').read_text(encoding='utf-8'))
++        config['project'].update({'name': 'Execution Safety Fixture', 'type': 'node-test', 'runtime_product': True})
++        (self.root / '.adwf/config.json').write_text(json.dumps(config, ensure_ascii=False, indent=2) + '\n', encoding='utf-8')
++        (self.root / 'package.json').write_text(json.dumps({'name': 'fixture', 'scripts': {'test': 'unused'}}) + '\n', encoding='utf-8')
++        (self.root / 'README.md').write_text('canonical\n', encoding='utf-8')
++        self._set_probe("import os,sys\nsys.exit(97 if 'VERY_SECRET_TOKEN' in os.environ else 0)\n")
++        self._materialize()
++        subprocess.run(['git', 'init', '-b', 'main'], cwd=self.root, check=True, capture_output=True)
++        subprocess.run(['git', 'config', 'user.email', 'adwf@example.invalid'], cwd=self.root, check=True)
++        subprocess.run(['git', 'config', 'user.name', 'ADWF Test'], cwd=self.root, check=True)
++        subprocess.run(['git', 'add', '.'], cwd=self.root, check=True)
++        subprocess.run(['git', 'commit', '-m', 'fixture'], cwd=self.root, check=True, capture_output=True)
++        self.head = subprocess.run(['git', 'rev-parse', 'HEAD'], cwd=self.root, check=True, capture_output=True, text=True).stdout.strip()
