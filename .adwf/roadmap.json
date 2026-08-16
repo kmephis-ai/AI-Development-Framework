@@ -190,6 +190,14 @@
             "LIFECYCLE-007"
           ],
           "product_impact": false
+        },
+        {
+          "roadmap_id": "UPGRADE-003",
+          "title_ru": "Real External Consumer Exact A→B→Rollback→B Proof v1",
+          "dependencies": [
+            "UPGRADE_FIX-001"
+          ],
+          "product_impact": false
         }
       ]
     }
