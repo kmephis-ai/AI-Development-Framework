@@ -11,7 +11,7 @@ import re
 from .contracts import validate
 from .strict_json import loads as strict_loads
 
-PACK_ORDER = ("apps-script", "react", "vue", "angular", "fastapi", "node", "python", "go")
+PACK_ORDER = ("apps-script", "edge-controller", "react", "vue", "angular", "fastapi", "node", "python", "go")
 COMMAND_NAMES = {"lint", "unit", "integration", "build", "smoke", "golden_paths", "e2e", "install", "start"}
 SHELL_CONTROL = re.compile(r"(?:\r|\n|\x00|`|\$\(|&&|\|\||[;|<>])")
 EXECUTABLE = re.compile(r"^[A-Za-z0-9_.+-]+$")
@@ -97,6 +97,24 @@ def _semantic_findings(value: dict[str, Any], path: Path) -> list[str]:
             errors.append("APPS_SCRIPT_INSTALL_COMMAND_FORBIDDEN")
         if commands.get("start") or preview:
             errors.append("APPS_SCRIPT_PREVIEW_RUNTIME_FORBIDDEN")
+    if value.get("id") == "edge-controller":
+        if detect.get("files") != ["edge-controller.json"]:
+            errors.append("EDGE_CONTROLLER_DETECTION_MARKER_REQUIRED")
+        if network != "NONE":
+            errors.append("EDGE_CONTROLLER_NETWORK_MUST_BE_NONE")
+        if set(commands) - {"lint", "unit", "build"}:
+            errors.append("EDGE_CONTROLLER_COMMAND_AUTHORITY_FORBIDDEN")
+        if commands.get("install") or commands.get("start") or preview:
+            errors.append("EDGE_CONTROLLER_EXTERNAL_RUNTIME_FORBIDDEN")
+        expected = {
+            "lint": (["npm", "run", "lint"], "lint"),
+            "unit": (["npm", "test"], "test"),
+            "build": (["npm", "run", "build"], "build"),
+        }
+        for command_name, (tokens, script) in expected.items():
+            entry = commands.get(command_name) or {}
+            if entry.get("command") != tokens or entry.get("requires_script") != script:
+                errors.append("EDGE_CONTROLLER_LOCAL_COMMAND_REQUIRED:" + command_name)
     if path.stem != value.get("id"):
         errors.append("PROJECT_PACK_ID_MISMATCH")
     return list(dict.fromkeys(errors))

@@ -1,0 +1,24 @@
+{
+  "cases": [
+    {
+      "name": "normal",
+      "input": {"leak": false, "temperature_c": 21, "away": false, "door_open": false},
+      "expected": []
+    },
+    {
+      "name": "leak",
+      "input": {"leak": true, "temperature_c": 20, "away": false, "door_open": false},
+      "expected": [
+        {"channel": "water_main", "value": false, "reason": "leak"}
+      ]
+    },
+    {
+      "name": "cold-and-away-door",
+      "input": {"leak": false, "temperature_c": 2, "away": true, "door_open": true},
+      "expected": [
+        {"channel": "freeze_protection", "value": true, "reason": "low_temperature"},
+        {"channel": "security_notice", "value": true, "reason": "door_open_away"}
+      ]
+    }
+  ]
+}

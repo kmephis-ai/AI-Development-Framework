@@ -41,6 +41,7 @@ from .strict_json import loads as strict_loads
 REPORT_SCHEMA = ".adwf/schemas/reference-conformance-report.schema.json"
 REFERENCE_TEMPLATE = ".adwf/reference-consumers/web"
 APPS_SCRIPT_REFERENCE_TEMPLATE = ".adwf/reference-consumers/apps-script"
+EDGE_CONTROLLER_REFERENCE_TEMPLATE = ".adwf/reference-consumers/edge-controller"
 COMMON_LIMITATIONS = [
     "SHARED_GUARDED_MERGE_NOT_IMPLEMENTED",
     "NETWORK_DECLARATION_ONLY_NOT_ENFORCED",
@@ -51,6 +52,12 @@ WEB_LIMITATIONS = list(COMMON_LIMITATIONS)
 APPS_SCRIPT_LIMITATIONS = list(COMMON_LIMITATIONS) + [
     "GOOGLE_APPS_SCRIPT_RUNTIME_NOT_EXECUTED",
     "GOOGLE_PROVIDER_NOT_VERIFIED",
+    "NO_MANDATORY_EXTERNAL_DEPLOYMENT",
+]
+EDGE_CONTROLLER_LIMITATIONS = list(COMMON_LIMITATIONS) + [
+    "REAL_EDGE_DEVICE_RUNTIME_NOT_EXECUTED",
+    "SSH_OR_DEVICE_DEPLOYMENT_NOT_EXECUTED",
+    "DEVICE_PROVIDER_NOT_VERIFIED",
     "NO_MANDATORY_EXTERNAL_DEPLOYMENT",
 ]
 # Backward-compatible name used by WEBREF tests and docs.
@@ -188,6 +195,83 @@ def initialize_reference_apps_script_consumer(target: str | Path, template_root:
     _git(consumer, "config", "core.autocrlf", "false")
     _git(consumer, "add", "--", *paths)
     _git(consumer, "commit", "-q", "-m", "reference apps script consumer seed")
+    head, tree = _git_identity(consumer)
+    preservation = {rel: _file_sha(consumer / rel) for rel in paths}
+    return {"head": head, "tree": tree, "paths": paths, "preservation": preservation}
+
+
+def _copy_edge_controller_reference_template(template: Path, target: Path) -> list[str]:
+    if not template.is_dir():
+        raise ReferenceConformanceError("REFERENCE_EDGE_CONTROLLER_TEMPLATE_MISSING")
+    paths: list[str] = []
+    for source in sorted(template.rglob("*")):
+        if source.is_symlink():
+            raise ReferenceConformanceError("REFERENCE_EDGE_CONTROLLER_TEMPLATE_SYMLINK_FORBIDDEN")
+        if not source.is_file():
+            continue
+        rel = source.relative_to(template)
+        destination = target / rel
+        destination.parent.mkdir(parents=True, exist_ok=True)
+        shutil.copy2(source, destination)
+        paths.append(rel.as_posix())
+    required = {
+        "package.json",
+        "edge-controller.json",
+        "rules/controller.js",
+        "scripts/check.mjs",
+        "fixtures/events.json",
+        "EDGEREF.md",
+    }
+    if not required.issubset(paths):
+        raise ReferenceConformanceError("REFERENCE_EDGE_CONTROLLER_TEMPLATE_INCOMPLETE")
+    try:
+        package = strict_loads((target / "package.json").read_text(encoding="utf-8"))
+        manifest = strict_loads((target / "edge-controller.json").read_text(encoding="utf-8"))
+        fixture = strict_loads((target / "fixtures/events.json").read_text(encoding="utf-8"))
+    except Exception as exc:
+        raise ReferenceConformanceError("REFERENCE_EDGE_CONTROLLER_TEMPLATE_JSON_INVALID") from exc
+    if not all(isinstance(value, dict) for value in (package, manifest, fixture)):
+        raise ReferenceConformanceError("REFERENCE_EDGE_CONTROLLER_TEMPLATE_JSON_OBJECT_REQUIRED")
+    if package.get("dependencies") not in (None, {}) or package.get("devDependencies") not in (None, {}):
+        raise ReferenceConformanceError("REFERENCE_EDGE_CONTROLLER_EXTERNAL_PACKAGE_DEPENDENCY_FORBIDDEN")
+    expected_scripts = {
+        "lint": "node scripts/check.mjs lint",
+        "test": "node scripts/check.mjs test",
+        "build": "node scripts/check.mjs build",
+    }
+    if package.get("scripts") != expected_scripts:
+        raise ReferenceConformanceError("REFERENCE_EDGE_CONTROLLER_LOCAL_SCRIPTS_REQUIRED")
+    serialized = json.dumps(package, ensure_ascii=False).lower()
+    forbidden = ("ssh", "scp", "rsync", "curl", "wget", "npx", "deploy", "http://", "https://")
+    if any(token in serialized for token in forbidden):
+        raise ReferenceConformanceError("REFERENCE_EDGE_CONTROLLER_EXTERNAL_TOOL_OR_NETWORK_FORBIDDEN")
+    if manifest != {
+        "schema_version": 1,
+        "runtime": "LOCAL_JS_EDGE_CONTROLLER_V1",
+        "entrypoint": "rules/controller.js",
+        "network": "NONE",
+        "deployment": "NONE",
+    }:
+        raise ReferenceConformanceError("REFERENCE_EDGE_CONTROLLER_MANIFEST_INVALID")
+    cases = fixture.get("cases")
+    if not isinstance(cases, list) or len(cases) < 2:
+        raise ReferenceConformanceError("REFERENCE_EDGE_CONTROLLER_FIXTURE_INVALID")
+    return paths
+
+
+def initialize_reference_edge_controller_consumer(target: str | Path, template_root: str | Path) -> dict[str, Any]:
+    consumer = Path(target).resolve()
+    template = Path(template_root).resolve()
+    if consumer.exists() and any(consumer.iterdir()):
+        raise ReferenceConformanceError("REFERENCE_CONSUMER_ROOT_NOT_EMPTY")
+    consumer.mkdir(parents=True, exist_ok=True)
+    paths = _copy_edge_controller_reference_template(template, consumer)
+    _git(consumer, "init", "-q", "-b", "main")
+    _git(consumer, "config", "user.name", "ADWF Reference Conformance")
+    _git(consumer, "config", "user.email", "adwf-reference@example.invalid")
+    _git(consumer, "config", "core.autocrlf", "false")
+    _git(consumer, "add", "--", *paths)
+    _git(consumer, "commit", "-q", "-m", "reference edge controller consumer seed")
     head, tree = _git_identity(consumer)
     preservation = {rel: _file_sha(consumer / rel) for rel in paths}
     return {"head": head, "tree": tree, "paths": paths, "preservation": preservation}
@@ -395,6 +479,36 @@ def validate_reference_conformance_report(value: dict[str, Any], framework_root:
             errors.append("REFERENCE_CONFORMANCE_APPS_SCRIPT_EXTERNAL_DEPENDENCY_MISMATCH")
         required_limitations = APPS_SCRIPT_LIMITATIONS
         expected_name, expected_type = "ADWF Reference Apps Script Consumer", "apps-script"
+    elif consumer_class == "EDGE_CONTROLLER":
+        if (value.get("pack") or {}).get("id") != "edge-controller":
+            errors.append("REFERENCE_CONFORMANCE_EDGE_PACK_MISMATCH")
+        expected_preview = {
+            "status": "NOT_APPLICABLE",
+            "capture_mode": "NOT_APPLICABLE",
+            "head_sha": None,
+            "pack_digest": None,
+            "execution_id": None,
+            "execution_evidence_sha256": None,
+            "preview_digest": None,
+            "attestation_id": None,
+            "screenshot_digests": [],
+            "reason": "EDGE_CONTROLLER_NO_BROWSER_PREVIEW",
+        }
+        if preview != expected_preview:
+            errors.append("REFERENCE_CONFORMANCE_EDGE_PREVIEW_TRUTH_MISMATCH")
+        functional = value.get("functional") or {}
+        if functional.get("gate_execution_id") != gate.get("execution_id"):
+            errors.append("REFERENCE_CONFORMANCE_EDGE_FUNCTIONAL_GATE_MISMATCH")
+        if functional.get("mode") != "LOCAL_DETERMINISTIC_EDGE_CONTROLLER_SHIM":
+            errors.append("REFERENCE_CONFORMANCE_EDGE_FUNCTIONAL_MODE_MISMATCH")
+        if functional.get("external_network_required") is not False or functional.get("google_credentials_required") is not False:
+            errors.append("REFERENCE_CONFORMANCE_EDGE_EXTERNAL_DEPENDENCY_MISMATCH")
+        if functional.get("device_runtime_executed") is not False:
+            errors.append("REFERENCE_CONFORMANCE_EDGE_DEVICE_RUNTIME_TRUTH_MISMATCH")
+        if functional.get("device_deployment_performed") is not False or functional.get("ssh_required") is not False:
+            errors.append("REFERENCE_CONFORMANCE_EDGE_DEPLOYMENT_TRUTH_MISMATCH")
+        required_limitations = EDGE_CONTROLLER_LIMITATIONS
+        expected_name, expected_type = "ADWF Reference Edge Controller", "edge-controller"
     else:
         required_limitations = COMMON_LIMITATIONS
         expected_name, expected_type = None, None
@@ -844,6 +958,9 @@ def run_reference_apps_script_conformance(
                 "fixture_sha256": _file_sha(consumer / "fixtures/operations.json"),
                 "google_credentials_required": False,
                 "external_network_required": False,
+                "device_runtime_executed": False,
+                "device_deployment_performed": False,
+                "ssh_required": False,
             },
             "detach": {
                 "status": detached["status"],
@@ -863,6 +980,236 @@ def run_reference_apps_script_conformance(
                 "profile_survived": True,
             },
             "limitations": list(APPS_SCRIPT_LIMITATIONS),
+            "outcome": "PASS",
+            "reason_codes": [],
+            "created_at": datetime.now(timezone.utc).isoformat().replace("+00:00", "Z"),
+        }
+        sealed = seal_reference_conformance_report(report)
+        errors = validate_reference_conformance_report(sealed, framework)
+        if errors:
+            raise ReferenceConformanceError("REFERENCE_CONFORMANCE_REPORT_INVALID:" + errors[0])
+        return sealed
+    except (ManagedSurfaceError, ProjectExecutionError, OSError, subprocess.SubprocessError) as exc:
+        if isinstance(exc, ReferenceConformanceError):
+            raise
+        raise ReferenceConformanceError(str(exc).split(":", 1)[0]) from exc
+    finally:
+        if temporary is not None:
+            temporary.cleanup()
+
+def run_reference_edge_controller_conformance(
+    framework_root: str | Path,
+    *,
+    consumer_root: str | Path | None = None,
+    template_root: str | Path | None = None,
+) -> dict[str, Any]:
+    """Run EDGEREF-001 without claiming a real device/runtime/deployment."""
+    framework = Path(framework_root).resolve()
+    source_sha, source_tree = _source_identity(framework)
+    manifest_path = framework / "MANIFEST.json"
+    if not manifest_path.is_file():
+        raise ReferenceConformanceError("REFERENCE_FRAMEWORK_MANIFEST_MISSING")
+    manifest_sha = _file_sha(manifest_path)
+    template = Path(template_root).resolve() if template_root else framework / EDGE_CONTROLLER_REFERENCE_TEMPLATE
+
+    temporary: tempfile.TemporaryDirectory[str] | None = None
+    if consumer_root is None:
+        temporary = tempfile.TemporaryDirectory(prefix="adwf-edgeref-")
+        consumer = Path(temporary.name).resolve()
+    else:
+        consumer = Path(consumer_root).resolve()
+        try:
+            consumer.relative_to(framework)
+            raise ReferenceConformanceError("REFERENCE_CONSUMER_INSIDE_FRAMEWORK_FORBIDDEN")
+        except ValueError:
+            pass
+
+    try:
+        seed = initialize_reference_edge_controller_consumer(consumer, template)
+        preservation_before = _object_sha(seed["preservation"])
+
+        adoption_plan = plan_adoption(framework, consumer, source_revision=source_sha)
+        if adoption_plan.get("status") != "READY":
+            code = (adoption_plan.get("blockers") or ["REFERENCE_ADOPTION_NOT_READY"])[0]
+            raise ReferenceConformanceError("REFERENCE_ADOPTION_BLOCK:" + str(code))
+        adoption = apply_adoption(framework, consumer, adoption_plan)
+        if adoption.get("status") != "COMMITTED":
+            raise ReferenceConformanceError("REFERENCE_ADOPTION_NOT_COMMITTED")
+        snapshot = copy.deepcopy(adoption["snapshot"])
+        snapshot_sha = _object_sha(snapshot)
+
+        detected = commands_for_pack(consumer, consumer)
+        if detected.get("pack") != "edge-controller" or (detected.get("candidates") or [])[:2] != ["edge-controller", "node"]:
+            raise ReferenceConformanceError("REFERENCE_EDGE_CONTROLLER_PACK_PRECEDENCE_INVALID")
+        profile = materialize_project_pack(
+            consumer,
+            consumer,
+            apply=True,
+            product_name="ADWF Reference Edge Controller",
+            default_branch="main",
+            repository_visibility="PRIVATE",
+        )
+        if profile.get("status") != "APPLIED" or profile.get("pack") != "edge-controller":
+            raise ReferenceConformanceError("REFERENCE_PROFILE_OR_PACK_NOT_APPLIED")
+        profile_path = consumer / PROFILE_REL
+        profile_value = load_consumer_profile(consumer, consumer, required=True)
+        if profile_value is None:
+            raise ReferenceConformanceError("REFERENCE_PROFILE_MISSING")
+        profile_sha = _file_sha(profile_path)
+        effective = load_effective_config(consumer, consumer)
+        project_identity = effective.get("project") or {}
+        pack_projection = effective.get("project_packs") or {}
+        if (
+            project_identity.get("name") != "ADWF Reference Edge Controller"
+            or project_identity.get("type") != "edge-controller"
+            or project_identity.get("runtime_product") is not True
+            or project_identity.get("default_branch") != "main"
+            or project_identity.get("repository_visibility") != "PRIVATE"
+            or pack_projection.get("selected") != "edge-controller"
+            or pack_projection.get("selected_digest") != profile.get("pack_digest")
+            or pack_projection.get("materialized") is not True
+        ):
+            raise ReferenceConformanceError("REFERENCE_EFFECTIVE_CONFIG_NOT_CONSUMER_RUNTIME")
+
+        operational_head, operational_tree = _commit_operational_consumer(consumer)
+        binding = load_bound_project_pack(consumer, consumer)
+        if binding.get("pack") != "edge-controller" or binding.get("safety", {}).get("monetary_budget_usd") != 0:
+            raise ReferenceConformanceError("REFERENCE_PACK_BINDING_INVALID")
+        if binding.get("safety", {}).get("network") != "NONE":
+            raise ReferenceConformanceError("REFERENCE_EDGE_CONTROLLER_NETWORK_DECLARATION_INVALID")
+        if binding.get("preview") or any(name in binding.get("commands", {}) for name in ("install", "start", "e2e")):
+            raise ReferenceConformanceError("REFERENCE_EDGE_CONTROLLER_EXTERNAL_RUNTIME_BINDING_FORBIDDEN")
+
+        gate_evidence = _run_gate_execution(consumer, binding, purpose="reference-edge-controller-gates")
+        if gate_evidence.get("head_sha") != operational_head or gate_evidence.get("tree_sha") != operational_tree:
+            raise ReferenceConformanceError("REFERENCE_GATE_OPERATIONAL_REVISION_MISMATCH")
+        if gate_evidence.get("secret_like_inherited") is not False or gate_evidence.get("declared_network") != "NONE":
+            raise ReferenceConformanceError("REFERENCE_EDGE_CONTROLLER_EXECUTION_SAFETY_TRUTH_INVALID")
+        if not _git_clean(consumer):
+            raise ReferenceConformanceError("REFERENCE_CANONICAL_SOURCE_MUTATED_BY_RUNTIME")
+
+        detach_plan = plan_detach(consumer, snapshot, framework_root=framework)
+        if detach_plan.get("status") != "READY":
+            code = (detach_plan.get("blockers") or ["REFERENCE_DETACH_NOT_READY"])[0]
+            raise ReferenceConformanceError("REFERENCE_DETACH_BLOCK:" + str(code))
+        detached = apply_detach(framework, consumer, snapshot, detach_plan)
+        if detached.get("status") != "COMMITTED":
+            raise ReferenceConformanceError("REFERENCE_DETACH_NOT_COMMITTED")
+        if not profile_path.is_file():
+            raise ReferenceConformanceError("REFERENCE_PROFILE_REMOVED_BY_DETACH")
+        preservation_after = _preservation_digest(consumer, seed["paths"])
+        if preservation_after != preservation_before:
+            raise ReferenceConformanceError("REFERENCE_CONSUMER_CONTENT_CHANGED_BY_DETACH")
+
+        readoption_plan = plan_adoption(framework, consumer, source_revision=source_sha)
+        if readoption_plan.get("status") != "READY":
+            code = (readoption_plan.get("blockers") or ["REFERENCE_READOPTION_NOT_READY"])[0]
+            raise ReferenceConformanceError("REFERENCE_READOPTION_BLOCK:" + str(code))
+        readoption = apply_adoption(framework, consumer, readoption_plan)
+        if readoption.get("status") != "COMMITTED":
+            raise ReferenceConformanceError("REFERENCE_READOPTION_NOT_COMMITTED")
+        if readoption.get("transaction_id") == adoption.get("transaction_id"):
+            raise ReferenceConformanceError("REFERENCE_READOPTION_TRANSACTION_IDENTITY_NOT_CHANGED")
+        profile_again = materialize_project_pack(
+            consumer,
+            consumer,
+            apply=True,
+            product_name="ADWF Reference Edge Controller",
+            default_branch="main",
+            repository_visibility="PRIVATE",
+        )
+        if profile_again.get("status") != "ALREADY_MATERIALIZED":
+            raise ReferenceConformanceError("REFERENCE_PROFILE_NOT_IDEMPOTENT_AFTER_READOPTION")
+
+        report = {
+            "$schema": REPORT_SCHEMA,
+            "schema_version": 1,
+            "role": "REFERENCE_CONFORMANCE_REPORT",
+            "conformance_id": "RCF-" + uuid.uuid4().hex,
+            "consumer_class": "EDGE_CONTROLLER",
+            "reference_kind": "SYNTHETIC_REFERENCE_CONSUMER",
+            "framework": {
+                "source_sha": source_sha,
+                "source_tree": source_tree,
+                "manifest_sha256": manifest_sha,
+            },
+            "consumer": {
+                "seed_head": seed["head"],
+                "seed_tree": seed["tree"],
+                "operational_head": operational_head,
+                "operational_tree": operational_tree,
+            },
+            "pack": {
+                "id": binding["pack"],
+                "digest": binding["pack_digest"],
+                "network_enforcement": NETWORK_ENFORCEMENT,
+            },
+            "adoption": {
+                "status": adoption["status"],
+                "transaction_id": adoption["transaction_id"],
+                "snapshot_sha256": snapshot_sha,
+            },
+            "profile": {"status": profile["status"], "path": PROFILE_REL, "sha256": profile_sha},
+            "effective_config": {
+                "project_name": project_identity["name"],
+                "project_type": project_identity["type"],
+                "runtime_product": project_identity["runtime_product"],
+                "default_branch": project_identity["default_branch"],
+                "repository_visibility": project_identity["repository_visibility"],
+                "pack_selected": pack_projection["selected"],
+                "pack_digest": pack_projection["selected_digest"],
+                "pack_materialized": pack_projection["materialized"],
+            },
+            "gate_execution": {
+                "status": "PASS",
+                "head_sha": gate_evidence["head_sha"],
+                "pack_digest": gate_evidence["pack_digest"],
+                "execution_id": gate_evidence["execution_id"],
+                "evidence_sha256": gate_evidence["evidence_sha256"],
+            },
+            "preview": {
+                "status": "NOT_APPLICABLE",
+                "capture_mode": "NOT_APPLICABLE",
+                "head_sha": None,
+                "pack_digest": None,
+                "execution_id": None,
+                "execution_evidence_sha256": None,
+                "preview_digest": None,
+                "attestation_id": None,
+                "screenshot_digests": [],
+                "reason": "EDGE_CONTROLLER_NO_BROWSER_PREVIEW",
+            },
+            "functional": {
+                "status": "PASS",
+                "mode": "LOCAL_DETERMINISTIC_EDGE_CONTROLLER_SHIM",
+                "gate_execution_id": gate_evidence["execution_id"],
+                "script_sha256": _file_sha(consumer / "rules/controller.js"),
+                "manifest_sha256": _file_sha(consumer / "edge-controller.json"),
+                "fixture_sha256": _file_sha(consumer / "fixtures/events.json"),
+                "google_credentials_required": False,
+                "external_network_required": False,
+                "device_runtime_executed": False,
+                "device_deployment_performed": False,
+                "ssh_required": False,
+            },
+            "detach": {
+                "status": detached["status"],
+                "transaction_id": detached["transaction_id"],
+                "removed_files": int(detached["removed_files"]),
+            },
+            "readoption": {
+                "status": readoption["status"],
+                "transaction_id": readoption["transaction_id"],
+                "profile_status": profile_again["status"],
+                "transaction_identity_changed": readoption["transaction_id"] != adoption["transaction_id"],
+            },
+            "preservation": {
+                "paths": seed["paths"],
+                "before_sha256": preservation_before,
+                "after_detach_sha256": preservation_after,
+                "profile_survived": True,
+            },
+            "limitations": list(EDGE_CONTROLLER_LIMITATIONS),
             "outcome": "PASS",
             "reason_codes": [],
             "created_at": datetime.now(timezone.utc).isoformat().replace("+00:00", "Z"),
