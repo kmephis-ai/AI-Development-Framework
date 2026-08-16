@@ -1,0 +1,120 @@
+name: ADWF UPGRADE-002 Provider Materialization
+
+on:
+  push:
+    branches:
+      - agent/materialize-upgrade002-20260816-d2fe840f
+
+permissions:
+  contents: write
+
+env:
+  EXPECTED_BASE: 8821431d585bfdc1fdaea433be9d3d2b5e35cc34
+  EXPECTED_SOURCE: d2fe840f45196f6929a5089c9924d2631efad80c
+  EXPECTED_TREE: 8dd782611d258ee4b8ffc8f5011e64362f3c7e0d
+  EXPECTED_PATCH_SHA256: 74353458de3da9886054e89d71b4b4b012cf79aef7c4ebcfc36d2dcac7136675
+  TARGET_BRANCH: agent/upgrade-002-transactional-apply
+
+jobs:
+  certify-publish:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-python@a309ff8b426b58ec0e2a45f0f869d46889d02405
+        with:
+          python-version: '3.13'
+
+      - name: Reconstruct exact candidate and verify immutable binding
+        shell: bash
+        run: |
+          set -euo pipefail
+          git fetch origin main "${TARGET_BRANCH}"
+          test "$(git rev-parse origin/main)" = "${EXPECTED_BASE}"
+          test "$(git rev-parse "origin/${TARGET_BRANCH}")" = "${EXPECTED_SOURCE}"
+          cat .transport/upgrade002/patch.b64.* > /tmp/upgrade002.patch.gz.b64
+          test "$(wc -c < /tmp/upgrade002.patch.gz.b64 | tr -d ' ')" = "37828"
+          base64 -d /tmp/upgrade002.patch.gz.b64 > /tmp/upgrade002.patch.gz
+          test "$(wc -c < /tmp/upgrade002.patch.gz | tr -d ' ')" = "28371"
+          gzip -dc /tmp/upgrade002.patch.gz > /tmp/upgrade002.patch
+          test "$(wc -c < /tmp/upgrade002.patch | tr -d ' ')" = "126688"
+          test "$(sha256sum /tmp/upgrade002.patch | awk '{print $1}')" = "${EXPECTED_PATCH_SHA256}"
+          git reset --hard "${EXPECTED_SOURCE}"
+          git apply --check /tmp/upgrade002.patch
+          git apply /tmp/upgrade002.patch
+          git add -A
+          git diff --cached --name-only | sort > /tmp/actual-files.txt
+          cat > /tmp/expected-files.txt <<'FILES'
+          .adwf/capability-traceability.json
+          .adwf/decision-requirement-traceability.json
+          .adwf/docs-registry.json
+          .adwf/lib/consumer_upgrade_transaction.py
+          .adwf/schemas/consumer-upgrade-transaction.schema.json
+          .adwf/scripts/apply_consumer_upgrade.py
+          .adwf/tests/consumer_upgrade_fixture.py
+          .adwf/tests/consumer_upgrade_transaction_fixture.py
+          .adwf/tests/test_consumer_upgrade_transaction.py
+          .adwf/tests/test_consumer_upgrade_transaction_adversarial.py
+          MANIFEST.json
+          SHA256SUMS.txt
+          docs/governance/CONSUMER_FRAMEWORK_UPGRADE_TRANSACTION.md
+          FILES
+          diff -u /tmp/expected-files.txt /tmp/actual-files.txt
+          test "$(git write-tree)" = "${EXPECTED_TREE}"
+          git config user.email 'adwf-provider@example.invalid'
+          git config user.name 'ADWF Provider Materialization'
+          git commit -m 'UPGRADE-002: materialize transactional upgrade apply evidence'
+          echo "CANDIDATE_SHA=$(git rev-parse HEAD)" >> "$GITHUB_ENV"
+
+      - name: Focused UPGRADE-001 and UPGRADE-002 suite
+        shell: bash
+        run: |
+          set -euo pipefail
+          PYTHONDONTWRITEBYTECODE=1 python -m unittest discover -s .adwf/tests -p 'test_consumer_upgrade*.py' -v
+          test -z "$(git status --porcelain)"
+
+      - name: Canonical structural validators
+        shell: bash
+        run: |
+          set -euo pipefail
+          PYTHONDONTWRITEBYTECODE=1 python .adwf/scripts/validate_capabilities.py
+          PYTHONDONTWRITEBYTECODE=1 python .adwf/scripts/validate_traceability.py
+          PYTHONDONTWRITEBYTECODE=1 python .adwf/scripts/docs_freshness.py
+          PYTHONDONTWRITEBYTECODE=1 python .adwf/scripts/validate_docs.py
+          PYTHONDONTWRITEBYTECODE=1 python .adwf/scripts/validate_managed_surface.py
+          PYTHONDONTWRITEBYTECODE=1 python .adwf/scripts/generate_manifest.py --check
+          timeout 900 python .adwf/scripts/validate_framework.py
+          test -z "$(git status --porcelain)"
+
+      - name: Full self-test and exact BASE trust classification
+        shell: bash
+        run: |
+          set -euo pipefail
+          timeout 900 python .adwf/adwf.py self-test
+          test -z "$(git status --porcelain)"
+          git worktree add --detach /tmp/adwf-base "${EXPECTED_BASE}"
+          PYTHONPATH=/tmp/adwf-base/.adwf python - <<'PY'
+          import json, os, sys
+          sys.path.insert(0, '/tmp/adwf-base/.adwf')
+          from lib.trust import classify_git_diff
+          result=classify_git_diff(os.environ['GITHUB_WORKSPACE'],os.environ['EXPECTED_BASE'],os.environ['CANDIDATE_SHA'])
+          print(json.dumps(result,sort_keys=True))
+          assert result['result']=='ALLOW'
+          assert result['authorization_mode']=='STANDING_OWNER_POLICY'
+          assert result['human_required'] is False
+          assert result['manual_required_files']==[]
+          assert result['weakening']==[]
+          assert result['reason_codes']==[]
+          PY
+
+      - name: Final CAS and atomic writer publication
+        shell: bash
+        run: |
+          set -euo pipefail
+          git fetch origin main "${TARGET_BRANCH}"
+          test "$(git rev-parse origin/main)" = "${EXPECTED_BASE}"
+          test "$(git rev-parse "origin/${TARGET_BRANCH}")" = "${EXPECTED_SOURCE}"
+          test "$(git rev-parse HEAD^{tree})" = "${EXPECTED_TREE}"
+          git push origin "HEAD:refs/heads/${TARGET_BRANCH}"
