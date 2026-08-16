@@ -2,7 +2,7 @@
   "$schema": ".adwf/schemas/decision-requirement-traceability.schema.json",
   "schema_version": 1,
   "role": "CANONICAL_DECISION_REQUIREMENT_TRACEABILITY",
-  "revision": 10,
+  "revision": 11,
   "records": [
     {
       "id": "INTENT-FOUNDATION-20260815",
@@ -190,6 +190,28 @@
       "source_path": null,
       "source_sha256": null,
       "record_sha256": "49832647c2c995857532ce86723cc0fad6a857ce8ac7652e2fbd404fb8b3b7fa"
+    },
+    {
+      "id": "REQ-UPGRADE-001",
+      "kind": "REQUIREMENT",
+      "version": 1,
+      "status": "ACTIVE",
+      "title_ru": "Подключённый consumer должен обновлять ADWF через exact-revision fail-closed planning contract",
+      "statement_ru": "Consumer project должен получить deterministic machine-verifiable read-only plan перехода с exact ADWF revision A на B, который обнаруживает drift/contract incompatibility, сохраняет consumer/shared/pre-existing ownership и заранее фиксирует rollback prerequisites без write/apply authority.",
+      "source_path": null,
+      "source_sha256": null,
+      "record_sha256": "915387fea6db28cdff3e6aed9950ee0b1be8e45e46e05451e3aaba97cf34f295"
+    },
+    {
+      "id": "DEC-UPGRADE-001",
+      "kind": "DECISION",
+      "version": 1,
+      "status": "ACCEPTED",
+      "title_ru": "Upgrade planning композирует существующие lifecycle evidence и не вводит mutating executor",
+      "statement_ru": "Использовать Managed Surface snapshot/provenance, sealed Consumer Profile, Project Pack digest и optional governed Skill bindings как exact inputs; строить self-sealed compatibility/plan, требовать explicit migration records для изменённых contract identities и оставлять transactional apply/recovery отдельному будущему work unit.",
+      "source_path": null,
+      "source_sha256": null,
+      "record_sha256": "aaeb1f2cfd3dfa9cbe756b5928344d907d6eafc3225662510862e10ab261063e"
     }
   ],
   "capability_refs": [
@@ -227,6 +249,11 @@
       "id": "CAPREF-REFERENCE-APPS-SCRIPT-CONFORMANCE",
       "capability_id": "REFERENCE_APPS_SCRIPT_CONFORMANCE",
       "ref_sha256": "ed4aa2c80419a1aae969ae5671489b2916ad0f245713084c986561a2c3d1ca4a"
+    },
+    {
+      "id": "CAPREF-CONSUMER-FRAMEWORK-UPGRADE-PLANNING",
+      "capability_id": "CONSUMER_FRAMEWORK_UPGRADE_PLANNING",
+      "ref_sha256": "d79ef273bcb139585edb9a5737c584d1cb85257ca5020c2370d0d8e4c0c2647e"
     }
   ],
   "work_unit_refs": [
@@ -299,6 +326,13 @@
       "issue_number": 80,
       "ai_work_package_id": null,
       "ref_sha256": "8b4e15d488d4a475d2ae7ebf13297737dc91af7dbf366a9abc8270b99b016355"
+    },
+    {
+      "id": "WORKREF-UPGRADE-001",
+      "roadmap_id": "UPGRADE-001",
+      "issue_number": 81,
+      "ai_work_package_id": null,
+      "ref_sha256": "9f225766dde9fd8b04221a13e466cb222405780c22f445cd5960e9bbb98ce85a"
     }
   ],
   "evidence_refs": [],
@@ -547,7 +581,35 @@
       "from": "CAPREF-REFERENCE-APPS-SCRIPT-CONFORMANCE",
       "to": "WORKREF-ASREF-001",
       "edge_sha256": "54791f46fd93c1c96d1396d8ba17eecaf01d4aff03107f0bee9fa055367f46e8"
+    },
+    {
+      "id": "EDGE-INTENT-REQ-UPGRADE-001",
+      "type": "INTENT_TO_REQUIREMENT",
+      "from": "INTENT-FOUNDATION-20260815",
+      "to": "REQ-UPGRADE-001",
+      "edge_sha256": "cda57e7b9bb96898cc37b6ed9adb2ddd7bede031071c96ddb9cc18789a2e060e"
+    },
+    {
+      "id": "EDGE-REQ-DEC-UPGRADE-001",
+      "type": "REQUIREMENT_TO_DECISION",
+      "from": "REQ-UPGRADE-001",
+      "to": "DEC-UPGRADE-001",
+      "edge_sha256": "816c5990182d18b7985cd8e51a6ad7f88bcc4f17478a4b1ee330bcb7125189bc"
+    },
+    {
+      "id": "EDGE-DEC-CAP-UPGRADE-001",
+      "type": "DECISION_TO_CAPABILITY",
+      "from": "DEC-UPGRADE-001",
+      "to": "CAPREF-CONSUMER-FRAMEWORK-UPGRADE-PLANNING",
+      "edge_sha256": "5964ec85013e9f9253e2df8bb8f709881b9331252858f26e4411fc94b386f100"
+    },
+    {
+      "id": "EDGE-CAP-WORK-UPGRADE-001",
+      "type": "CAPABILITY_TO_WORK",
+      "from": "CAPREF-CONSUMER-FRAMEWORK-UPGRADE-PLANNING",
+      "to": "WORKREF-UPGRADE-001",
+      "edge_sha256": "b6bf67f65f7b8a215559858dadd943440d193ccefd83a1022cf8bd18ece3184b"
     }
   ],
-  "graph_sha256": "72beb9346a099ec050a39ad7b4a26833aebda85a60d99dadcd1dff99f0ae9544"
+  "graph_sha256": "140b80eaf6fe13b927e022666ee8807c495192c027ba3c8c15983051f018e0b9"
 }

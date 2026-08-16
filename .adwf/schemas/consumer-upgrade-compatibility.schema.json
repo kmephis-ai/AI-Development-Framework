@@ -1,0 +1,48 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "ADWF Consumer Framework Upgrade Compatibility v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["$schema", "schema_version", "role", "status", "source_revision", "target_revision", "consumer_root_sha256", "source_manifest_sha256", "target_manifest_sha256", "profile", "framework_config", "managed_surface", "project_pack", "contracts", "skills", "path_entries", "rollback_prerequisites", "findings", "write_performed", "compatibility_sha256"],
+  "properties": {
+    "$schema": {"const": ".adwf/schemas/consumer-upgrade-compatibility.schema.json"},
+    "schema_version": {"const": 1},
+    "role": {"const": "CONSUMER_UPGRADE_COMPATIBILITY"},
+    "status": {"enum": ["PASS", "HUMAN_REQUIRED", "BLOCK"]},
+    "source_revision": {"type": "string", "pattern": "^[0-9a-f]{40}$"},
+    "target_revision": {"type": "string", "pattern": "^[0-9a-f]{40}$"},
+    "consumer_root_sha256": {"type": "string", "format": "sha256"},
+    "source_manifest_sha256": {"type": "string", "format": "sha256"},
+    "target_manifest_sha256": {"type": "string", "format": "sha256"},
+    "profile": {
+      "type": "object", "additionalProperties": false,
+      "required": ["source_sha256", "target_sha256", "source_file_sha256", "source_schema_version", "target_schema_version"],
+      "properties": {
+        "source_sha256": {"type": "string", "format": "sha256"},
+        "target_sha256": {"type": "string", "format": "sha256"},
+        "source_file_sha256": {"type": "string", "format": "sha256"},
+        "source_schema_version": {"type": "integer", "minimum": 1},
+        "target_schema_version": {"type": "integer", "minimum": 1}
+      }
+    },
+    "framework_config": {"type": "object", "additionalProperties": false, "required": ["source_schema_version", "target_schema_version"], "properties": {"source_schema_version": {"type": "integer", "minimum": 1}, "target_schema_version": {"type": "integer", "minimum": 1}}},
+    "managed_surface": {"type": "object", "additionalProperties": false, "required": ["source_schema_version", "target_schema_version"], "properties": {"source_schema_version": {"type": "integer", "minimum": 1}, "target_schema_version": {"type": "integer", "minimum": 1}}},
+    "project_pack": {
+      "type": "object", "additionalProperties": false,
+      "required": ["source_id", "source_digest", "target_id", "target_digest", "status", "migration_id", "record_id"],
+      "properties": {
+        "source_id": {"type": "string", "minLength": 1}, "source_digest": {"type": "string", "format": "sha256"},
+        "target_id": {"type": "string", "minLength": 1}, "target_digest": {"type": "string", "format": "sha256"},
+        "status": {"enum": ["PASS", "HUMAN_REQUIRED"]},
+        "migration_id": {"type": ["string", "null"]}, "record_id": {"type": ["string", "null"]}
+      }
+    },
+    "contracts": {"type": "array", "items": {"type": "object", "additionalProperties": false, "required": ["contract", "source_identity", "target_identity", "status", "migration_id", "record_id"], "properties": {"contract": {"type": "string", "minLength": 1}, "source_identity": {"type": "string", "minLength": 1}, "target_identity": {"type": "string", "minLength": 1}, "status": {"enum": ["PASS", "HUMAN_REQUIRED"]}, "migration_id": {"type": ["string", "null"]}, "record_id": {"type": ["string", "null"]}}}},
+    "skills": {"type": "array", "items": {"type": "object", "additionalProperties": false, "required": ["id", "source_package_sha256", "target_package_sha256", "status", "migration_id", "record_id"], "properties": {"id": {"type": "string", "minLength": 1}, "source_package_sha256": {"type": "string", "format": "sha256"}, "target_package_sha256": {"anyOf": [{"type": "string", "format": "sha256"}, {"type": "null"}]}, "status": {"enum": ["PASS", "HUMAN_REQUIRED"]}, "migration_id": {"type": ["string", "null"]}, "record_id": {"type": ["string", "null"]}}}},
+    "path_entries": {"type": "array", "minItems": 1, "uniqueItems": true, "items": {"type": "object", "additionalProperties": false, "required": ["path", "classification", "source_ownership", "target_ownership", "source_sha256", "target_sha256", "consumer_state", "consumer_sha256", "action"], "properties": {"path": {"type": "string", "minLength": 1}, "classification": {"enum": ["UNCHANGED_FRAMEWORK_PRIVATE", "ADD_FRAMEWORK_PRIVATE", "REMOVE_FRAMEWORK_PRIVATE", "MODIFY_FRAMEWORK_PRIVATE", "SHARED_GUARDED"]}, "source_ownership": {"enum": ["FRAMEWORK_PRIVATE", "SHARED_GUARDED", "CONSUMER_OWNED"]}, "target_ownership": {"enum": ["FRAMEWORK_PRIVATE", "SHARED_GUARDED", "CONSUMER_OWNED"]}, "source_sha256": {"anyOf": [{"type": "string", "format": "sha256"}, {"type": "null"}]}, "target_sha256": {"anyOf": [{"type": "string", "format": "sha256"}, {"type": "null"}]}, "consumer_state": {"enum": ["ABSENT", "FILE", "SYMLINK", "PARENT_NON_DIRECTORY", "NON_FILE"]}, "consumer_sha256": {"anyOf": [{"type": "string", "format": "sha256"}, {"type": "null"}]}, "action": {"enum": ["BLOCK", "PRESERVE_PREEXISTING", "PRESERVE_SHARED", "PRESERVE_SHARED_ABSENT", "REMOVE_PLANNED", "KEEP_EXACT", "REPLACE_PLANNED", "CREATE_PLANNED", "PRESERVE_CONSUMER_COLLISION"]}}}},
+    "rollback_prerequisites": {"type": "object", "additionalProperties": false, "required": ["source_revision_required", "source_manifest_required", "restore", "remove_on_rollback"], "properties": {"source_revision_required": {"const": true}, "source_manifest_required": {"const": true}, "restore": {"type": "array", "uniqueItems": true, "items": {"type": "object", "additionalProperties": false, "required": ["path", "sha256"], "properties": {"path": {"type": "string", "minLength": 1}, "sha256": {"type": "string", "format": "sha256"}}}}, "remove_on_rollback": {"type": "array", "uniqueItems": true, "items": {"type": "object", "additionalProperties": false, "required": ["path", "sha256"], "properties": {"path": {"type": "string", "minLength": 1}, "sha256": {"type": "string", "format": "sha256"}}}}}},
+    "findings": {"type": "array", "items": {"type": "object", "additionalProperties": false, "required": ["severity", "code", "subject"], "properties": {"severity": {"enum": ["BLOCK", "HUMAN_REQUIRED"]}, "code": {"type": "string", "minLength": 3}, "subject": {"type": "string", "minLength": 1}}}},
+    "write_performed": {"const": false},
+    "compatibility_sha256": {"type": "string", "format": "sha256"}
+  }
+}

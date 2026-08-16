@@ -1,0 +1,26 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "ADWF Consumer Framework Upgrade Plan v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["$schema", "schema_version", "role", "status", "source_revision", "target_revision", "consumer_root_sha256", "source_manifest_sha256", "target_manifest_sha256", "compatibility_sha256", "source_profile_sha256", "target_profile_sha256", "entries", "rollback_prerequisites", "findings", "write_performed", "plan_sha256"],
+  "properties": {
+    "$schema": {"const": ".adwf/schemas/consumer-upgrade-plan.schema.json"},
+    "schema_version": {"const": 1},
+    "role": {"const": "CONSUMER_FRAMEWORK_UPGRADE_PLAN"},
+    "status": {"enum": ["READY", "HUMAN_REQUIRED", "BLOCK"]},
+    "source_revision": {"type": "string", "pattern": "^[0-9a-f]{40}$"},
+    "target_revision": {"type": "string", "pattern": "^[0-9a-f]{40}$"},
+    "consumer_root_sha256": {"type": "string", "format": "sha256"},
+    "source_manifest_sha256": {"type": "string", "format": "sha256"},
+    "target_manifest_sha256": {"type": "string", "format": "sha256"},
+    "compatibility_sha256": {"type": "string", "format": "sha256"},
+    "source_profile_sha256": {"type": "string", "format": "sha256"},
+    "target_profile_sha256": {"type": "string", "format": "sha256"},
+    "entries": {"type": "array", "minItems": 1},
+    "rollback_prerequisites": {"type": "object"},
+    "findings": {"type": "array"},
+    "write_performed": {"const": false},
+    "plan_sha256": {"type": "string", "format": "sha256"}
+  }
+}

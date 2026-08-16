@@ -1,0 +1,29 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "ADWF Consumer Upgrade Migration Registry v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["$schema", "schema_version", "role", "records"],
+  "properties": {
+    "$schema": {"const": ".adwf/schemas/consumer-upgrade-migrations.schema.json"},
+    "schema_version": {"const": 1},
+    "role": {"const": "CONSUMER_UPGRADE_MIGRATION_REGISTRY"},
+    "records": {
+      "type": "array",
+      "uniqueItems": true,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["id", "contract", "from_identity", "to_identity", "disposition"],
+        "properties": {
+          "id": {"type": "string", "pattern": "^[A-Z0-9][A-Z0-9._-]{2,95}$"},
+          "contract": {"enum": ["FRAMEWORK_CONFIG_SCHEMA", "CONSUMER_PROFILE_SCHEMA", "MANAGED_SURFACE_SNAPSHOT_SCHEMA", "PROJECT_PACK", "SKILL"]},
+          "from_identity": {"type": "string", "minLength": 3, "maxLength": 256},
+          "to_identity": {"type": "string", "minLength": 3, "maxLength": 256},
+          "disposition": {"enum": ["COMPATIBLE_NO_MIGRATION", "MIGRATION_REQUIRED"]},
+          "migration_id": {"type": "string", "pattern": "^[A-Z0-9][A-Z0-9._-]{2,95}$"}
+        }
+      }
+    }
+  }
+}
