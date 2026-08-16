@@ -16,30 +16,42 @@ jobs:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd
         with:
           persist-credentials: false
-      - name: Verify each bounded chunk
+      - name: Verify each bounded chunk and combined payload
         shell: bash
         run: |
           set -euo pipefail
-          expected=(
-            7c2506abd9981213d73ec33fac194a8b2ebdf81e4ab046483fa0f308b721f633
-            0ca0af96cde42246ac4503f7a3c071c4b7cc03d737d06a7f4b74a2775795afee
-            61f463fad26ca21d7b5032f10ebc3d075265c9a6701c4abf33b523483cf58f1b
-            97929d072ac76be01514460dbee4ee8c97d88f48ae15b8c743702390f3775b59
-            a182b5b00e1f5e81b349f8d4fafc22fd24f73db50073b5b0fed1612afaade4e3
-            be111b96ba701baa2b7991b4757e939c8684c2e65742874207d4d8891f6b6f1d
-            f86a6716084f9d58303101dab13863283e3cc8dd8bf9f259203317ac1f03fc36
-            c2c7f51b8e468abdbb78d779822d4c02cb9534a259f1cf5bcf2e36c67c44cc18
-          )
-          : > /tmp/all.b64
-          for i in 00 01 02 03 04 05 06 07; do
-            f=".github/lifecycle002.exact${i}"
-            actual="$(sha256sum "$f" | awk '{print $1}')"
-            bytes="$(wc -c < "$f" | tr -d ' ')"
-            idx=$((10#$i))
-            echo "chunk=${i} bytes=${bytes} sha256=${actual} expected=${expected[$idx]}"
-            test "$actual" = "${expected[$idx]}"
-            cat "$f" >> /tmp/all.b64
-          done
+          verify() {
+            local file="$1" expected_bytes="$2" expected_sha="$3"
+            local actual bytes
+            actual="$(sha256sum "$file" | awk '{print $1}')"
+            bytes="$(wc -c < "$file" | tr -d ' ')"
+            echo "file=${file} bytes=${bytes} sha256=${actual} expected=${expected_sha}"
+            test "$bytes" = "$expected_bytes"
+            test "$actual" = "$expected_sha"
+          }
+          verify .github/lifecycle002.exact00 4000 7c2506abd9981213d73ec33fac194a8b2ebdf81e4ab046483fa0f308b721f633
+          verify .github/lifecycle002.exact01 4000 0ca0af96cde42246ac4503f7a3c071c4b7cc03d737d06a7f4b74a2775795afee
+          verify .github/lifecycle002.exact02a 1000 f9cd02c16aadc1aac9cd078229806aec2eec1731b27c92f609cbbea804bbfa36
+          verify .github/lifecycle002.exact02b 1000 d56053d609ac8b3f10a75dd923de6215d9b560113d6bb911c2f13775fda15c7d
+          verify .github/lifecycle002.exact02c 1000 3e40eb1e0d0524b7f359749278b4a14a51d9c859dbe7b7ab8cc794e2fb3c854a
+          verify .github/lifecycle002.exact02d 1000 0e85bf7929d41150215a7431756fa2e034e18f4cccfad7acba1f9ac711a893e7
+          verify .github/lifecycle002.exact03 4000 97929d072ac76be01514460dbee4ee8c97d88f48ae15b8c743702390f3775b59
+          verify .github/lifecycle002.exact04 4000 a182b5b00e1f5e81b349f8d4fafc22fd24f73db50073b5b0fed1612afaade4e3
+          verify .github/lifecycle002.exact05 4000 be111b96ba701baa2b7991b4757e939c8684c2e65742874207d4d8891f6b6f1d
+          verify .github/lifecycle002.exact06 4000 f86a6716084f9d58303101dab13863283e3cc8dd8bf9f259203317ac1f03fc36
+          verify .github/lifecycle002.exact07 3232 c2c7f51b8e468abdbb78d779822d4c02cb9534a259f1cf5bcf2e36c67c44cc18
+
+          cat .github/lifecycle002.exact00 \
+              .github/lifecycle002.exact01 \
+              .github/lifecycle002.exact02a \
+              .github/lifecycle002.exact02b \
+              .github/lifecycle002.exact02c \
+              .github/lifecycle002.exact02d \
+              .github/lifecycle002.exact03 \
+              .github/lifecycle002.exact04 \
+              .github/lifecycle002.exact05 \
+              .github/lifecycle002.exact06 \
+              .github/lifecycle002.exact07 > /tmp/all.b64
           echo "combined bytes=$(wc -c < /tmp/all.b64 | tr -d ' ') sha256=$(sha256sum /tmp/all.b64 | awk '{print $1}')"
           test "$(wc -c < /tmp/all.b64 | tr -d ' ')" = '31232'
           test "$(sha256sum /tmp/all.b64 | awk '{print $1}')" = '8925b142ca35792e70086316965de3c395f022553c4593b4d88697dda52bd14e'
