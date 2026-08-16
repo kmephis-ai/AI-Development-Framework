@@ -1,0 +1,44 @@
+name: ADWF AGENTQUAL-001 Apply Error Capture
+
+on:
+  push:
+    branches:
+      - agent/materialize-agentqual001-6483a41b
+
+permissions:
+  contents: write
+
+env:
+  BASE_SHA: 6483a41b20cedcc17721800b164e8bce1d20ec33
+
+jobs:
+  capture:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 3
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd
+        with:
+          ref: agent/materialize-agentqual001-6483a41b
+          fetch-depth: 0
+      - name: Capture deterministic apply stderr
+        shell: bash
+        run: |
+          set -u
+          rm -rf /tmp/agentqual-error
+          git worktree add --detach /tmp/agentqual-error "$BASE_SHA"
+          set +e
+          python .transport/agentqual001/apply.py /tmp/agentqual-error > /tmp/apply.out 2> /tmp/apply.err
+          code=$?
+          set -e
+          {
+            echo "exit_code=$code"
+            echo "--- stdout ---"
+            cat /tmp/apply.out
+            echo "--- stderr ---"
+            cat /tmp/apply.err
+          } > .transport/agentqual001/last-apply-error.txt
+          git add .transport/agentqual001/last-apply-error.txt
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git commit -m "AGENTQUAL-001: capture apply diagnostic" || true
+          git push origin HEAD:refs/heads/agent/materialize-agentqual001-6483a41b
