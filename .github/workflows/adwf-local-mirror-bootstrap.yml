@@ -9,7 +9,7 @@ permissions:
   contents: read
 
 env:
-  SOURCE_SHA: 1e949c52b50d3e2b834c339572933d6bb00e16f4
+  SOURCE_SHA: 486073e374e04c270691bf55f4ddf1c77137180b
   SOURCE_BRANCH: agent/upgrade-001-compatibility-plan
   MIRROR_ARTIFACT_NAME: adwf-local-mirror-upgrade001-85d49523
 
