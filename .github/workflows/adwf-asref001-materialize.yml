@@ -57,7 +57,8 @@ jobs:
           git reset --hard "${EXPECTED_BASE}"
           git apply --check /tmp/asref.patch
           git apply /tmp/asref.patch
-          git diff --name-only | sort > /tmp/actual-files.txt
+          git add -A
+          git diff --cached --name-only | sort > /tmp/actual-files.txt
           cat > /tmp/expected-files.txt <<'FILES'
           .adwf/capability-traceability.json
           .adwf/decision-requirement-traceability.json
@@ -83,7 +84,6 @@ jobs:
           docs/governance/REFERENCE_WEB_CONFORMANCE.md
           FILES
           diff -u /tmp/expected-files.txt /tmp/actual-files.txt
-          git add -A
           test "$(git write-tree)" = "${EXPECTED_TREE}"
           git config user.email 'adwf-provider@example.invalid'
           git config user.name 'ADWF Provider Certification'
