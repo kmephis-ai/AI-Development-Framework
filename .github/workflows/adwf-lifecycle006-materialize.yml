@@ -1,0 +1,123 @@
+name: ADWF LIFECYCLE-006 Provider Materialization
+
+on:
+  push:
+    branches:
+      - agent/materialize-lifecycle006-20260816-9848e87f
+
+permissions:
+  contents: write
+
+env:
+  EXPECTED_BASE: 9848e87f464f2efa4c147b6639aaba9242077d96
+  EXPECTED_SOURCE: 9848e87f464f2efa4c147b6639aaba9242077d96
+  EXPECTED_TREE: 7f2ab69624ac258c854f44c853de3b76bc4f4e92
+  EXPECTED_PATCH_SHA256: 0073e6521b4926be51f63006b6452be7a5b37fe6656c9e754eb2cd784cb68967
+  TARGET_BRANCH: agent/lifecycle-006-preserve-shared-adoption
+
+jobs:
+  certify-publish:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-python@a309ff8b426b58ec0e2a45f0f869d46889d02405
+        with:
+          python-version: '3.13'
+
+      - name: Reconstruct exact candidate and verify immutable binding
+        shell: bash
+        run: |
+          set -euo pipefail
+          git fetch origin main "${TARGET_BRANCH}"
+          test "$(git rev-parse origin/main)" = "${EXPECTED_BASE}"
+          test "$(git rev-parse "origin/${TARGET_BRANCH}")" = "${EXPECTED_SOURCE}"
+          cat .transport/lifecycle006/patch.b64.* > /tmp/lifecycle006.patch.xz.b64
+          test "$(wc -c < /tmp/lifecycle006.patch.xz.b64 | tr -d ' ')" = "17728"
+          base64 -d /tmp/lifecycle006.patch.xz.b64 > /tmp/lifecycle006.patch.xz
+          test "$(wc -c < /tmp/lifecycle006.patch.xz | tr -d ' ')" = "13296"
+          xz -dc /tmp/lifecycle006.patch.xz > /tmp/lifecycle006.patch
+          test "$(wc -c < /tmp/lifecycle006.patch | tr -d ' ')" = "52585"
+          test "$(sha256sum /tmp/lifecycle006.patch | awk '{print $1}')" = "${EXPECTED_PATCH_SHA256}"
+          git reset --hard "${EXPECTED_SOURCE}"
+          git apply --check /tmp/lifecycle006.patch
+          git apply /tmp/lifecycle006.patch
+          git add -A
+          git diff --cached --name-only | sort > /tmp/actual-files.txt
+          cat > /tmp/expected-files.txt <<'FILES'
+          .adwf/capability-traceability.json
+          .adwf/decision-requirement-traceability.json
+          .adwf/docs-registry.json
+          .adwf/lib/managed_surface.py
+          .adwf/lib/managed_surface_transaction.py
+          .adwf/managed-surface-policy.json
+          .adwf/roadmap.json
+          .adwf/schemas/managed-surface-transaction.schema.json
+          .adwf/tests/test_managed_surface.py
+          .adwf/tests/test_managed_surface_detach_transaction.py
+          .adwf/tests/test_managed_surface_transaction.py
+          MANIFEST.json
+          SHA256SUMS.txt
+          docs/governance/MANAGED_SURFACE_CONTRACT.md
+          FILES
+          diff -u /tmp/expected-files.txt /tmp/actual-files.txt
+          test "$(git write-tree)" = "${EXPECTED_TREE}"
+          git config user.email 'adwf-provider@example.invalid'
+          git config user.name 'ADWF Provider Materialization'
+          git commit -m 'LIFECYCLE-006: preserve existing shared files during adoption'
+          echo "CANDIDATE_SHA=$(git rev-parse HEAD)" >> "$GITHUB_ENV"
+
+      - name: Focused lifecycle suite
+        shell: bash
+        run: |
+          set -euo pipefail
+          PYTHONDONTWRITEBYTECODE=1 python -m unittest discover -s .adwf/tests -p 'test_managed_surface.py' -v
+          PYTHONDONTWRITEBYTECODE=1 python -m unittest discover -s .adwf/tests -p 'test_managed_surface_transaction.py' -v
+          PYTHONDONTWRITEBYTECODE=1 python -m unittest discover -s .adwf/tests -p 'test_managed_surface_detach_transaction.py' -v
+          test -z "$(git status --porcelain)"
+
+      - name: Canonical structural validators
+        shell: bash
+        run: |
+          set -euo pipefail
+          PYTHONDONTWRITEBYTECODE=1 python .adwf/scripts/validate_capabilities.py
+          PYTHONDONTWRITEBYTECODE=1 python .adwf/scripts/validate_traceability.py
+          PYTHONDONTWRITEBYTECODE=1 python .adwf/scripts/docs_freshness.py
+          PYTHONDONTWRITEBYTECODE=1 python .adwf/scripts/validate_docs.py
+          PYTHONDONTWRITEBYTECODE=1 python .adwf/scripts/validate_managed_surface.py
+          PYTHONDONTWRITEBYTECODE=1 python .adwf/scripts/generate_manifest.py --check
+          timeout 900 python .adwf/scripts/validate_framework.py
+          test -z "$(git status --porcelain)"
+
+      - name: Full self-test and exact BASE trust classification
+        shell: bash
+        run: |
+          set -euo pipefail
+          timeout 900 python .adwf/adwf.py self-test
+          test -z "$(git status --porcelain)"
+          git worktree add --detach /tmp/adwf-base "${EXPECTED_BASE}"
+          PYTHONPATH=/tmp/adwf-base/.adwf python - <<'PY'
+          import json, os, sys
+          sys.path.insert(0, '/tmp/adwf-base/.adwf')
+          from lib.trust import classify_git_diff
+          result=classify_git_diff(os.environ['GITHUB_WORKSPACE'],os.environ['EXPECTED_BASE'],os.environ['CANDIDATE_SHA'])
+          print('TRUST_CLASSIFICATION=' + json.dumps(result,sort_keys=True))
+          required={'result','authorization_mode','human_required','manual_required_files','weakening','reason_codes'}
+          assert required.issubset(result)
+          with open(os.environ['GITHUB_STEP_SUMMARY'],'a',encoding='utf-8') as f:
+              f.write('## Exact BASE trust classification\n\n```json\n')
+              f.write(json.dumps(result,indent=2,sort_keys=True))
+              f.write('\n```\n')
+          PY
+
+      - name: Final CAS and atomic writer publication
+        shell: bash
+        run: |
+          set -euo pipefail
+          git fetch origin main "${TARGET_BRANCH}"
+          test "$(git rev-parse origin/main)" = "${EXPECTED_BASE}"
+          test "$(git rev-parse "origin/${TARGET_BRANCH}")" = "${EXPECTED_SOURCE}"
+          test "$(git rev-parse HEAD^{tree})" = "${EXPECTED_TREE}"
+          git push origin "HEAD:refs/heads/${TARGET_BRANCH}"
