@@ -198,6 +198,14 @@
             "UPGRADE_FIX-001"
           ],
           "product_impact": false
+        },
+        {
+          "roadmap_id": "GOV-021",
+          "title_ru": "Provider-Resolved Live Evidence Governance + Upgrade Capability Promotion v1",
+          "dependencies": [
+            "UPGRADE-003"
+          ],
+          "product_impact": false
         }
       ]
     }
