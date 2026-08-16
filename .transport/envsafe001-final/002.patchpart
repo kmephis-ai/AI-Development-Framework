@@ -1,0 +1,226 @@
++    sealed["evidence_sha256"] = _sha256({k: v for k, v in sealed.items() if k != "evidence_sha256"})
++    return sealed
++
++
++def validate_execution_evidence(
++    value: dict[str, Any], framework_root: str | Path, *, expected_head: str | None = None, expected_pack_digest: str | None = None,
++) -> list[str]:
++    root = Path(framework_root).resolve()
++    errors: list[str] = []
++    try:
++        schema = _strict_object(root / ".adwf/schemas/project-execution-evidence.schema.json", "PROJECT_EXECUTION_EVIDENCE_SCHEMA_INVALID")
++    except ProjectExecutionError as exc:
++        return [str(exc)]
++    for item in validate(value, schema):
++        errors.append(f"SCHEMA:{item.path}:{item.code}")
++    actual = value.get("evidence_sha256")
++    expected = _sha256({k: v for k, v in value.items() if k != "evidence_sha256"})
++    if actual != expected:
++        errors.append("PROJECT_EXECUTION_EVIDENCE_DIGEST_MISMATCH")
++    if expected_head is not None and value.get("head_sha") != expected_head:
++        errors.append("PROJECT_EXECUTION_EVIDENCE_HEAD_MISMATCH")
++    if expected_pack_digest is not None and value.get("pack_digest") != expected_pack_digest:
++        errors.append("PROJECT_EXECUTION_EVIDENCE_PACK_DIGEST_MISMATCH")
++    return list(dict.fromkeys(errors))
++
++
++@dataclass
++class CommandObservation:
++    process: subprocess.CompletedProcess[str]
++    safety_status: str
++    reason_codes: list[str]
++    tracked_mutation_count: int
++    untracked_output_count: int
++
++
++class ProjectExecutionSession:
++    """Independent exact-revision local clone for one bounded consumer execution cycle."""
++
++    def __init__(self, project_root: str | Path, framework_root: str | Path, binding: dict[str, Any], *, purpose: str):
++        self.project_root = Path(project_root).resolve()
++        self.framework_root = Path(framework_root).resolve()
++        self.binding = binding
++        self.purpose = str(purpose)
++        self.execution_id = "PEX-" + uuid.uuid4().hex
++        self._tmp: tempfile.TemporaryDirectory[str] | None = None
++        self.workspace: Path | None = None
++        self._env: dict[str, str] | None = None
++        self._head: str | None = None
++        self._tree: str | None = None
++        self._records: list[dict[str, Any]] = []
++        self._reason_codes: list[str] = []
++        self._canonical_integrity = "NOT_VERIFIED"
++        self.evidence: dict[str, Any] | None = None
++
++    @property
++    def head_sha(self) -> str:
++        if not self._head:
++            raise ProjectExecutionError("PROJECT_EXECUTION_SESSION_NOT_STARTED")
++        return self._head
++
++    @property
++    def tree_sha(self) -> str:
++        if not self._tree:
++            raise ProjectExecutionError("PROJECT_EXECUTION_SESSION_NOT_STARTED")
++        return self._tree
++
++    @property
++    def environment_names(self) -> list[str]:
++        if self._env is None:
++            raise ProjectExecutionError("PROJECT_EXECUTION_SESSION_NOT_STARTED")
++        return sorted(self._env)
++
++    def __enter__(self) -> "ProjectExecutionSession":
++        top = Path(_run_git(self.project_root, "rev-parse", "--show-toplevel").stdout.strip()).resolve()
++        if top != self.project_root:
++            raise ProjectExecutionError("PROJECT_EXECUTION_ROOT_NOT_GIT_TOPLEVEL")
++        if not _git_clean(self.project_root):
++            raise ProjectExecutionError("PROJECT_SOURCE_NOT_CLEAN")
++        self._head, self._tree = _git_identity(self.project_root)
++        self._tmp = tempfile.TemporaryDirectory(prefix="adwf-project-exec-")
++        temp_root = Path(self._tmp.name)
++        workspace = temp_root / "workspace"
++        home = temp_root / "home"
++        scratch = temp_root / "scratch"
++        self._env = _minimal_environment(home, scratch)
++        clone = subprocess.run(
++            ["git", "clone", "--no-local", "--no-hardlinks", "--no-checkout", "--no-tags", "--quiet", str(self.project_root), str(workspace)],
++            cwd=self.project_root, env=self._env, text=True, capture_output=True, check=False, timeout=120,
++        )
++        if clone.returncode:
++            self._tmp.cleanup(); self._tmp = None
++            raise ProjectExecutionError("PROJECT_EXECUTION_CLONE_FAILED")
++        self.workspace = workspace.resolve()
++        _run_git(self.workspace, "checkout", "--detach", "--quiet", self._head, env=self._env)
++        _run_git(self.workspace, "remote", "remove", "origin", env=self._env)
++        alternates = self.workspace / ".git/objects/info/alternates"
++        if alternates.exists():
++            self._tmp.cleanup(); self._tmp = None
++            raise ProjectExecutionError("PROJECT_EXECUTION_SHARED_OBJECT_STORE_FORBIDDEN")
++        clone_head, clone_tree = _git_identity(self.workspace)
++        if clone_head != self._head or clone_tree != self._tree or not _git_clean(self.workspace):
++            self._tmp.cleanup(); self._tmp = None
++            raise ProjectExecutionError("PROJECT_EXECUTION_EXACT_CLONE_NOT_VERIFIED")
++        return self
++
++    def _canonical_ok(self) -> bool:
++        if not self._head or not self._tree:
++            return False
++        try:
++            head, tree = _git_identity(self.project_root)
++            return head == self._head and tree == self._tree and _git_clean(self.project_root)
++        except ProjectExecutionError:
++            return False
++
++    def _check_command_binding(self, name: str, command: list[str], *, pack_bound: bool) -> None:
++        if not isinstance(command, list) or not command or not all(isinstance(item, str) and item for item in command):
++            raise ProjectExecutionError("PROJECT_COMMAND_INVALID:" + name)
++        if not pack_bound:
++            return
++        current = self.binding.get("commands", {}).get(name)
++        if not isinstance(current, dict) or current.get("available") is not True or current.get("command") != command:
++            raise ProjectExecutionError("PROJECT_COMMAND_PACK_BINDING_MISMATCH:" + name)
++
++    def run(
++        self, name: str, command: list[str], *, pack_bound: bool = True, cwd: Path | None = None,
++        timeout: int = 900, capture_output: bool = True,
++    ) -> CommandObservation:
++        if self.workspace is None or self._env is None:
++            raise ProjectExecutionError("PROJECT_EXECUTION_SESSION_NOT_STARTED")
++        self._check_command_binding(name, command, pack_bound=pack_bound)
++        target = (cwd or self.workspace).resolve()
++        if target != self.workspace and self.workspace not in target.parents:
++            raise ProjectExecutionError("PROJECT_EXECUTION_CWD_ESCAPE")
++        reason_codes: list[str] = []
++        safety_reasons: list[str] = []
++        try:
++            proc = subprocess.run(
++                command, cwd=target, env=self._env, text=True, capture_output=capture_output,
++                check=False, timeout=timeout,
++            )
++        except FileNotFoundError:
++            proc = subprocess.CompletedProcess(command, 127, "", "")
++            reason_codes.append("PROJECT_COMMAND_EXECUTABLE_NOT_FOUND")
++        except subprocess.TimeoutExpired:
++            proc = subprocess.CompletedProcess(command, 124, "", "")
++            reason_codes.append("PROJECT_COMMAND_TIMEOUT")
++        tracked_count, untracked_count = _status_counts(self.workspace)
++        tracked_dirty = _tracked_dirty(self.workspace)
++        head, tree = _git_identity(self.workspace)
++        if head != self._head or tree != self._tree:
++            safety_reasons.append("PROJECT_EXECUTION_REVISION_DRIFT")
++        if tracked_dirty or tracked_count:
++            safety_reasons.append("PROJECT_COMMAND_TRACKED_MUTATION")
++        if not self._canonical_ok():
++            safety_reasons.append("PROJECT_CANONICAL_SOURCE_MUTATED")
++        reason_codes.extend(safety_reasons)
++        if proc.returncode:
++            reason_codes.append("PROJECT_COMMAND_NONZERO_EXIT")
++        safety_status = "PASS" if not safety_reasons else "BLOCK"
++        self._records.append({
++            "name": name,
++            "kind": "PACK_COMMAND" if pack_bound else "FRAMEWORK_TOOL",
++            "argv_sha256": hashlib.sha256("\0".join(command).encode("utf-8")).hexdigest(),
++            "returncode": int(proc.returncode),
++            "safety_status": safety_status,
++            "reason_codes": list(dict.fromkeys(reason_codes)),
++            "tracked_mutation_count": tracked_count,
++            "untracked_output_count": untracked_count,
++        })
++        self._reason_codes.extend(reason_codes)
++        return CommandObservation(
++            process=proc, safety_status=safety_status, reason_codes=list(dict.fromkeys(reason_codes)),
++            tracked_mutation_count=tracked_count, untracked_output_count=untracked_count,
++        )
++
++    def popen(self, name: str, command: list[str], *, pack_bound: bool = True, cwd: Path | None = None) -> subprocess.Popen[str]:
++        if self.workspace is None or self._env is None:
++            raise ProjectExecutionError("PROJECT_EXECUTION_SESSION_NOT_STARTED")
++        self._check_command_binding(name, command, pack_bound=pack_bound)
++        target = (cwd or self.workspace).resolve()
++        if target != self.workspace and self.workspace not in target.parents:
++            raise ProjectExecutionError("PROJECT_EXECUTION_CWD_ESCAPE")
++        try:
++            return subprocess.Popen(
++                command, cwd=target, env=self._env, text=True,
++                stdout=subprocess.DEVNULL, stderr=subprocess.STDOUT, start_new_session=True,
++            )
++        except FileNotFoundError as exc:
++            raise ProjectExecutionError("PROJECT_COMMAND_EXECUTABLE_NOT_FOUND:" + name) from exc
++
++    def record_process(self, name: str, command: list[str], process: subprocess.Popen[str], *, pack_bound: bool = True, expected_termination: bool = False) -> CommandObservation:
++        returncode = process.poll()
++        if returncode is None:
++            raise ProjectExecutionError("PROJECT_PROCESS_STILL_RUNNING:" + name)
++        fake = subprocess.CompletedProcess(command, int(returncode), "", "")
++        # Do not execute again; reproduce postcondition checks and evidence shape.
++        if self.workspace is None:
++            raise ProjectExecutionError("PROJECT_EXECUTION_SESSION_NOT_STARTED")
++        self._check_command_binding(name, command, pack_bound=pack_bound)
++        tracked_count, untracked_count = _status_counts(self.workspace)
++        reason_codes: list[str] = []
++        safety_reasons: list[str] = []
++        head, tree = _git_identity(self.workspace)
++        if head != self._head or tree != self._tree:
++            safety_reasons.append("PROJECT_EXECUTION_REVISION_DRIFT")
++        if _tracked_dirty(self.workspace) or tracked_count:
++            safety_reasons.append("PROJECT_COMMAND_TRACKED_MUTATION")
++        if not self._canonical_ok():
++            safety_reasons.append("PROJECT_CANONICAL_SOURCE_MUTATED")
++        reason_codes.extend(safety_reasons)
++        if returncode and not expected_termination:
++            reason_codes.append("PROJECT_COMMAND_NONZERO_EXIT")
++        status = "PASS" if not safety_reasons else "BLOCK"
++        self._records.append({
++            "name": name, "kind": "PACK_COMMAND" if pack_bound else "FRAMEWORK_TOOL",
++            "argv_sha256": hashlib.sha256("\0".join(command).encode("utf-8")).hexdigest(),
++            "returncode": int(returncode), "safety_status": status,
++            "reason_codes": list(dict.fromkeys(reason_codes)), "tracked_mutation_count": tracked_count,
++            "untracked_output_count": untracked_count,
++        })
++        self._reason_codes.extend(reason_codes)
++        return CommandObservation(fake, status, list(dict.fromkeys(reason_codes)), tracked_count, untracked_count)
++
++    def _build_evidence(self) -> dict[str, Any]:
++        if not self._head or not self._tree:
++            raise ProjectExecutionError("PROJECT_EXECUTION_SESSION_NOT_STARTED")
