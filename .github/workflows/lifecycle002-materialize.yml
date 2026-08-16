@@ -33,12 +33,15 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          cat .github/lifecycle002.patch.part00 \
-              .github/lifecycle002.patch.part01 \
-              .github/lifecycle002.patch.part02 \
-              .github/lifecycle002.patch.part03 \
-              .github/lifecycle002.patch.part04 \
-              .github/lifecycle002.patch.part05 > /tmp/lifecycle002.patch.gz.b64
+          cat .github/lifecycle002.exact00 \
+              .github/lifecycle002.exact01 \
+              .github/lifecycle002.exact02 \
+              .github/lifecycle002.exact03 \
+              .github/lifecycle002.exact04 \
+              .github/lifecycle002.exact05 \
+              .github/lifecycle002.exact06 \
+              .github/lifecycle002.exact07 > /tmp/lifecycle002.patch.gz.b64
+          test "$(wc -c < /tmp/lifecycle002.patch.gz.b64 | tr -d ' ')" = '31232'
           REMOTE_MAIN="$(git ls-remote origin refs/heads/main | awk '{print $1}')"
           test "$REMOTE_MAIN" = "$BASE_SHA"
           git checkout --detach "$BASE_SHA"
