@@ -16,6 +16,7 @@ from lib.github_provider import GitHubClient
 from lib.provider_contracts import ProviderContractError
 from lib.strict_json import loads as strict_loads
 from lib.trust import classify_diff,is_trust_sensitive_path,normalize_repo_path
+from lib.capability_live_evidence import validate_certification_registry, resolve_capability_live_evidence, verify_provider_certification
 
 OWNER_ATTESTATION=re.compile(r'(?mi)^\s*Owner-Attestation:\s*`?([0-9a-f]{40})`?\s*$')
 SHA=re.compile(r'^[0-9a-f]{40}$')
@@ -129,6 +130,38 @@ def _provider_trust_classification(client:GitHubClient,pr:dict[str,Any])->dict[s
     return result
 
 
+def _capability_live_evidence_provider_gate(client:GitHubClient,pr:dict[str,Any],sha:str)->dict[str,Any]:
+    """Provider-verify candidate live certifications using trusted BASE code.
+
+    This runs only when Capability Truth/certification surfaces change.  Schemas
+    are loaded from the exact PR BASE, so a candidate cannot relax its own
+    certification contract and use that relaxation for self-authorization.
+    """
+    number=int(pr.get('number') or 0)
+    if number<1:return {'applicable':True,'verified':False,'reason_codes':['LIVE_CERT_PR_NUMBER_INVALID']}
+    files=client.pull_files(number)
+    names={normalize_repo_path(str(item.get('filename') or '')) for item in files}
+    guarded={'.adwf/capability-live-evidence.json','.adwf/capability-traceability.json','.adwf/schemas/capability-live-evidence-certification.schema.json','.adwf/lib/capability_live_evidence.py'}
+    if not (names & guarded):return {'applicable':False,'verified':True,'reason_codes':[]}
+    base_sha=_exact_sha((pr.get('base') or {}).get('sha'),'LIVE_CERT_BASE_SHA_INVALID')
+    try:
+        registry=strict_loads(_github_blob(client,'.adwf/capability-live-evidence.json',sha))
+        trace=strict_loads(_github_blob(client,'.adwf/capability-traceability.json',sha))
+        schema=strict_loads(_github_blob(client,'.adwf/schemas/capability-live-evidence-certification.schema.json',base_sha))
+    except (ProviderContractError,TimeoutError,json.JSONDecodeError,ValueError) as exc:
+        return {'applicable':True,'verified':False,'reason_codes':['LIVE_CERT_CANDIDATE_READBACK_FAILED:'+type(exc).__name__]}
+    reasons=[]
+    reasons.extend(validate_certification_registry(registry,schema=schema,known_capability_ids={str(item.get('id') or '') for item in trace.get('capabilities') or []}))
+    reasons.extend(resolve_capability_live_evidence(trace,registry,schema=schema))
+    provider=[]
+    if not reasons:
+        for cert in registry.get('certifications') or []:
+            result=verify_provider_certification(client,cert); provider.append({'id':cert.get('id'),**result})
+            if result.get('verified') is not True:
+                reasons.extend(result.get('reason_codes') or ['LIVE_CERT_PROVIDER_NOT_VERIFIED'])
+    return {'applicable':True,'verified':not reasons,'reason_codes':list(dict.fromkeys(reasons)),'provider':provider}
+
+
 def evaluate_trusted_gate(client:GitHubClient,repo:str,workflow_run:dict[str,Any])->dict[str,Any]:
     run_id=workflow_run.get('id');sha=str(workflow_run.get('head_sha') or '')
     reasons=[];governance_reasons=[]
@@ -193,8 +226,14 @@ def evaluate_trusted_gate(client:GitHubClient,repo:str,workflow_run:dict[str,Any
                     reasons.append('TRUST_BOUNDARY_CHANGE_NOT_AUTHORIZED')
             else:
                 governance['verified']=True
+        live_evidence=_capability_live_evidence_provider_gate(client,pr,sha)
+        if live_evidence.get('verified') is not True:
+            reasons.append('CAPABILITY_LIVE_EVIDENCE_PROVIDER_NOT_VERIFIED')
+            reasons.extend(str(code) for code in (live_evidence.get('reason_codes') or []))
+    else:
+        live_evidence={'applicable':False,'verified':True,'reason_codes':[]}
     governance['reason_codes']=governance_reasons
-    return {'sha':sha,'pr_number':pr_number,'reasons':list(dict.fromkeys(reasons)),'governance':governance}
+    return {'sha':sha,'pr_number':pr_number,'reasons':list(dict.fromkeys(reasons)),'governance':governance,'live_evidence':live_evidence}
 
 
 def _publish(client:GitHubClient,name:str,sha:str,passed:bool,title:str,summary:str)->None:

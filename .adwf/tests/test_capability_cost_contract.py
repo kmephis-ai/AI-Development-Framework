@@ -54,11 +54,14 @@ class CapabilityCostContractTests(unittest.TestCase):
         errors = validate_truth_payload(candidate, schema=schema, root=ROOT)
         self.assertIn("CAPABILITY_LIVE_EVIDENCE_MISSING:TRUSTED_GATE", errors)
 
-    def test_current_catalog_does_not_promote_test_evidence_to_live_verified(self):
+    def test_only_provider_certified_upgrade_capabilities_are_live_verified(self):
         truth = json.loads((ROOT / ".adwf/capability-traceability.json").read_text(encoding="utf-8"))
-        self.assertFalse(any(item["status"] == "LIVE_VERIFIED" for item in truth["capabilities"]))
+        verified = {item["id"] for item in truth["capabilities"] if item["status"] == "LIVE_VERIFIED"}
+        self.assertEqual(verified, {"CONSUMER_FRAMEWORK_UPGRADE_PLANNING", "CONSUMER_FRAMEWORK_UPGRADE_TRANSACTION"})
         for item in truth["capabilities"]:
-            if item["status"] == "LIVE_NOT_VERIFIED":
+            if item["status"] == "LIVE_VERIFIED":
+                self.assertEqual(item["live_evidence"], ["certification:CERT-UPGRADE-003-PRIHRASH-EXTERNAL"])
+            elif item["status"] == "LIVE_NOT_VERIFIED":
                 self.assertTrue(item["live_boundary"])
                 self.assertEqual(item["live_evidence"], [])
 

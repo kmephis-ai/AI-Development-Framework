@@ -198,6 +198,14 @@
             "UPGRADE_FIX-001"
           ],
           "product_impact": false
+        },
+        {
+          "roadmap_id": "UPGRADE-004",
+          "title_ru": "Provider-Resolved Live Evidence Binding + Upgrade Capability Promotion v1",
+          "dependencies": [
+            "UPGRADE-003"
+          ],
+          "product_impact": false
         }
       ]
     }
