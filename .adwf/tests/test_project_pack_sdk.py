@@ -53,9 +53,9 @@ class ProjectPackSdkTests(unittest.TestCase):
             base=Path(tmp);framework=base/'fw';project=base/'product'
             shutil.copytree(ROOT/'.adwf',framework/'.adwf',ignore=shutil.ignore_patterns('__pycache__','tests'))
             project.mkdir();(project/'package.json').write_text(json.dumps({'dependencies':{'react':'19'},'scripts':{'build':'vite build','dev':'vite','test':'echo ok'}}));(project/'package-lock.json').write_text('{}')
-            out=materialize_project_pack(project,framework,apply=False)
+            out=materialize_project_pack(project,framework,apply=False,product_name='React Consumer',default_branch='main',repository_visibility='PUBLIC')
             self.assertEqual(out['status'],'READY_TO_APPLY');self.assertEqual(out['pack'],'react')
-            self.assertEqual(out['desired_config']['project_packs']['selected_digest'],out['pack_digest'])
+            self.assertEqual(out['desired_profile']['project_packs']['selected_digest'],out['pack_digest']);self.assertEqual(out['desired_profile']['project']['name'],'React Consumer')
             self.assertEqual(out['safety']['monetary_budget_usd'],0);self.assertEqual(out['safety']['secrets'],'FORBIDDEN')
 
     def _canonical(self)->dict:

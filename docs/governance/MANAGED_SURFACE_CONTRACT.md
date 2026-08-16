@@ -146,6 +146,14 @@ Destructive mutation разрешена только явным `--detach-apply`
 
 COMMITTED фиксируется только после полного readback: все `REMOVE_ELIGIBLE`/`ALREADY_ABSENT` должны быть действительно absent и ни один quarantine object не должен остаться. Partial failure не может создать ложный successful detach.
 
+## Consumer-owned profile overlay — LIFECYCLE-005
+
+Consumer identity нельзя безопасно записывать в managed `.adwf/config.json`: это изменило бы installed digest после adoption и разрушило бы transaction-bound snapshot provenance. Поэтому consumer bootstrap хранит project identity и exact Project Pack projection в `.adwf-consumer/profile.json`.
+
+Этот path намеренно отсутствует в `MANIFEST.json`, имеет `CONSUMER_OWNED` semantics и никогда не входит в detach deletion authority. Effective config существует только как validated in-memory merge разрешённых consumer fields с immutable canonical config. Guarded detach удаляет framework-private managed package files, но consumer profile переживает framework.
+
+Contract: [Consumer Project Profile Overlay](CONSUMER_PROFILE_CONTRACT.md).
+
 ## CLI
 
 Проверить canonical contract:

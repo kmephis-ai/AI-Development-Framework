@@ -1,0 +1,500 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "ADWF Consumer Project Profile v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "$schema",
+    "schema_version",
+    "role",
+    "framework_config_sha256",
+    "project_pack_digest",
+    "project",
+    "commands",
+    "project_packs",
+    "profile_sha256"
+  ],
+  "properties": {
+    "$schema": {
+      "const": ".adwf/schemas/consumer-profile.schema.json"
+    },
+    "schema_version": {
+      "const": 1
+    },
+    "role": {
+      "const": "CONSUMER_PROJECT_PROFILE"
+    },
+    "framework_config_sha256": {
+      "type": "string",
+      "format": "sha256"
+    },
+    "project_pack_digest": {
+      "type": "string",
+      "format": "sha256"
+    },
+    "project": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "name",
+        "default_branch",
+        "type",
+        "runtime_product",
+        "repository_visibility"
+      ],
+      "properties": {
+        "name": {
+          "type": "string",
+          "minLength": 2,
+          "maxLength": 160
+        },
+        "default_branch": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 255
+        },
+        "type": {
+          "type": "string",
+          "pattern": "^[a-z][a-z0-9-]{1,31}$"
+        },
+        "runtime_product": {
+          "const": true
+        },
+        "repository_visibility": {
+          "enum": [
+            "PUBLIC",
+            "PRIVATE",
+            "INTERNAL"
+          ]
+        }
+      }
+    },
+    "commands": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "lint",
+        "unit",
+        "integration",
+        "build",
+        "smoke",
+        "golden_paths",
+        "e2e"
+      ],
+      "properties": {
+        "lint": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "required",
+            "command",
+            "phases"
+          ],
+          "properties": {
+            "required": {
+              "type": "boolean"
+            },
+            "command": {
+              "type": "array",
+              "maxItems": 32,
+              "items": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 512
+              }
+            },
+            "phases": {
+              "type": "array",
+              "minItems": 1,
+              "maxItems": 4,
+              "uniqueItems": true,
+              "items": {
+                "enum": [
+                  "pr",
+                  "main",
+                  "runtime"
+                ]
+              }
+            }
+          }
+        },
+        "unit": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "required",
+            "command",
+            "phases"
+          ],
+          "properties": {
+            "required": {
+              "type": "boolean"
+            },
+            "command": {
+              "type": "array",
+              "maxItems": 32,
+              "items": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 512
+              }
+            },
+            "phases": {
+              "type": "array",
+              "minItems": 1,
+              "maxItems": 4,
+              "uniqueItems": true,
+              "items": {
+                "enum": [
+                  "pr",
+                  "main",
+                  "runtime"
+                ]
+              }
+            }
+          }
+        },
+        "integration": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "required",
+            "command",
+            "phases"
+          ],
+          "properties": {
+            "required": {
+              "type": "boolean"
+            },
+            "command": {
+              "type": "array",
+              "maxItems": 32,
+              "items": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 512
+              }
+            },
+            "phases": {
+              "type": "array",
+              "minItems": 1,
+              "maxItems": 4,
+              "uniqueItems": true,
+              "items": {
+                "enum": [
+                  "pr",
+                  "main",
+                  "runtime"
+                ]
+              }
+            }
+          }
+        },
+        "build": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "required",
+            "command",
+            "phases"
+          ],
+          "properties": {
+            "required": {
+              "type": "boolean"
+            },
+            "command": {
+              "type": "array",
+              "maxItems": 32,
+              "items": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 512
+              }
+            },
+            "phases": {
+              "type": "array",
+              "minItems": 1,
+              "maxItems": 4,
+              "uniqueItems": true,
+              "items": {
+                "enum": [
+                  "pr",
+                  "main",
+                  "runtime"
+                ]
+              }
+            }
+          }
+        },
+        "smoke": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "required",
+            "command",
+            "phases"
+          ],
+          "properties": {
+            "required": {
+              "type": "boolean"
+            },
+            "command": {
+              "type": "array",
+              "maxItems": 32,
+              "items": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 512
+              }
+            },
+            "phases": {
+              "type": "array",
+              "minItems": 1,
+              "maxItems": 4,
+              "uniqueItems": true,
+              "items": {
+                "enum": [
+                  "pr",
+                  "main",
+                  "runtime"
+                ]
+              }
+            }
+          }
+        },
+        "golden_paths": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "required",
+            "command",
+            "phases"
+          ],
+          "properties": {
+            "required": {
+              "type": "boolean"
+            },
+            "command": {
+              "type": "array",
+              "maxItems": 32,
+              "items": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 512
+              }
+            },
+            "phases": {
+              "type": "array",
+              "minItems": 1,
+              "maxItems": 4,
+              "uniqueItems": true,
+              "items": {
+                "enum": [
+                  "pr",
+                  "main",
+                  "runtime"
+                ]
+              }
+            }
+          }
+        },
+        "e2e": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "required",
+            "command",
+            "phases"
+          ],
+          "properties": {
+            "required": {
+              "type": "boolean"
+            },
+            "command": {
+              "type": "array",
+              "maxItems": 32,
+              "items": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 512
+              }
+            },
+            "phases": {
+              "type": "array",
+              "minItems": 1,
+              "maxItems": 4,
+              "uniqueItems": true,
+              "items": {
+                "enum": [
+                  "pr",
+                  "main",
+                  "runtime"
+                ]
+              }
+            }
+          }
+        }
+      }
+    },
+    "project_packs": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "selected",
+        "selected_digest",
+        "materialized",
+        "runtime_commands",
+        "preview",
+        "safety"
+      ],
+      "properties": {
+        "selected": {
+          "type": "string",
+          "pattern": "^[a-z][a-z0-9-]{1,31}$"
+        },
+        "selected_digest": {
+          "type": "string",
+          "format": "sha256"
+        },
+        "materialized": {
+          "const": true
+        },
+        "runtime_commands": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "install": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "command",
+                "available",
+                "phases"
+              ],
+              "properties": {
+                "command": {
+                  "type": [
+                    "array",
+                    "null"
+                  ],
+                  "items": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 512
+                  }
+                },
+                "available": {
+                  "type": "boolean"
+                },
+                "phases": {
+                  "type": "array",
+                  "maxItems": 4,
+                  "uniqueItems": true,
+                  "items": {
+                    "enum": [
+                      "bootstrap",
+                      "pr",
+                      "main",
+                      "runtime"
+                    ]
+                  }
+                }
+              }
+            },
+            "start": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "command",
+                "available",
+                "phases"
+              ],
+              "properties": {
+                "command": {
+                  "type": [
+                    "array",
+                    "null"
+                  ],
+                  "items": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 512
+                  }
+                },
+                "available": {
+                  "type": "boolean"
+                },
+                "phases": {
+                  "type": "array",
+                  "maxItems": 4,
+                  "uniqueItems": true,
+                  "items": {
+                    "enum": [
+                      "bootstrap",
+                      "pr",
+                      "main",
+                      "runtime"
+                    ]
+                  }
+                }
+              }
+            }
+          }
+        },
+        "preview": {
+          "type": "object"
+        },
+        "safety": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "monetary_budget_usd",
+            "secrets",
+            "network",
+            "environment",
+            "data_access"
+          ],
+          "properties": {
+            "monetary_budget_usd": {
+              "const": 0
+            },
+            "secrets": {
+              "const": "FORBIDDEN"
+            },
+            "network": {
+              "enum": [
+                "NONE",
+                "LOOPBACK",
+                "PACKAGE_REGISTRY",
+                "PACKAGE_REGISTRY_AND_LOOPBACK"
+              ]
+            },
+            "environment": {
+              "const": "PROCESS_MINIMAL"
+            },
+            "data_access": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "read_scope",
+                "write_scope"
+              ],
+              "properties": {
+                "read_scope": {
+                  "const": "PROJECT_TREE"
+                },
+                "write_scope": {
+                  "const": "TOOL_OUTPUTS_ONLY"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "profile_sha256": {
+      "type": "string",
+      "format": "sha256"
+    }
+  }
+}

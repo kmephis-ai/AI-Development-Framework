@@ -12,6 +12,7 @@ import sys
 
 ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT / '.adwf'))
+from lib.consumer_profile import PROFILE_REL, seal_profile
 from lib.pack_materializer import materialize_project_pack
 from lib.project_execution import (
     NETWORK_ENFORCEMENT,
@@ -28,7 +29,7 @@ class ProjectExecutionSafetyTests(unittest.TestCase):
         self.root = Path(self.temp.name)
         (self.root / '.adwf/schemas').mkdir(parents=True)
         (self.root / '.adwf/packs').mkdir(parents=True)
-        for name in ('config.schema.json', 'project-pack.schema.json', 'project-execution-evidence.schema.json'):
+        for name in ('config.schema.json', 'project-pack.schema.json', 'project-execution-evidence.schema.json', 'consumer-profile.schema.json'):
             shutil.copy2(ROOT / '.adwf/schemas' / name, self.root / '.adwf/schemas' / name)
         for path in (ROOT / '.adwf/packs').glob('*.json'):
             shutil.copy2(path, self.root / '.adwf/packs' / path.name)
@@ -117,17 +118,21 @@ class ProjectExecutionSafetyTests(unittest.TestCase):
         self.assertEqual(session.evidence['outcome'], 'PASS')
 
     def test_stale_pack_digest_blocks_before_execution(self):
-        config = json.loads((self.root / '.adwf/config.json').read_text(encoding='utf-8'))
-        config['project_packs']['selected_digest'] = '0' * 64
-        (self.root / '.adwf/config.json').write_text(json.dumps(config, ensure_ascii=False, indent=2) + '\n', encoding='utf-8')
-        with self.assertRaisesRegex(ProjectExecutionError, 'PROJECT_PACK_DIGEST_MISMATCH'):
+        path = self.root / PROFILE_REL
+        profile = json.loads(path.read_text(encoding='utf-8'))
+        profile['project_pack_digest'] = '0' * 64
+        profile = seal_profile(profile)
+        path.write_text(json.dumps(profile, ensure_ascii=False, indent=2) + '\n', encoding='utf-8')
+        with self.assertRaisesRegex(ProjectExecutionError, 'CONSUMER_PROFILE_PACK_DIGEST_MISMATCH'):
             self._binding()
 
     def test_safety_projection_mismatch_blocks_before_execution(self):
-        config = json.loads((self.root / '.adwf/config.json').read_text(encoding='utf-8'))
-        config['project_packs']['safety']['network'] = 'LOOPBACK'
-        (self.root / '.adwf/config.json').write_text(json.dumps(config, ensure_ascii=False, indent=2) + '\n', encoding='utf-8')
-        with self.assertRaisesRegex(ProjectExecutionError, 'PROJECT_PACK_SAFETY_MISMATCH'):
+        path = self.root / PROFILE_REL
+        profile = json.loads(path.read_text(encoding='utf-8'))
+        profile['project_packs']['safety']['network'] = 'LOOPBACK'
+        profile = seal_profile(profile)
+        path.write_text(json.dumps(profile, ensure_ascii=False, indent=2) + '\n', encoding='utf-8')
+        with self.assertRaisesRegex(ProjectExecutionError, 'CONSUMER_PROFILE_PACK_PROJECTION_MISMATCH'):
             self._binding()
 
     def test_dirty_or_ambiguous_canonical_source_is_blocked(self):

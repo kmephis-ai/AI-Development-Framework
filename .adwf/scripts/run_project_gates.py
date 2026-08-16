@@ -10,6 +10,7 @@ import sys
 
 ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT / ".adwf"))
+from lib.consumer_profile import ConsumerProfileError, load_effective_config  # noqa: E402
 from lib.project_execution import ProjectExecutionError, ProjectExecutionSession, load_bound_project_pack  # noqa: E402
 from lib.project_gates import GATE_NAMES, gate_configuration_findings  # noqa: E402
 
@@ -84,15 +85,16 @@ def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("--phase", choices=["pr", "main", "runtime"], default="pr")
     args = parser.parse_args()
-    config = json.loads((ROOT / ".adwf/config.json").read_text(encoding="utf-8"))
-    failed = runtime_checks(config) + gate_configuration_findings(config, ROOT)
     results: dict[str, str] = {}
+    failed: list[str] = []
     try:
+        config = load_effective_config(ROOT, ROOT)
+        failed = runtime_checks(config) + gate_configuration_findings(config, ROOT)
         if _framework_self_host(config):
             _legacy_framework_gates(config, args.phase, failed, results)
         else:
             _consumer_gates(config, args.phase, failed, results)
-    except (OSError, ProjectExecutionError, subprocess.SubprocessError) as exc:
+    except (OSError, ConsumerProfileError, ProjectExecutionError, subprocess.SubprocessError) as exc:
         failed.append(str(exc).split(":", 1)[0])
         for name in ORDER:
             results.setdefault(name, "NOT_VERIFIED")

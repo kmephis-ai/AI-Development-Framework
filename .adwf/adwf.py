@@ -526,7 +526,7 @@ def cmd_owner_init(args) -> int:
     try:
         plan = bootstrap_plan(product, outcome, public_confirmed=args.public_confirmed, license_acknowledged=args.license_acknowledged)
         if plan.get("status") == "READY":
-            live=bootstrap_repository(ROOT,apply=True);plan["github"]=live
+            live=bootstrap_repository(ROOT,apply=True,product_name=product);plan["github"]=live
             plan["status"]="READY" if live.get("status")=="VERIFIED" else str(live.get("status") or "NOT_VERIFIED")
         emit(plan)
         return 0 if plan.get("status") in {"READY","WAITING_SEED_CHECKS","WAITING_OWNER_GOVERNANCE_APPROVAL"} else 6
@@ -575,9 +575,10 @@ def cmd_runtime_status(args) -> int:
 
 def cmd_project_pack(args) -> int:
     project=args.project_root or ROOT
+    kwargs={"product_name":getattr(args,"product_name",None),"default_branch":getattr(args,"default_branch",None),"repository_visibility":getattr(args,"repository_visibility",None)}
     if args.apply:
-        result=materialize_project_pack(project,ROOT,apply=True); emit(result); return 0 if result.get("status")=="APPLIED" else 6
-    emit(materialize_project_pack(project,ROOT,apply=False) if args.plan else commands_for_pack(project,ROOT)); return 0
+        result=materialize_project_pack(project,ROOT,apply=True,**kwargs); emit(result); return 0 if result.get("status") in {"APPLIED","ALREADY_MATERIALIZED"} else 6
+    emit(materialize_project_pack(project,ROOT,apply=False,**kwargs) if args.plan else commands_for_pack(project,ROOT)); return 0
 
 def cmd_portfolio_view(args) -> int:
     if args.register: register_project(args.register)
@@ -747,7 +748,7 @@ def main() -> int:
     p = sub.add_parser("roadmap-view"); p.add_argument("--state")
     p = sub.add_parser("runtime-tick"); p.add_argument("--run-id", required=True)
     p = sub.add_parser("runtime-status"); p.add_argument("--run-id", required=True)
-    p = sub.add_parser("project-pack"); p.add_argument("--project-root"); p.add_argument("--plan",action="store_true"); p.add_argument("--apply",action="store_true")
+    p = sub.add_parser("project-pack"); p.add_argument("--project-root"); p.add_argument("--plan",action="store_true"); p.add_argument("--apply",action="store_true"); p.add_argument("--product-name"); p.add_argument("--default-branch"); p.add_argument("--repository-visibility",choices=["PUBLIC","PRIVATE","INTERNAL"])
     p = sub.add_parser("portfolio-view"); p.add_argument("--register")
     p = sub.add_parser("release-plan"); p.add_argument("--input", required=True)
     p = sub.add_parser("release"); p.add_argument("--auto",action="store_true"); p.add_argument("--input"); p.add_argument("--prepare",action="store_true"); p.add_argument("--confirm",action="store_true"); p.add_argument("--external",action="store_true"); p.add_argument("--publish-github",action="store_true"); p.add_argument("--output",default="dist")

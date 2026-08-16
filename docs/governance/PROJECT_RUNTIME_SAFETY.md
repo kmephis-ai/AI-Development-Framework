@@ -10,7 +10,7 @@ Project Pack по-прежнему только описывает требов�
 
 ## Exact pack/config binding
 
-Consumer execution разрешён только когда `.adwf/config.json` содержит уже materialized Project Pack и одновременно доказаны:
+Consumer execution разрешён только когда validated **effective config** содержит materialized Project Pack. После `LIFECYCLE-005` effective config строится in-memory из immutable canonical `.adwf/config.json` + sealed consumer-owned `.adwf-consumer/profile.json`; profile не получает authority над governance/provider/trust sections. Одновременно доказаны:
 
 - selected pack совпадает с deterministic current detection;
 - `selected_digest` совпадает с SHA-256 текущей strict pack definition;
@@ -20,7 +20,9 @@ Consumer execution разрешён только когда `.adwf/config.json` 
 - `environment = PROCESS_MINIMAL`;
 - data access остаётся `PROJECT_TREE` read + `TOOL_OUTPUTS_ONLY` write.
 
-Stale digest, pack substitution или safety mismatch блокируют execution до запуска subprocess.
+Stale framework-config binding, profile tamper, stale pack digest, pack substitution или safety mismatch блокируют execution до запуска subprocess.
+
+Framework self-host без consumer profile продолжает использовать canonical config; adopted consumer после explicit profile bootstrap больше не считается framework self-host.
 
 ## Minimal child environment
 
