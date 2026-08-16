@@ -99,8 +99,9 @@ jobs:
           python .adwf/tests/test_project_pack_sdk.py
           python .adwf/tests/test_reference_apps_script_conformance.py
           python .adwf/tests/test_reference_web_conformance.py
-          python .adwf/scripts/validate_capability_truth.py
-          python .adwf/scripts/validate_decision_requirement_traceability.py
+          python .adwf/scripts/validate_project_packs.py
+          python .adwf/scripts/validate_capabilities.py
+          python .adwf/scripts/validate_traceability.py
           python .adwf/scripts/docs_freshness.py
           python .adwf/scripts/generate_manifest.py --check
           python .adwf/scripts/validate_framework.py
