@@ -1,0 +1,46 @@
+name: LIFECYCLE-002 chunk diagnostic
+
+on:
+  push:
+    branches:
+      - agent/materialize-lifecycle002-20260816-4940d49a
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 3
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd
+        with:
+          persist-credentials: false
+      - name: Verify each bounded chunk
+        shell: bash
+        run: |
+          set -euo pipefail
+          expected=(
+            7c2506abd9981213d73ec33fac194a8b2ebdf81e4ab046483fa0f308b721f633
+            0ca0af96cde42246ac4503f7a3c071c4b7cc03d737d06a7f4b74a2775795afee
+            61f463fad26ca21d7b5032f10ebc3d075265c9a6701c4abf33b523483cf58f1b
+            97929d072ac76be01514460dbee4ee8c97d88f48ae15b8c743702390f3775b59
+            a182b5b00e1f5e81b349f8d4fafc22fd24f73db50073b5b0fed1612afaade4e3
+            be111b96ba701baa2b7991b4757e939c8684c2e65742874207d4d8891f6b6f1d
+            f86a6716084f9d58303101dab13863283e3cc8dd8bf9f259203317ac1f03fc36
+            c2c7f51b8e468abdbb78d779822d4c02cb9534a259f1cf5bcf2e36c67c44cc18
+          )
+          : > /tmp/all.b64
+          for i in 00 01 02 03 04 05 06 07; do
+            f=".github/lifecycle002.exact${i}"
+            actual="$(sha256sum "$f" | awk '{print $1}')"
+            bytes="$(wc -c < "$f" | tr -d ' ')"
+            idx=$((10#$i))
+            echo "chunk=${i} bytes=${bytes} sha256=${actual} expected=${expected[$idx]}"
+            test "$actual" = "${expected[$idx]}"
+            cat "$f" >> /tmp/all.b64
+          done
+          echo "combined bytes=$(wc -c < /tmp/all.b64 | tr -d ' ') sha256=$(sha256sum /tmp/all.b64 | awk '{print $1}')"
+          test "$(wc -c < /tmp/all.b64 | tr -d ' ')" = '31232'
+          test "$(sha256sum /tmp/all.b64 | awk '{print $1}')" = '8925b142ca35792e70086316965de3c395f022553c4593b4d88697dda52bd14e'
+          base64 -d /tmp/all.b64 | gzip -t
