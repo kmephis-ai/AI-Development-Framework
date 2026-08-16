@@ -2,7 +2,7 @@
   "$schema": ".adwf/schemas/decision-requirement-traceability.schema.json",
   "schema_version": 1,
   "role": "CANONICAL_DECISION_REQUIREMENT_TRACEABILITY",
-  "revision": 2,
+  "revision": 3,
   "records": [
     {
       "id": "INTENT-FOUNDATION-20260815",
@@ -58,6 +58,17 @@
       "source_path": null,
       "source_sha256": null,
       "record_sha256": "6b71630ceebfb404a9a3b7e2e385a674a4a9e6099b2da4136bfee931f7e813b3"
+    },
+    {
+      "id": "DEC-LIFECYCLE-002",
+      "kind": "DECISION",
+      "version": 1,
+      "status": "ACCEPTED",
+      "title_ru": "Adoption выполняется отдельной no-overwrite filesystem transaction до любого destructive detach",
+      "statement_ru": "Разрешить explicit transactional adoption только для CREATE_PLANNED/ABSENT package paths, с exact source revision, no-replace atomic create, durable journal/snapshot, idempotent resume и conservative rollback; existing consumer/shared paths не перезаписываются, destructive detach остаётся отдельным будущим решением.",
+      "source_path": null,
+      "source_sha256": null,
+      "record_sha256": "bef41f2b3e25eeddabe328e0b548b56cd7bdb2759865dee103851706cf3e349f"
     }
   ],
   "capability_refs": [
@@ -86,6 +97,13 @@
       "issue_number": 47,
       "ai_work_package_id": null,
       "ref_sha256": "3dfb6e27acbe1ccb6346aee2cf3abcfa291cc4ec8c95510a0eaeaface335ca31"
+    },
+    {
+      "id": "WORKREF-LIFECYCLE-002",
+      "roadmap_id": "LIFECYCLE-002",
+      "issue_number": 62,
+      "ai_work_package_id": null,
+      "ref_sha256": "445adb619a4f254255b51cd00109591b0218cd07405d78606d8d3450289663f6"
     }
   ],
   "evidence_refs": [],
@@ -145,7 +163,28 @@
       "from": "CAPREF-MANAGED-SURFACE-CONTRACT",
       "to": "WORKREF-LIFECYCLE-001",
       "edge_sha256": "4dce56544586f0b9add4757da1eaad22a87f69d85e7874e625d0eb09051a666f"
+    },
+    {
+      "id": "EDGE-REQ-DEC-LIFECYCLE-002",
+      "type": "REQUIREMENT_TO_DECISION",
+      "from": "REQ-LIFECYCLE-001",
+      "to": "DEC-LIFECYCLE-002",
+      "edge_sha256": "c668cfb152eef49416e088c79664170c11bae6ea13e8e0c18c53b4b38c4cce61"
+    },
+    {
+      "id": "EDGE-DEC-CAP-LIFECYCLE-002",
+      "type": "DECISION_TO_CAPABILITY",
+      "from": "DEC-LIFECYCLE-002",
+      "to": "CAPREF-MANAGED-SURFACE-CONTRACT",
+      "edge_sha256": "4082a148865ac0ddd71c75becd893c4c4333c1802f827b9a44d57035fb4aeae3"
+    },
+    {
+      "id": "EDGE-CAP-WORK-LIFECYCLE-002",
+      "type": "CAPABILITY_TO_WORK",
+      "from": "CAPREF-MANAGED-SURFACE-CONTRACT",
+      "to": "WORKREF-LIFECYCLE-002",
+      "edge_sha256": "d29c9f141b061e209c81e034864d58054835eb0be9330e9ee1145f9aa451a73a"
     }
   ],
-  "graph_sha256": "d4626442c5105382da6ff1916211903eea4e99abf072a6a6d3be7fafca641d23"
+  "graph_sha256": "6451255f5d434c7606fd81d31d5663a2c9871ee2229acc36ce07c682dac8c79f"
 }

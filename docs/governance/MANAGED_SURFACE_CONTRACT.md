@@ -53,7 +53,7 @@ Default для любого пути, которого нет в package manifes
 
 ## Adoption plan
 
-`plan_adoption()` — read-only.
+`plan_adoption()` — read-only. Сам planner и после LIFECYCLE-002 ничего не пишет.
 
 Он cryptographically проверяет `MANIFEST.json` + `SHA256SUMS.txt`, exact 40-char source revision, canonical relative paths и отсутствие source symlinks. Для consumer target формируется одна из truth states:
 
@@ -65,16 +65,47 @@ Default для любого пути, которого нет в package manifes
 
 Никакого `--apply` в LIFECYCLE-001 нет.
 
+## Transactional adoption apply — LIFECYCLE-002
+
+Запись разрешена только явным `--apply` и только поверх `READY` adoption plan. Planner остаётся read-only.
+
+`apply_adoption()`:
+
+- повторно проверяет source `MANIFEST.json`/`SHA256SUMS.txt`, требует чистый source Git worktree и совпадение фактического `HEAD` с exact `source_revision`; dirty/untracked source bytes не могут выдаваться за старый commit;
+- принимает только plan, который полностью совпадает с текущим package inventory, ownership и source digests; forged READY plan блокируется;
+- для `KEEP_EXACT` только повторно доказывает exact target и никогда не присваивает provenance;
+- для `CREATE_PLANNED` перед каждой записью заново проверяет parent chain и запрещает symlink/non-directory escape;
+- создаёт fully-written staging file в том же filesystem и публикует target через no-replace hard-link. Если target появился между plan и apply, он **не перезаписывается**;
+- хранит self-sealed SHA-256 transaction journal под `.adwf-runtime/managed-surface/transactions/`, привязанный к exact source revision, manifest digest, canonical plan digest и consumer-root digest; изменение journal без canonical reseal детектируется как tamper;
+- после каждого шага выполняет postcondition readback; повторный apply committed transaction является idempotent;
+- destructive detach по-прежнему не выполняет.
+
+Если filesystem не может доказуемо выполнить no-replace create, apply блокируется вместо fallback на overwrite-capable write.
+
 ## Snapshot
 
-`snapshot_from_adoption_plan()` создаёт expected post-adoption ownership snapshot только из `READY` plan.
+`snapshot_from_adoption_plan()` создаёт expected post-adoption ownership snapshot только из `READY` plan. LIFECYCLE-002 дополнительно сохраняет transaction-bound snapshot под `.adwf-runtime/managed-surface/snapshots/` **только после полного postcondition readback**.
+
+Transaction snapshot содержит optional binding fields `transaction_id`, `plan_sha256`, `consumer_root_sha256`; старый read-only v1 snapshot без этих полей остаётся schema-compatible.
 
 Консервативное правило provenance:
 
 - путь, который **уже существовал exact** до adoption, не становится автоматически `managed_by_adwf=true`;
-- ADWF может auto-own только то, чего не было до adoption и что будущий apply executor действительно создаст.
+- ADWF auto-own только файл, который plan видел `ABSENT` и текущая transaction реально создала;
+- failed/partial apply не создаёт committed snapshot.
 
 Это специально жертвует агрессивной очисткой ради сохранности consumer project.
+
+## Rollback / recovery
+
+При apply failure transaction переходит в recovery и удаляет только то, чьё создание доказано текущим journal/staging provenance.
+
+- exact unchanged файл, созданный transaction, rollback-eligible;
+- concurrent/foreign target не удаляется;
+- если созданный ADWF файл был изменён после записи, recovery сохраняет его и возвращает `RECOVERY_BLOCKED`;
+- созданные transaction directories удаляются только если они пусты; consumer files внутри них сохраняются;
+- staging drift/symlink и ambiguous provenance блокируют destructive cleanup;
+- отдельный `--recover-transaction <id>` повторяет recovery идемпотентно.
 
 ## Detach plan
 
@@ -110,6 +141,25 @@ python .adwf/scripts/validate_managed_surface.py \
   --source-revision <EXACT_40_CHAR_SHA>
 ```
 
+Явно применить READY adoption transaction (dry-run остаётся default):
+
+<!-- adwf-doc: skip(reason=requires-consumer-checkout-and-exact-source-git-revision) -->
+```bash
+python .adwf/scripts/validate_managed_surface.py \
+  --consumer-root /path/to/project \
+  --source-revision <EXACT_40_CHAR_SHA> \
+  --apply
+```
+
+Восстановить/откатить незавершённую transaction:
+
+<!-- adwf-doc: skip(reason=requires-existing-consumer-transaction-journal) -->
+```bash
+python .adwf/scripts/validate_managed_surface.py \
+  --consumer-root /path/to/project \
+  --recover-transaction <64_CHAR_TRANSACTION_ID>
+```
+
 Построить read-only detach plan по trusted snapshot:
 
 <!-- adwf-doc: skip(reason=requires-consumer-checkout-and-trusted-snapshot) -->
@@ -121,20 +171,19 @@ python .adwf/scripts/validate_managed_surface.py \
 
 ## Что намеренно ещё не реализовано
 
-LIFECYCLE-001 **не** выполняет:
+После LIFECYCLE-002 всё ещё **не** реализованы:
 
-- запись/adoption;
-- upgrade;
+- upgrade между ADWF revisions;
 - migration consumer data;
-- rollback;
-- удаление/detach;
-- Project Pack SDK;
+- destructive detach/uninstall executor;
+- merge/overwrite `SHARED_GUARDED`;
+- Project Pack SDK formalization;
 - Apps Script/edge conformance.
 
-Следующий lifecycle work unit может строить safe adoption/update executor только поверх этого ownership contract и обязан записывать provenance snapshot транзакционно.
+Destructive detach должен оставаться отдельным work unit: право **создать отсутствующий framework file** не эквивалентно праву **удалить** даже ранее managed path.
 
 ## Truth boundary
 
-Наличие schemas, planner и tests означает **implementation**, но не live consumer proof.
+Наличие schemas, planner, transaction executor и synthetic/fault-injection tests означает **implementation**, но не live consumer proof.
 
-Capability `MANAGED_SURFACE_CONTRACT` остаётся `LIVE_NOT_VERIFIED`, пока отдельный реальный consumer repository не пройдёт adoption/detach evidence cycle. Unit/self-tests или успешный merge не являются таким live evidence.
+Capability `MANAGED_SURFACE_CONTRACT` остаётся `LIVE_NOT_VERIFIED`, пока отдельный реальный consumer repository не пройдёт transactional adoption + downstream detach/recovery evidence cycle. Unit/self-tests или успешный merge не являются таким live evidence.

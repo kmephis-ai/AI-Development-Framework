@@ -86,6 +86,14 @@
             "TRACE-001"
           ],
           "product_impact": false
+        },
+        {
+          "roadmap_id": "LIFECYCLE-002",
+          "title_ru": "Transactional Adoption Apply + Rollback/Recovery v1",
+          "dependencies": [
+            "LIFECYCLE-001"
+          ],
+          "product_impact": false
         }
       ]
     }
