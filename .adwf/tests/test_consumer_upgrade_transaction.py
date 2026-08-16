@@ -181,6 +181,43 @@ class UpgradeTransactionTests(unittest.TestCase):
             self.assertEqual((c / "README.md").read_bytes(), baseline)
         finally: temp.cleanup()
 
+    def test_15_committed_rollback_with_unchanged_profile_is_verification_only(self):
+        temp, s, t, c, snap, comp, plan = prepared_transaction(ROOT, change_profile=False)
+        try:
+            profile_path = c / PROFILE_REL
+            baseline = profile_path.read_bytes()
+            result = self.apply(s,t,c,comp,plan,snap)
+            self.assertEqual(result["status"], "COMMITTED")
+            txid = result["transaction_id"]
+            store = UpgradeTransactionStore(t,c,txid,create=False)
+            journal = store.load(); self.assertIsNotNone(journal)
+            self.assertEqual(journal["profile"]["state"], "UNCHANGED")
+            self.assertIsNone(journal["profile"]["quarantine_path"])
+            self.assertEqual(profile_path.read_bytes(), baseline)
+            rolled = self.rollback(s,t,c,txid)
+            self.assertEqual(rolled["status"], "ROLLED_BACK")
+            self.assertEqual(profile_path.read_bytes(), baseline)
+            self.assert_a(s,c)
+            retried = self.apply(s,t,c,comp,plan,snap)
+            self.assertEqual(retried["status"], "COMMITTED")
+            self.assertEqual(profile_path.read_bytes(), baseline)
+            self.assert_b(t,c)
+        finally: temp.cleanup()
+
+    def test_16_drifted_unchanged_profile_blocks_rollback_without_rewrite(self):
+        temp, s, t, c, snap, comp, plan = prepared_transaction(ROOT, change_profile=False)
+        try:
+            result = self.apply(s,t,c,comp,plan,snap)
+            self.assertEqual(result["status"], "COMMITTED")
+            profile_path = c / PROFILE_REL
+            foreign = b'{"foreign":true}\n'
+            profile_path.write_bytes(foreign)
+            rolled = self.rollback(s,t,c,result["transaction_id"])
+            self.assertEqual(rolled["status"], "RECOVERY_BLOCKED")
+            self.assertIn("UPGRADE_RECOVERY_FOREIGN_UNCHANGED_PROFILE", rolled["blockers"])
+            self.assertEqual(profile_path.read_bytes(), foreign)
+        finally: temp.cleanup()
+
     def test_14_preserved_preexisting_drift_blocks_before_upgrade_write(self):
         temp, s, t, c, snap, comp, plan = prepared_transaction(ROOT, preserve_shared=True)
         try:

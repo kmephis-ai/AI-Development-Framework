@@ -10,7 +10,7 @@ from lib.managed_surface import plan_adoption
 from lib.managed_surface_transaction import apply_adoption
 
 
-def prepared_transaction(canonical_root: Path, *, preserve_shared: bool = False):
+def prepared_transaction(canonical_root: Path, *, preserve_shared: bool = False, change_profile: bool = True):
     temp = tempfile.TemporaryDirectory(); base = Path(temp.name)
     source, target, consumer = base / "source", base / "target", base / "consumer"
     source.mkdir(); consumer.mkdir(); build_framework(source, canonical_root)
@@ -31,9 +31,10 @@ def prepared_transaction(canonical_root: Path, *, preserve_shared: bool = False)
     # B exercises REPLACE + CREATE + REMOVE and forces exact profile transition
     # through a harmless config-file byte change while preserving valid semantics.
     (target / ".adwf/private.txt").write_text("private-v2\n", encoding="utf-8")
-    config = target / ".adwf/config.json"
-    value = json.loads(config.read_text(encoding="utf-8"))
-    config.write_text(json.dumps(value, ensure_ascii=False, separators=(",", ":")) + "\n", encoding="utf-8")
+    if change_profile:
+        config = target / ".adwf/config.json"
+        value = json.loads(config.read_text(encoding="utf-8"))
+        config.write_text(json.dumps(value, ensure_ascii=False, separators=(",", ":")) + "\n", encoding="utf-8")
     (target / ".adwf/new-target.txt").write_text("new-v2\n", encoding="utf-8")
     (target / ".adwf/remove-me.txt").unlink()
     seal_inventory(target)
