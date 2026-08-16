@@ -99,6 +99,17 @@ class TrustedControllerTests(unittest.TestCase):
         pr = {"user": {"login": "owner"}, "body": f"Owner-Attestation: {sha}"}
         self.assertFalse(GATE._owner_exact_head_attestation(client, pr, sha)["verified"])
 
+    def test_preview_log_provider_failure_is_structured_and_fail_closed(self):
+        sha = "a" * 40; client = mock.Mock()
+        client.check_runs.return_value = [{"name": name, "head_sha": sha, "status": "completed", "conclusion": "success", "app": {"slug": "github-actions", "id": 15368}} for name in ("fast-feedback", "adwf/governance-gate", "adwf/trusted-gate")]
+        client.jobs.return_value = [{"id": 123, "name": "fast-feedback", "status": "completed", "conclusion": "success", "steps": [{"name": PREVIEW.PREVIEW_STEP, "conclusion": "success"}]}]
+        client.job_logs.side_effect = PREVIEW.ProviderContractError("PROVIDER_HTTP_401")
+        event = {"workflow_run": {"name": "ADWF PR", "event": "pull_request", "status": "completed", "conclusion": "success", "head_sha": sha, "id": 55}}
+        result = PREVIEW.collect(client, event)
+        self.assertEqual(result["status"], "NOT_VERIFIED")
+        self.assertEqual(result["reason"], "PREVIEW_LOG_READBACK_UNAVAILABLE")
+        self.assertNotIn("provider_error", result)
+
     def test_preview_skip_is_not_applicable_without_job_log_access(self):
         sha = "a" * 40; client = mock.Mock()
         client.check_runs.return_value = [{"name": name, "head_sha": sha, "status": "completed", "conclusion": "success", "app": {"slug": "github-actions", "id": 15368}} for name in ("fast-feedback", "adwf/governance-gate", "adwf/trusted-gate")]
