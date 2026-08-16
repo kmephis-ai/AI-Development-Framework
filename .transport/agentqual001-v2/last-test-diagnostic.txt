@@ -16,7 +16,7 @@ First differing element 0:
 + ['AGENT_COMMAND_TIMEOUT']
 
 ----------------------------------------------------------------------
-Ran 13 tests in 0.268s
+Ran 13 tests in 0.267s
 
 FAILED (failures=1)
 
@@ -30,7 +30,7 @@ OK
 === python .adwf/tests/test_v15_executive.py -q ===
 exit_code=0
 ----------------------------------------------------------------------
-Ran 16 tests in 0.267s
+Ran 16 tests in 1.921s
 
 OK
 
@@ -40,7 +40,7 @@ EFFECTIVE POLICY: WRITTEN b8a2156b99a93b0828cdfb865fcf02843013aaf546e833eb878c6c
 PIPELINE PROJECTIONS generated
 MANIFEST/SHA256SUMS updated
 ----------------------------------------------------------------------
-Ran 20 tests in 0.877s
+Ran 20 tests in 0.888s
 
 OK
 
