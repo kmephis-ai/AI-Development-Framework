@@ -443,6 +443,28 @@
       ],
       "live_boundary": "REFERENCE_CONFORMANCE_REPORT доказывает synthetic/local Apps Script reference path без Google credentials/network/deployment. LIVE_VERIFIED требует отдельного реального downstream Apps Script consumer repository и actual Google runtime/provider evidence, привязанного к exact consumer revision и apps-script pack digest; local Node vm shim, CI и provider-side synthetic run не считаются такой live evidence.",
       "live_evidence": []
+    },
+    {
+      "id": "CONSUMER_FRAMEWORK_UPGRADE_PLANNING",
+      "status": "LIVE_NOT_VERIFIED",
+      "execution_mode": "CORE",
+      "owner_claim_ru": "ADWF строит self-sealed exact-revision read-only compatibility result и upgrade plan A→B, сохраняя consumer/shared/pre-existing ownership fail-closed и не выдавая planning READY за безопасный mutating upgrade.",
+      "entrypoints": [
+        ".adwf/scripts/plan_consumer_upgrade.py"
+      ],
+      "production_paths": [
+        ".adwf/lib/consumer_upgrade.py",
+        ".adwf/consumer-upgrade-migrations.json",
+        ".adwf/schemas/consumer-upgrade-compatibility.schema.json",
+        ".adwf/schemas/consumer-upgrade-plan.schema.json",
+        ".adwf/schemas/consumer-upgrade-migrations.schema.json"
+      ],
+      "verification": [
+        ".adwf/tests/test_consumer_upgrade_core.py",
+        ".adwf/tests/test_consumer_upgrade_adversarial.py"
+      ],
+      "live_boundary": "LIVE_VERIFIED запрещён по evidence UPGRADE-001: unit/CI/provider validation доказывают только deterministic planning/compatibility. Safe framework upgrade требует отдельный transactional apply/recovery executor и real consumer exact A→B→rollback→B evidence с сохранностью consumer/shared data.",
+      "live_evidence": []
     }
   ]
 }

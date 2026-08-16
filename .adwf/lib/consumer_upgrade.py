@@ -14,7 +14,9 @@ import json
 import re
 import subprocess
 
-from .consumer_profile import PROFILE_REL, build_consumer_profile, load_consumer_profile
+from .consumer_profile import (
+    PROFILE_REL, ConsumerProfileError, build_consumer_profile, load_consumer_profile,
+)
 from .contracts import validate
 from .managed_surface import _validate_snapshot, load_source_inventory
 from .strict_json import load as strict_load
@@ -417,15 +419,21 @@ def build_upgrade_compatibility(
     profile_path = consumer / PROFILE_REL
     if profile_path.is_symlink() or not profile_path.is_file():
         raise ConsumerUpgradeError("UPGRADE_CONSUMER_PROFILE_REQUIRED")
-    current_profile = load_consumer_profile(consumer, source_root, required=True)
+    try:
+        current_profile = load_consumer_profile(consumer, source_root, required=True)
+    except ConsumerProfileError as exc:
+        raise ConsumerUpgradeError("UPGRADE_SOURCE_PROFILE_INVALID:" + str(exc).split(":", 1)[0]) from exc
     if current_profile is None:
         raise ConsumerUpgradeError("UPGRADE_CONSUMER_PROFILE_REQUIRED")
-    target_profile = build_consumer_profile(
-        consumer, target_root,
-        product_name=str(current_profile["project"]["name"]),
-        default_branch=str(current_profile["project"]["default_branch"]),
-        repository_visibility=str(current_profile["project"]["repository_visibility"]),
-    )
+    try:
+        target_profile = build_consumer_profile(
+            consumer, target_root,
+            product_name=str(current_profile["project"]["name"]),
+            default_branch=str(current_profile["project"]["default_branch"]),
+            repository_visibility=str(current_profile["project"]["repository_visibility"]),
+        )
+    except ConsumerProfileError as exc:
+        raise ConsumerUpgradeError("UPGRADE_TARGET_PROFILE_INCOMPATIBLE:" + str(exc).split(":", 1)[0]) from exc
     migrations = _load_migrations(target_root)
     findings: list[dict[str, str]] = []
 

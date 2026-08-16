@@ -65,4 +65,51 @@ class ConsumerUpgradeAdversarialTests(unittest.TestCase):
             self.assertTrue(any(item["code"] == "UPGRADE_PATH_TYPE_AMBIGUITY" for item in result["findings"]))
         finally: temp.cleanup()
 
+    def test_06_stale_source_profile_fails_closed(self):
+        temp, source, target, consumer, snapshot = prepared(ROOT)
+        try:
+            profile_path = consumer / ".adwf-consumer/profile.json"
+            import json
+            profile = json.loads(profile_path.read_text(encoding="utf-8"))
+            profile["project"]["name"] = "tampered"
+            profile_path.write_text(json.dumps(profile, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+            with self.assertRaisesRegex(ConsumerUpgradeError, "UPGRADE_SOURCE_PROFILE_INVALID:CONSUMER_PROFILE_DIGEST_MISMATCH"):
+                self.compat(source, target, consumer, snapshot)
+        finally: temp.cleanup()
+
+    def test_07_target_profile_schema_incompatibility_fails_closed(self):
+        temp, source, target, consumer, snapshot = prepared(ROOT)
+        try:
+            import json
+            schema_path = target / ".adwf/schemas/consumer-profile.schema.json"
+            schema = json.loads(schema_path.read_text(encoding="utf-8"))
+            schema["properties"]["schema_version"]["const"] = 2
+            schema_path.write_text(json.dumps(schema, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+            seal_inventory(target)
+            with self.assertRaisesRegex(ConsumerUpgradeError, "UPGRADE_TARGET_PROFILE_INCOMPATIBLE:CONSUMER_PROFILE_SCHEMA_MISMATCH"):
+                self.compat(source, target, consumer, snapshot)
+        finally: temp.cleanup()
+
+    def test_08_missing_migration_record_is_human_required(self):
+        temp, source, target, consumer, snapshot = prepared(ROOT)
+        try:
+            import json
+            config_path = target / ".adwf/config.json"
+            config = json.loads(config_path.read_text(encoding="utf-8"))
+            config["schema_version"] = 6
+            config_path.write_text(json.dumps(config, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+            schema_path = target / ".adwf/schemas/config.schema.json"
+            schema = json.loads(schema_path.read_text(encoding="utf-8"))
+            schema["properties"]["schema_version"]["const"] = 6
+            schema_path.write_text(json.dumps(schema, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+            seal_inventory(target)
+            result = self.compat(source, target, consumer, snapshot)
+            self.assertEqual(result["status"], "HUMAN_REQUIRED")
+            self.assertTrue(any(
+                item["code"] == "UPGRADE_CONTRACT_MIGRATION_UNKNOWN"
+                and item["subject"] == "FRAMEWORK_CONFIG_SCHEMA"
+                for item in result["findings"]
+            ))
+        finally: temp.cleanup()
+
 if __name__ == "__main__": unittest.main()

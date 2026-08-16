@@ -10,7 +10,7 @@ import sys
 ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT / ".adwf"))
 
-from lib.consumer_upgrade import build_upgrade_compatibility, plan_consumer_upgrade  # noqa: E402
+from lib.consumer_upgrade import ConsumerUpgradeError, build_upgrade_compatibility, plan_consumer_upgrade  # noqa: E402
 from lib.strict_json import load as strict_load  # noqa: E402
 
 
@@ -34,24 +34,32 @@ def main() -> int:
 
     snapshot = _object(args.snapshot, "SNAPSHOT")
     bindings = _object(args.skill_bindings, "SKILL_BINDINGS") if args.skill_bindings else None
-    compatibility = build_upgrade_compatibility(
-        args.source_root,
-        args.target_root,
-        args.consumer_root,
-        source_revision=args.source_revision,
-        target_revision=args.target_revision,
-        snapshot=snapshot,
-        skill_bindings=bindings,
-    )
-    plan = plan_consumer_upgrade(
-        args.source_root,
-        args.target_root,
-        args.consumer_root,
-        source_revision=args.source_revision,
-        target_revision=args.target_revision,
-        snapshot=snapshot,
-        skill_bindings=bindings,
-    )
+    try:
+        compatibility = build_upgrade_compatibility(
+            args.source_root,
+            args.target_root,
+            args.consumer_root,
+            source_revision=args.source_revision,
+            target_revision=args.target_revision,
+            snapshot=snapshot,
+            skill_bindings=bindings,
+        )
+        plan = plan_consumer_upgrade(
+            args.source_root,
+            args.target_root,
+            args.consumer_root,
+            source_revision=args.source_revision,
+            target_revision=args.target_revision,
+            snapshot=snapshot,
+            skill_bindings=bindings,
+        )
+    except (ConsumerUpgradeError, OSError, ValueError, json.JSONDecodeError) as exc:
+        print(json.dumps({
+            "status": "BLOCK",
+            "reason": str(exc).split("\n", 1)[0],
+            "write_performed": False,
+        }, ensure_ascii=False, indent=2, sort_keys=True))
+        return 2
     print(json.dumps({"compatibility": compatibility, "plan": plan}, ensure_ascii=False, indent=2, sort_keys=True))
     return 0 if plan["status"] == "READY" else 2
 
