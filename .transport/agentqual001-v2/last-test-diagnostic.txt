@@ -1,0 +1,46 @@
+=== python .adwf/tests/test_creative_agent_qualification.py -q ===
+exit_code=1
+======================================================================
+FAIL: test_timeout_nonzero_and_missing_result_fail_closed (__main__.CreativeAgentQualificationTests.test_timeout_nonzero_and_missing_result_fail_closed)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/tmp/agentqual-diag-v2/.adwf/tests/test_creative_agent_qualification.py", line 185, in test_timeout_nonzero_and_missing_result_fail_closed
+    self.assertEqual(result["reason_codes"], ["AGENT_COMMAND_TIMEOUT"])
+AssertionError: Lists differ: ['AI_WORK_PACKAGE_MISSING'] != ['AGENT_COMMAND_TIMEOUT']
+
+First differing element 0:
+'AI_WORK_PACKAGE_MISSING'
+'AGENT_COMMAND_TIMEOUT'
+
+- ['AI_WORK_PACKAGE_MISSING']
++ ['AGENT_COMMAND_TIMEOUT']
+
+----------------------------------------------------------------------
+Ran 13 tests in 0.282s
+
+FAILED (failures=1)
+
+=== python .adwf/tests/test_ai_work_contracts.py -q ===
+exit_code=0
+----------------------------------------------------------------------
+Ran 10 tests in 0.007s
+
+OK
+
+=== python .adwf/tests/test_v15_executive.py -q ===
+exit_code=0
+----------------------------------------------------------------------
+Ran 16 tests in 0.285s
+
+OK
+
+=== python .adwf/tests/test_v16_remediation.py -q ===
+exit_code=0
+EFFECTIVE POLICY: WRITTEN b8a2156b99a93b0828cdfb865fcf02843013aaf546e833eb878c6c6f7cb0bed7
+PIPELINE PROJECTIONS generated
+MANIFEST/SHA256SUMS updated
+----------------------------------------------------------------------
+Ran 20 tests in 0.836s
+
+OK
+
