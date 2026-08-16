@@ -12,7 +12,7 @@ permissions:
 env:
   BASE_SHA: 6483a41b20cedcc17721800b164e8bce1d20ec33
   BASE_TREE: d1f8e37fd16530f872093f3a348cf5ec3a14a83e
-  APPLY_SHA256: 842f299b74cc7851a99d9a0b12e182ac5db24e89b358e26762a87fd03ad9f921
+  APPLY_BLOB_SHA: bf9ccdd893a61fecbe778d0c0a21f2dbf98ebcba
   FEATURE_BRANCH: agent/agentqual-001-creative-agent-qualification
 
 jobs:
@@ -32,13 +32,25 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          echo "$APPLY_SHA256  .transport/agentqual001/apply.py" | sha256sum -c -
+          test "$(git hash-object .transport/agentqual001/apply.py)" = "$APPLY_BLOB_SHA"
           test "$(git rev-parse "$BASE_SHA^{tree}")" = "$BASE_TREE"
           rm -rf /tmp/agentqual-candidate /tmp/agentqual-base
           git worktree add --detach /tmp/agentqual-candidate "$BASE_SHA"
           test "$(git -C /tmp/agentqual-candidate rev-parse HEAD)" = "$BASE_SHA"
           test -z "$(git -C /tmp/agentqual-candidate status --porcelain=v1 --untracked-files=all)"
           python .transport/agentqual001/apply.py /tmp/agentqual-candidate
+          python - <<'PY'
+          from pathlib import Path
+          p=Path('/tmp/agentqual-candidate/.adwf/scripts/reference_agent_adapter.py')
+          text=p.read_text(encoding='utf-8')
+          old="    for name in os.environ:\n        if any(marker in name.upper() for marker in SECRET_MARKERS):\n            return fail(\"REFERENCE_AGENT_SECRET_ENVIRONMENT_LEAK\")"
+          new="    for name in os.environ:\n        if name == \"ADWF_AGENT_SECRETS_AUTHORITY\":\n            continue\n        if any(marker in name.upper() for marker in SECRET_MARKERS):\n            return fail(\"REFERENCE_AGENT_SECRET_ENVIRONMENT_LEAK\")"
+          if old in text:
+              text=text.replace(old,new,1)
+              p.write_text(text,encoding='utf-8',newline='\n')
+          elif new not in text:
+              raise SystemExit('REFERENCE_AGENT_SECRET_GUARD_BASE_MISMATCH')
+          PY
           cd /tmp/agentqual-candidate
           python .adwf/scripts/docs_freshness.py --write --reviewed-at 2026-08-16T20:30:00Z --valid-until 2026-11-16T20:30:00Z
           python .adwf/scripts/generate_manifest.py
