@@ -1,0 +1,134 @@
+name: ADWF EDGEREF-001 Post-Merge Synthetic Edge Proof
+
+on:
+  push:
+    branches:
+      - agent/postmerge-edgeref001-6483a41b
+
+permissions:
+  contents: read
+  checks: write
+
+env:
+  PYTHONDONTWRITEBYTECODE: "1"
+  MERGE_SHA: 6483a41b20cedcc17721800b164e8bce1d20ec33
+  MERGE_TREE: d1f8e37fd16530f872093f3a348cf5ec3a14a83e
+
+jobs:
+  prove:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd
+        with:
+          ref: ${{ env.MERGE_SHA }}
+          persist-credentials: false
+          fetch-depth: 1
+      - uses: actions/setup-python@a309ff8b426b58ec0e2a45f0f869d46889d02405
+        with:
+          python-version: "3.12.10"
+      - name: Verify exact merge identity
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "$MERGE_SHA"
+          test "$(git rev-parse HEAD^{tree})" = "$MERGE_TREE"
+          test -z "$(git status --porcelain=v1 --untracked-files=all)"
+          python .adwf/scripts/validate_capabilities.py
+      - name: Run full synthetic Edge lifecycle on exact merge
+        shell: bash
+        run: |
+          set -euo pipefail
+          python .adwf/scripts/reference_edge_conformance.py --output /tmp/edgeref-postmerge.json > /tmp/edgeref-postmerge-stdout.json
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          report = json.loads(Path('/tmp/edgeref-postmerge.json').read_text(encoding='utf-8'))
+          assert report['outcome'] == 'PASS'
+          assert report['consumer_class'] == 'EDGE_CONTROLLER'
+          assert report['reference_kind'] == 'SYNTHETIC_REFERENCE_CONSUMER'
+          assert report['pack']['id'] == 'edge-controller'
+          assert report['preview']['status'] == 'NOT_APPLICABLE'
+          assert report['preview']['reason'] == 'EDGE_CONTROLLER_NO_BROWSER_PREVIEW'
+          assert report['functional']['mode'] == 'LOCAL_DETERMINISTIC_EDGE_CONTROLLER_SHIM'
+          assert report['functional']['external_network_required'] is False
+          assert report['functional']['device_runtime_executed'] is False
+          assert report['functional']['device_deployment_performed'] is False
+          assert report['functional']['ssh_required'] is False
+          assert report['preservation']['before_sha256'] == report['preservation']['after_detach_sha256']
+          assert report['preservation']['profile_survived'] is True
+          assert report['readoption']['transaction_identity_changed'] is True
+          assert 'REAL_EDGE_DEVICE_RUNTIME_NOT_EXECUTED' in report['limitations']
+          assert 'SSH_OR_DEVICE_DEPLOYMENT_NOT_EXECUTED' in report['limitations']
+          PY
+      - name: Publish exact merge-SHA synthetic Edge check
+        shell: bash
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          import hashlib, json, os, urllib.request
+          from pathlib import Path
+
+          repo = os.environ['GITHUB_REPOSITORY']
+          token = os.environ['GITHUB_TOKEN']
+          merge_sha = os.environ['MERGE_SHA']
+          merge_tree = os.environ['MERGE_TREE']
+          report_path = Path('/tmp/edgeref-postmerge.json')
+          report = json.loads(report_path.read_text(encoding='utf-8'))
+          report_sha = hashlib.sha256(report_path.read_bytes()).hexdigest()
+
+          def get(path):
+              req = urllib.request.Request(
+                  'https://api.github.com' + path,
+                  headers={
+                      'Authorization': f'Bearer {token}',
+                      'Accept': 'application/vnd.github+json',
+                      'X-GitHub-Api-Version': '2022-11-28',
+                  },
+              )
+              with urllib.request.urlopen(req, timeout=30) as response:
+                  return json.load(response)
+
+          main_ref = get(f'/repos/{repo}/git/ref/heads/main')
+          current = str((main_ref.get('object') or {}).get('sha') or '')
+          if current != merge_sha:
+              raise SystemExit('POSTMERGE_MAIN_DRIFT:' + current)
+          commit = get(f'/repos/{repo}/git/commits/{merge_sha}')
+          tree = str((commit.get('tree') or {}).get('sha') or '')
+          if tree != merge_tree:
+              raise SystemExit('POSTMERGE_TREE_MISMATCH:' + tree)
+
+          payload = {
+              'name': 'adwf/reference-edge-provider-proof',
+              'head_sha': merge_sha,
+              'status': 'completed',
+              'conclusion': 'success',
+              'output': {
+                  'title': 'EDGEREF-001 post-merge synthetic Edge proof — PASS',
+                  'summary': 'PASS: exact merged tree passed the synthetic/local-only Edge lifecycle. No real device/provider certification is claimed.',
+                  'text': (
+                      f'merge_sha={merge_sha} tree={merge_tree}\n'
+                      f'report_sha256={report_sha}\n'
+                      'consumer_class=EDGE_CONTROLLER reference_kind=SYNTHETIC_REFERENCE_CONSUMER\n'
+                      'device_runtime_executed=false device_deployment_performed=false ssh_required=false external_network_required=false\n'
+                      'capability_status=LIVE_NOT_VERIFIED real_device_certification=false'
+                  ),
+              },
+          }
+          req = urllib.request.Request(
+              f'https://api.github.com/repos/{repo}/check-runs',
+              data=json.dumps(payload).encode('utf-8'),
+              method='POST',
+              headers={
+                  'Authorization': f'Bearer {token}',
+                  'Accept': 'application/vnd.github+json',
+                  'X-GitHub-Api-Version': '2022-11-28',
+                  'Content-Type': 'application/json',
+              },
+          )
+          with urllib.request.urlopen(req, timeout=30) as response:
+              created = json.load(response)
+          print(json.dumps({'status':'PASS','merge_sha':merge_sha,'merge_tree':merge_tree,'check_run_id':created.get('id'),'report_sha256':report_sha}, sort_keys=True))
+          PY
