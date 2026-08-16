@@ -59,9 +59,11 @@ Package-install commands require a package-registry network declaration. Preview
 
 ## Materialization
 
-`materialize_project_pack()` accepts only output produced by the strict loader. It stores the selected pack ID, exact pack digest, runtime command projection, preview declaration and safety declaration in canonical config. It does not copy unknown pack fields and does not turn declarations into new authority.
+`materialize_project_pack()` принимает только output strict loader, но после `LIFECYCLE-005` **не переписывает framework-private `.adwf/config.json` ради consumer identity**. Selected pack ID, exact digest, gate/runtime commands, preview и safety projection записываются в bounded consumer-owned `.adwf-consumer/profile.json`.
 
-The materializer remains atomic for `.adwf/config.json` and idempotent for an already materialized exact definition.
+Profile cryptographically bound к exact canonical config digest и current pack digest, self-sealed и валидируется перед каждым effective load. Existing foreign/malformed profile не перезаписывается автоматически. Canonical framework config, effective-policy и package integrity SSOT остаются byte-stable относительно adoption provenance.
+
+Подробный contract: [Consumer Project Profile Overlay](CONSUMER_PROFILE_CONTRACT.md).
 
 ## Fail-closed examples
 

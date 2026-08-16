@@ -7,7 +7,7 @@ ROOT=Path(__file__).resolve().parents[2];sys.path.insert(0,str(ROOT/'.adwf'))
 from lib.github_bootstrap import bootstrap_repository
 
 def main()->int:
-    p=argparse.ArgumentParser();p.add_argument('--apply',action='store_true');args=p.parse_args()
-    result=bootstrap_repository(ROOT,apply=args.apply);print(json.dumps(result,ensure_ascii=False,indent=2))
+    p=argparse.ArgumentParser();p.add_argument('--apply',action='store_true');p.add_argument('--product');args=p.parse_args()
+    result=bootstrap_repository(ROOT,apply=args.apply,product_name=args.product);print(json.dumps(result,ensure_ascii=False,indent=2))
     return 0 if result.get('status') in {'VERIFIED','READY_TO_APPLY'} else 6
 if __name__=='__main__':raise SystemExit(main())

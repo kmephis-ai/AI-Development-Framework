@@ -9,10 +9,11 @@ Activation order is fail-closed:
 from __future__ import annotations
 from pathlib import Path
 from typing import Any
-import hashlib,json,shutil,subprocess,sys,tempfile
+import hashlib,json
 from .github_auth import detect_repository,discover_token
 from .github_provider import GitHubClient
 from .github_rulesets import canonical_ruleset_payload,verify_rulesets,discover_check_source,runtime_anchor_ruleset_payload,verify_runtime_anchor_ruleset
+from .consumer_profile import ConsumerProfileError, PROFILE_REL, load_effective_config
 from .pack_materializer import materialize_project_pack
 from .strict_json import loads as strict_loads
 
@@ -28,14 +29,9 @@ def _open_pr_for_branch(client:GitHubClient,branch:str)->dict[str,Any]|None:
     return None
 
 def _framework_self_host(root:Path)->bool:
-    """Return true only for the ADWF framework repository itself.
-
-    Project Pack detection describes a product runtime. The framework package is
-    intentionally not a runtime product, so absence of a product pack is a
-    valid NOT_APPLICABLE state rather than HUMAN_REQUIRED.
-    """
-    try:cfg=strict_loads((root/'.adwf/config.json').read_text(encoding='utf-8'))
-    except Exception:return False
+    """Return true only when effective config still identifies ADWF itself."""
+    try:cfg=load_effective_config(root,root)
+    except (OSError,ConsumerProfileError):return False
     project=cfg.get('project') if isinstance(cfg,dict) else {}
     return isinstance(project,dict) and project.get('type')=='framework' and project.get('runtime_product') is False
 
@@ -48,36 +44,36 @@ def ensure_seed_pr(client:GitHubClient,default_branch:str,default_sha:str)->dict
     pr=client.create_pull(title='[ADWF] Seed protected check contexts',body='Safe bootstrap seed. No trust-boundary file is changed.',head=SEED_BRANCH,base=default_branch)
     return {'status':'SEED_PR_CREATED','pull_request_number':pr.get('number'),'pull_request_url':pr.get('html_url'),'branch':SEED_BRANCH}
 
-def _pack_projection_files(root:Path,desired_config:dict[str,Any])->dict[str,str]:
-    with tempfile.TemporaryDirectory() as tmp:
-        target=Path(tmp)/'repo';shutil.copytree(root,target,ignore=shutil.ignore_patterns('.git','.adwf-runtime','dist','node_modules','__pycache__'))
-        (target/'.adwf/config.json').write_text(json.dumps(desired_config,ensure_ascii=False,indent=2)+'\n',encoding='utf-8')
-        subprocess.run([sys.executable,str(target/'.adwf/scripts/compile_policy.py'),'--write'],cwd=target,check=True,capture_output=True,text=True)
-        subprocess.run([sys.executable,str(target/'.adwf/scripts/generate_manifest.py')],cwd=target,check=True,capture_output=True,text=True)
-        return {rel:(target/rel).read_text(encoding='utf-8') for rel in ('.adwf/config.json','.adwf/effective-policy.json','MANIFEST.json','SHA256SUMS.txt')}
-
 def ensure_pack_pr(client:GitHubClient,root:Path,default_branch:str,default_sha:str,plan:dict[str,Any])->dict[str,Any]:
-    if plan.get('status') in {'HUMAN_REQUIRED','NOT_APPLICABLE'}:return {'status':'NOT_APPLICABLE','reason':plan.get('reason') or 'PROJECT_PACK_NOT_DETECTED'}
+    if plan.get('status') in {'HUMAN_REQUIRED','BLOCK','NOT_APPLICABLE'}:
+        return {'status':plan.get('status'),'reason':plan.get('reason') or 'PROJECT_PACK_NOT_READY'}
     if plan.get('status')=='ALREADY_MATERIALIZED':return {'status':'ALREADY_MATERIALIZED','pack':plan.get('pack')}
     pack=str(plan.get('pack') or 'generic');branch=f'adwf/project-pack-{pack}-v1-6'
     existing=_open_pr_for_branch(client,branch)
     if existing:return {'status':'GOVERNANCE_PR_WAITING_OWNER_APPROVAL','pack':pack,'pull_request_number':existing.get('number'),'pull_request_url':existing.get('html_url'),'branch':branch}
-    desired=plan.get('desired_config')
-    if not isinstance(desired,dict):return {'status':'NOT_VERIFIED','reason':'PROJECT_PACK_DESIRED_CONFIG_MISSING'}
-    files=_pack_projection_files(root,desired);_ensure_branch(client,branch,default_sha)
-    for rel,text in files.items():client.put_text_file(rel,text,branch=branch,message=f'chore(adwf): materialize {pack} project pack')
-    pr=client.create_pull(title=f'[ADWF] Materialize {pack} Project Pack',body='Generated governance bootstrap PR. It materializes deterministic project commands/preview settings; exact-HEAD owner/admin approval is required because trusted config changes.',head=branch,base=default_branch)
-    return {'status':'GOVERNANCE_PR_CREATED','pack':pack,'pull_request_number':pr.get('number'),'pull_request_url':pr.get('html_url'),'branch':branch,'owner_approval_required':True}
+    desired=plan.get('desired_profile')
+    if not isinstance(desired,dict):return {'status':'NOT_VERIFIED','reason':'CONSUMER_PROFILE_DESIRED_MISSING'}
+    _ensure_branch(client,branch,default_sha)
+    client.put_text_file(PROFILE_REL,json.dumps(desired,ensure_ascii=False,indent=2)+'\n',branch=branch,message=f'chore(adwf): materialize {pack} consumer profile')
+    pr=client.create_pull(
+        title=f'[ADWF] Materialize {pack} consumer profile',
+        body='Generated bootstrap PR. It creates only the bounded consumer-owned project profile; canonical framework config/policy/MANIFEST are unchanged.',
+        head=branch,base=default_branch,
+    )
+    return {'status':'GOVERNANCE_PR_CREATED','pack':pack,'pull_request_number':pr.get('number'),'pull_request_url':pr.get('html_url'),'branch':branch,'owner_approval_required':True,'profile_path':PROFILE_REL}
 
-def bootstrap_repository(root:str|Path,*,apply:bool)->dict[str,Any]:
-    base=Path(root).resolve();pack_plan=materialize_project_pack(base,base,apply=False)
-    if pack_plan.get('status')=='HUMAN_REQUIRED' and _framework_self_host(base):
-        pack_plan={'status':'NOT_APPLICABLE','reason':'FRAMEWORK_SELF_HOST_PROJECT_PACK_NOT_APPLICABLE','write_performed':False}
-    repo=detect_repository(base);token,source=discover_token()
-    if not repo:return {'status':'HUMAN_REQUIRED','reason':'GITHUB_REPOSITORY_NOT_DETECTED','credential_source':source,'project_pack':pack_plan}
-    if not token:return {'status':'HUMAN_REQUIRED','reason':'GITHUB_AUTH_REQUIRED','repository':repo,'credential_source':source,'project_pack':pack_plan}
+def bootstrap_repository(root:str|Path,*,apply:bool,product_name:str|None=None)->dict[str,Any]:
+    base=Path(root).resolve();repo=detect_repository(base);token,source=discover_token()
+    pending_pack={'status':'NOT_VERIFIED','reason':'PROVIDER_CONSUMER_IDENTITY_REQUIRED','write_performed':False}
+    if not repo:return {'status':'HUMAN_REQUIRED','reason':'GITHUB_REPOSITORY_NOT_DETECTED','credential_source':source,'project_pack':pending_pack}
+    if not token:return {'status':'HUMAN_REQUIRED','reason':'GITHUB_AUTH_REQUIRED','repository':repo,'credential_source':source,'project_pack':pending_pack}
     client=GitHubClient(repo,token);info=client.repo_info();visibility=str(info.get('visibility') or ('private' if info.get('private') else 'public')).upper();default=str(info.get('default_branch') or 'main')
+    pack_plan=materialize_project_pack(base,base,apply=False,product_name=product_name,default_branch=default,repository_visibility=visibility)
+    if pack_plan.get('status')=='HUMAN_REQUIRED' and pack_plan.get('reason')=='PROJECT_PACK_NOT_DETECTED' and _framework_self_host(base):
+        pack_plan={'status':'NOT_APPLICABLE','reason':'FRAMEWORK_SELF_HOST_PROJECT_PACK_NOT_APPLICABLE','write_performed':False}
     if visibility!='PUBLIC':return {'status':'HUMAN_REQUIRED','reason':'PUBLIC_REPOSITORY_REQUIRED','repository':repo,'visibility':visibility,'project_pack':pack_plan}
+    if pack_plan.get('status') in {'HUMAN_REQUIRED','BLOCK'} and not _framework_self_host(base):
+        return {'status':pack_plan.get('status'),'reason':pack_plan.get('reason'),'repository':repo,'visibility':visibility,'project_pack':pack_plan,'credential_source':source}
     default_sha=str((client.branch(default).get('commit') or {}).get('sha') or '')
     source_proof=discover_check_source(client)
     if source_proof['status']!='VERIFIED':

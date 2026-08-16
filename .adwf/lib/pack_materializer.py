@@ -1,37 +1,100 @@
-"""Materialize a detected Project Pack into the canonical ADWF config."""
+"""Materialize a detected Project Pack into a consumer-owned profile overlay."""
 from __future__ import annotations
+
 from pathlib import Path
 from typing import Any
-import json,os,tempfile
+
+from .consumer_profile import (
+    ConsumerProfileError,
+    apply_consumer_profile,
+    load_consumer_profile,
+    load_effective_config,
+    plan_consumer_profile,
+)
 from .project_packs import commands_for_pack
 from .strict_json import loads as strict_loads
 
-CONFIG_COMMANDS={'lint','unit','integration','build','smoke','golden_paths','e2e'}
 
-def _atomic(path:Path,value:dict[str,Any])->None:
-    fd,tmp=tempfile.mkstemp(prefix=path.name+'.',dir=path.parent)
+def _identity(
+    project: Path,
+    framework: Path,
+    *,
+    product_name: str | None,
+    default_branch: str | None,
+    repository_visibility: str | None,
+) -> tuple[str, str, str] | None:
+    if product_name and default_branch and repository_visibility:
+        return str(product_name), str(default_branch), str(repository_visibility)
     try:
-        with os.fdopen(fd,'w',encoding='utf-8') as h:json.dump(value,h,ensure_ascii=False,indent=2);h.write('\n');h.flush();os.fsync(h.fileno())
-        os.replace(tmp,path)
-    finally:
-        if os.path.exists(tmp):os.unlink(tmp)
+        existing = load_consumer_profile(project, framework, required=False)
+    except ConsumerProfileError:
+        existing = None
+    if existing is not None:
+        p = existing["project"]
+        return str(p["name"]), str(p["default_branch"]), str(p["repository_visibility"])
+    try:
+        base = strict_loads((framework / ".adwf/config.json").read_text(encoding="utf-8"))
+    except Exception:
+        return None
+    p = base.get("project") if isinstance(base, dict) else None
+    if isinstance(p, dict) and p.get("type") != "framework" and p.get("runtime_product") is True:
+        return str(p.get("name") or ""), str(p.get("default_branch") or ""), str(p.get("repository_visibility") or "")
+    return None
 
-def materialize_project_pack(project_root:str|Path,framework_root:str|Path,*,apply:bool=False)->dict[str,Any]:
-    project=Path(project_root).resolve();framework=Path(framework_root).resolve();pack=commands_for_pack(project,framework)
-    if not pack.get('pack'):return {'status':'HUMAN_REQUIRED','reason':'PROJECT_PACK_NOT_DETECTED','write_performed':False}
-    cfg_path=framework/'.adwf/config.json';original=strict_loads(cfg_path.read_text(encoding='utf-8'));cfg=json.loads(json.dumps(original));changed=[]
-    for name,entry in (pack.get('commands') or {}).items():
-        if name not in CONFIG_COMMANDS or entry.get('available') is not True or not entry.get('command'):continue
-        desired={'required':True,'command':entry['command'],'phases':entry.get('phases') or ['pr']}
-        if cfg.setdefault('commands',{}).get(name)!=desired:cfg['commands'][name]=desired;changed.append(f'commands.{name}')
-    pp=cfg.setdefault('project_packs',{})
-    desired_runtime={name:{'command':entry.get('command'),'available':entry.get('available',False),'phases':entry.get('phases') or []} for name,entry in (pack.get('commands') or {}).items() if name in {'install','start'}}
-    desired_preview=pack.get('preview') or {}
-    desired_safety=pack.get('safety') or {}
-    for key,value in [('selected',pack['pack']),('selected_digest',pack.get('pack_digest')),('materialized',True),('runtime_commands',desired_runtime),('preview',desired_preview),('safety',desired_safety)]:
-        if pp.get(key)!=value:changed.append(f'project_packs.{key}')
-        pp[key]=value
-    if not changed:
-        return {'status':'ALREADY_MATERIALIZED','pack':pack['pack'],'pack_digest':pack.get('pack_digest'),'changed':[],'preview':desired_preview,'safety':desired_safety,'write_performed':False,'config_path':str(cfg_path),'desired_config':cfg}
-    if apply:_atomic(cfg_path,cfg)
-    return {'status':'APPLIED' if apply else 'READY_TO_APPLY','pack':pack['pack'],'pack_digest':pack.get('pack_digest'),'changed':changed,'preview':desired_preview,'safety':desired_safety,'write_performed':apply,'config_path':str(cfg_path),'desired_config':cfg if not apply else None}
+
+def materialize_project_pack(
+    project_root: str | Path,
+    framework_root: str | Path,
+    *,
+    apply: bool = False,
+    product_name: str | None = None,
+    default_branch: str | None = None,
+    repository_visibility: str | None = None,
+) -> dict[str, Any]:
+    project = Path(project_root).resolve()
+    framework = Path(framework_root).resolve()
+    detected = commands_for_pack(project, framework)
+    if not detected.get("pack"):
+        return {"status": "HUMAN_REQUIRED", "reason": "PROJECT_PACK_NOT_DETECTED", "write_performed": False}
+    identity = _identity(
+        project,
+        framework,
+        product_name=product_name,
+        default_branch=default_branch,
+        repository_visibility=repository_visibility,
+    )
+    if identity is None or not all(identity):
+        return {
+            "status": "HUMAN_REQUIRED",
+            "reason": "CONSUMER_PROFILE_IDENTITY_REQUIRED",
+            "pack": detected.get("pack"),
+            "pack_digest": detected.get("pack_digest"),
+            "write_performed": False,
+        }
+    name, branch, visibility = identity
+    try:
+        result = (
+            apply_consumer_profile(
+                project,
+                framework,
+                product_name=name,
+                default_branch=branch,
+                repository_visibility=visibility,
+            )
+            if apply
+            else plan_consumer_profile(
+                project,
+                framework,
+                product_name=name,
+                default_branch=branch,
+                repository_visibility=visibility,
+            )
+        )
+        if result.get("status") in {"READY_TO_APPLY", "ALREADY_MATERIALIZED", "APPLIED"}:
+            result["preview"] = detected.get("preview") or {}
+            result["safety"] = detected.get("safety") or {}
+            if result.get("status") != "READY_TO_APPLY":
+                result["effective_config"] = load_effective_config(project, framework)
+        return result
+    except ConsumerProfileError as exc:
+        return {"status": "BLOCK", "reason": str(exc).split(":", 1)[0], "write_performed": False}

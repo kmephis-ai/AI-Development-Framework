@@ -380,6 +380,29 @@
       ],
       "live_boundary": "LIVE_VERIFIED требует real consumer/provider evidence, привязанное к exact pack digest и source revision. Portable v1 доказывает direct env minimization и canonical-tree isolation, но network остаётся DECLARATION_ONLY_NOT_ENFORCED и не выдаётся за OS/domain sandbox.",
       "live_evidence": []
+    },
+    {
+      "id": "CONSUMER_PROFILE_OVERLAY",
+      "status": "LIVE_NOT_VERIFIED",
+      "execution_mode": "CORE",
+      "owner_claim_ru": "Consumer-specific identity и Project Pack projection хранятся в consumer-owned sealed profile вне immutable framework package inventory; effective config допускает только bounded overlay и не расширяет governance/provider/trust authority.",
+      "entrypoints": [
+        ".adwf/adwf.py",
+        ".adwf/scripts/github_bootstrap.py"
+      ],
+      "production_paths": [
+        ".adwf/lib/consumer_profile.py",
+        ".adwf/schemas/consumer-profile.schema.json",
+        ".adwf/lib/pack_materializer.py",
+        ".adwf/lib/github_bootstrap.py"
+      ],
+      "verification": [
+        ".adwf/tests/test_consumer_profile.py",
+        ".adwf/tests/test_project_pack_sdk.py",
+        ".adwf/tests/test_project_execution_safety.py"
+      ],
+      "live_boundary": "LIVE_VERIFIED требует downstream evidence от реального adopted consumer repository: profile bootstrap, effective runtime execution и guarded detach с сохранением consumer profile. Synthetic/unit/CI подтверждают implementation, но не live consumer truth.",
+      "live_evidence": []
     }
   ]
 }

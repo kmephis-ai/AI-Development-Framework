@@ -2,7 +2,7 @@
   "$schema": ".adwf/schemas/decision-requirement-traceability.schema.json",
   "schema_version": 1,
   "role": "CANONICAL_DECISION_REQUIREMENT_TRACEABILITY",
-  "revision": 7,
+  "revision": 8,
   "records": [
     {
       "id": "INTENT-FOUNDATION-20260815",
@@ -124,6 +124,28 @@
       "source_path": null,
       "source_sha256": null,
       "record_sha256": "bf565176beacb15c98b873661b240b8aa53d4ce4a7b9db2294677147e9855156"
+    },
+    {
+      "id": "REQ-LIFECYCLE-005",
+      "kind": "REQUIREMENT",
+      "version": 1,
+      "status": "ACTIVE",
+      "title_ru": "Consumer identity должна жить вне immutable framework package surface",
+      "statement_ru": "После adoption consumer должен получить bounded project identity и exact Project Pack binding без изменения framework-private config/package integrity и без передачи consumer overlay governance/provider/trust authority.",
+      "source_path": null,
+      "source_sha256": null,
+      "record_sha256": "588062e43b008ce75243647a33d24f19b1f56669881edc5abe5cf858054c9d25"
+    },
+    {
+      "id": "DEC-LIFECYCLE-005",
+      "kind": "DECISION",
+      "version": 1,
+      "status": "ACCEPTED",
+      "title_ru": "Consumer bootstrap использует sealed consumer-owned profile + validated effective config overlay",
+      "statement_ru": "Хранить consumer identity и Project Pack projection в .adwf-consumer/profile.json вне MANIFEST/Managed Surface inventory; связывать profile с exact framework config digest и pack digest, разрешать overlay только project/commands/project_packs и сохранять profile при guarded detach.",
+      "source_path": null,
+      "source_sha256": null,
+      "record_sha256": "d5dd145ba0cec666b0136a18c259273aa2ec55746231e5af20513e18148dcc77"
     }
   ],
   "capability_refs": [
@@ -146,6 +168,11 @@
       "id": "CAPREF-PROJECT-RUNTIME-SAFETY",
       "capability_id": "PROJECT_RUNTIME_SAFETY",
       "ref_sha256": "c32087126a6ecd2b239d9987449f24d9f4fae6f3b2a4b470b2dab88aaab55ee0"
+    },
+    {
+      "id": "CAPREF-CONSUMER-PROFILE-OVERLAY",
+      "capability_id": "CONSUMER_PROFILE_OVERLAY",
+      "ref_sha256": "e894adebd11d299b69db046a90ca591203588b63a9795bff6f190eda673c81cc"
     }
   ],
   "work_unit_refs": [
@@ -197,6 +224,13 @@
       "issue_number": 70,
       "ai_work_package_id": null,
       "ref_sha256": "ae07da9855681b6889d84478f46d97e625dc93c8527d854734754521e326e6f2"
+    },
+    {
+      "id": "WORKREF-LIFECYCLE-005",
+      "roadmap_id": "LIFECYCLE-005",
+      "issue_number": 72,
+      "ai_work_package_id": null,
+      "ref_sha256": "bb211adf2b6b55dada00f75507ff9b2ffc2a27cef40eac72b56bb807fce6e61e"
     }
   ],
   "evidence_refs": [],
@@ -361,7 +395,35 @@
       "from": "CAPREF-MANAGED-SURFACE-CONTRACT",
       "to": "WORKREF-LIFECYCLE-004",
       "edge_sha256": "594965af8b73d795eeea77aa4c967516c0328ff6a9ef410767383d9d9e34e69e"
+    },
+    {
+      "id": "EDGE-INTENT-REQ-LIFECYCLE-005",
+      "type": "INTENT_TO_REQUIREMENT",
+      "from": "INTENT-FOUNDATION-20260815",
+      "to": "REQ-LIFECYCLE-005",
+      "edge_sha256": "6ead7fc0190fda8f5508a011f2df14697590c50cd615179bda7d31d3785aa0fa"
+    },
+    {
+      "id": "EDGE-REQ-DEC-LIFECYCLE-005",
+      "type": "REQUIREMENT_TO_DECISION",
+      "from": "REQ-LIFECYCLE-005",
+      "to": "DEC-LIFECYCLE-005",
+      "edge_sha256": "9ff7fbfad4623c4a4a91d0129550a2329c990d02c928b0d61cb60d76a33df56c"
+    },
+    {
+      "id": "EDGE-DEC-CAP-LIFECYCLE-005",
+      "type": "DECISION_TO_CAPABILITY",
+      "from": "DEC-LIFECYCLE-005",
+      "to": "CAPREF-CONSUMER-PROFILE-OVERLAY",
+      "edge_sha256": "469afbc7e975e0adaa6e1c724755be2a541f6e75a3e6824a05d7cea3a5aafb41"
+    },
+    {
+      "id": "EDGE-CAP-WORK-LIFECYCLE-005",
+      "type": "CAPABILITY_TO_WORK",
+      "from": "CAPREF-CONSUMER-PROFILE-OVERLAY",
+      "to": "WORKREF-LIFECYCLE-005",
+      "edge_sha256": "56594f6734f3fdcee6cbf65567039ac16b541d27ce4f24a8a7a64bae77cc15fe"
     }
   ],
-  "graph_sha256": "d8da2f6224ef4349fc3e41acb553044eac264cffb9dc0c81e6596cb2a9bb3d5b"
+  "graph_sha256": "4c53fcdbb5c6722aec908f8171715e7e03d7977a2f45aa9a2e9a913dc75b6281"
 }

@@ -109,7 +109,7 @@ class V16RemediationTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmp:
             base=Path(tmp);framework=base/'fw';project=base/'product';shutil.copytree(ROOT/'.adwf',framework/'.adwf',ignore=shutil.ignore_patterns('__pycache__','tests'));project.mkdir()
             (project/'package.json').write_text(json.dumps({'dependencies':{'react':'19.0.0'},'scripts':{'build':'vite build','dev':'vite','test':'echo ok'}}));(project/'package-lock.json').write_text('{}')
-            r=materialize_project_pack(project,framework,apply=True);self.assertEqual(r['status'],'APPLIED');cfg=json.loads((framework/'.adwf/config.json').read_text());self.assertEqual(cfg['project_packs']['selected'],'react');self.assertTrue(cfg['project_packs']['materialized']);self.assertTrue(cfg['project_packs']['preview'])
+            before=(framework/'.adwf/config.json').read_bytes();r=materialize_project_pack(project,framework,apply=True,product_name='React Consumer',default_branch='main',repository_visibility='PUBLIC');self.assertEqual(r['status'],'APPLIED');self.assertEqual((framework/'.adwf/config.json').read_bytes(),before);self.assertEqual(r['effective_config']['project_packs']['selected'],'react');self.assertTrue(r['effective_config']['project_packs']['materialized']);self.assertTrue(r['effective_config']['project_packs']['preview'])
             r2=materialize_project_pack(project,framework,apply=False);self.assertEqual(r2['status'],'ALREADY_MATERIALIZED')
 
     def test_reference_delivery_promotes_exact_revision_and_observes_digest(self):

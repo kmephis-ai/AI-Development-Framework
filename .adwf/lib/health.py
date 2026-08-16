@@ -10,6 +10,7 @@ import json
 import re
 
 from .contracts import validate
+from .consumer_profile import ConsumerProfileError, load_effective_config
 from .docs_freshness import check_docs
 from .evidence import DEFAULT_PRODUCT_TTL_HOURS, parse_time, verify_product_evidence
 from .policy_compiler import check_compiled_policy
@@ -111,7 +112,7 @@ def package_integrity(root: Path) -> dict[str, Any]:
 def config_health(root: Path) -> dict[str, Any]:
     findings: list[str] = []
     try:
-        cfg = _json(root / ".adwf/config.json")
+        cfg = load_effective_config(root, root)
         schema = _json(root / ".adwf/schemas/config.schema.json")
         findings.extend(f"SCHEMA:{item.path}:{item.code}" for item in validate(cfg, schema))
         if cfg.get("policy", {}).get("fail_mode") != "CLOSED":
@@ -135,7 +136,7 @@ def config_health(root: Path) -> dict[str, Any]:
         github_trust = cfg.get("github", {}).get("trust", {})
         findings.extend(check_compiled_policy(root))
         findings.extend(check_docs(root))
-    except (OSError, ValueError, json.JSONDecodeError) as exc:
+    except (OSError, ConsumerProfileError, ValueError, json.JSONDecodeError) as exc:
         findings.append(f"CONFIG_UNREADABLE:{type(exc).__name__}")
     return _category("VERIFIED" if not findings else "BROKEN", findings)
 
@@ -217,7 +218,7 @@ def product_health(root: Path, *, now: datetime | None = None) -> dict[str, Any]
     findings: list[str] = []
     status = "NOT_VERIFIED"
     try:
-        cfg = _json(root / ".adwf/config.json")
+        cfg = load_effective_config(root, root)
         state = _json(active_state_path(root))
         head = state.get("main", {}).get("head")
         if re.fullmatch(r"[0-9a-f]{40}", str(head or "")) is None:

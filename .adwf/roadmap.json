@@ -126,6 +126,14 @@
             "ENVSAFE-001"
           ],
           "product_impact": false
+        },
+        {
+          "roadmap_id": "LIFECYCLE-005",
+          "title_ru": "Consumer Profile Overlay + Project Pack Bootstrap Finalization v1",
+          "dependencies": [
+            "LIFECYCLE-004"
+          ],
+          "product_impact": false
         }
       ]
     }

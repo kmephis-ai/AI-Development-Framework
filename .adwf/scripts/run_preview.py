@@ -15,6 +15,7 @@ import urllib.request
 
 ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT / ".adwf"))
+from lib.consumer_profile import ConsumerProfileError, load_effective_config  # noqa: E402
 from lib.preview_engine import capture_preview  # noqa: E402
 from lib.project_execution import ProjectExecutionError, ProjectExecutionSession, load_bound_project_pack  # noqa: E402
 
@@ -34,8 +35,8 @@ def wait(url: str, timeout: int = 60) -> None:
 
 def _framework_self_host() -> bool:
     try:
-        config = json.loads((ROOT / ".adwf/config.json").read_text(encoding="utf-8"))
-    except Exception:
+        config = load_effective_config(ROOT, ROOT)
+    except (OSError, ConsumerProfileError):
         return False
     project = config.get("project") or {}
     return project.get("type") == "framework" and project.get("runtime_product") is False
@@ -127,7 +128,7 @@ def main() -> int:
             print(json.dumps(manifest, ensure_ascii=False, indent=2))
             print("ADWF_PREVIEW_ATTESTATION_V1=" + encoded)
             return 0
-    except (OSError, ValueError, ProjectExecutionError, subprocess.SubprocessError) as exc:
+    except (OSError, ValueError, ConsumerProfileError, ProjectExecutionError, subprocess.SubprocessError) as exc:
         print(json.dumps({"status": "NOT_VERIFIED", "reason": str(exc).split(":", 1)[0]}, ensure_ascii=False))
         return 5
 

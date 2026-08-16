@@ -27,6 +27,7 @@ import tempfile
 import uuid
 
 from .contracts import validate
+from .consumer_profile import ConsumerProfileError, load_effective_config
 from .project_packs import commands_for_pack
 from .strict_json import loads as strict_loads
 
@@ -113,7 +114,10 @@ def load_bound_project_pack(project_root: str | Path, framework_root: str | Path
     """Return a pack binding only when canonical config matches current validated pack truth."""
     project = Path(project_root).resolve()
     framework = Path(framework_root).resolve()
-    config = _strict_object(framework / ".adwf/config.json", "PROJECT_CONFIG_INVALID")
+    try:
+        config = load_effective_config(project, framework)
+    except ConsumerProfileError as exc:
+        raise ProjectExecutionError(str(exc)) from exc
     _validate_config(config, framework)
     pp = config.get("project_packs") or {}
     if pp.get("materialized") is not True:
