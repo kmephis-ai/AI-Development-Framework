@@ -1,0 +1,111 @@
+name: ADWF AGENTQUAL-001 Post-Merge Synthetic Qualification Proof
+
+on:
+  push:
+    branches:
+      - agent/postmerge-agentqual001-e1c39313
+
+permissions:
+  contents: read
+  checks: write
+
+env:
+  MERGE_SHA: e1c39313ea3d8222aa825fd759d0ae8953c79737
+  MERGE_TREE: 6b70c76f845a8ae190189243327e1a8333231c02
+
+jobs:
+  prove:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd
+        with:
+          ref: agent/postmerge-agentqual001-e1c39313
+          fetch-depth: 0
+      - uses: actions/setup-python@a309ff8b426b58ec0e2a45f0f869d46889d02405
+        with:
+          python-version: "3.12.10"
+
+      - name: Verify exact merge identity
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse "$MERGE_SHA^{tree}")" = "$MERGE_TREE"
+          rm -rf /tmp/agentqual-merge
+          git worktree add --detach /tmp/agentqual-merge "$MERGE_SHA"
+          test "$(git -C /tmp/agentqual-merge rev-parse HEAD)" = "$MERGE_SHA"
+          test "$(git -C /tmp/agentqual-merge rev-parse HEAD^{tree})" = "$MERGE_TREE"
+          test -z "$(git -C /tmp/agentqual-merge status --porcelain=v1 --untracked-files=all)"
+
+      - name: Run merged qualification and focused verification
+        shell: bash
+        working-directory: /tmp/agentqual-merge
+        run: |
+          set -euo pipefail
+          python .adwf/scripts/qualify_creative_agent.py --output /tmp/agentqual-postmerge-proof.json
+          python .adwf/tests/test_creative_agent_qualification.py -q
+          python .adwf/scripts/validate_traceability.py
+          python .adwf/scripts/validate_capabilities.py
+          python .adwf/scripts/docs_freshness.py
+          python .adwf/scripts/generate_manifest.py --check
+          python .adwf/adwf.py doctor --scope package_integrity
+          test -z "$(git status --porcelain=v1 --untracked-files=all)"
+          python - <<'PY'
+          import hashlib, json
+          from pathlib import Path
+          proof=json.loads(Path('/tmp/agentqual-postmerge-proof.json').read_text(encoding='utf-8'))
+          registry=json.loads(Path('.adwf/creative-agent-adapters.json').read_text(encoding='utf-8'))
+          adapter=registry['adapters'][0]
+          command=Path(adapter['command']['path'])
+          assert proof['status']=='PASS', proof
+          assert proof['adapter_id']=='reference-local', proof
+          assert proof['network']=='NONE', proof
+          assert proof['secrets']=='FORBIDDEN', proof
+          assert proof['filesystem']=='PACKAGE_SCOPED', proof
+          assert proof['monetary_budget_usd']==0, proof
+          assert proof['low_trust_result'] is True, proof
+          assert proof['real_external_agent_verified'] is False, proof
+          assert adapter['command']['sha256']==hashlib.sha256(command.read_bytes()).hexdigest(), adapter
+          Path('/tmp/agentqual-postmerge-meta.json').write_text(json.dumps({
+              'proof':proof,
+              'registry_sha256':registry['registry_sha256'],
+              'command_sha256':adapter['command']['sha256'],
+          },sort_keys=True),encoding='utf-8')
+          PY
+
+      - name: Publish exact merge-SHA synthetic qualification check
+        shell: bash
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          import json, os, urllib.request
+          meta=json.load(open('/tmp/agentqual-postmerge-meta.json',encoding='utf-8'))
+          proof=meta['proof']
+          payload={
+              'name':'adwf/creative-agent-qualification-proof',
+              'head_sha':os.environ['MERGE_SHA'],
+              'status':'completed',
+              'conclusion':'success',
+              'output':{
+                  'title':'AGENTQUAL-001 post-merge synthetic qualification — PASS',
+                  'summary':'PASS: exact merged tree passed offline Creative Agent qualification. No real external AI/agent provider certification is claimed.',
+                  'text':(
+                      f"merge_sha={os.environ['MERGE_SHA']} tree={os.environ['MERGE_TREE']}\n"
+                      f"adapter_id={proof['adapter_id']} adapter_digest={proof['adapter_digest']} registry_sha256={meta['registry_sha256']} report_sha256={proof['report_sha256']} command_sha256={meta['command_sha256']}\n"
+                      'network=NONE secrets=FORBIDDEN filesystem=PACKAGE_SCOPED monetary_budget_usd=0\n'
+                      'low_trust_result=true real_external_agent_verified=false capability_status=LIVE_NOT_VERIFIED\n'
+                      'trace_owner_intent_binding=true synthetic_reference_only=true'
+                  )
+              }
+          }
+          req=urllib.request.Request(
+              f"https://api.github.com/repos/{os.environ['GITHUB_REPOSITORY']}/check-runs",
+              data=json.dumps(payload).encode('utf-8'),method='POST',
+              headers={'Authorization':f"Bearer {os.environ['GITHUB_TOKEN']}",'Accept':'application/vnd.github+json','X-GitHub-Api-Version':'2022-11-28','Content-Type':'application/json'}
+          )
+          with urllib.request.urlopen(req,timeout=30) as response:
+              created=json.load(response)
+          print(json.dumps({'status':'PASS','check_run_id':created.get('id'),'merge_sha':os.environ['MERGE_SHA'],'tree':os.environ['MERGE_TREE'],'report_sha256':proof['report_sha256'],'registry_sha256':meta['registry_sha256']},sort_keys=True))
+          PY
