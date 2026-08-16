@@ -1,0 +1,52 @@
+name: ADWF EDGEREF-001 Exact Transport Repair V2
+
+on:
+  push:
+    branches:
+      - agent/materialize-edgeref001-81da2e96
+
+permissions:
+  contents: write
+
+jobs:
+  repair:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 3
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd
+        with:
+          ref: agent/materialize-edgeref001-81da2e96
+          fetch-depth: 1
+      - name: Repair localized interval if needed
+        shell: bash
+        run: |
+          python - <<'PY'
+          import hashlib
+          from pathlib import Path
+          path = Path('.transport/edgeref001/chunk.000')
+          remote = path.read_text(encoding='utf-8')
+          target = '355bc238155fcaa8033a75f22e8e006bd1eb6678a612379160e4270174c22ac6'
+          if len(remote) == 18000:
+              digest = hashlib.sha256(remote.encode()).hexdigest()
+              assert digest == target, digest
+              print('ALREADY_REPAIRED=' + digest)
+              raise SystemExit(0)
+          assert len(remote) == 17999, len(remote)
+          assert hashlib.sha256(remote.encode()).hexdigest() == 'f0c931a8d84ac7202eebb723d2529452fe6eadf09fbca9904468cdd7b25ce8dd'
+          segment = '19UErqsluEbMTx4/ah937h/vPmq/e3j8dufx0YPj3XvtztHD3YOD/YMHjWZwDbcbmB1vkqiYQu1CVOI/XnYHqQDSGjp1u+FTYqWiUT5mrlTmVNgUlTckhRCs1s5TwkIgVDm+ve01F4IV1qQIE0o451LWMeJ0UDxRy72iXupVxOqWS2pSrFteUsgW29LVZjlMeNbG302gqnh3Gd9eP+cyyNWRqn/pAHuGE9ihk9+RwpNOuntweLC/t/uwc6+9t3+yf3iAkv/54/3j9qP2wWnn9Hh3r737k/2H+6e/wIytcuW0Ispcuk64pZ/MdP4U+oM4gfeVCbd/cIobtO4fPj64t3uK+7YYYYoYKnGf2i3aFA5aPphpctBh/3IAYCw4gonOL3u9revnhk8dk+rG2cmiFmc3vIhOca1FVNoqm6nnxmeiSZYsUuEMC8IEyYMOMWTPbeIRSaQC1yDuNG/Mi+oVHOjnrcJ+AK0tQmijPJ8hfacjZr7eWOoUi2jd5Eq7e6eo'
+          assert len(segment) == 512
+          repaired = remote[:1536] + segment + remote[2047:]
+          assert len(repaired) == 18000
+          digest = hashlib.sha256(repaired.encode()).hexdigest()
+          assert digest == target, digest
+          path.write_text(repaired, encoding='utf-8')
+          print('REPAIRED=' + digest)
+          PY
+          if git diff --quiet -- .transport/edgeref001/chunk.000; then
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add .transport/edgeref001/chunk.000
+          git commit -m "EDGEREF-001: repair exact transport byte"
+          git push origin HEAD:agent/materialize-edgeref001-81da2e96
