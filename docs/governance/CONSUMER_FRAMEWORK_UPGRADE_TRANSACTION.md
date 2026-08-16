@@ -43,7 +43,7 @@ Executor использует закрытый whitelist:
 | `REPLACE_PLANNED` | exact A managed private preimage → quarantine → exact B |
 | `REMOVE_PLANNED` | exact A managed private preimage → quarantine → absence |
 
-`PRESERVE_SHARED`/`PRESERVE_PREEXISTING` разрешены только когда A и B требуют один и тот же exact digest. Изменённый shared/pre-existing path остаётся `HUMAN_REQUIRED` на planning stage и не получает write authority.
+`PRESERVE_SHARED` разрешён только когда A и B требуют один и тот же exact package digest. Для `PRESERVE_PREEXISTING` `LIFECYCLE-007` дополнительно несёт immutable `preserved_sha256`: package digest связывает A/B contract, а фактические consumer bytes проверяются по preserved preimage. Такой path не staging-ится, не quarantine-ится, не заменяется и не удаляется; preserved drift блокирует fail-closed.
 
 ## Durable journal и provenance
 

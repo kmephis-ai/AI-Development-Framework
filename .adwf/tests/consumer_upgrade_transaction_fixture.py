@@ -10,7 +10,7 @@ from lib.managed_surface import plan_adoption
 from lib.managed_surface_transaction import apply_adoption
 
 
-def prepared_transaction(canonical_root: Path):
+def prepared_transaction(canonical_root: Path, *, preserve_shared: bool = False):
     temp = tempfile.TemporaryDirectory(); base = Path(temp.name)
     source, target, consumer = base / "source", base / "target", base / "consumer"
     source.mkdir(); consumer.mkdir(); build_framework(source, canonical_root)
@@ -18,6 +18,8 @@ def prepared_transaction(canonical_root: Path):
     (source / ".adwf/remove-me.txt").write_text("remove-v1\n", encoding="utf-8"); seal_inventory(source)
     shutil.copytree(source, target)
     (consumer / "appsscript.json").write_text('{"timeZone":"Etc/UTC"}\n', encoding="utf-8")
+    if preserve_shared:
+        (consumer / "README.md").write_text("consumer-owned shared readme\n", encoding="utf-8")
     adoption_plan = plan_adoption(source, consumer, source_revision=A)
     with patch("lib.managed_surface_transaction._verify_source_revision", return_value=None):
         adopted = apply_adoption(source, consumer, adoption_plan)

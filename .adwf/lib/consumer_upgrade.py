@@ -342,7 +342,10 @@ def _package_diff(
             elif snap["ownership"] != source_ownership or snap["installed_sha256"] != source_sha:
                 action = "BLOCK"
                 findings.append({"severity": "BLOCK", "code": "UPGRADE_SNAPSHOT_BINDING_MISMATCH", "subject": rel})
-            elif state != "FILE" or current_sha != snap["installed_sha256"]:
+            elif state != "FILE" or current_sha != (
+                snap.get("preserved_sha256") if snap["managed_by_adwf"] is not True and snap.get("preserved_sha256") is not None
+                else snap["installed_sha256"]
+            ):
                 action = "BLOCK"
                 findings.append({"severity": "BLOCK", "code": "UPGRADE_CONSUMER_DRIFT", "subject": rel})
             elif snap["managed_by_adwf"] is not True:

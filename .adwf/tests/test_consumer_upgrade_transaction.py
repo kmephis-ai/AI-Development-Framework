@@ -157,4 +157,37 @@ class UpgradeTransactionTests(unittest.TestCase):
             result=self.recover(s,t,c,txid); self.assertEqual(result["status"],"RECOVERY_BLOCKED")
         finally: temp.cleanup()
 
+    def test_13_preserved_preexisting_flows_a_b_rollback_retry_without_byte_change(self):
+        temp, s, t, c, snap, comp, plan = prepared_transaction(ROOT, preserve_shared=True)
+        try:
+            baseline = (c / "README.md").read_bytes()
+            source_item = next(x for x in snap["entries"] if x["path"] == "README.md")
+            planned = next(x for x in plan["entries"] if x["path"] == "README.md")
+            self.assertFalse(source_item["managed_by_adwf"])
+            self.assertNotEqual(source_item["installed_sha256"], source_item["preserved_sha256"])
+            self.assertEqual(planned["action"], "PRESERVE_PREEXISTING")
+            result = self.apply(s,t,c,comp,plan,snap)
+            self.assertEqual(result["status"], "COMMITTED")
+            self.assertEqual((c / "README.md").read_bytes(), baseline)
+            target_item = next(x for x in result["snapshot"]["entries"] if x["path"] == "README.md")
+            self.assertFalse(target_item["managed_by_adwf"])
+            self.assertEqual(target_item["preserved_sha256"], source_item["preserved_sha256"])
+            txid = result["transaction_id"]
+            rolled = self.rollback(s,t,c,txid)
+            self.assertEqual(rolled["status"], "ROLLED_BACK")
+            self.assertEqual((c / "README.md").read_bytes(), baseline)
+            retried = self.apply(s,t,c,comp,plan,snap)
+            self.assertEqual(retried["status"], "COMMITTED")
+            self.assertEqual((c / "README.md").read_bytes(), baseline)
+        finally: temp.cleanup()
+
+    def test_14_preserved_preexisting_drift_blocks_before_upgrade_write(self):
+        temp, s, t, c, snap, comp, plan = prepared_transaction(ROOT, preserve_shared=True)
+        try:
+            (c / "README.md").write_text("consumer drift\n", encoding="utf-8")
+            with self.assertRaisesRegex(ConsumerUpgradeError, "UPGRADE_APPLY_PREEXISTING_PRESERVE_INVALID"):
+                self.apply(s,t,c,comp,plan,snap)
+            self.assertFalse((c / ".adwf-runtime/consumer-upgrade").exists())
+        finally: temp.cleanup()
+
 if __name__ == "__main__": unittest.main()

@@ -245,14 +245,19 @@ def snapshot_from_adoption_plan(
         raise ManagedSurfaceError("SNAPSHOT_REQUIRES_READY_ADOPTION_PLAN")
     entries = []
     for item in plan["entries"]:
-        entries.append(
-            {
-                "path": item["path"],
-                "ownership": item["ownership"],
-                "installed_sha256": item["source_sha256"],
-                "managed_by_adwf": item["target_state"] == "ABSENT",
-            }
-        )
+        managed = item["target_state"] == "ABSENT"
+        entry = {
+            "path": item["path"],
+            "ownership": item["ownership"],
+            "installed_sha256": item["source_sha256"],
+            "managed_by_adwf": managed,
+        }
+        if not managed:
+            preserved = item.get("target_sha256")
+            if not isinstance(preserved, str) or not SHA256.fullmatch(preserved):
+                raise ManagedSurfaceError("SNAPSHOT_PREEXISTING_DIGEST_REQUIRED:" + item["path"])
+            entry["preserved_sha256"] = preserved
+        entries.append(entry)
     snapshot = {
         "$schema": ".adwf/schemas/managed-surface-snapshot.schema.json",
         "schema_version": 1,
@@ -291,7 +296,9 @@ def plan_detach(
         target = target_root / rel
         ownership = item["ownership"]
         managed = item["managed_by_adwf"] is True
-        state, current = _target_state(target, item["installed_sha256"])
+        preserved = item.get("preserved_sha256") if not managed else None
+        expected = preserved or item["installed_sha256"]
+        state, current = _target_state(target, expected)
         if not managed:
             action = "PRESERVE_PREEXISTING"
         elif ownership == "SHARED_GUARDED":
@@ -316,6 +323,7 @@ def plan_detach(
                 "path": rel,
                 "ownership": ownership,
                 "installed_sha256": item["installed_sha256"],
+                "preserved_sha256": preserved,
                 "managed_by_adwf": managed,
                 "target_state": state,
                 "target_sha256": current,
@@ -361,6 +369,11 @@ def _validate_snapshot(value: dict[str, Any], root: Path) -> None:
             raise ManagedSurfaceError("SNAPSHOT_OWNERSHIP_MISMATCH:" + rel)
         if item["installed_sha256"] != inventory["sums"][rel]:
             raise ManagedSurfaceError("SNAPSHOT_DIGEST_MISMATCH:" + rel)
+        preserved = item.get("preserved_sha256")
+        if item["managed_by_adwf"] is True and preserved is not None:
+            raise ManagedSurfaceError("SNAPSHOT_MANAGED_PRESERVED_DIGEST_FORBIDDEN:" + rel)
+        if preserved is not None and (not isinstance(preserved, str) or not SHA256.fullmatch(preserved)):
+            raise ManagedSurfaceError("SNAPSHOT_PRESERVED_DIGEST_INVALID:" + rel)
 
 
 def _validate_plan(value: dict[str, Any], root: Path) -> None:

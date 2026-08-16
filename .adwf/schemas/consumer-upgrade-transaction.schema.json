@@ -4,61 +4,264 @@
   "type": "object",
   "additionalProperties": false,
   "required": [
-    "$schema", "schema_version", "role", "transaction_id", "status",
-    "source_revision", "target_revision", "source_manifest_sha256", "target_manifest_sha256",
-    "compatibility_sha256", "plan_sha256", "source_snapshot_sha256", "consumer_root_sha256",
-    "attempts", "entries", "profile", "created_dirs", "snapshot_path", "snapshot_sha256",
-    "last_error", "journal_sha256"
+    "$schema",
+    "schema_version",
+    "role",
+    "transaction_id",
+    "status",
+    "source_revision",
+    "target_revision",
+    "source_manifest_sha256",
+    "target_manifest_sha256",
+    "compatibility_sha256",
+    "plan_sha256",
+    "source_snapshot_sha256",
+    "consumer_root_sha256",
+    "attempts",
+    "entries",
+    "profile",
+    "created_dirs",
+    "snapshot_path",
+    "snapshot_sha256",
+    "last_error",
+    "journal_sha256"
   ],
   "properties": {
-    "$schema": {"const": ".adwf/schemas/consumer-upgrade-transaction.schema.json"},
-    "schema_version": {"const": 1},
-    "role": {"const": "CONSUMER_FRAMEWORK_UPGRADE_TRANSACTION"},
-    "transaction_id": {"type": "string", "format": "sha256"},
-    "status": {"enum": ["PLANNED", "APPLYING", "RECOVERY_REQUIRED", "RECOVERY_BLOCKED", "COMMITTED", "ROLLED_BACK"]},
-    "source_revision": {"type": "string", "pattern": "^[0-9a-f]{40}$"},
-    "target_revision": {"type": "string", "pattern": "^[0-9a-f]{40}$"},
-    "source_manifest_sha256": {"type": "string", "format": "sha256"},
-    "target_manifest_sha256": {"type": "string", "format": "sha256"},
-    "compatibility_sha256": {"type": "string", "format": "sha256"},
-    "plan_sha256": {"type": "string", "format": "sha256"},
-    "source_snapshot_sha256": {"type": "string", "format": "sha256"},
-    "consumer_root_sha256": {"type": "string", "format": "sha256"},
-    "attempts": {"type": "integer", "minimum": 0},
+    "$schema": {
+      "const": ".adwf/schemas/consumer-upgrade-transaction.schema.json"
+    },
+    "schema_version": {
+      "const": 1
+    },
+    "role": {
+      "const": "CONSUMER_FRAMEWORK_UPGRADE_TRANSACTION"
+    },
+    "transaction_id": {
+      "type": "string",
+      "format": "sha256"
+    },
+    "status": {
+      "enum": [
+        "PLANNED",
+        "APPLYING",
+        "RECOVERY_REQUIRED",
+        "RECOVERY_BLOCKED",
+        "COMMITTED",
+        "ROLLED_BACK"
+      ]
+    },
+    "source_revision": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{40}$"
+    },
+    "target_revision": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{40}$"
+    },
+    "source_manifest_sha256": {
+      "type": "string",
+      "format": "sha256"
+    },
+    "target_manifest_sha256": {
+      "type": "string",
+      "format": "sha256"
+    },
+    "compatibility_sha256": {
+      "type": "string",
+      "format": "sha256"
+    },
+    "plan_sha256": {
+      "type": "string",
+      "format": "sha256"
+    },
+    "source_snapshot_sha256": {
+      "type": "string",
+      "format": "sha256"
+    },
+    "consumer_root_sha256": {
+      "type": "string",
+      "format": "sha256"
+    },
+    "attempts": {
+      "type": "integer",
+      "minimum": 0
+    },
     "entries": {
-      "type": "array", "minItems": 1, "uniqueItems": true,
+      "type": "array",
+      "minItems": 1,
+      "uniqueItems": true,
       "items": {
-        "type": "object", "additionalProperties": false,
-        "required": ["path", "planned_action", "source_sha256", "target_sha256", "state", "staging_path", "quarantine_path"],
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "path",
+          "planned_action",
+          "source_sha256",
+          "target_sha256",
+          "preserved_sha256",
+          "state",
+          "staging_path",
+          "quarantine_path"
+        ],
         "properties": {
-          "path": {"type": "string", "minLength": 1},
-          "planned_action": {"enum": ["KEEP_EXACT", "PRESERVE_SHARED", "PRESERVE_PREEXISTING", "CREATE_PLANNED", "REPLACE_PLANNED", "REMOVE_PLANNED"]},
-          "source_sha256": {"anyOf": [{"type": "string", "format": "sha256"}, {"type": "null"}]},
-          "target_sha256": {"anyOf": [{"type": "string", "format": "sha256"}, {"type": "null"}]},
-          "state": {"enum": ["PENDING", "PRESERVED", "STAGED", "BACKED_UP", "SOURCE_REMOVED", "TARGET_INSTALLED", "VERIFIED", "ROLLED_BACK"]},
-          "staging_path": {"type": ["string", "null"]},
-          "quarantine_path": {"type": ["string", "null"]}
+          "path": {
+            "type": "string",
+            "minLength": 1
+          },
+          "planned_action": {
+            "enum": [
+              "KEEP_EXACT",
+              "PRESERVE_SHARED",
+              "PRESERVE_PREEXISTING",
+              "CREATE_PLANNED",
+              "REPLACE_PLANNED",
+              "REMOVE_PLANNED"
+            ]
+          },
+          "source_sha256": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "sha256"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "target_sha256": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "sha256"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "state": {
+            "enum": [
+              "PENDING",
+              "PRESERVED",
+              "STAGED",
+              "BACKED_UP",
+              "SOURCE_REMOVED",
+              "TARGET_INSTALLED",
+              "VERIFIED",
+              "ROLLED_BACK"
+            ]
+          },
+          "staging_path": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "quarantine_path": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "preserved_sha256": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "sha256"
+          }
         }
       }
     },
     "profile": {
-      "type": "object", "additionalProperties": false,
-      "required": ["path", "source_profile_sha256", "target_profile_sha256", "source_file_sha256", "target_file_sha256", "state", "staging_path", "quarantine_path"],
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "path",
+        "source_profile_sha256",
+        "target_profile_sha256",
+        "source_file_sha256",
+        "target_file_sha256",
+        "state",
+        "staging_path",
+        "quarantine_path"
+      ],
       "properties": {
-        "path": {"const": ".adwf-consumer/profile.json"},
-        "source_profile_sha256": {"type": "string", "format": "sha256"},
-        "target_profile_sha256": {"type": "string", "format": "sha256"},
-        "source_file_sha256": {"type": "string", "format": "sha256"},
-        "target_file_sha256": {"type": "string", "format": "sha256"},
-        "state": {"enum": ["PENDING", "UNCHANGED", "STAGED", "BACKED_UP", "SOURCE_REMOVED", "TARGET_INSTALLED", "VERIFIED", "ROLLED_BACK"]},
-        "staging_path": {"type": ["string", "null"]},
-        "quarantine_path": {"type": ["string", "null"]}
+        "path": {
+          "const": ".adwf-consumer/profile.json"
+        },
+        "source_profile_sha256": {
+          "type": "string",
+          "format": "sha256"
+        },
+        "target_profile_sha256": {
+          "type": "string",
+          "format": "sha256"
+        },
+        "source_file_sha256": {
+          "type": "string",
+          "format": "sha256"
+        },
+        "target_file_sha256": {
+          "type": "string",
+          "format": "sha256"
+        },
+        "state": {
+          "enum": [
+            "PENDING",
+            "UNCHANGED",
+            "STAGED",
+            "BACKED_UP",
+            "SOURCE_REMOVED",
+            "TARGET_INSTALLED",
+            "VERIFIED",
+            "ROLLED_BACK"
+          ]
+        },
+        "staging_path": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "quarantine_path": {
+          "type": [
+            "string",
+            "null"
+          ]
+        }
       }
     },
-    "created_dirs": {"type": "array", "uniqueItems": true, "items": {"type": "string", "minLength": 1}},
-    "snapshot_path": {"type": ["string", "null"]},
-    "snapshot_sha256": {"type": ["string", "null"]},
-    "last_error": {"type": ["string", "null"]},
-    "journal_sha256": {"type": "string", "format": "sha256"}
+    "created_dirs": {
+      "type": "array",
+      "uniqueItems": true,
+      "items": {
+        "type": "string",
+        "minLength": 1
+      }
+    },
+    "snapshot_path": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "snapshot_sha256": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "last_error": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "journal_sha256": {
+      "type": "string",
+      "format": "sha256"
+    }
   }
 }
