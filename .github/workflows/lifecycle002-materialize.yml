@@ -1,0 +1,137 @@
+name: LIFECYCLE-002 materialize and verify
+
+on:
+  push:
+    branches:
+      - agent/materialize-lifecycle002-20260816-4940d49a
+
+permissions:
+  contents: write
+
+jobs:
+  materialize:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    env:
+      BASE_SHA: a485a8e8e2984ff8c28274795977b1d3eff881a0
+      EXPECTED_TREE: ffdceaef2ab207eaec9ec97b7de4ee3044369fa9
+      FEATURE_BRANCH: agent/lifecycle-002-transactional-adoption
+      PATCH_SHA256: 8a3d4146bdbf6453b53c82621acfcad3089c18819fa0fb8c492525f8d1bb90be
+      PYTHONDONTWRITEBYTECODE: '1'
+    steps:
+      - name: Checkout disposable transport
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd
+        with:
+          fetch-depth: 0
+
+      - name: Setup canonical Python
+        uses: actions/setup-python@a309ff8b426b58ec0e2a45f0f869d46889d02405
+        with:
+          python-version: '3.12.10'
+
+      - name: Restore exact candidate tree
+        shell: bash
+        run: |
+          set -euo pipefail
+          cp .github/lifecycle002.patch.gz.b64 /tmp/lifecycle002.patch.gz.b64
+          REMOTE_MAIN="$(git ls-remote origin refs/heads/main | awk '{print $1}')"
+          test "$REMOTE_MAIN" = "$BASE_SHA"
+          git checkout --detach "$BASE_SHA"
+          base64 -d /tmp/lifecycle002.patch.gz.b64 | gzip -d > /tmp/lifecycle002.patch
+          test "$(sha256sum /tmp/lifecycle002.patch | awk '{print $1}')" = "$PATCH_SHA256"
+          git apply --index --whitespace=error-all /tmp/lifecycle002.patch
+          test "$(git diff --cached --name-only | wc -l | tr -d ' ')" = '15'
+          for path in \
+            .adwf/capability-traceability.json \
+            .adwf/decision-requirement-traceability.json \
+            .adwf/docs-registry.json \
+            .adwf/lib/managed_surface.py \
+            .adwf/lib/managed_surface_transaction.py \
+            .adwf/managed-surface-policy.json \
+            .adwf/roadmap.json \
+            .adwf/schemas/managed-surface-policy.schema.json \
+            .adwf/schemas/managed-surface-snapshot.schema.json \
+            .adwf/schemas/managed-surface-transaction.schema.json \
+            .adwf/scripts/validate_managed_surface.py \
+            .adwf/tests/test_managed_surface_transaction.py \
+            MANIFEST.json \
+            SHA256SUMS.txt \
+            docs/governance/MANAGED_SURFACE_CONTRACT.md; do
+              git diff --cached --name-only | grep -Fx "$path"
+          done
+          test "$(git write-tree)" = "$EXPECTED_TREE"
+          git diff --cached --check
+
+      - name: Commit immutable candidate
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name 'ADWF LIFECYCLE-002 Materializer'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git commit -m 'LIFECYCLE-002: transactional adoption apply and recovery'
+          test "$(git rev-parse HEAD^{tree})" = "$EXPECTED_TREE"
+          echo "CANDIDATE_SHA=$(git rev-parse HEAD)" >> "$GITHUB_ENV"
+
+      - name: Prove exact BASE Standing Policy classification
+        shell: bash
+        run: |
+          set -euo pipefail
+          git worktree add --detach /tmp/lifecycle002-base "$BASE_SHA"
+          cd /tmp/lifecycle002-base
+          python - "$BASE_SHA" "$CANDIDATE_SHA" <<'PY'
+          import json,sys
+          from pathlib import Path
+          root=Path('.').resolve();sys.path.insert(0,str(root/'.adwf'))
+          from lib.trust import classify_git_diff
+          result=classify_git_diff(root,sys.argv[1],sys.argv[2])
+          print(json.dumps(result,ensure_ascii=False,sort_keys=True))
+          assert result['result']=='ALLOW',result
+          assert result['authorization_mode']=='STANDING_OWNER_POLICY',result
+          assert result['human_required'] is False,result
+          assert result['manual_required_files']==[],result
+          assert result['weakening']==[],result
+          assert result['reason_codes']==[],result
+          assert result['standing_policy']['revision']==1,result
+          PY
+
+      - name: Verify focused lifecycle and truth contracts
+        shell: bash
+        run: |
+          set -euo pipefail
+          python .adwf/tests/test_managed_surface.py
+          python .adwf/tests/test_managed_surface_transaction.py
+          python .adwf/tests/test_decision_traceability.py
+          python .adwf/tests/test_roadmap_truth.py
+          python .adwf/scripts/validate_managed_surface.py
+          python .adwf/scripts/validate_traceability.py
+          python .adwf/scripts/validate_capabilities.py
+          python .adwf/scripts/docs_freshness.py
+          python .adwf/scripts/generate_manifest.py --check
+          python .adwf/scripts/validate_framework.py
+          git diff --check
+
+      - name: Verify full framework without mutating candidate tree
+        shell: bash
+        run: |
+          set -euo pipefail
+          python .adwf/adwf.py self-test 2>&1 | tee /tmp/lifecycle002-selftest.log
+          grep -Eq 'Ran 385 tests' /tmp/lifecycle002-selftest.log
+          git reset --hard "$CANDIDATE_SHA"
+          test "$(git rev-parse HEAD^{tree})" = "$EXPECTED_TREE"
+          python .adwf/scripts/validate_framework.py
+          python .adwf/scripts/docs_freshness.py
+          python .adwf/scripts/generate_manifest.py --check
+          git diff --check
+          test -z "$(git status --porcelain)"
+
+      - name: Publish atomic feature branch
+        shell: bash
+        run: |
+          set -euo pipefail
+          REMOTE_MAIN="$(git ls-remote origin refs/heads/main | awk '{print $1}')"
+          test "$REMOTE_MAIN" = "$BASE_SHA"
+          REMOTE_FEATURE="$(git ls-remote origin "refs/heads/${FEATURE_BRANCH}" | awk '{print $1}')"
+          test "$REMOTE_FEATURE" = "$BASE_SHA"
+          test "$(git rev-parse HEAD)" = "$CANDIDATE_SHA"
+          test "$(git rev-parse HEAD^{tree})" = "$EXPECTED_TREE"
+          git push origin "$CANDIDATE_SHA:refs/heads/$FEATURE_BRANCH"
