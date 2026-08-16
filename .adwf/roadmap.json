@@ -182,6 +182,14 @@
             "LIFECYCLE-006"
           ],
           "product_impact": false
+        },
+        {
+          "roadmap_id": "UPGRADE_FIX-001",
+          "title_ru": "Committed Rollback with Unchanged Consumer Profile",
+          "dependencies": [
+            "LIFECYCLE-007"
+          ],
+          "product_impact": false
         }
       ]
     }

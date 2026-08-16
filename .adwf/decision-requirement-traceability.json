@@ -2,7 +2,7 @@
   "$schema": ".adwf/schemas/decision-requirement-traceability.schema.json",
   "schema_version": 1,
   "role": "CANONICAL_DECISION_REQUIREMENT_TRACEABILITY",
-  "revision": 14,
+  "revision": 15,
   "records": [
     {
       "id": "INTENT-FOUNDATION-20260815",
@@ -403,6 +403,13 @@
       "issue_number": 90,
       "ai_work_package_id": null,
       "ref_sha256": "36e31766befd4bfd8ae5137416a90ff585536d73c138db5e45a5fdd23cfc3196"
+    },
+    {
+      "id": "WORKREF-UPGRADE-FIX-001",
+      "roadmap_id": "UPGRADE_FIX-001",
+      "issue_number": 92,
+      "ai_work_package_id": null,
+      "ref_sha256": "f1250121cd986fe4bdeb55fbea248f546056b43c3d7204ba13046ac50da5e2d8"
     }
   ],
   "evidence_refs": [],
@@ -784,7 +791,14 @@
       "from": "CAPREF-CONSUMER-FRAMEWORK-UPGRADE-TRANSACTION",
       "to": "WORKREF-LIFECYCLE-007",
       "edge_sha256": "b787e829b1d1eefeb7d42fe8ed8072fa00deadd8b36c86e561f6216289fcae3e"
+    },
+    {
+      "id": "EDGE-CAP-UTX-WORK-UPGRADE-FIX-001",
+      "type": "CAPABILITY_TO_WORK",
+      "from": "CAPREF-CONSUMER-FRAMEWORK-UPGRADE-TRANSACTION",
+      "to": "WORKREF-UPGRADE-FIX-001",
+      "edge_sha256": "9a2d2568188448faae0db5c5af64f2744f852d99b0660739cbf3043bf8b3df0b"
     }
   ],
-  "graph_sha256": "3fc8086e60e789c8065e0d4a6e029d583edaf77dcacb342b34496e4e97577dae"
+  "graph_sha256": "8d505050c602223d75b100b4534818be31d03f96fdaa151f35c83e15caa8657b"
 }

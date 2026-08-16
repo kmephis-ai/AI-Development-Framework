@@ -893,9 +893,24 @@ def _recover_locked(source_root: Path, target_root: Path, consumer: Path, store:
         elif journal.get("status") == "COMMITTED":
             blockers.append("UPGRADE_RECOVERY_SNAPSHOT_DRIFT")
 
-    # Profile first in reverse of commit order.
+    # Profile first in reverse of commit order.  An unchanged profile has no
+    # quarantine by design and is verification-only even during committed
+    # rollback.  Never turn an unchanged exact profile into destructive
+    # restore authority merely because the surrounding transaction committed.
     profile = journal["profile"]
-    if profile["state"] not in {"UNCHANGED", "PENDING", "ROLLED_BACK"} or journal.get("status") == "COMMITTED":
+    if profile["state"] == "UNCHANGED":
+        pstate, pdigest = _path_state(consumer, PROFILE_REL)
+        if (
+            profile.get("source_file_sha256") != profile.get("target_file_sha256")
+            or profile.get("quarantine_path") is not None
+            or profile.get("staging_path") is not None
+        ):
+            blockers.append("UPGRADE_RECOVERY_UNCHANGED_PROFILE_PROVENANCE_INVALID")
+        elif pstate != "FILE" or pdigest != profile.get("source_file_sha256"):
+            blockers.append("UPGRADE_RECOVERY_FOREIGN_UNCHANGED_PROFILE")
+        else:
+            profile["state"] = "ROLLED_BACK"
+    elif profile["state"] not in {"PENDING", "ROLLED_BACK"} or journal.get("status") == "COMMITTED":
         path = consumer / PROFILE_REL; q = consumer / str(profile["quarantine_path"])
         pstate, pdigest = _path_state(consumer, PROFILE_REL)
         if pdigest == profile["target_file_sha256"]:

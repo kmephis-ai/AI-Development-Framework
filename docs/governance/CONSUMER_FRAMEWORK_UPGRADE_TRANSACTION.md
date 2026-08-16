@@ -95,3 +95,6 @@ Planning CLI UPGRADE-001 остаётся read-only; mutating operation нико
 Focused suite проверяет commit/idempotence, rollback→retry, stale/forged inputs, checkout substitution, consumer drift, create collision, symlink/type ambiguity, changed shared path, unsupported migration, replace/remove/profile crash windows, crash after B snapshot before commit, journal/quarantine tamper, foreign target preservation, quarantine parent symlink и chained B→C provenance.
 
 Эти tests являются implementation evidence. Следующий rolling-wave unit должен добавить real external consumer exact-revision `A → B → rollback → B` evidence и только затем может повысить live truth.
+## Unchanged Consumer Profile rollback semantics
+
+Если exact A и B дают byte-identical `.adwf-consumer/profile.json`, transaction journal фиксирует profile как `UNCHANGED`: committed rollback **только проверяет** exact source/target digest и не получает quarantine/restore authority. Отсутствие profile quarantine в этом состоянии является нормой, а не поводом для восстановления. Любой drift такого profile блокирует rollback fail-closed без удаления или перезаписи consumer bytes. Это regression invariant `UPGRADE_FIX-001`.
