@@ -1,0 +1,67 @@
+name: ADWF AGENTQUAL-001 V2 Test Diagnostic
+
+on:
+  push:
+    branches:
+      - agent/materialize-agentqual001-v2-6483a41b
+
+permissions:
+  contents: write
+
+env:
+  BASE_SHA: 6483a41b20cedcc17721800b164e8bce1d20ec33
+
+jobs:
+  diagnose:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd
+        with:
+          ref: agent/materialize-agentqual001-v2-6483a41b
+          fetch-depth: 0
+      - uses: actions/setup-python@a309ff8b426b58ec0e2a45f0f869d46889d02405
+        with:
+          python-version: "3.12.10"
+      - name: Build exact candidate
+        shell: bash
+        run: |
+          set -euo pipefail
+          rm -rf /tmp/agentqual-diag-v2
+          git worktree add --detach /tmp/agentqual-diag-v2 "$BASE_SHA"
+          python .transport/agentqual001-v2/apply.py /tmp/agentqual-diag-v2
+          python .transport/agentqual001-v2/harden.py /tmp/agentqual-diag-v2
+          cd /tmp/agentqual-diag-v2
+          python .adwf/scripts/docs_freshness.py --write --reviewed-at 2026-08-16T20:30:00Z --valid-until 2026-11-16T20:30:00Z
+          python .adwf/scripts/generate_manifest.py
+          git add -A
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git commit -q -m "AGENTQUAL-001: diagnostic candidate"
+      - name: Capture focused test outcomes
+        shell: bash
+        run: |
+          set +e
+          : > /tmp/diag.txt
+          cd /tmp/agentqual-diag-v2
+          for cmd in \
+            "python .adwf/tests/test_creative_agent_qualification.py -q" \
+            "python .adwf/tests/test_ai_work_contracts.py -q" \
+            "python .adwf/tests/test_v15_executive.py -q" \
+            "python .adwf/tests/test_v16_remediation.py -q"
+          do
+            echo "=== $cmd ===" >> /tmp/diag.txt
+            bash -lc "$cmd" > /tmp/one.out 2>&1
+            code=$?
+            echo "exit_code=$code" >> /tmp/diag.txt
+            tail -n 120 /tmp/one.out >> /tmp/diag.txt
+            echo >> /tmp/diag.txt
+          done
+          set -e
+          cp /tmp/diag.txt "$GITHUB_WORKSPACE/.transport/agentqual001-v2/last-test-diagnostic.txt"
+          cd "$GITHUB_WORKSPACE"
+          git add .transport/agentqual001-v2/last-test-diagnostic.txt
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git commit -m "AGENTQUAL-001: capture focused test diagnostic" || true
+          git push origin HEAD:refs/heads/agent/materialize-agentqual001-v2-6483a41b
