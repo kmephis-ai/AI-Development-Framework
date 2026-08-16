@@ -214,6 +214,14 @@
             "GOV-021"
           ],
           "product_impact": false
+        },
+        {
+          "roadmap_id": "AGENTQUAL-001",
+          "title_ru": "Replaceable Creative Agent Qualification Contract + Reference Adapter v1",
+          "dependencies": [
+            "EDGEREF-001"
+          ],
+          "product_impact": false
         }
       ]
     }
