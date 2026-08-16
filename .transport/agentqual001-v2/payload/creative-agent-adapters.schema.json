@@ -1,0 +1,98 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://adwf.local/schemas/creative-agent-adapters.schema.json",
+  "type": "object",
+  "required": [
+    "$schema",
+    "schema_version",
+    "qualification_profile",
+    "adapters",
+    "registry_sha256"
+  ],
+  "additionalProperties": false,
+  "properties": {
+    "$schema": {
+      "const": ".adwf/schemas/creative-agent-adapters.schema.json"
+    },
+    "schema_version": {
+      "const": 1
+    },
+    "qualification_profile": {
+      "type": "object",
+      "required": ["id", "version", "digest"],
+      "additionalProperties": false,
+      "properties": {
+        "id": {"const": "CREATIVE_AGENT_COMMAND_V1"},
+        "version": {"const": 1},
+        "digest": {"type": "string", "format": "sha256"}
+      }
+    },
+    "adapters": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "required": [
+          "id",
+          "version",
+          "kind",
+          "invocation_mode",
+          "supported_phases",
+          "command",
+          "authority",
+          "monetary_budget_usd",
+          "timeout_seconds",
+          "result_channel",
+          "package_schema",
+          "result_schema",
+          "qualification_report",
+          "qualification_profile_id",
+          "qualification_profile_version",
+          "qualification_profile_digest"
+        ],
+        "additionalProperties": false,
+        "properties": {
+          "id": {"type": "string", "pattern": "^[a-z0-9][a-z0-9-]{1,63}$"},
+          "version": {"type": "string", "pattern": "^[0-9]+\\.[0-9]+\\.[0-9]+$"},
+          "kind": {"enum": ["REFERENCE_DETERMINISTIC", "EXTERNAL_COMMAND"]},
+          "invocation_mode": {"const": "COMMAND"},
+          "supported_phases": {
+            "type": "array",
+            "minItems": 1,
+            "uniqueItems": true,
+            "items": {"enum": ["EXECUTE", "RECOVERY"]}
+          },
+          "command": {
+            "type": "object",
+            "required": ["runner", "path"],
+            "additionalProperties": false,
+            "properties": {
+              "runner": {"enum": ["PYTHON", "EXECUTABLE"]},
+              "path": {"type": "string", "minLength": 1, "maxLength": 240}
+            }
+          },
+          "authority": {
+            "type": "object",
+            "required": ["network", "secrets", "filesystem"],
+            "additionalProperties": false,
+            "properties": {
+              "network": {"enum": ["NONE", "DECLARED_EXTERNAL"]},
+              "secrets": {"enum": ["FORBIDDEN", "DECLARED_REQUIRED"]},
+              "filesystem": {"const": "PACKAGE_SCOPED"}
+            }
+          },
+          "monetary_budget_usd": {"const": 0},
+          "timeout_seconds": {"type": "integer", "minimum": 1, "maximum": 1800},
+          "result_channel": {"const": "ADWF_ACTION_RESULT_JSON"},
+          "package_schema": {"const": ".adwf/schemas/ai-work-package.schema.json"},
+          "result_schema": {"const": ".adwf/schemas/ai-work-result.schema.json"},
+          "qualification_report": {"type": "string", "minLength": 1, "maxLength": 240},
+          "qualification_profile_id": {"const": "CREATIVE_AGENT_COMMAND_V1"},
+          "qualification_profile_version": {"const": 1},
+          "qualification_profile_digest": {"type": "string", "format": "sha256"}
+        }
+      }
+    },
+    "registry_sha256": {"type": "string", "format": "sha256"}
+  }
+}
