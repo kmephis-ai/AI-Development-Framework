@@ -1,0 +1,79 @@
+name: ADWF EDGEREF-001 Prefix Diagnostic
+
+on:
+  push:
+    branches:
+      - agent/materialize-edgeref001-81da2e96
+
+permissions:
+  contents: read
+
+jobs:
+  locate:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 3
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd
+        with:
+          ref: agent/materialize-edgeref001-81da2e96
+          persist-credentials: false
+      - name: Compare exact prefix checkpoints
+        shell: bash
+        run: |
+          python - <<'PY'
+          import hashlib
+          from pathlib import Path
+
+          expected = {
+            512:'61e448a591695b58e790ad057168f6c6a6615dc101013d371d1ed4864d621fec',
+            1024:'5c433358ba4a29ea5b30e265ba162d6b601565577b18b21940bc18d6b73f502f',
+            1536:'2bd6d0fd03ce9620a894bf815a44704cd8a5dd57419609ef752343d6c983956c',
+            2048:'f3f13e668ce96ca5dfa23c6d4c5e130eca372b18f1387b12a2af5cfadf579b82',
+            2560:'65d9eeab432e8e1af74123d7fd61670697b24b3646dfc4c2ccba74f945d6b46e',
+            3072:'8fb46284f2c670eab5e8c1f0847e301984c8643dc48c8398a472b3bcc1dbd089',
+            3584:'dcd327cf67b96e2f407e8e8ce050c1ffdb3b50abe52a81bac3c2bcdd78e77384',
+            4096:'cd5348110d185b714d16c087552d7c9abead1494cbbcd7b812a4e86fd7e256af',
+            4608:'7395bd41f0858922f44f7a609e05fc7c84414daa32321f190eccfc79b441c156',
+            5120:'851bcff7afeb6220a6d1fd628f50ad83f6d42fa88f5cf2f0a7d4c32a202e48b5',
+            5632:'73e1731362c936a517cf5d5e8d1fd6c571513fed3704d722235595b329598a6e',
+            6144:'7968d521918cc5c95d5093c65d9e2e2e872b91b6ce2d8a72350dd8d0d2a9f59e',
+            6656:'d26d74ba7272d20f301f608316be456e09ffc9598621e17a55ad55eed165c19b',
+            7168:'1f38713567cd84621ff910643b37b8ebc4d98aaf1bc8d6e29e85272f630665a0',
+            7680:'2b5d7f69c39021d5b1ae6905c099d46da96a92df54e3362113b5eb8f342d129a',
+            8192:'99ba3657bc25f2457e284096145b3e4ec4e50cb11993901aa46c518bef4fd689',
+            8704:'76604354d23fc955d3b8cf1e97c1908ce293aa36751caa023ce32f5a11da12dc',
+            9216:'d386ba8c33921b7b9b0a9007a528f5c04c651b9c1e5296bcb87cc9f06c646552',
+            9728:'e26054d6e59bc25a813837c13ce42b0d0711242d7c2618e5780dac22dbbffa62',
+            10240:'cb15449e57929739366b11ff3ab98e0dd350d3feea88d809e97a797592a85d4a',
+            10752:'39641f3d69f20f12121a535f17ee37edd14817d29ccf5a4b537b634fac96d481',
+            11264:'f3d9c3970bccb397a0705b391905843ed150204750afea85317a228f0b498ab7',
+            11776:'870ffb6ee361e8b9a4acf86639fcb4e06a85a255e2e41020daf2df7bf6355500',
+            12288:'b615c7a580459719def86d9578afac9f289d369fb943f45b3dbfbdfdea23b102',
+            12800:'b98014c716517b0f3481df91168a48a77bdf8f226845c3d58566a591e7de4266',
+            13312:'09138d3d7f882bd8036ee88a0bf5bcd81581f205089cc982cfe873429eeb0acf',
+            13824:'23ef0d98468bfe0badb68b4618a0824f61da03b1d0df274c02fa10a802cd3cbe',
+            14336:'207a5c59365fa81d322679782ba8f40c0779f7b0c118b8ec459225cfa085778f',
+            14848:'36c728f33f59ebaeb83ccb6e48ae33897daa2cba01a47195939aec9322077ffa',
+            15360:'a0bee72168125b71df7e4389904e4cc53e4a69cdd85e4ba17a538682d3b89b21',
+            15872:'67d3c8e69d8a9a51a4ccb71be73496faeacc840e684772bcbd81eec875822a70',
+            16384:'3d9b5bade7b93d332223744f201820c9afc083cc6e0f76f6f318f4458be819ba',
+            16896:'f7ff19b54aa08c16e7bdc5da36de5ba8e4f1ddfa23ad7d0a45d751c38a1fdf6e',
+            17408:'942d517dc8ffa8dd047baff585c7087171520727a53d5206147896ba660e6cd5',
+            17920:'8df38986de0a8855a850799e34813fb5103bd312b438aedcaa4b937087ffc422',
+          }
+          data = Path('.transport/edgeref001/chunk.000').read_bytes()
+          last_match = 0
+          first_mismatch = None
+          for n, digest in expected.items():
+              actual = hashlib.sha256(data[:n]).hexdigest()
+              ok = actual == digest
+              print(f'PREFIX {n} {"MATCH" if ok else "MISMATCH"} {actual}')
+              if ok and first_mismatch is None:
+                  last_match = n
+              elif not ok and first_mismatch is None:
+                  first_mismatch = n
+          print(f'LAST_MATCH={last_match}')
+          print(f'FIRST_MISMATCH={first_mismatch}')
+          if first_mismatch is None:
+              raise SystemExit('MISSING_BYTE_AFTER_LAST_CHECKPOINT')
+          PY
