@@ -465,6 +465,25 @@
       ],
       "live_boundary": "LIVE_VERIFIED запрещён по evidence UPGRADE-001: unit/CI/provider validation доказывают только deterministic planning/compatibility. Safe framework upgrade требует отдельный transactional apply/recovery executor и real consumer exact A→B→rollback→B evidence с сохранностью consumer/shared data.",
       "live_evidence": []
+    },
+    {
+      "id": "CONSUMER_FRAMEWORK_UPGRADE_TRANSACTION",
+      "status": "LIVE_NOT_VERIFIED",
+      "execution_mode": "CORE",
+      "owner_claim_ru": "ADWF применяет sealed READY upgrade plan A→B как durable fail-closed filesystem transaction с exact quarantine provenance, rollback/recovery и без mutation authority над shared/pre-existing/consumer-owned content.",
+      "entrypoints": [
+        ".adwf/scripts/apply_consumer_upgrade.py"
+      ],
+      "production_paths": [
+        ".adwf/lib/consumer_upgrade_transaction.py",
+        ".adwf/schemas/consumer-upgrade-transaction.schema.json"
+      ],
+      "verification": [
+        ".adwf/tests/test_consumer_upgrade_transaction.py",
+        ".adwf/tests/test_consumer_upgrade_transaction_adversarial.py"
+      ],
+      "live_boundary": "LIVE_VERIFIED запрещён по evidence UPGRADE-002: deterministic/adversarial fixtures доказывают executor/recovery semantics, но не real external consumer exact A→B→rollback→B и не PrihRash adoption readiness.",
+      "live_evidence": []
     }
   ]
 }
