@@ -134,6 +134,14 @@
             "LIFECYCLE-004"
           ],
           "product_impact": false
+        },
+        {
+          "roadmap_id": "WEBREF-001",
+          "title_ru": "Reference Web Consumer End-to-End Conformance v1",
+          "dependencies": [
+            "LIFECYCLE-005"
+          ],
+          "product_impact": false
         }
       ]
     }

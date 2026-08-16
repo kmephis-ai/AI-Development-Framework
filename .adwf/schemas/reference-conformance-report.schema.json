@@ -1,0 +1,404 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "ADWF Reference Consumer Conformance Report v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "$schema",
+    "schema_version",
+    "role",
+    "conformance_id",
+    "consumer_class",
+    "reference_kind",
+    "framework",
+    "consumer",
+    "pack",
+    "adoption",
+    "profile",
+    "effective_config",
+    "gate_execution",
+    "preview",
+    "detach",
+    "readoption",
+    "preservation",
+    "limitations",
+    "outcome",
+    "reason_codes",
+    "created_at",
+    "report_sha256"
+  ],
+  "properties": {
+    "$schema": {
+      "const": ".adwf/schemas/reference-conformance-report.schema.json"
+    },
+    "schema_version": {
+      "const": 1
+    },
+    "role": {
+      "const": "REFERENCE_CONFORMANCE_REPORT"
+    },
+    "conformance_id": {
+      "type": "string",
+      "pattern": "^RCF-[0-9a-f]{32}$"
+    },
+    "consumer_class": {
+      "const": "STANDARD_WEB"
+    },
+    "reference_kind": {
+      "const": "SYNTHETIC_REFERENCE_CONSUMER"
+    },
+    "framework": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "source_sha",
+        "source_tree",
+        "manifest_sha256"
+      ],
+      "properties": {
+        "source_sha": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{40}$"
+        },
+        "source_tree": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{40}$"
+        },
+        "manifest_sha256": {
+          "type": "string",
+          "format": "sha256"
+        }
+      }
+    },
+    "consumer": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "seed_head",
+        "seed_tree",
+        "operational_head",
+        "operational_tree"
+      ],
+      "properties": {
+        "seed_head": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{40}$"
+        },
+        "seed_tree": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{40}$"
+        },
+        "operational_head": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{40}$"
+        },
+        "operational_tree": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{40}$"
+        }
+      }
+    },
+    "pack": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "digest",
+        "network_enforcement"
+      ],
+      "properties": {
+        "id": {
+          "const": "react"
+        },
+        "digest": {
+          "type": "string",
+          "format": "sha256"
+        },
+        "network_enforcement": {
+          "const": "DECLARATION_ONLY_NOT_ENFORCED"
+        }
+      }
+    },
+    "adoption": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "status",
+        "transaction_id",
+        "snapshot_sha256"
+      ],
+      "properties": {
+        "status": {
+          "const": "COMMITTED"
+        },
+        "transaction_id": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "snapshot_sha256": {
+          "type": "string",
+          "format": "sha256"
+        }
+      }
+    },
+    "profile": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "status",
+        "path",
+        "sha256"
+      ],
+      "properties": {
+        "status": {
+          "enum": [
+            "APPLIED",
+            "ALREADY_MATERIALIZED"
+          ]
+        },
+        "path": {
+          "const": ".adwf-consumer/profile.json"
+        },
+        "sha256": {
+          "type": "string",
+          "format": "sha256"
+        }
+      }
+    },
+    "gate_execution": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "status",
+        "head_sha",
+        "pack_digest",
+        "execution_id",
+        "evidence_sha256"
+      ],
+      "properties": {
+        "status": {
+          "const": "PASS"
+        },
+        "head_sha": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{40}$"
+        },
+        "pack_digest": {
+          "type": "string",
+          "format": "sha256"
+        },
+        "execution_id": {
+          "type": "string",
+          "pattern": "^PEX-[0-9a-f]{32}$"
+        },
+        "evidence_sha256": {
+          "type": "string",
+          "format": "sha256"
+        }
+      }
+    },
+    "preview": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "status",
+        "capture_mode",
+        "head_sha",
+        "pack_digest",
+        "execution_id",
+        "execution_evidence_sha256",
+        "preview_digest",
+        "attestation_id",
+        "screenshot_digests"
+      ],
+      "properties": {
+        "status": {
+          "const": "PASS"
+        },
+        "capture_mode": {
+          "enum": [
+            "LIVE_BROWSER",
+            "SIMULATED_TEST"
+          ]
+        },
+        "head_sha": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{40}$"
+        },
+        "pack_digest": {
+          "type": "string",
+          "format": "sha256"
+        },
+        "execution_id": {
+          "type": "string",
+          "pattern": "^PEX-[0-9a-f]{32}$"
+        },
+        "execution_evidence_sha256": {
+          "type": "string",
+          "format": "sha256"
+        },
+        "preview_digest": {
+          "type": "string",
+          "format": "sha256"
+        },
+        "attestation_id": {
+          "type": "string",
+          "format": "sha256"
+        },
+        "screenshot_digests": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "string",
+            "format": "sha256"
+          }
+        }
+      }
+    },
+    "detach": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "status",
+        "transaction_id",
+        "removed_files"
+      ],
+      "properties": {
+        "status": {
+          "const": "COMMITTED"
+        },
+        "transaction_id": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "removed_files": {
+          "type": "integer",
+          "minimum": 1
+        }
+      }
+    },
+    "readoption": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "status",
+        "transaction_id",
+        "profile_status",
+        "transaction_identity_changed"
+      ],
+      "properties": {
+        "status": {
+          "const": "COMMITTED"
+        },
+        "transaction_id": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "profile_status": {
+          "const": "ALREADY_MATERIALIZED"
+        },
+        "transaction_identity_changed": {
+          "const": true
+        }
+      }
+    },
+    "preservation": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "paths",
+        "before_sha256",
+        "after_detach_sha256",
+        "profile_survived"
+      ],
+      "properties": {
+        "paths": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "before_sha256": {
+          "type": "string",
+          "format": "sha256"
+        },
+        "after_detach_sha256": {
+          "type": "string",
+          "format": "sha256"
+        },
+        "profile_survived": {
+          "const": true
+        }
+      }
+    },
+    "limitations": {
+      "type": "array",
+      "minItems": 4,
+      "uniqueItems": true,
+      "items": {
+        "type": "string",
+        "minLength": 1
+      }
+    },
+    "outcome": {
+      "const": "PASS"
+    },
+    "reason_codes": {
+      "type": "array",
+      "maxItems": 0
+    },
+    "created_at": {
+      "type": "string",
+      "minLength": 20,
+      "maxLength": 64
+    },
+    "report_sha256": {
+      "type": "string",
+      "format": "sha256"
+    },
+    "effective_config": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "project_name",
+        "project_type",
+        "runtime_product",
+        "default_branch",
+        "repository_visibility",
+        "pack_selected",
+        "pack_digest",
+        "pack_materialized"
+      ],
+      "properties": {
+        "project_name": {
+          "const": "ADWF Reference Web Consumer"
+        },
+        "project_type": {
+          "const": "react"
+        },
+        "runtime_product": {
+          "const": true
+        },
+        "default_branch": {
+          "const": "main"
+        },
+        "repository_visibility": {
+          "const": "PRIVATE"
+        },
+        "pack_selected": {
+          "const": "react"
+        },
+        "pack_digest": {
+          "type": "string",
+          "format": "sha256"
+        },
+        "pack_materialized": {
+          "const": true
+        }
+      }
+    }
+  }
+}

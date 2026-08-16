@@ -11,9 +11,9 @@
         ".github/workflows/**"
       ],
       "mode": "generated-status-block+manual",
-      "source_digest": "b8c456b8ae32e50723370aefd35d6883f4b7336f6bebbe475685e2c9310c4cb4",
-      "reviewed_at": "2026-08-16T09:08:00Z",
-      "valid_until": "2026-11-16T09:08:00Z"
+      "source_digest": "6b886ca187b9dc832f4b441bff7256b9950fc836170e7fd8dd0efc26ae6089ef",
+      "reviewed_at": "2026-08-16T10:17:04Z",
+      "valid_until": "2026-11-16T10:17:04Z"
     },
     {
       "path": "AGENTS.md",
@@ -24,9 +24,9 @@
         "skills/**"
       ],
       "mode": "manual-governance",
-      "source_digest": "e5feba169a3808a477ec7b6fef8ce474892f80de06c9d13501500579d367f078",
-      "reviewed_at": "2026-08-16T09:08:00Z",
-      "valid_until": "2026-11-16T09:08:00Z"
+      "source_digest": "5e83c34f86be05e3c4333414cf6f11b42a114d248e64bfba678eac96c3c18213",
+      "reviewed_at": "2026-08-16T10:17:04Z",
+      "valid_until": "2026-11-16T10:17:04Z"
     },
     {
       "path": "docs/architecture/CI_CD_ARCHITECTURE.md",
@@ -37,9 +37,9 @@
         ".adwf/scripts/**"
       ],
       "mode": "architecture",
-      "source_digest": "23c1b8c583887c8db15b12573291b9d8f02a7bc84e7c60598d3c3da798549c19",
-      "reviewed_at": "2026-08-16T09:08:00Z",
-      "valid_until": "2026-11-16T09:08:00Z"
+      "source_digest": "4e215097143ca4d7afd50abf25e507572475a55f50685a61484c89cab3728395",
+      "reviewed_at": "2026-08-16T10:17:04Z",
+      "valid_until": "2026-11-16T10:17:04Z"
     },
     {
       "path": "CONTROL_CENTER.md",
@@ -50,8 +50,8 @@
       ],
       "mode": "generated",
       "source_digest": "bf76d0c9ddcd11614474038c97c363480abdaa7bba2d46f2f65af1b6a1bed5f7",
-      "reviewed_at": "2026-08-16T09:08:00Z",
-      "valid_until": "2026-11-16T09:08:00Z"
+      "reviewed_at": "2026-08-16T10:17:04Z",
+      "valid_until": "2026-11-16T10:17:04Z"
     },
     {
       "path": "docs/V1_6_IMPLEMENTATION_REPORT.md",
@@ -65,9 +65,9 @@
         ".adwf/scripts/validate_capabilities.py"
       ],
       "mode": "implementation-certification",
-      "source_digest": "6d409d6f73a5341a74addf66ea6293e5142a93b1c877b76f1d27d2c2620d719d",
-      "reviewed_at": "2026-08-16T09:08:00Z",
-      "valid_until": "2026-11-16T09:08:00Z"
+      "source_digest": "da76bb6ac36fe3e25e582de1421513dc891a85fd99787417a051625c4cceb7fd",
+      "reviewed_at": "2026-08-16T10:17:04Z",
+      "valid_until": "2026-11-16T10:17:04Z"
     },
     {
       "path": "docs/operations/OWNER_AI_GUIDE.md",
@@ -79,8 +79,8 @@
       ],
       "mode": "owner-guide",
       "source_digest": "825bce6785f2038c6acd5cf1e48eb9a914a18fed713efa8eb2be6e28d104e2ed",
-      "reviewed_at": "2026-08-16T09:08:00Z",
-      "valid_until": "2026-11-16T09:08:00Z"
+      "reviewed_at": "2026-08-16T10:17:04Z",
+      "valid_until": "2026-11-16T10:17:04Z"
     },
     {
       "path": "docs/governance/RECOVERY_PLAYBOOK.md",
@@ -92,8 +92,8 @@
       ],
       "mode": "governance",
       "source_digest": "68f0c11d641d731c0a6560fe566f0aeb307aed37ed5bd812cf1773ef4ca7b3e4",
-      "reviewed_at": "2026-08-16T09:08:00Z",
-      "valid_until": "2026-11-16T09:08:00Z"
+      "reviewed_at": "2026-08-16T10:17:04Z",
+      "valid_until": "2026-11-16T10:17:04Z"
     },
     {
       "path": "docs/operations/FREE_LIMITS_AND_NOTIFICATIONS.md",
@@ -105,8 +105,8 @@
       ],
       "mode": "provider-facts",
       "source_digest": "61094eb026194041ef8d6e7dd8a0efc3c17182b12bbb3313cc6460ce342d60a9",
-      "reviewed_at": "2026-08-16T09:08:00Z",
-      "valid_until": "2026-11-16T09:08:00Z"
+      "reviewed_at": "2026-08-16T10:17:04Z",
+      "valid_until": "2026-11-16T10:17:04Z"
     },
     {
       "path": "docs/operations/SKILL_OPERATING_LAYER.md",
@@ -122,8 +122,8 @@
       ],
       "mode": "operations",
       "source_digest": "b73efed85abf805badba59d14e7328e81a3613d39892d641b8c4eb2d686cf566",
-      "reviewed_at": "2026-08-16T09:08:00Z",
-      "valid_until": "2026-11-16T09:08:00Z"
+      "reviewed_at": "2026-08-16T10:17:04Z",
+      "valid_until": "2026-11-16T10:17:04Z"
     },
     {
       "path": "docs/governance/AI_WORK_CONTRACTS.md",
@@ -138,8 +138,8 @@
       ],
       "mode": "governance",
       "source_digest": "252af6d74df0e9aee929aad28fe3f56ad33a6a6e7a4180cf2dc3f89180d9f4b5",
-      "reviewed_at": "2026-08-16T09:08:00Z",
-      "valid_until": "2026-11-16T09:08:00Z"
+      "reviewed_at": "2026-08-16T10:17:04Z",
+      "valid_until": "2026-11-16T10:17:04Z"
     },
     {
       "path": "docs/governance/DECISION_REQUIREMENT_TRACEABILITY.md",
@@ -153,9 +153,9 @@
         ".adwf/roadmap.json"
       ],
       "mode": "governance",
-      "source_digest": "78b33ae0264c3caf685bafe4ef9de5f3245ec57396dc96a409ce048b3168051f",
-      "reviewed_at": "2026-08-16T09:08:00Z",
-      "valid_until": "2026-11-16T09:08:00Z"
+      "source_digest": "65d9c4b3a5894a352ac6d1580b8f9bf27134d38016c7544bcff971d248b75a1d",
+      "reviewed_at": "2026-08-16T10:17:04Z",
+      "valid_until": "2026-11-16T10:17:04Z"
     },
     {
       "path": "docs/governance/PROJECT_PACK_SDK.md",
@@ -173,8 +173,8 @@
       ],
       "mode": "governance-contract",
       "source_digest": "ad84277cd6a08b01de26619952da0902d884336554cea6b0b76fb0e516e12257",
-      "reviewed_at": "2026-08-16T09:08:00Z",
-      "valid_until": "2026-11-16T09:08:00Z"
+      "reviewed_at": "2026-08-16T10:17:04Z",
+      "valid_until": "2026-11-16T10:17:04Z"
     },
     {
       "path": "docs/governance/PROJECT_RUNTIME_SAFETY.md",
@@ -192,8 +192,8 @@
       ],
       "mode": "governance-contract",
       "source_digest": "e34ee157f792e5ee7d33d9b65b77d6d026dbed90060c6479736ef9192d77e4c0",
-      "reviewed_at": "2026-08-16T09:08:00Z",
-      "valid_until": "2026-11-16T09:08:00Z"
+      "reviewed_at": "2026-08-16T10:17:04Z",
+      "valid_until": "2026-11-16T10:17:04Z"
     },
     {
       "path": "docs/governance/CONSUMER_PROFILE_CONTRACT.md",
@@ -210,9 +210,29 @@
         ".adwf/decision-requirement-traceability.json"
       ],
       "mode": "governance-contract",
-      "source_digest": "94255d6a1507446007a9551c36a1c43f0ae818584cbd7d13bbe60789b69a635d",
-      "reviewed_at": "2026-08-16T09:08:00Z",
-      "valid_until": "2026-11-16T09:08:00Z"
+      "source_digest": "57672367967b74d7e8c85f6dc61447e5aea7903fbde23c77a5f9abbd52d5aab2",
+      "reviewed_at": "2026-08-16T10:17:04Z",
+      "valid_until": "2026-11-16T10:17:04Z"
+    },
+    {
+      "path": "docs/governance/REFERENCE_WEB_CONFORMANCE.md",
+      "watched": [
+        ".adwf/lib/reference_conformance.py",
+        ".adwf/schemas/reference-conformance-report.schema.json",
+        ".adwf/scripts/reference_web_conformance.py",
+        ".adwf/tests/test_reference_web_conformance.py",
+        ".adwf/reference-consumers/web/**",
+        ".adwf/lib/managed_surface_transaction.py",
+        ".adwf/lib/project_execution.py",
+        ".adwf/lib/consumer_profile.py",
+        ".adwf/roadmap.json",
+        ".adwf/capability-traceability.json",
+        ".adwf/decision-requirement-traceability.json"
+      ],
+      "mode": "governance-contract",
+      "source_digest": "1f37fde63d9cbd5e1fdfa498dea4166104dcbd7ce3fe4f45c215d5ebef7eb534",
+      "reviewed_at": "2026-08-16T10:17:04Z",
+      "valid_until": "2026-11-16T10:17:04Z"
     }
   ]
 }

@@ -2,7 +2,7 @@
   "$schema": ".adwf/schemas/decision-requirement-traceability.schema.json",
   "schema_version": 1,
   "role": "CANONICAL_DECISION_REQUIREMENT_TRACEABILITY",
-  "revision": 8,
+  "revision": 9,
   "records": [
     {
       "id": "INTENT-FOUNDATION-20260815",
@@ -146,6 +146,28 @@
       "source_path": null,
       "source_sha256": null,
       "record_sha256": "d5dd145ba0cec666b0136a18c259273aa2ec55746231e5af20513e18148dcc77"
+    },
+    {
+      "id": "REQ-WEBREF-001",
+      "kind": "REQUIREMENT",
+      "version": 1,
+      "status": "ACTIVE",
+      "title_ru": "Стандартный Web consumer должен доказать ADWF lifecycle вне framework self-host",
+      "statement_ru": "На отдельном synthetic standard-web consumer необходимо machine-verifiably пройти exact-source transactional adoption, bounded consumer profile и React Project Pack binding, isolated project gates, exact-revision preview и guarded detach с сохранением consumer-owned data, не выдавая reference/CI evidence за real downstream LIVE_VERIFIED.",
+      "source_path": null,
+      "source_sha256": null,
+      "record_sha256": "0011fb1ca1cce25835b4b35877ab43a6f796ca6d7f5b1deff077268c17cfe3f5"
+    },
+    {
+      "id": "DEC-WEBREF-001",
+      "kind": "DECISION",
+      "version": 1,
+      "status": "ACCEPTED",
+      "title_ru": "Web reference conformance агрегирует существующие lifecycle/runtime evidence вместо второго evidence framework",
+      "statement_ru": "Использовать существующие Managed Surface journals/snapshot, sealed consumer profile, ProjectExecution evidence и preview attestation; добавить только self-sealed REFERENCE_CONFORMANCE_REPORT, который связывает authoritative refs. Network остаётся declaration-only, SHARED_GUARDED merge не добавляется, а reference re-adoption обязана использовать новый transaction identity, возникающий из distinct post-detach plan; это не считается универсальным upgrade/re-install contract.",
+      "source_path": null,
+      "source_sha256": null,
+      "record_sha256": "cc5aa430025aebbd4e572611211d0529f45e2a61350d05a0ab3caff7eeab6714"
     }
   ],
   "capability_refs": [
@@ -173,6 +195,11 @@
       "id": "CAPREF-CONSUMER-PROFILE-OVERLAY",
       "capability_id": "CONSUMER_PROFILE_OVERLAY",
       "ref_sha256": "e894adebd11d299b69db046a90ca591203588b63a9795bff6f190eda673c81cc"
+    },
+    {
+      "id": "CAPREF-REFERENCE-WEB-CONFORMANCE",
+      "capability_id": "REFERENCE_WEB_CONFORMANCE",
+      "ref_sha256": "668f3d5a8e0ebd26ea7b29b6605fe225707645f63c2b97d426e94f16e5cad5bf"
     }
   ],
   "work_unit_refs": [
@@ -231,6 +258,13 @@
       "issue_number": 72,
       "ai_work_package_id": null,
       "ref_sha256": "bb211adf2b6b55dada00f75507ff9b2ffc2a27cef40eac72b56bb807fce6e61e"
+    },
+    {
+      "id": "WORKREF-WEBREF-001",
+      "roadmap_id": "WEBREF-001",
+      "issue_number": 75,
+      "ai_work_package_id": null,
+      "ref_sha256": "92fadfcd13486f1d6e0497110992425b1e373c266fd3679e8d6ec8f852fc6462"
     }
   ],
   "evidence_refs": [],
@@ -423,7 +457,35 @@
       "from": "CAPREF-CONSUMER-PROFILE-OVERLAY",
       "to": "WORKREF-LIFECYCLE-005",
       "edge_sha256": "56594f6734f3fdcee6cbf65567039ac16b541d27ce4f24a8a7a64bae77cc15fe"
+    },
+    {
+      "id": "EDGE-INTENT-REQ-WEBREF-001",
+      "type": "INTENT_TO_REQUIREMENT",
+      "from": "INTENT-FOUNDATION-20260815",
+      "to": "REQ-WEBREF-001",
+      "edge_sha256": "8a2ba4957a97622c15ba7da2435343256fa494e640ede0e3a2b86445d544b673"
+    },
+    {
+      "id": "EDGE-REQ-DEC-WEBREF-001",
+      "type": "REQUIREMENT_TO_DECISION",
+      "from": "REQ-WEBREF-001",
+      "to": "DEC-WEBREF-001",
+      "edge_sha256": "5ee773bba520c4cb685bb5def0f2b081267de09a93bdcc6d617f81221e4b843a"
+    },
+    {
+      "id": "EDGE-DEC-CAP-WEBREF-001",
+      "type": "DECISION_TO_CAPABILITY",
+      "from": "DEC-WEBREF-001",
+      "to": "CAPREF-REFERENCE-WEB-CONFORMANCE",
+      "edge_sha256": "10c3329c7e2f0fa7355658ba91d9aacc8821e0479166c5556520d6a345409d96"
+    },
+    {
+      "id": "EDGE-CAP-WORK-WEBREF-001",
+      "type": "CAPABILITY_TO_WORK",
+      "from": "CAPREF-REFERENCE-WEB-CONFORMANCE",
+      "to": "WORKREF-WEBREF-001",
+      "edge_sha256": "2e182eead63a419749fa7e4d8b2a9fb214f7f02dd11060c66592839fa79afd20"
     }
   ],
-  "graph_sha256": "4c53fcdbb5c6722aec908f8171715e7e03d7977a2f45aa9a2e9a913dc75b6281"
+  "graph_sha256": "f226565ecf8e2b328f92d51ebb4a9b36aad305b32d31cb90878db255cab442d1"
 }
