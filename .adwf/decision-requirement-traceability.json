@@ -2,7 +2,7 @@
   "$schema": ".adwf/schemas/decision-requirement-traceability.schema.json",
   "schema_version": 1,
   "role": "CANONICAL_DECISION_REQUIREMENT_TRACEABILITY",
-  "revision": 4,
+  "revision": 5,
   "records": [
     {
       "id": "INTENT-FOUNDATION-20260815",
@@ -80,6 +80,28 @@
       "source_path": null,
       "source_sha256": null,
       "record_sha256": "c61beabbce0b4c2f135752bbfda2fbed79705f174ab9983c7df035a5b4df4ae1"
+    },
+    {
+      "id": "REQ-PACKSDK-001",
+      "kind": "REQUIREMENT",
+      "version": 1,
+      "status": "ACTIVE",
+      "title_ru": "Project Pack должен быть формальным безопасным SDK contract",
+      "statement_ru": "Любой Project Pack обязан пройти строгую versioned schema/semantic validation до detection/materialization и не может декларацией расширить command, provider, secret, network, monetary или consumer-data authority.",
+      "source_path": null,
+      "source_sha256": null,
+      "record_sha256": "89f9e149898a6f8551e413320ffa1e4002ef9c000dd73c223bd40ae6380fda3d"
+    },
+    {
+      "id": "DEC-PACKSDK-001",
+      "kind": "DECISION",
+      "version": 1,
+      "status": "ACCEPTED",
+      "title_ru": "Pack definition является requirement declaration, а не authority grant",
+      "statement_ru": "Ввести ProjectPackDefinition v1 с exact digest, bounded command/detection/preview fields и mandatory FREE_ONLY/secret/network/environment/data declarations; materializer переносит только разрешённую projection, а реальные permissions остаются у существующих ADWF policy/Managed Surface boundaries.",
+      "source_path": null,
+      "source_sha256": null,
+      "record_sha256": "f21064652a42364530ade11fbec9234052ed12512d40d9082257530824d42e67"
     }
   ],
   "capability_refs": [
@@ -92,6 +114,11 @@
       "id": "CAPREF-MANAGED-SURFACE-CONTRACT",
       "capability_id": "MANAGED_SURFACE_CONTRACT",
       "ref_sha256": "64ea9428a747adceaa185fe673782f49f8437371a527856382f3b638ed1124e9"
+    },
+    {
+      "id": "CAPREF-PROJECT-PACKS",
+      "capability_id": "PROJECT_PACKS",
+      "ref_sha256": "fe2bc5b3d913f52c38249fe11db8122b7ecd4959b7f1f91b9a8e71c0c5c99205"
     }
   ],
   "work_unit_refs": [
@@ -122,6 +149,13 @@
       "issue_number": 64,
       "ai_work_package_id": null,
       "ref_sha256": "b902ed92cb6fb7e58b7710f8531e34f7d1e599ec4bcd61a620c2d4712c59cdb8"
+    },
+    {
+      "id": "WORKREF-PACKSDK-001",
+      "roadmap_id": "PACKSDK-001",
+      "issue_number": 66,
+      "ai_work_package_id": null,
+      "ref_sha256": "6c602509b44fd6ed1d10c9358d0ec19f7aa78277cf65a44698c0ea64f68e3c12"
     }
   ],
   "evidence_refs": [],
@@ -223,7 +257,35 @@
       "from": "CAPREF-MANAGED-SURFACE-CONTRACT",
       "to": "WORKREF-LIFECYCLE-003",
       "edge_sha256": "4708a72da8c452ccb390c58491ceeb71e4078e508caab7ec9fc963bfcff8a350"
+    },
+    {
+      "id": "EDGE-INTENT-REQ-PACKSDK-001",
+      "type": "INTENT_TO_REQUIREMENT",
+      "from": "INTENT-FOUNDATION-20260815",
+      "to": "REQ-PACKSDK-001",
+      "edge_sha256": "5675e2ef5f037ab98b848b166beae5c46a6cc61adba34dde065ad77ae016447e"
+    },
+    {
+      "id": "EDGE-REQ-DEC-PACKSDK-001",
+      "type": "REQUIREMENT_TO_DECISION",
+      "from": "REQ-PACKSDK-001",
+      "to": "DEC-PACKSDK-001",
+      "edge_sha256": "91ce21b22f732956aa359466079fd0aa3cdeb25522d5b3f553e467dd9555e228"
+    },
+    {
+      "id": "EDGE-DEC-CAP-PACKSDK-001",
+      "type": "DECISION_TO_CAPABILITY",
+      "from": "DEC-PACKSDK-001",
+      "to": "CAPREF-PROJECT-PACKS",
+      "edge_sha256": "36a4768b35680790914bbc7161ce794b1cd3661959bc646bfa6ae4943bcf3008"
+    },
+    {
+      "id": "EDGE-CAP-WORK-PACKSDK-001",
+      "type": "CAPABILITY_TO_WORK",
+      "from": "CAPREF-PROJECT-PACKS",
+      "to": "WORKREF-PACKSDK-001",
+      "edge_sha256": "3b199d2f391e09be82a02094a7a15a6378d177f98f82cf969b5db90dcbc64e4b"
     }
   ],
-  "graph_sha256": "e212a8e6d0e7ad91840454463a94729194f0cc47ed6eb2dc1221df651933f85b"
+  "graph_sha256": "0e084384c208f79d26bc0c175d4c6c3d0e3c79615c1d23135f09789c8b1d777f"
 }

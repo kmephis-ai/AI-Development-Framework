@@ -1108,6 +1108,59 @@
         },
         "preview": {
           "type": "object"
+        },
+        "selected_digest": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "format": "sha256"
+        },
+        "safety": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "monetary_budget_usd",
+            "secrets",
+            "network",
+            "environment",
+            "data_access"
+          ],
+          "properties": {
+            "monetary_budget_usd": {
+              "const": 0
+            },
+            "secrets": {
+              "const": "FORBIDDEN"
+            },
+            "network": {
+              "enum": [
+                "NONE",
+                "LOOPBACK",
+                "PACKAGE_REGISTRY",
+                "PACKAGE_REGISTRY_AND_LOOPBACK"
+              ]
+            },
+            "environment": {
+              "const": "PROCESS_MINIMAL"
+            },
+            "data_access": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "read_scope",
+                "write_scope"
+              ],
+              "properties": {
+                "read_scope": {
+                  "const": "PROJECT_TREE"
+                },
+                "write_scope": {
+                  "const": "TOOL_OUTPUTS_ONLY"
+                }
+              }
+            }
+          }
         }
       }
     },
