@@ -115,7 +115,7 @@ jobs:
           python .adwf/scripts/validate_managed_surface.py
           python .adwf/scripts/validate_project_packs.py
           python .adwf/scripts/validate_framework.py
-          TERM=xterm python .adwf/adwf.py self-test | tee /tmp/webref-selftest.log
+          TERM=xterm python .adwf/adwf.py self-test 2>&1 | tee /tmp/webref-selftest.log
           grep -Eq 'Ran 437 tests in ' /tmp/webref-selftest.log
           grep -Fxq 'OK' /tmp/webref-selftest.log
           test -z "$(git status --porcelain)"
@@ -129,7 +129,6 @@ jobs:
           python - <<'PY'
           import json, os
           from pathlib import Path
-          from importlib import util
           import sys
           sys.path.insert(0, '/tmp/webref-candidate/.adwf')
           from lib.reference_conformance import LIMITATIONS, validate_reference_conformance_report
