@@ -1,0 +1,245 @@
+-        ".adwf/scripts/validate_project_packs.py"
++        ".adwf/scripts/validate_project_packs.py",
++        ".adwf/lib/project_execution.py",
++        ".adwf/scripts/run_project_gates.py",
++        ".adwf/scripts/run_preview.py"
+       ],
+       "mode": "governance-contract",
+-      "source_digest": "08028f77fe2ab3731fd08821e198ddfccbe426cc671d4cd410f759e41482ea42",
+-      "reviewed_at": "2026-08-16T07:00:00Z",
+-      "valid_until": "2026-11-16T07:00:00Z"
++      "source_digest": "e6dfcfe880c0cfeec373559ab05ce5f83200ac4e3f22daee2535a1da985ee2c2",
++      "reviewed_at": "2026-08-16T07:35:00Z",
++      "valid_until": "2026-11-16T07:35:00Z"
++    },
++    {
++      "path": "docs/governance/PROJECT_RUNTIME_SAFETY.md",
++      "watched": [
++        ".adwf/lib/project_execution.py",
++        ".adwf/lib/preview_engine.py",
++        ".adwf/scripts/run_project_gates.py",
++        ".adwf/scripts/run_preview.py",
++        ".adwf/schemas/project-execution-evidence.schema.json",
++        ".adwf/tests/test_project_execution_safety.py",
++        ".adwf/lib/project_packs.py",
++        ".adwf/lib/pack_materializer.py"
++      ],
++      "mode": "governance-contract",
++      "source_digest": "eccd2d32561f461ba092337245a4589c42028bd262ab11a0047c06a403fb8b13",
++      "reviewed_at": "2026-08-16T07:35:00Z",
++      "valid_until": "2026-11-16T07:35:00Z"
+     }
+   ]
+ }
+diff --git a/.adwf/lib/preview_engine.py b/.adwf/lib/preview_engine.py
+index 96cef43..c271014 100644
+--- a/.adwf/lib/preview_engine.py
++++ b/.adwf/lib/preview_engine.py
+@@ -34,7 +34,8 @@ def _source_attestation(project:Path,url:str,head_sha:str,provided:dict[str,Any]
+     return {'mode':'REMOTE_PROVIDER_ATTESTED','verified':True,'head_sha':head_sha,'deployment_id':att.get('deployment_id'),'provider':att.get('provider'),'readback_id':att.get('readback_id')}
+ 
+ def capture_preview(root:str|Path,*,url:str,head_sha:str,baseline_url:str|None=None,output_dir:str|Path|None=None,install:bool=False,
+-                    command_runner:Callable[[list[str],Path,int],subprocess.CompletedProcess[str]]|None=None,source_attestation:dict[str,Any]|None=None)->dict[str,Any]:
++                    command_runner:Callable[[list[str],Path,int],subprocess.CompletedProcess[str]]|None=None,source_attestation:dict[str,Any]|None=None,
++                    runtime_root:str|Path|None=None)->dict[str,Any]:
+     if SHA.fullmatch(str(head_sha)) is None:raise ValueError('PREVIEW_SHA_INVALID')
+     target_url=validate_preview_url(url);base_url=validate_preview_url(baseline_url) if baseline_url else None
+     project=Path(root).resolve();attestation=_source_attestation(project,target_url,head_sha,source_attestation)
+@@ -68,6 +69,9 @@ def capture_preview(root:str|Path,*,url:str,head_sha:str,baseline_url:str|None=N
+     if provider.is_file():
+         try:refs=list(json.loads(provider.read_text(encoding='utf-8')).get('evidence_refs') or [])
+         except Exception:refs=[]
+-    att_file={'schema_version':1,'attestation_id':manifest['attestation_id'],'head_sha':head_sha,'preview_digest':manifest['preview_digest'],'source_attestation':attestation,'runtime_environment':runtime,'evidence_refs':refs,'manifest_path':str((out/'preview-manifest.json').relative_to(project)) if project in (out/'preview-manifest.json').parents else str(out/'preview-manifest.json')}
+-    runtime_path=project/'.adwf-runtime/preview-attestation.json';runtime_path.parent.mkdir(parents=True,exist_ok=True);runtime_path.write_text(json.dumps(att_file,ensure_ascii=False,indent=2)+'\n',encoding='utf-8')
++    runtime_base=Path(runtime_root).resolve() if runtime_root is not None else project
++    manifest_file=(out/'preview-manifest.json').resolve()
++    manifest_path=str(manifest_file.relative_to(runtime_base)) if runtime_base in manifest_file.parents else (str(manifest_file.relative_to(project)) if project in manifest_file.parents else manifest_file.name)
++    att_file={'schema_version':1,'attestation_id':manifest['attestation_id'],'head_sha':head_sha,'preview_digest':manifest['preview_digest'],'source_attestation':attestation,'runtime_environment':runtime,'evidence_refs':refs,'manifest_path':manifest_path}
++    runtime_path=runtime_base/'.adwf-runtime/preview-attestation.json';runtime_path.parent.mkdir(parents=True,exist_ok=True);runtime_path.write_text(json.dumps(att_file,ensure_ascii=False,indent=2)+'\n',encoding='utf-8')
+     return manifest
+diff --git a/.adwf/lib/project_execution.py b/.adwf/lib/project_execution.py
+new file mode 100644
+index 0000000..3cf2cfe
+--- /dev/null
++++ b/.adwf/lib/project_execution.py
+@@ -0,0 +1,473 @@
++"""Fail-closed execution envelope for consumer Project Pack commands.
++
++The envelope enforces properties that are portable and observable in ADWF v1:
++- exact validated Project Pack/config binding;
++- a minimal child environment that does not inherit secret-like variables;
++- execution in an independent local Git clone of the exact source revision;
++- post-command proof that the canonical checkout was not mutated;
++- machine-readable self-sealed runtime evidence.
++
++Network declarations remain requirements. This module deliberately does not claim
++packet/domain confinement where the host provides no verified sandbox primitive.
++"""
++from __future__ import annotations
++
++from dataclasses import dataclass
++from datetime import datetime, timezone
++from pathlib import Path
++from typing import Any
++import copy
++import hashlib
++import json
++import os
++import re
++import shutil
++import subprocess
++import tempfile
++import uuid
++
++from .contracts import validate
++from .project_packs import commands_for_pack
++from .strict_json import loads as strict_loads
++
++SHA40 = re.compile(r"^[0-9a-f]{40}$")
++SHA256 = re.compile(r"^[0-9a-f]{64}$")
++SECRET_NAME = re.compile(
++    r"(?i)(?:^|_)(?:api[_-]?key|access[_-]?token|auth(?:orization)?|bearer|client[_-]?secret|credential|cookie|password|passwd|private[_-]?key|secret|session|token)(?:_|$)"
++)
++SAFE_INHERITED_ENV = (
++    "PATH", "PATHEXT", "SYSTEMROOT", "WINDIR", "COMSPEC", "LANG", "LC_ALL", "TERM",
++)
++NETWORK_ENFORCEMENT = "DECLARATION_ONLY_NOT_ENFORCED"
++
++
++class ProjectExecutionError(ValueError):
++    """Deterministic runtime-safety blocker."""
++
++
++def _canonical(value: Any) -> bytes:
++    return json.dumps(value, ensure_ascii=False, sort_keys=True, separators=(",", ":")).encode("utf-8")
++
++
++def _sha256(value: Any) -> str:
++    return hashlib.sha256(_canonical(value)).hexdigest()
++
++
++def _run_git(root: Path, *args: str, env: dict[str, str] | None = None) -> subprocess.CompletedProcess[str]:
++    proc = subprocess.run(
++        ["git", *args], cwd=root, env=env, text=True, capture_output=True, check=False, timeout=60,
++    )
++    if proc.returncode:
++        raise ProjectExecutionError(f"PROJECT_EXECUTION_GIT_FAILED:{args[0]}")
++    return proc
++
++
++def _git_identity(root: Path) -> tuple[str, str]:
++    head = _run_git(root, "rev-parse", "HEAD").stdout.strip()
++    tree = _run_git(root, "rev-parse", "HEAD^{tree}").stdout.strip()
++    if not SHA40.fullmatch(head) or not SHA40.fullmatch(tree):
++        raise ProjectExecutionError("PROJECT_EXECUTION_GIT_IDENTITY_INVALID")
++    return head, tree
++
++
++def _git_clean(root: Path) -> bool:
++    return not _run_git(root, "status", "--porcelain=v1", "--untracked-files=all").stdout.strip()
++
++
++def _tracked_dirty(root: Path) -> bool:
++    unstaged = subprocess.run(["git", "diff", "--quiet"], cwd=root, check=False).returncode != 0
++    staged = subprocess.run(["git", "diff", "--cached", "--quiet"], cwd=root, check=False).returncode != 0
++    return unstaged or staged
++
++
++def _status_counts(root: Path) -> tuple[int, int]:
++    text = _run_git(root, "status", "--porcelain=v1", "--untracked-files=all").stdout
++    tracked = 0
++    untracked = 0
++    for line in text.splitlines():
++        if line.startswith("??"):
++            untracked += 1
++        elif line.strip():
++            tracked += 1
++    return tracked, untracked
++
++
++def _strict_object(path: Path, code: str) -> dict[str, Any]:
++    try:
++        value = strict_loads(path.read_text(encoding="utf-8"))
++    except Exception as exc:
++        raise ProjectExecutionError(code + ":" + type(exc).__name__) from exc
++    if not isinstance(value, dict):
++        raise ProjectExecutionError(code + ":OBJECT_REQUIRED")
++    return value
++
++
++def _validate_config(config: dict[str, Any], framework_root: Path) -> None:
++    schema = _strict_object(framework_root / ".adwf/schemas/config.schema.json", "PROJECT_CONFIG_SCHEMA_INVALID")
++    findings = validate(config, schema)
++    if findings:
++        raise ProjectExecutionError("PROJECT_CONFIG_SCHEMA_MISMATCH")
++
++
++def load_bound_project_pack(project_root: str | Path, framework_root: str | Path) -> dict[str, Any]:
++    """Return a pack binding only when canonical config matches current validated pack truth."""
++    project = Path(project_root).resolve()
++    framework = Path(framework_root).resolve()
++    config = _strict_object(framework / ".adwf/config.json", "PROJECT_CONFIG_INVALID")
++    _validate_config(config, framework)
++    pp = config.get("project_packs") or {}
++    if pp.get("materialized") is not True:
++        raise ProjectExecutionError("PROJECT_PACK_RUNTIME_BINDING_REQUIRED")
++    selected = pp.get("selected")
++    selected_digest = pp.get("selected_digest")
++    materialized_safety = pp.get("safety")
++    if not isinstance(selected, str) or not selected or not isinstance(selected_digest, str) or not SHA256.fullmatch(selected_digest):
++        raise ProjectExecutionError("PROJECT_PACK_RUNTIME_BINDING_INVALID")
++    current = commands_for_pack(project, framework)
++    if current.get("pack") != selected:
++        raise ProjectExecutionError("PROJECT_PACK_SELECTED_DETECTION_MISMATCH")
++    if current.get("pack_digest") != selected_digest:
++        raise ProjectExecutionError("PROJECT_PACK_DIGEST_MISMATCH")
++    if current.get("safety") != materialized_safety:
++        raise ProjectExecutionError("PROJECT_PACK_SAFETY_MISMATCH")
++    safety = current.get("safety") or {}
++    if safety.get("monetary_budget_usd") != 0 or safety.get("secrets") != "FORBIDDEN" or safety.get("environment") != "PROCESS_MINIMAL":
++        raise ProjectExecutionError("PROJECT_PACK_RUNTIME_SAFETY_INVALID")
++    data_access = safety.get("data_access") or {}
++    if data_access != {"read_scope": "PROJECT_TREE", "write_scope": "TOOL_OUTPUTS_ONLY"}:
++        raise ProjectExecutionError("PROJECT_PACK_DATA_ACCESS_INVALID")
++    return {
++        "config": config,
++        "pack": selected,
++        "pack_digest": selected_digest,
++        "commands": current.get("commands") or {},
++        "preview": current.get("preview") or {},
++        "safety": copy.deepcopy(safety),
++    }
++
++
++def _minimal_environment(home: Path, scratch: Path) -> dict[str, str]:
++    env: dict[str, str] = {}
++    for name in SAFE_INHERITED_ENV:
++        value = os.environ.get(name)
++        if value and not SECRET_NAME.search(name):
++            env[name] = value
++    home.mkdir(parents=True, exist_ok=True)
++    scratch.mkdir(parents=True, exist_ok=True)
++    env.update({
++        "HOME": str(home),
++        "USERPROFILE": str(home),
++        "TMP": str(scratch),
++        "TEMP": str(scratch),
++        "TMPDIR": str(scratch),
++        "XDG_CACHE_HOME": str(scratch / "xdg-cache"),
++        "PIP_CACHE_DIR": str(scratch / "pip-cache"),
++        "NPM_CONFIG_CACHE": str(scratch / "npm-cache"),
++        "GOCACHE": str(scratch / "go-build-cache"),
++        "GOMODCACHE": str(scratch / "go-mod-cache"),
++        "CI": "true",
++        "ADWF_PROJECT_EXECUTION": "1",
++        "GIT_TERMINAL_PROMPT": "0",
++        "GCM_INTERACTIVE": "Never",
++        "GIT_CONFIG_NOSYSTEM": "1",
++    })
++    if any(SECRET_NAME.search(name) for name in env):
++        raise ProjectExecutionError("PROJECT_EXECUTION_SECRET_ENV_NAME_PRESENT")
++    return env
++
++
++def _seal_evidence(value: dict[str, Any]) -> dict[str, Any]:
++    sealed = copy.deepcopy(value)
