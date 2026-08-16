@@ -1,0 +1,167 @@
+name: ADWF ASREF-001 Provider Certification
+
+on:
+  push:
+    branches:
+      - agent/materialize-asref001-20260816-2ec71613
+
+permissions:
+  contents: write
+
+env:
+  EXPECTED_BASE: 3537cc005ebaaaa6aa9d65f678cb917bc4150963
+  EXPECTED_TREE: 1afc5c5c142e1a37edf1ab90822d8562ec32554d
+  EXPECTED_PATCH_SHA256: 9ac8ccd94d6dcb62d3d00e5f998151dd916f86862049a46c1d2bb657ff344a5f
+  TARGET_BRANCH: agent/asref-001-apps-script-conformance
+
+jobs:
+  certify-publish:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-python@a309ff8b426b58ec0e2a45f0f869d46889d02405
+        with:
+          python-version: '3.13'
+
+      - name: Reconstruct exact candidate and verify immutable binding
+        shell: bash
+        run: |
+          set -euo pipefail
+          git fetch origin main "${TARGET_BRANCH}"
+          test "$(git rev-parse origin/main)" = "${EXPECTED_BASE}"
+          test "$(git rev-parse "origin/${TARGET_BRANCH}")" = "${EXPECTED_BASE}"
+
+          cat \
+            .transport/asref001/patch.b64.00a \
+            .transport/asref001/patch.b64.00b0 \
+            .transport/asref001/patch.b64.00b1 \
+            .transport/asref001/patch.b64.00b2 \
+            .transport/asref001/patch.b64.00b30 \
+            .transport/asref001/patch.b64.00b31 \
+            .transport/asref001/patch.b64.00b32 \
+            .transport/asref001/patch.b64.00b33 \
+            .transport/asref001/patch.b64.01 \
+            .transport/asref001/patch.b64.02 \
+            .transport/asref001/patch.b64.03a \
+            .transport/asref001/patch.b64.03b \
+            .transport/asref001/patch.b64.04 \
+            > /tmp/asref.patch.gz.b64
+          test "$(wc -c < /tmp/asref.patch.gz.b64 | tr -d ' ')" = "36972"
+          base64 -d /tmp/asref.patch.gz.b64 > /tmp/asref.patch.gz
+          gzip -dc /tmp/asref.patch.gz > /tmp/asref.patch
+          test "$(sha256sum /tmp/asref.patch | awk '{print $1}')" = "${EXPECTED_PATCH_SHA256}"
+
+          git reset --hard "${EXPECTED_BASE}"
+          git apply --check /tmp/asref.patch
+          git apply /tmp/asref.patch
+          git diff --name-only | sort > /tmp/actual-files.txt
+          cat > /tmp/expected-files.txt <<'FILES'
+          .adwf/capability-traceability.json
+          .adwf/decision-requirement-traceability.json
+          .adwf/docs-registry.json
+          .adwf/lib/project_packs.py
+          .adwf/lib/reference_conformance.py
+          .adwf/packs/apps-script.json
+          .adwf/reference-consumers/apps-script/ASREF.md
+          .adwf/reference-consumers/apps-script/Code.gs
+          .adwf/reference-consumers/apps-script/appsscript.json
+          .adwf/reference-consumers/apps-script/fixtures/operations.json
+          .adwf/reference-consumers/apps-script/package.json
+          .adwf/reference-consumers/apps-script/scripts/check.mjs
+          .adwf/roadmap.json
+          .adwf/schemas/reference-conformance-report.schema.json
+          .adwf/scripts/reference_apps_script_conformance.py
+          .adwf/tests/test_project_pack_sdk.py
+          .adwf/tests/test_reference_apps_script_conformance.py
+          MANIFEST.json
+          SHA256SUMS.txt
+          docs/governance/PROJECT_PACK_SDK.md
+          docs/governance/REFERENCE_APPS_SCRIPT_CONFORMANCE.md
+          docs/governance/REFERENCE_WEB_CONFORMANCE.md
+          FILES
+          diff -u /tmp/expected-files.txt /tmp/actual-files.txt
+          git add -A
+          test "$(git write-tree)" = "${EXPECTED_TREE}"
+          git config user.email 'adwf-provider@example.invalid'
+          git config user.name 'ADWF Provider Certification'
+          git commit -m 'ASREF-001: add Apps Script reference conformance'
+          echo "CANDIDATE_SHA=$(git rev-parse HEAD)" >> "$GITHUB_ENV"
+
+      - name: Focused ASREF and canonical validators
+        shell: bash
+        run: |
+          set -euo pipefail
+          node --version
+          npm --version
+          python .adwf/tests/test_project_pack_sdk.py
+          python .adwf/tests/test_reference_apps_script_conformance.py
+          python .adwf/tests/test_reference_web_conformance.py
+          python .adwf/scripts/validate_capability_truth.py
+          python .adwf/scripts/validate_decision_requirement_traceability.py
+          python .adwf/scripts/docs_freshness.py
+          python .adwf/scripts/generate_manifest.py --check
+          python .adwf/scripts/validate_framework.py
+          test -z "$(git status --porcelain)"
+
+      - name: Full-framework Apps Script reference conformance
+        shell: bash
+        run: |
+          set -euo pipefail
+          timeout 600 python .adwf/scripts/reference_apps_script_conformance.py --output "$RUNNER_TEMP/asref-report.json" > "$RUNNER_TEMP/asref-output.txt"
+          python - <<'PY'
+          import json, os
+          from pathlib import Path
+          report=json.loads((Path(os.environ['RUNNER_TEMP'])/'asref-report.json').read_text())
+          assert report['outcome']=='PASS'
+          assert report['consumer_class']=='APPS_SCRIPT_DATA_CENTRIC'
+          assert report['reference_kind']=='SYNTHETIC_REFERENCE_CONSUMER'
+          assert report['framework']['source_tree']==os.environ['EXPECTED_TREE']
+          assert report['pack']['id']=='apps-script'
+          assert report['pack']['network_enforcement']=='DECLARATION_ONLY'
+          assert report['preview']['status']=='NOT_APPLICABLE'
+          assert report['functional']['status']=='PASS'
+          assert report['functional']['mode']=='LOCAL_DETERMINISTIC_APPS_SCRIPT_SHIM'
+          assert report['functional']['google_credentials_required'] is False
+          assert report['functional']['external_network_required'] is False
+          assert report['preservation']['profile_survived'] is True
+          assert report['readoption']['transaction_identity_changed'] is True
+          assert 'GOOGLE_APPS_SCRIPT_RUNTIME_NOT_EXECUTED' in report['limitations']
+          assert 'GOOGLE_PROVIDER_NOT_VERIFIED' in report['limitations']
+          print('ASREF_FULL_FRAMEWORK=PASS')
+          print('ASREF_REPORT_SHA256='+report['report_sha256'])
+          PY
+          test -z "$(git status --porcelain)"
+
+      - name: Full self-test and exact BASE trust classification
+        shell: bash
+        run: |
+          set -euo pipefail
+          python .adwf/adwf.py self-test
+          test -z "$(git status --porcelain)"
+          git worktree add --detach /tmp/adwf-base "${EXPECTED_BASE}"
+          PYTHONPATH=/tmp/adwf-base/.adwf python - <<'PY'
+          import json, os, sys
+          sys.path.insert(0, '/tmp/adwf-base/.adwf')
+          from lib.trust import classify_git_diff
+          result=classify_git_diff(os.environ['GITHUB_WORKSPACE'],os.environ['EXPECTED_BASE'],os.environ['CANDIDATE_SHA'])
+          print(json.dumps(result,sort_keys=True))
+          assert result['result']=='ALLOW'
+          assert result['authorization_mode']=='STANDING_OWNER_POLICY'
+          assert result['human_required'] is False
+          assert result['manual_required_files']==[]
+          assert result['weakening']==[]
+          assert result['reason_codes']==[]
+          PY
+
+      - name: Final CAS and atomic writer publication
+        shell: bash
+        run: |
+          set -euo pipefail
+          git fetch origin main "${TARGET_BRANCH}"
+          test "$(git rev-parse origin/main)" = "${EXPECTED_BASE}"
+          test "$(git rev-parse "origin/${TARGET_BRANCH}")" = "${EXPECTED_BASE}"
+          test "$(git rev-parse HEAD^{tree})" = "${EXPECTED_TREE}"
+          git push origin "HEAD:refs/heads/${TARGET_BRANCH}"
