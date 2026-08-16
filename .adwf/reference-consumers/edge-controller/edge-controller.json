@@ -1,0 +1,7 @@
+{
+  "schema_version": 1,
+  "runtime": "LOCAL_JS_EDGE_CONTROLLER_V1",
+  "entrypoint": "rules/controller.js",
+  "network": "NONE",
+  "deployment": "NONE"
+}

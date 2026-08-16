@@ -445,6 +445,27 @@
       "live_evidence": []
     },
     {
+      "id": "REFERENCE_EDGE_CONFORMANCE",
+      "status": "LIVE_NOT_VERIFIED",
+      "execution_mode": "CORE",
+      "owner_claim_ru": "ADWF может прогнать synthetic local-only Edge Controller consumer через transactional adoption, sealed consumer profile/edge-controller Project Pack, isolated exact-revision gates, deterministic rule proof и guarded detach без SSH, device deployment или ложного hardware claim.",
+      "entrypoints": [
+        ".adwf/scripts/reference_edge_conformance.py"
+      ],
+      "production_paths": [
+        ".adwf/lib/reference_conformance.py",
+        ".adwf/schemas/reference-conformance-report.schema.json",
+        ".adwf/packs/edge-controller.json",
+        ".adwf/reference-consumers/edge-controller"
+      ],
+      "verification": [
+        ".adwf/tests/test_reference_edge_conformance.py",
+        ".adwf/tests/test_project_pack_sdk.py"
+      ],
+      "live_boundary": "REFERENCE_CONFORMANCE_REPORT доказывает только built-in synthetic/local Edge Controller path. LIVE_VERIFIED требует отдельный реальный downstream edge consumer и device/provider runtime evidence, привязанные к exact consumer revision и edge-controller pack digest; local fixture/CI, отсутствие SSH и отсутствие hardware I/O не являются physical-device certification.",
+      "live_evidence": []
+    },
+    {
       "id": "CONSUMER_FRAMEWORK_UPGRADE_PLANNING",
       "status": "LIVE_VERIFIED",
       "execution_mode": "CORE",

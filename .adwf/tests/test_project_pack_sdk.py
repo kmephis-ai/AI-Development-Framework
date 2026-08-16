@@ -31,7 +31,7 @@ class ProjectPackSdkTests(unittest.TestCase):
 
     def test_all_builtin_packs_are_strict_and_digest_stable(self):
         a=load_packs(ROOT);b=load_packs(ROOT)
-        self.assertEqual(set(a),{'apps-script','react','vue','angular','fastapi','node','python','go'})
+        self.assertEqual(set(a),{'apps-script','edge-controller','react','vue','angular','fastapi','node','python','go'})
         self.assertEqual({k:v['digest'] for k,v in a.items()},{k:v['digest'] for k,v in b.items()})
         self.assertTrue(all(len(v['digest'])==64 for v in a.values()))
 
@@ -65,6 +65,30 @@ class ProjectPackSdkTests(unittest.TestCase):
         self.assertIn('APPS_SCRIPT_NETWORK_MUST_BE_NONE',errors)
         self.assertIn('APPS_SCRIPT_INSTALL_COMMAND_FORBIDDEN',errors)
         self.assertIn('APPS_SCRIPT_PREVIEW_RUNTIME_FORBIDDEN',errors)
+
+    def test_edge_controller_marker_wins_over_node_and_has_no_external_runtime_authority(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            p=Path(tmp)
+            (p/'edge-controller.json').write_text('{"schema_version":1}\n',encoding='utf-8')
+            (p/'package.json').write_text(json.dumps({'scripts':{'lint':'node x','test':'node x','build':'node x'}}),encoding='utf-8')
+            out=detect_pack(p,ROOT)
+            self.assertEqual(out['pack'],'edge-controller')
+            self.assertEqual(out['candidates'][:2],['edge-controller','node'])
+            definition=out['definition']
+            self.assertEqual(definition['safety']['network'],'NONE')
+            self.assertNotIn('install',definition['commands'])
+            self.assertNotIn('start',definition['commands'])
+            self.assertEqual(definition['preview'],{})
+
+    def test_edge_controller_pack_rejects_network_install_preview_or_command_expansion(self):
+        definition=copy.deepcopy(load_packs(ROOT)['edge-controller']['definition'])
+        definition['safety']['network']='PACKAGE_REGISTRY'
+        definition['commands']['install']={'command':['npm','ci'],'phases':['pr']}
+        definition['preview']={'default_url':'http://127.0.0.1:4173'}
+        errors=validate_pack_definition(definition,ROOT,path=Path('edge-controller.json'))
+        self.assertIn('EDGE_CONTROLLER_NETWORK_MUST_BE_NONE',errors)
+        self.assertIn('EDGE_CONTROLLER_COMMAND_AUTHORITY_FORBIDDEN',errors)
+        self.assertIn('EDGE_CONTROLLER_EXTERNAL_RUNTIME_FORBIDDEN',errors)
 
     def test_fastapi_contains_detection_is_definition_driven(self):
         with tempfile.TemporaryDirectory() as tmp:

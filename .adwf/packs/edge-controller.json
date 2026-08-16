@@ -1,0 +1,59 @@
+{
+  "$schema": ".adwf/schemas/project-pack.schema.json",
+  "schema_version": 1,
+  "role": "PROJECT_PACK_DEFINITION",
+  "id": "edge-controller",
+  "language": "javascript",
+  "detect": {
+    "files": [
+      "edge-controller.json"
+    ]
+  },
+  "commands": {
+    "lint": {
+      "command": [
+        "npm",
+        "run",
+        "lint"
+      ],
+      "requires_script": "lint",
+      "phases": [
+        "pr"
+      ]
+    },
+    "unit": {
+      "command": [
+        "npm",
+        "test"
+      ],
+      "requires_script": "test",
+      "phases": [
+        "pr",
+        "main"
+      ]
+    },
+    "build": {
+      "command": [
+        "npm",
+        "run",
+        "build"
+      ],
+      "requires_script": "build",
+      "phases": [
+        "pr",
+        "main"
+      ]
+    }
+  },
+  "preview": {},
+  "safety": {
+    "monetary_budget_usd": 0,
+    "secrets": "FORBIDDEN",
+    "network": "NONE",
+    "environment": "PROCESS_MINIMAL",
+    "data_access": {
+      "read_scope": "PROJECT_TREE",
+      "write_scope": "TOOL_OUTPUTS_ONLY"
+    }
+  }
+}

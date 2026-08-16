@@ -206,6 +206,14 @@
             "UPGRADE-003"
           ],
           "product_impact": false
+        },
+        {
+          "roadmap_id": "EDGEREF-001",
+          "title_ru": "Reference Edge Controller End-to-End Conformance v1",
+          "dependencies": [
+            "GOV-021"
+          ],
+          "product_impact": false
         }
       ]
     }

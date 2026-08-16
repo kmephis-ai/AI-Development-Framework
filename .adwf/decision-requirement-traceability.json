@@ -2,7 +2,7 @@
   "$schema": ".adwf/schemas/decision-requirement-traceability.schema.json",
   "schema_version": 1,
   "role": "CANONICAL_DECISION_REQUIREMENT_TRACEABILITY",
-  "revision": 17,
+  "revision": 18,
   "records": [
     {
       "id": "INTENT-FOUNDATION-20260815",
@@ -278,6 +278,28 @@
       "source_path": null,
       "source_sha256": null,
       "record_sha256": "b4da63774d67969f1b38bf070f52d14a82c48c53c7cdcfb39e3d4216c3742e1f"
+    },
+    {
+      "id": "REQ-EDGEREF-001",
+      "kind": "REQUIREMENT",
+      "version": 1,
+      "status": "ACTIVE",
+      "title_ru": "Третий heterogeneous reference class должен доказать local-only Edge Controller lifecycle без реального устройства",
+      "statement_ru": "На отдельном synthetic Edge Controller consumer необходимо machine-verifiably пройти exact-source adoption, sealed consumer profile/edge-controller Project Pack, isolated local-only gates, deterministic controller-rule proof и guarded detach/re-adoption с сохранением consumer-owned bytes, не требуя SSH, device deployment, network/provider credentials и не выдавая fixture/CI за real hardware evidence.",
+      "source_path": null,
+      "source_sha256": null,
+      "record_sha256": "4d97368796360342ad4046c8352d27bfe450db59c92cbca7bdeccfa5589f7eb1"
+    },
+    {
+      "id": "DEC-EDGEREF-001",
+      "kind": "DECISION",
+      "version": 1,
+      "status": "ACCEPTED",
+      "title_ru": "Edge reference расширяет общий conformance engine отдельным local-only pack вместо device-specific orchestration",
+      "statement_ru": "Добавить generic edge-controller marker pack с precedence над node, network=NONE и без install/start/preview; deterministic JavaScript rules проверять только внутри ProjectExecutionSession. Расширить существующий REFERENCE_CONFORMANCE_REPORT третьим EDGE_CONTROLLER class; SSH, physical device runtime/deployment и vendor provider остаются отдельной future live boundary.",
+      "source_path": null,
+      "source_sha256": null,
+      "record_sha256": "9661c1919a2a30a92ea1cc6b02e4393ce348aa34099648ec79aeed9fc8f509e1"
     }
   ],
   "capability_refs": [
@@ -325,6 +347,11 @@
       "id": "CAPREF-CONSUMER-FRAMEWORK-UPGRADE-TRANSACTION",
       "capability_id": "CONSUMER_FRAMEWORK_UPGRADE_TRANSACTION",
       "ref_sha256": "aa3aa789842bf535fb7c6e1ecbd92e3ac84ff5a8620d5b6581a0b8b0e7e7ccb2"
+    },
+    {
+      "id": "CAPREF-REFERENCE-EDGE-CONFORMANCE",
+      "capability_id": "REFERENCE_EDGE_CONFORMANCE",
+      "ref_sha256": "2b5681c34f75a62cc57fbca47286ce7db6d2f3c861c9eaeb26639049a7531ba5"
     }
   ],
   "work_unit_refs": [
@@ -446,6 +473,13 @@
       "issue_number": 95,
       "ai_work_package_id": null,
       "ref_sha256": "34313c6a342f4bdf744608f0272c1df099145c03e4a62f6ae9f48f7f659a3919"
+    },
+    {
+      "id": "WORKREF-EDGEREF-001",
+      "roadmap_id": "EDGEREF-001",
+      "issue_number": 97,
+      "ai_work_package_id": null,
+      "ref_sha256": "9f1eda66bbadd24878e748303fa8dcc8dc8ffabd73323554eb6e1389a9b52ac3"
     }
   ],
   "evidence_refs": [],
@@ -904,7 +938,35 @@
       "from": "CAPREF-CONSUMER-FRAMEWORK-UPGRADE-TRANSACTION",
       "to": "WORKREF-GOV-021",
       "edge_sha256": "4a00cc3f51f886535ccfb26707d586e19f76235beb19fe7aafb86e2c043ce3c5"
+    },
+    {
+      "id": "EDGE-INTENT-REQ-EDGEREF-001",
+      "type": "INTENT_TO_REQUIREMENT",
+      "from": "INTENT-FOUNDATION-20260815",
+      "to": "REQ-EDGEREF-001",
+      "edge_sha256": "28430d46e1b1356f0d1601bcf717d45570d69fb08d64d3f7f928e49e0f4b369b"
+    },
+    {
+      "id": "EDGE-REQ-DEC-EDGEREF-001",
+      "type": "REQUIREMENT_TO_DECISION",
+      "from": "REQ-EDGEREF-001",
+      "to": "DEC-EDGEREF-001",
+      "edge_sha256": "9a0abffc261340bdd10db38872572ee0e1852aefb4ee23a2765a4871348a467f"
+    },
+    {
+      "id": "EDGE-DEC-CAP-EDGEREF-001",
+      "type": "DECISION_TO_CAPABILITY",
+      "from": "DEC-EDGEREF-001",
+      "to": "CAPREF-REFERENCE-EDGE-CONFORMANCE",
+      "edge_sha256": "4d9fc326123a3c8de82cef143914b306945fc7445348882539de94014a78136c"
+    },
+    {
+      "id": "EDGE-CAP-WORK-EDGEREF-001",
+      "type": "CAPABILITY_TO_WORK",
+      "from": "CAPREF-REFERENCE-EDGE-CONFORMANCE",
+      "to": "WORKREF-EDGEREF-001",
+      "edge_sha256": "e964bfc64aa67668f551752322b00512cbe90b4ddfe556072c12e81e176e51b3"
     }
   ],
-  "graph_sha256": "398fe6f952cf5848b02337b423d9510ed279966d7861109a1975ea9e27f15939"
+  "graph_sha256": "c5c54d4494e4eb640fa8adbb06345d1e4029784bf14a380489a5239ed195cb15"
 }
