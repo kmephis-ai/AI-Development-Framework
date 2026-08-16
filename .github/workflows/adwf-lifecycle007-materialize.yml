@@ -1,0 +1,130 @@
+name: ADWF LIFECYCLE-007 Provider Materialization
+
+on:
+  push:
+    branches:
+      - agent/materialize-lifecycle007-20260816-286720d7
+
+permissions:
+  contents: write
+
+env:
+  EXPECTED_BASE: 286720d708c9c2ac264221d76f9c78b9539c3503
+  EXPECTED_SOURCE: 286720d708c9c2ac264221d76f9c78b9539c3503
+  EXPECTED_TREE: 43aaa2cdc23983bd1f35462314dacb52e662e1c4
+  EXPECTED_PATCH_SHA256: ac76f0e1bae03f8c3b0c788eee752bc57bb9a522a1c43e5d179b317f8c2d374d
+  TARGET_BRANCH: agent/lifecycle-007-preserved-preimage-provenance
+
+jobs:
+  certify-publish:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-python@a309ff8b426b58ec0e2a45f0f869d46889d02405
+        with:
+          python-version: '3.13'
+
+      - name: Reconstruct exact candidate and verify immutable binding
+        shell: bash
+        run: |
+          set -euo pipefail
+          git fetch origin main "${TARGET_BRANCH}"
+          test "$(git rev-parse origin/main)" = "${EXPECTED_BASE}"
+          test "$(git rev-parse "origin/${TARGET_BRANCH}")" = "${EXPECTED_SOURCE}"
+          cat .transport/lifecycle007/patch.b64.* > /tmp/lifecycle007.patch.xz.b64
+          test "$(wc -c < /tmp/lifecycle007.patch.xz.b64 | tr -d ' ')" = "22616"
+          base64 -d /tmp/lifecycle007.patch.xz.b64 > /tmp/lifecycle007.patch.xz
+          test "$(wc -c < /tmp/lifecycle007.patch.xz | tr -d ' ')" = "16960"
+          xz -dc /tmp/lifecycle007.patch.xz > /tmp/lifecycle007.patch
+          test "$(wc -c < /tmp/lifecycle007.patch | tr -d ' ')" = "76775"
+          test "$(sha256sum /tmp/lifecycle007.patch | awk '{print $1}')" = "${EXPECTED_PATCH_SHA256}"
+          git reset --hard "${EXPECTED_SOURCE}"
+          git apply --check /tmp/lifecycle007.patch
+          git apply /tmp/lifecycle007.patch
+          git add -A
+          git diff --cached --name-only | sort > /tmp/actual-files.txt
+          cat > /tmp/expected-files.txt <<'FILES'
+          .adwf/capability-traceability.json
+          .adwf/decision-requirement-traceability.json
+          .adwf/docs-registry.json
+          .adwf/lib/consumer_upgrade.py
+          .adwf/lib/consumer_upgrade_transaction.py
+          .adwf/lib/managed_surface.py
+          .adwf/lib/managed_surface_transaction.py
+          .adwf/roadmap.json
+          .adwf/schemas/consumer-upgrade-transaction.schema.json
+          .adwf/schemas/managed-surface-detach-transaction.schema.json
+          .adwf/schemas/managed-surface-plan.schema.json
+          .adwf/schemas/managed-surface-snapshot.schema.json
+          .adwf/tests/consumer_upgrade_transaction_fixture.py
+          .adwf/tests/test_consumer_upgrade_transaction.py
+          .adwf/tests/test_managed_surface.py
+          MANIFEST.json
+          SHA256SUMS.txt
+          docs/governance/CONSUMER_FRAMEWORK_UPGRADE_PLANNING.md
+          docs/governance/CONSUMER_FRAMEWORK_UPGRADE_TRANSACTION.md
+          docs/governance/MANAGED_SURFACE_CONTRACT.md
+          FILES
+          diff -u /tmp/expected-files.txt /tmp/actual-files.txt
+          test "$(git write-tree)" = "${EXPECTED_TREE}"
+          git config user.email 'adwf-provider@example.invalid'
+          git config user.name 'ADWF Provider Materialization'
+          git commit -m 'LIFECYCLE-007: preserve exact consumer preimage provenance'
+          echo "CANDIDATE_SHA=$(git rev-parse HEAD)" >> "$GITHUB_ENV"
+
+      - name: Focused lifecycle and upgrade suite
+        shell: bash
+        run: |
+          set -euo pipefail
+          PYTHONDONTWRITEBYTECODE=1 python -m unittest discover -s .adwf/tests -p 'test_managed_surface.py' -v
+          PYTHONDONTWRITEBYTECODE=1 python -m unittest discover -s .adwf/tests -p 'test_managed_surface_transaction.py' -v
+          PYTHONDONTWRITEBYTECODE=1 python -m unittest discover -s .adwf/tests -p 'test_managed_surface_detach_transaction.py' -v
+          PYTHONDONTWRITEBYTECODE=1 python -m unittest discover -s .adwf/tests -p 'test_consumer_upgrade*.py' -v
+          test -z "$(git status --porcelain)"
+
+      - name: Canonical structural validators
+        shell: bash
+        run: |
+          set -euo pipefail
+          PYTHONDONTWRITEBYTECODE=1 python .adwf/scripts/validate_capabilities.py
+          PYTHONDONTWRITEBYTECODE=1 python .adwf/scripts/validate_traceability.py
+          PYTHONDONTWRITEBYTECODE=1 python .adwf/scripts/docs_freshness.py
+          PYTHONDONTWRITEBYTECODE=1 python .adwf/scripts/validate_docs.py
+          PYTHONDONTWRITEBYTECODE=1 python .adwf/scripts/validate_managed_surface.py
+          PYTHONDONTWRITEBYTECODE=1 python .adwf/scripts/generate_manifest.py --check
+          timeout 900 python .adwf/scripts/validate_framework.py
+          test -z "$(git status --porcelain)"
+
+      - name: Full self-test and exact BASE trust classification
+        shell: bash
+        run: |
+          set -euo pipefail
+          timeout 900 python .adwf/adwf.py self-test
+          test -z "$(git status --porcelain)"
+          git worktree add --detach /tmp/adwf-base "${EXPECTED_BASE}"
+          PYTHONPATH=/tmp/adwf-base/.adwf python - <<'PY'
+          import json, os, sys
+          sys.path.insert(0, '/tmp/adwf-base/.adwf')
+          from lib.trust import classify_git_diff
+          result=classify_git_diff(os.environ['GITHUB_WORKSPACE'],os.environ['EXPECTED_BASE'],os.environ['CANDIDATE_SHA'])
+          required={'result','authorization_mode','human_required','manual_required_files','weakening','reason_codes'}
+          assert required.issubset(result)
+          print('TRUST_CLASSIFICATION=' + json.dumps(result,sort_keys=True))
+          with open(os.environ['GITHUB_STEP_SUMMARY'],'a',encoding='utf-8') as f:
+              f.write('## Exact BASE trust classification\n\n```json\n')
+              f.write(json.dumps(result,indent=2,sort_keys=True))
+              f.write('\n```\n')
+          PY
+
+      - name: Final CAS and atomic writer publication
+        shell: bash
+        run: |
+          set -euo pipefail
+          git fetch origin main "${TARGET_BRANCH}"
+          test "$(git rev-parse origin/main)" = "${EXPECTED_BASE}"
+          test "$(git rev-parse "origin/${TARGET_BRANCH}")" = "${EXPECTED_SOURCE}"
+          test "$(git rev-parse HEAD^{tree})" = "${EXPECTED_TREE}"
+          git push origin "HEAD:refs/heads/${TARGET_BRANCH}"
