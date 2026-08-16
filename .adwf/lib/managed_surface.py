@@ -391,7 +391,15 @@ def validate_canonical_contract(root: str | Path) -> dict[str, Any]:
         "TRANSACTIONAL_ADOPTION_APPLY_V1",
         "EXPLICIT_APPLY_ONLY",
         "NO_OVERWRITE_EXISTING_CONSUMER_PATH",
+        "TRANSACTIONAL_GUARDED_DETACH_V1",
+        "DESTRUCTIVE_AUTHORITY_REQUIRES_PROVENANCE",
     }
+    detach_schema_rel = policy.get("detach_transaction_schema")
+    if detach_schema_rel != ".adwf/schemas/managed-surface-detach-transaction.schema.json":
+        raise ManagedSurfaceError("DETACH_TRANSACTION_SCHEMA_POLICY_INVALID")
+    detach_schema = base / str(detach_schema_rel)
+    if detach_schema.is_symlink() or not detach_schema.is_file():
+        raise ManagedSurfaceError("DETACH_TRANSACTION_SCHEMA_MISSING")
     invariants = set(policy.get("invariants") or [])
     missing = sorted(required - invariants)
     if missing:

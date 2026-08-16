@@ -31,6 +31,7 @@ class ManagedSurfaceTests(unittest.TestCase):
             "managed-surface-policy.schema.json",
             "managed-surface-snapshot.schema.json",
             "managed-surface-plan.schema.json",
+            "managed-surface-detach-transaction.schema.json",
         ):
             (root / ".adwf/schemas" / name).write_text(
                 (ROOT / ".adwf/schemas" / name).read_text(encoding="utf-8"),
@@ -44,14 +45,15 @@ class ManagedSurfaceTests(unittest.TestCase):
         )
         (root / ".adwf/private.txt").write_text("framework private\n", encoding="utf-8")
         (root / "README.md").write_text("framework readme\n", encoding="utf-8")
-        files = [
+        files = sorted([
             ".adwf/managed-surface-policy.json",
             ".adwf/private.txt",
             ".adwf/schemas/managed-surface-plan.schema.json",
+            ".adwf/schemas/managed-surface-detach-transaction.schema.json",
             ".adwf/schemas/managed-surface-policy.schema.json",
             ".adwf/schemas/managed-surface-snapshot.schema.json",
             "README.md",
-        ]
+        ])
         manifest = {
             "framework": "AI Development Framework",
             "version": "test",

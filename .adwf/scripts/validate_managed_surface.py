@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Validate Managed Surface Contract or plan/apply/recover consumer adoption."""
+"""Validate Managed Surface Contract or explicitly run bounded lifecycle transactions."""
 from __future__ import annotations
 
 from pathlib import Path
@@ -16,7 +16,12 @@ from lib.managed_surface import (  # noqa: E402
     plan_detach,
     validate_canonical_contract,
 )
-from lib.managed_surface_transaction import apply_adoption, recover_adoption  # noqa: E402
+from lib.managed_surface_transaction import (  # noqa: E402
+    apply_adoption,
+    apply_detach,
+    recover_adoption,
+    recover_detach,
+)
 from lib.strict_json import load as strict_load  # noqa: E402
 
 
@@ -34,19 +39,43 @@ def main() -> int:
     parser.add_argument("--source-revision")
     parser.add_argument("--detach-snapshot")
     parser.add_argument("--apply", action="store_true", help="explicit transactional adoption apply")
-    parser.add_argument("--recover-transaction", help="recover/rollback exact managed-surface transaction id")
+    parser.add_argument("--detach-apply", action="store_true", help="explicit guarded transactional detach apply")
+    parser.add_argument("--recover-transaction", help="recover/rollback exact adoption transaction id")
+    parser.add_argument("--recover-detach-transaction", help="recover/rollback exact detach transaction id")
     args = parser.parse_args()
     root = Path(args.root).resolve()
     try:
         contract = validate_canonical_contract(root)
-        if args.detach_snapshot and (args.apply or args.recover_transaction):
+        mutation_modes = sum(
+            bool(value)
+            for value in (
+                args.apply,
+                args.detach_apply,
+                args.recover_transaction,
+                args.recover_detach_transaction,
+            )
+        )
+        if mutation_modes > 1:
             raise ManagedSurfaceError("LIFECYCLE_MODE_CONFLICT")
+        if args.detach_apply and not args.detach_snapshot:
+            raise ManagedSurfaceError("DETACH_SNAPSHOT_REQUIRED")
+        if args.detach_snapshot and (args.apply or args.recover_transaction or args.recover_detach_transaction):
+            raise ManagedSurfaceError("LIFECYCLE_MODE_CONFLICT")
+
+        if args.recover_detach_transaction:
+            if not args.consumer_root:
+                raise ManagedSurfaceError("CONSUMER_ROOT_REQUIRED")
+            result = recover_detach(root, args.consumer_root, args.recover_detach_transaction)
+            print(json.dumps(result, ensure_ascii=False, indent=2))
+            return 0 if result["status"] in {"ROLLED_BACK", "COMMITTED"} else 1
+
         if args.recover_transaction:
             if not args.consumer_root:
                 raise ManagedSurfaceError("CONSUMER_ROOT_REQUIRED")
             result = recover_adoption(root, args.consumer_root, args.recover_transaction)
             print(json.dumps(result, ensure_ascii=False, indent=2))
             return 0 if result["status"] in {"ROLLED_BACK", "COMMITTED"} else 1
+
         if args.detach_snapshot:
             if not args.consumer_root:
                 raise ManagedSurfaceError("CONSUMER_ROOT_REQUIRED")
@@ -54,8 +83,16 @@ def main() -> int:
             if not isinstance(snapshot, dict):
                 raise ManagedSurfaceError("SNAPSHOT_OBJECT_REQUIRED")
             plan = plan_detach(args.consumer_root, snapshot, framework_root=root)
+            if args.detach_apply:
+                if plan["status"] != "READY":
+                    print(json.dumps(plan, ensure_ascii=False, indent=2))
+                    return 1
+                result = apply_detach(root, args.consumer_root, snapshot, plan)
+                print(json.dumps(result, ensure_ascii=False, indent=2))
+                return 0 if result["status"] in {"COMMITTED", "ALREADY_COMMITTED"} else 1
             print(json.dumps(plan, ensure_ascii=False, indent=2))
             return 1 if plan["status"] == "BLOCK" else 0
+
         if args.consumer_root:
             revision = args.source_revision or _head_sha(root)
             plan = plan_adoption(root, args.consumer_root, source_revision=revision)
@@ -66,9 +103,12 @@ def main() -> int:
                 result = apply_adoption(root, args.consumer_root, plan)
                 print(json.dumps(result, ensure_ascii=False, indent=2))
                 return 0 if result["status"] in {"COMMITTED", "ALREADY_COMMITTED"} else 1
+            if args.detach_apply:
+                raise ManagedSurfaceError("DETACH_SNAPSHOT_REQUIRED")
             print(json.dumps(plan, ensure_ascii=False, indent=2))
             return 1 if plan["status"] == "BLOCK" else 0
-        if args.apply:
+
+        if mutation_modes:
             raise ManagedSurfaceError("CONSUMER_ROOT_REQUIRED")
         print("MANAGED SURFACE CONTRACT: PASS")
         print(
@@ -76,7 +116,7 @@ def main() -> int:
             f"shared_guarded={contract['shared_guarded']} "
             f"manifest_sha256={contract['manifest_sha256']}"
         )
-        print("WRITE MODE: EXPLICIT --apply ONLY; destructive detach remains unavailable")
+        print("WRITE MODE: EXPLICIT --apply / --detach-apply ONLY; default remains dry-run")
         return 0
     except (ManagedSurfaceError, OSError, ValueError, json.JSONDecodeError) as exc:
         print("MANAGED SURFACE CONTRACT: BLOCK")

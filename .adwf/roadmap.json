@@ -94,6 +94,14 @@
             "LIFECYCLE-001"
           ],
           "product_impact": false
+        },
+        {
+          "roadmap_id": "LIFECYCLE-003",
+          "title_ru": "Guarded Transactional Detach/Uninstall v1",
+          "dependencies": [
+            "LIFECYCLE-002"
+          ],
+          "product_impact": false
         }
       ]
     }

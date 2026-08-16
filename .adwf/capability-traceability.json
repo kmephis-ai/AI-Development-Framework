@@ -334,7 +334,7 @@
       "id": "MANAGED_SURFACE_CONTRACT",
       "status": "LIVE_NOT_VERIFIED",
       "execution_mode": "CORE",
-      "owner_claim_ru": "ADWF отличает framework-private, shared-guarded и consumer-owned поверхности, строит fail-closed lifecycle plan и явно применяет adoption транзакционно без перезаписи существующих consumer paths.",
+      "owner_claim_ru": "ADWF отличает framework-private, shared-guarded и consumer-owned поверхности, строит fail-closed lifecycle plan и явно применяет adoption транзакционно без перезаписи существующих consumer paths; guarded detach удаляет только provenance-bound exact managed private paths.",
       "entrypoints": [
         ".adwf/scripts/validate_managed_surface.py"
       ],
@@ -344,13 +344,15 @@
         "MANIFEST.json",
         "SHA256SUMS.txt",
         ".adwf/lib/managed_surface_transaction.py",
-        ".adwf/schemas/managed-surface-transaction.schema.json"
+        ".adwf/schemas/managed-surface-transaction.schema.json",
+        ".adwf/schemas/managed-surface-detach-transaction.schema.json"
       ],
       "verification": [
         ".adwf/tests/test_managed_surface.py",
-        ".adwf/tests/test_managed_surface_transaction.py"
+        ".adwf/tests/test_managed_surface_transaction.py",
+        ".adwf/tests/test_managed_surface_detach_transaction.py"
       ],
-      "live_boundary": "LIVE_VERIFIED требует evidence от реального consumer repository: transactional adoption + durable snapshot и последующий detach/recovery outcome с доказательством сохранности consumer-owned data; synthetic/unit/CI tests подтверждают implementation, но не live consumer truth.",
+      "live_boundary": "LIVE_VERIFIED требует evidence от реального consumer repository: transactional adoption + durable snapshot и последующий guarded detach/recovery outcome с доказательством сохранности shared/pre-existing/consumer-owned data; synthetic/unit/CI tests подтверждают implementation, но не live consumer truth.",
       "live_evidence": []
     }
   ]

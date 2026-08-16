@@ -78,7 +78,7 @@ Default для любого пути, которого нет в package manifes
 - создаёт fully-written staging file в том же filesystem и публикует target через no-replace hard-link. Если target появился между plan и apply, он **не перезаписывается**;
 - хранит self-sealed SHA-256 transaction journal под `.adwf-runtime/managed-surface/transactions/`, привязанный к exact source revision, manifest digest, canonical plan digest и consumer-root digest; изменение journal без canonical reseal детектируется как tamper;
 - после каждого шага выполняет postcondition readback; повторный apply committed transaction является idempotent;
-- destructive detach по-прежнему не выполняет.
+- сам adoption executor не выполняет detach и не расширяет свою mutation authority за пределы создания отсутствующих paths.
 
 Если filesystem не может доказуемо выполнить no-replace create, apply блокируется вместо fallback на overwrite-capable write.
 
@@ -122,6 +122,25 @@ Transaction snapshot содержит optional binding fields `transaction_id`, 
 Для pre-existing exact paths → `PRESERVE_PREEXISTING`.
 
 План никогда не удаляет файл сам.
+
+## Transactional guarded detach — LIFECYCLE-003
+
+Destructive mutation разрешена только явным `--detach-apply` поверх `READY` detach plan и **только** когда authority доказана durable transaction-bound snapshot от LIFECYCLE-002. Read-only `plan_detach()` остаётся отдельным planner и сам ничего не удаляет.
+
+`apply_detach()`:
+
+- повторно проверяет exact source Git revision, package integrity, snapshot schema и durable adoption journal/snapshot digest; legacy/unbound snapshot не получает delete authority;
+- принимает только plan, который CAS-style совпадает с фактическим target state до начала новой transaction; forged/stale READY plan блокируется;
+- разрешает mutation только для `FRAMEWORK_PRIVATE + managed_by_adwf=true + REMOVE_ELIGIBLE`; `SHARED_GUARDED`, pre-existing exact и unlisted/consumer-owned paths никогда не становятся delete targets;
+- перед каждым destructive step заново проверяет parent chain, тип объекта и exact installed digest; symlink, non-file, drift или concurrent replacement переводят transaction в recovery/block вместо удаления неизвестных bytes;
+- сначала атомарно переносит target в same-filesystem transaction quarantine, проверяет postcondition `target=ABSENT` и exact quarantine digest и только затем purges quarantine; это закрывает crash window между delete и durable journal;
+- хранит отдельный self-sealed detach journal под `.adwf-runtime/managed-surface/detach-transactions/`, привязанный к adoption transaction, snapshot digest, detach-plan digest, source revision/manifest и consumer root; при recovery immutable authority заново сверяется с durable adoption snapshot, а quarantine path обязан быть детерминированным для конкретного managed path;
+- поддерживает deterministic/idempotent resume: `PURGED`/`ALREADY_ABSENT` распознаются как уже выполненный progress той же transaction, а неизвестное состояние блокируется;
+- при partial failure восстанавливает quarantined bytes без overwrite. Если exact managed bytes уже были безопасно purged, recovery может восстановить их только из cryptographically verified exact source revision;
+- если concurrent replacement успел попасть в quarantine, recovery возвращает **эти** неизвестные bytes на target и оставляет `RECOVERY_BLOCKED/HUMAN_REQUIRED`, а не уничтожает их;
+- после COMMITTED удаляет только доказанно adoption-created directories и только через `rmdir()` пустых каталогов; non-empty directories и consumer content сохраняются.
+
+COMMITTED фиксируется только после полного readback: все `REMOVE_ELIGIBLE`/`ALREADY_ABSENT` должны быть действительно absent и ни один quarantine object не должен остаться. Partial failure не может создать ложный successful detach.
 
 ## CLI
 
@@ -169,18 +188,39 @@ python .adwf/scripts/validate_managed_surface.py \
   --detach-snapshot /path/to/managed-surface-snapshot.json
 ```
 
+Явно применить guarded detach transaction (default без `--detach-apply` остаётся dry-run):
+
+<!-- adwf-doc: skip(reason=requires-transaction-bound-snapshot-and-exact-source-revision) -->
+```bash
+python .adwf/scripts/validate_managed_surface.py \
+  --consumer-root /path/to/project \
+  --source-revision <EXACT_40_CHAR_SHA> \
+  --detach-snapshot /path/to/managed-surface-snapshot.json \
+  --detach-apply
+```
+
+Восстановить незавершённую detach transaction из quarantine/exact verified source:
+
+<!-- adwf-doc: skip(reason=requires-existing-detach-transaction-journal-and-exact-source-revision) -->
+```bash
+python .adwf/scripts/validate_managed_surface.py \
+  --consumer-root /path/to/project \
+  --source-revision <EXACT_40_CHAR_SHA> \
+  --recover-detach-transaction <64_CHAR_TRANSACTION_ID>
+```
+
 ## Что намеренно ещё не реализовано
 
-После LIFECYCLE-002 всё ещё **не** реализованы:
+После LIFECYCLE-003 всё ещё **не** реализованы:
 
 - upgrade между ADWF revisions;
 - migration consumer data;
-- destructive detach/uninstall executor;
 - merge/overwrite `SHARED_GUARDED`;
+- aggressive cleanup неизвестных/orphaned consumer paths;
 - Project Pack SDK formalization;
 - Apps Script/edge conformance.
 
-Destructive detach должен оставаться отдельным work unit: право **создать отсутствующий framework file** не эквивалентно праву **удалить** даже ранее managed path.
+LIFECYCLE-003 сознательно не превращает detach в «удалить всё ADWF-похожее»: delete authority существует только для provenance-bound exact managed private paths. Всё неоднозначное сохраняется.
 
 ## Truth boundary
 
