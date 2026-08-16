@@ -1,0 +1,6 @@
+{
+  "$schema": ".adwf/schemas/consumer-upgrade-migrations.schema.json",
+  "schema_version": 1,
+  "role": "CONSUMER_UPGRADE_MIGRATION_REGISTRY",
+  "records": []
+}
