@@ -339,6 +339,116 @@ class ManagedSurfaceTransactionTests(unittest.TestCase):
         finally:
             temp.cleanup(); consumer.cleanup()
 
+    def test_17_differing_shared_file_is_preserved_and_never_owned(self) -> None:
+        temp, source, revision = self.source_repo(); consumer = tempfile.TemporaryDirectory()
+        try:
+            target = Path(consumer.name)
+            shared = target / "README.md"
+            original = b"consumer-owned shared readme\n"
+            shared.write_bytes(original)
+            plan = self.plan(source, target, revision)
+            planned = next(x for x in plan["entries"] if x["path"] == "README.md")
+            self.assertEqual(plan["status"], "READY")
+            self.assertEqual(planned["action"], "PRESERVE_SHARED")
+            result = apply_adoption(source, target, plan)
+            self.assertEqual(result["status"], "COMMITTED")
+            self.assertEqual(shared.read_bytes(), original)
+            journal = strict_load(self.journal_path(target, result["transaction_id"]))
+            stored = next(x for x in journal["entries"] if x["path"] == "README.md")
+            self.assertEqual(stored["planned_action"], "PRESERVE_SHARED")
+            self.assertEqual(stored["preserved_sha256"], hashlib.sha256(original).hexdigest())
+            snapshot = next(x for x in result["snapshot"]["entries"] if x["path"] == "README.md")
+            self.assertFalse(snapshot["managed_by_adwf"])
+        finally:
+            temp.cleanup(); consumer.cleanup()
+
+    def test_18_shared_drift_after_plan_rolls_back_owned_writes_without_touching_shared(self) -> None:
+        temp, source, revision = self.source_repo(); consumer = tempfile.TemporaryDirectory()
+        try:
+            target = Path(consumer.name)
+            shared = target / "README.md"
+            original = b"consumer shared baseline\n"
+            drifted = b"consumer shared changed after plan\n"
+            shared.write_bytes(original)
+            plan = self.plan(source, target, revision)
+            self.assertEqual(next(x for x in plan["entries"] if x["path"] == "README.md")["action"], "PRESERVE_SHARED")
+            shared.write_bytes(drifted)
+            result = apply_adoption(source, target, plan)
+            self.assertEqual(result["status"], "RECOVERY_BLOCKED")
+            self.assertEqual(shared.read_bytes(), drifted)
+            self.assertTrue(any("RECOVERY_PRESERVED_SHARED_DRIFT:README.md" == x for x in result["blockers"]))
+            for item in plan["entries"]:
+                if item["action"] == "CREATE_PLANNED":
+                    self.assertFalse((target / item["path"]).exists(), item["path"])
+        finally:
+            temp.cleanup(); consumer.cleanup()
+
+    def test_19_shared_drift_during_apply_blocks_recovery_then_restore_allows_retry(self) -> None:
+        temp, source, revision = self.source_repo(); consumer = tempfile.TemporaryDirectory()
+        try:
+            target = Path(consumer.name)
+            shared = target / "README.md"
+            original = b"consumer shared baseline\n"
+            drifted = b"consumer concurrent edit\n"
+            shared.write_bytes(original)
+            plan = self.plan(source, target, revision)
+            from lib import managed_surface_transaction as module
+            real_link = module._link_stage_no_replace
+            changed = {"done": False}
+            def mutate_shared(stage: Path, destination: Path, expected: str) -> None:
+                real_link(stage, destination, expected)
+                if not changed["done"]:
+                    shared.write_bytes(drifted)
+                    changed["done"] = True
+            with patch.object(module, "_link_stage_no_replace", side_effect=mutate_shared):
+                result = apply_adoption(source, target, plan)
+            self.assertTrue(changed["done"])
+            self.assertEqual(result["status"], "RECOVERY_BLOCKED")
+            self.assertEqual(shared.read_bytes(), drifted)
+            self.assertIn("RECOVERY_PRESERVED_SHARED_DRIFT:README.md", result["blockers"])
+            for item in plan["entries"]:
+                if item["action"] == "CREATE_PLANNED":
+                    self.assertFalse((target / item["path"]).exists(), item["path"])
+            shared.write_bytes(original)
+            recovered = recover_adoption(source, target, result["transaction_id"])
+            self.assertEqual(recovered["status"], "ROLLED_BACK")
+            retried = apply_adoption(source, target, plan)
+            self.assertEqual(retried["status"], "COMMITTED")
+            self.assertEqual(shared.read_bytes(), original)
+        finally:
+            temp.cleanup(); consumer.cleanup()
+
+    def test_20_forged_preserve_shared_on_private_path_is_rejected_before_write(self) -> None:
+        temp, source, revision = self.source_repo(); consumer = tempfile.TemporaryDirectory()
+        try:
+            target = Path(consumer.name); plan = self.plan(source, target, revision); forged = copy.deepcopy(plan)
+            item = next(x for x in forged["entries"] if x["path"] == ".adwf/private.txt")
+            item["target_state"] = "COLLISION"
+            item["target_sha256"] = "a" * 64
+            item["action"] = "PRESERVE_SHARED"
+            with self.assertRaisesRegex(ManagedSurfaceError, "PLAN_SHARED_PRESERVE_INVALID:.adwf/private.txt"):
+                apply_adoption(source, target, forged)
+            self.assertFalse((target / ".adwf-runtime").exists())
+        finally:
+            temp.cleanup(); consumer.cleanup()
+
+    def test_21_preserved_digest_tamper_in_journal_is_rejected(self) -> None:
+        temp, source, revision = self.source_repo(); consumer = tempfile.TemporaryDirectory()
+        try:
+            target = Path(consumer.name); shared = target / "README.md"; shared.write_text("consumer shared\n", encoding="utf-8")
+            plan = self.plan(source, target, revision)
+            failed = apply_adoption(source, target, plan, fault_after_writes=1)
+            self.assertEqual(failed["status"], "ROLLED_BACK")
+            path = self.journal_path(target, failed["transaction_id"])
+            journal = strict_load(path)
+            entry = next(x for x in journal["entries"] if x["path"] == "README.md")
+            entry["preserved_sha256"] = "f" * 64
+            path.write_text(json.dumps(journal, indent=2) + "\n", encoding="utf-8")
+            with self.assertRaisesRegex(ManagedSurfaceError, "TRANSACTION_JOURNAL_DIGEST_MISMATCH"):
+                apply_adoption(source, target, plan)
+        finally:
+            temp.cleanup(); consumer.cleanup()
+
 
 if __name__ == "__main__":
     unittest.main()

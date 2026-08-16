@@ -91,16 +91,37 @@ class ManagedSurfaceTests(unittest.TestCase):
             temp.cleanup()
             target.cleanup()
 
-    def test_03_shared_collision_blocks_adoption(self) -> None:
+    def test_03_shared_regular_collision_is_preserved_without_write_authority(self) -> None:
         temp, source = self.minimal_source()
         target = tempfile.TemporaryDirectory()
         try:
-            Path(target.name, "README.md").write_text("consumer readme\n", encoding="utf-8")
+            consumer_bytes = b"consumer readme\n"
+            Path(target.name, "README.md").write_bytes(consumer_bytes)
             plan = plan_adoption(source, target.name, source_revision="1" * 40)
-            self.assertEqual(plan["status"], "BLOCK")
-            self.assertIn("TARGET_CONTENT_COLLISION:README.md", plan["blockers"])
+            self.assertEqual(plan["status"], "READY")
+            self.assertEqual(plan["blockers"], [])
             item = next(x for x in plan["entries"] if x["path"] == "README.md")
             self.assertEqual(item["ownership"], "SHARED_GUARDED")
+            self.assertEqual(item["target_state"], "COLLISION")
+            self.assertEqual(item["action"], "PRESERVE_SHARED")
+            self.assertEqual(item["target_sha256"], hashlib.sha256(consumer_bytes).hexdigest())
+            self.assertFalse(plan["write_performed"])
+        finally:
+            temp.cleanup()
+            target.cleanup()
+
+    def test_03b_framework_private_collision_still_blocks_adoption(self) -> None:
+        temp, source = self.minimal_source()
+        target = tempfile.TemporaryDirectory()
+        try:
+            private = Path(target.name, ".adwf/private.txt")
+            private.parent.mkdir(parents=True)
+            private.write_text("consumer private collision\n", encoding="utf-8")
+            plan = plan_adoption(source, target.name, source_revision="a" * 40)
+            self.assertEqual(plan["status"], "BLOCK")
+            self.assertIn("TARGET_CONTENT_COLLISION:.adwf/private.txt", plan["blockers"])
+            item = next(x for x in plan["entries"] if x["path"] == ".adwf/private.txt")
+            self.assertEqual(item["ownership"], "FRAMEWORK_PRIVATE")
             self.assertEqual(item["action"], "BLOCK")
         finally:
             temp.cleanup()
@@ -155,6 +176,23 @@ class ManagedSurfaceTests(unittest.TestCase):
             self.assertEqual(plan["status"], "BLOCK")
             self.assertIn("TARGET_SYMLINK_FORBIDDEN:README.md", plan["blockers"])
             self.assertFalse(plan["write_performed"])
+        finally:
+            temp.cleanup()
+            target.cleanup()
+
+
+    def test_06b_shared_non_file_collision_remains_blocked(self) -> None:
+        temp, source = self.minimal_source()
+        target = tempfile.TemporaryDirectory()
+        try:
+            Path(target.name, "README.md").mkdir()
+            plan = plan_adoption(source, target.name, source_revision="b" * 40)
+            self.assertEqual(plan["status"], "BLOCK")
+            self.assertIn("TARGET_NON_FILE_COLLISION:README.md", plan["blockers"])
+            item = next(x for x in plan["entries"] if x["path"] == "README.md")
+            self.assertEqual(item["ownership"], "SHARED_GUARDED")
+            self.assertEqual(item["target_state"], "NON_FILE")
+            self.assertEqual(item["action"], "BLOCK")
         finally:
             temp.cleanup()
             target.cleanup()
@@ -251,8 +289,11 @@ class ManagedSurfaceTests(unittest.TestCase):
         temp, source = self.minimal_source()
         target = tempfile.TemporaryDirectory()
         try:
-            Path(target.name, "README.md").write_text("collision\n", encoding="utf-8")
+            private = Path(target.name, ".adwf/private.txt")
+            private.parent.mkdir(parents=True)
+            private.write_text("collision\n", encoding="utf-8")
             plan = plan_adoption(source, target.name, source_revision="8" * 40)
+            self.assertEqual(plan["status"], "BLOCK")
             with self.assertRaisesRegex(ManagedSurfaceError, "SNAPSHOT_REQUIRES_READY_ADOPTION_PLAN"):
                 snapshot_from_adoption_plan(plan, source)
         finally:

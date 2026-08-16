@@ -194,6 +194,10 @@ def plan_adoption(
         elif state == "NON_FILE":
             action = "BLOCK"
             blockers.append("TARGET_NON_FILE_COLLISION:" + rel)
+        elif state == "COLLISION" and ownership == "SHARED_GUARDED":
+            # Existing consumer/shared regular files are verification-only.
+            # Preserving them is not mutation or ownership authority.
+            action = "PRESERVE_SHARED"
         else:
             action = "BLOCK"
             blockers.append("TARGET_CONTENT_COLLISION:" + rel)
@@ -388,6 +392,7 @@ def validate_canonical_contract(root: str | Path) -> dict[str, Any]:
         "READ_ONLY_PLANNER_V1",
         "DRIFT_BLOCKS_DESTRUCTIVE_DETACH",
         "SHARED_GUARDED_PRESERVED",
+        "SHARED_GUARDED_ADOPTION_PRESERVE_V1",
         "TRANSACTIONAL_ADOPTION_APPLY_V1",
         "EXPLICIT_APPLY_ONLY",
         "NO_OVERWRITE_EXISTING_CONSUMER_PATH",

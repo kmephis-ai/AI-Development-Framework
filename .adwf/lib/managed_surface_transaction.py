@@ -20,6 +20,7 @@ import tempfile
 from .contracts import validate
 from .file_lock import exclusive_file_lock
 from .managed_surface import (
+    SHA256,
     ManagedSurfaceError,
     _safe_rel,
     _target_state,
@@ -125,6 +126,15 @@ def _validate_adoption_plan(plan: dict[str, Any], source_root: Path) -> dict[str
         elif state == "EXACT":
             if action != "KEEP_EXACT" or current != inventory["sums"][rel]:
                 raise ManagedSurfaceError("PLAN_EXACT_ACTION_INVALID:" + rel)
+        elif state == "COLLISION":
+            if (
+                item.get("ownership") != "SHARED_GUARDED"
+                or action != "PRESERVE_SHARED"
+                or not isinstance(current, str)
+                or not SHA256.fullmatch(current)
+                or current == inventory["sums"][rel]
+            ):
+                raise ManagedSurfaceError("PLAN_SHARED_PRESERVE_INVALID:" + rel)
         else:
             raise ManagedSurfaceError("READY_PLAN_CONTAINS_BLOCKED_STATE:" + rel)
     _verify_source_revision(source_root, str(plan["source_revision"]))
@@ -267,6 +277,7 @@ def _new_transaction(plan: dict[str, Any], consumer_root: Path, transaction_id: 
                 "path": item["path"],
                 "source_sha256": item["source_sha256"],
                 "planned_action": item["action"],
+                "preserved_sha256": item.get("target_sha256") if item["action"] == "PRESERVE_SHARED" else None,
                 "state": "PENDING",
                 "staging_path": None,
             }
@@ -296,7 +307,12 @@ def _assert_journal_identity(journal: dict[str, Any], plan: dict[str, Any], cons
         raise ManagedSurfaceError("TRANSACTION_ENTRY_SET_MISMATCH")
     for item in plan["entries"]:
         stored = by_path[item["path"]]
-        if stored["source_sha256"] != item["source_sha256"] or stored["planned_action"] != item["action"]:
+        expected_preserved = item.get("target_sha256") if item["action"] == "PRESERVE_SHARED" else None
+        if (
+            stored["source_sha256"] != item["source_sha256"]
+            or stored["planned_action"] != item["action"]
+            or stored.get("preserved_sha256") != expected_preserved
+        ):
             raise ManagedSurfaceError("TRANSACTION_ENTRY_IMMUTABLE_MISMATCH:" + item["path"])
 
 
@@ -407,7 +423,10 @@ def _verify_committed(store: TransactionStore, journal: dict[str, Any], consumer
     if snapshot.get("transaction_id") != journal["transaction_id"]:
         raise ManagedSurfaceError("COMMITTED_SNAPSHOT_TRANSACTION_MISMATCH")
     for entry in journal["entries"]:
-        state, _ = _target_state(consumer_root / entry["path"], entry["source_sha256"])
+        expected = entry.get("preserved_sha256") if entry["planned_action"] == "PRESERVE_SHARED" else entry["source_sha256"]
+        if not isinstance(expected, str) or not SHA256.fullmatch(expected):
+            raise ManagedSurfaceError("COMMITTED_TARGET_EXPECTATION_INVALID:" + entry["path"])
+        state, _ = _target_state(consumer_root / entry["path"], expected)
         if state != "EXACT":
             raise ManagedSurfaceError("COMMITTED_TARGET_DRIFT:" + entry["path"])
     return snapshot
@@ -472,8 +491,17 @@ def recover_adoption(
         for entry in reversed(journal["entries"]):
             entry_blockers_before = len(blockers)
             if entry["planned_action"] != "CREATE_PLANNED":
-                entry["state"] = "PRESERVED"
-                entry["staging_path"] = None
+                if entry["planned_action"] == "PRESERVE_SHARED":
+                    expected = entry.get("preserved_sha256")
+                    if not isinstance(expected, str) or not SHA256.fullmatch(expected):
+                        blockers.append("RECOVERY_PRESERVED_SHARED_EXPECTATION_INVALID:" + entry["path"])
+                    else:
+                        state, _ = _target_state(target_root / entry["path"], expected)
+                        if state != "EXACT":
+                            blockers.append("RECOVERY_PRESERVED_SHARED_DRIFT:" + entry["path"])
+                if len(blockers) == entry_blockers_before:
+                    entry["state"] = "PRESERVED"
+                    entry["staging_path"] = None
                 continue
             rel = entry["path"]
             target = target_root / rel
@@ -585,10 +613,14 @@ def apply_adoption(
                 expected = entry["source_sha256"]
                 target = target_root / rel
                 source = source_root / rel
-                if entry["planned_action"] == "KEEP_EXACT":
-                    state, _ = _target_state(target, expected)
+                if entry["planned_action"] in {"KEEP_EXACT", "PRESERVE_SHARED"}:
+                    preserve_expected = expected if entry["planned_action"] == "KEEP_EXACT" else entry.get("preserved_sha256")
+                    if not isinstance(preserve_expected, str) or not SHA256.fullmatch(preserve_expected):
+                        raise ManagedSurfaceError("PREEXISTING_TARGET_EXPECTATION_INVALID:" + rel)
+                    state, _ = _target_state(target, preserve_expected)
                     if state != "EXACT":
-                        raise ManagedSurfaceError("PREEXISTING_TARGET_CHANGED:" + rel)
+                        code = "PREEXISTING_SHARED_CHANGED:" if entry["planned_action"] == "PRESERVE_SHARED" else "PREEXISTING_TARGET_CHANGED:"
+                        raise ManagedSurfaceError(code + rel)
                     entry["state"] = "PRESERVED"
                     entry["staging_path"] = None
                     store.save(journal)
@@ -622,7 +654,10 @@ def apply_adoption(
                     raise ManagedSurfaceError("INJECTED_ADOPTION_FAILURE")
 
             for entry in journal["entries"]:
-                state, _ = _target_state(target_root / entry["path"], entry["source_sha256"])
+                expected_post = entry.get("preserved_sha256") if entry["planned_action"] == "PRESERVE_SHARED" else entry["source_sha256"]
+                if not isinstance(expected_post, str) or not SHA256.fullmatch(expected_post):
+                    raise ManagedSurfaceError("ADOPTION_POSTCONDITION_EXPECTATION_INVALID:" + entry["path"])
+                state, _ = _target_state(target_root / entry["path"], expected_post)
                 if state != "EXACT":
                     raise ManagedSurfaceError("ADOPTION_POSTCONDITION_FAILED:" + entry["path"])
             snapshot = snapshot_from_adoption_plan(
@@ -662,8 +697,17 @@ def apply_adoption(
             for entry in reversed(journal["entries"]):
                 entry_blockers_before = len(blockers)
                 if entry["planned_action"] != "CREATE_PLANNED":
-                    entry["state"] = "PRESERVED"
-                    entry["staging_path"] = None
+                    if entry["planned_action"] == "PRESERVE_SHARED":
+                        preserved = entry.get("preserved_sha256")
+                        if not isinstance(preserved, str) or not SHA256.fullmatch(preserved):
+                            blockers.append("RECOVERY_PRESERVED_SHARED_EXPECTATION_INVALID:" + entry["path"])
+                        else:
+                            state, _ = _target_state(target_root / entry["path"], preserved)
+                            if state != "EXACT":
+                                blockers.append("RECOVERY_PRESERVED_SHARED_DRIFT:" + entry["path"])
+                    if len(blockers) == entry_blockers_before:
+                        entry["state"] = "PRESERVED"
+                        entry["staging_path"] = None
                     continue
                 rel = entry["path"]
                 target = target_root / rel

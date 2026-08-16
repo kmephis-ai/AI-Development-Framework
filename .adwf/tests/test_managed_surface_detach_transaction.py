@@ -301,6 +301,29 @@ class ManagedSurfaceDetachTransactionTests(unittest.TestCase):
         finally:
             temp.cleanup(); consumer.cleanup()
 
+    def test_16_differing_shared_file_survives_adoption_and_detach_byte_exact(self) -> None:
+        temp, source, revision = self.source_repo(); consumer = tempfile.TemporaryDirectory()
+        try:
+            target = Path(consumer.name)
+            shared = target / "README.md"
+            original = b"consumer shared stays byte exact\n"
+            shared.write_bytes(original)
+            adoption, snapshot = self.adopt(source, target, revision)
+            snap = next(item for item in snapshot["entries"] if item["path"] == "README.md")
+            self.assertFalse(snap["managed_by_adwf"])
+            self.assertEqual(shared.read_bytes(), original)
+            plan = self.detach_plan(source, target, snapshot)
+            planned = next(item for item in plan["entries"] if item["path"] == "README.md")
+            self.assertEqual(planned["action"], "PRESERVE_PREEXISTING")
+            result = apply_detach(source, target, snapshot, plan)
+            self.assertEqual(result["status"], "COMMITTED")
+            self.assertEqual(shared.read_bytes(), original)
+            self.assertFalse((target / ".adwf/private.txt").exists())
+            self.assertFalse((target / ".adwf/second.txt").exists())
+            self.assertTrue((target / adoption["snapshot_path"]).exists())
+        finally:
+            temp.cleanup(); consumer.cleanup()
+
 
 if __name__ == "__main__":
     unittest.main()

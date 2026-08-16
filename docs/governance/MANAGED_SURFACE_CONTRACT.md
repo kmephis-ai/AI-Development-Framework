@@ -33,6 +33,8 @@ Managed Surface Contract **не копирует этот список**. `.adwf
 - существующий файл с другим содержимым блокирует adoption;
 - symlink/non-file collision блокирует adoption.
 
+Эти правила не расширяются LIFECYCLE-006: `FRAMEWORK_PRIVATE` content collision по-прежнему `BLOCK`.
+
 При detach:
 
 - удалить можно **только в плане** и только файл, который snapshot доказуемо пометил `managed_by_adwf=true`;
@@ -43,7 +45,9 @@ Managed Surface Contract **не копирует этот список**. `.adwf
 
 Это package paths, которые типично могут уже принадлежать продукту: например `README.md`, `VERSION`, `CHANGELOG.md`, `.gitignore`, `.gitattributes`, `AGENTS.md`, `SECURITY.md`, `.gitlab-ci.yml`.
 
-Они никогда не удаляются автоматически в v1. Даже если ADWF когда-то создал такой файл, detach plan возвращает `PRESERVE_SHARED`.
+Они никогда не удаляются автоматически. Начиная с `LIFECYCLE-006`, существующий **regular-file** `SHARED_GUARDED` с отличающимися consumer bytes больше не блокирует весь adoption: planner фиксирует exact current SHA-256 и выдаёт `PRESERVE_SHARED`. Это строго verification-only semantics — ADWF не получает право переписать, merge-ить, quarantine-ить, удалить или считать такой путь своим. Symlink/non-file collision остаётся `BLOCK`.
+
+Если ADWF сам создал shared path из состояния `ABSENT`, guarded detach всё равно не удаляет его автоматически и возвращает preserve semantics.
 
 ### `CONSUMER_OWNED`
 
@@ -59,7 +63,8 @@ Default для любого пути, которого нет в package manifes
 
 - `ABSENT` → `CREATE_PLANNED`;
 - `EXACT` → `KEEP_EXACT`;
-- `COLLISION` → `BLOCK`;
+- `COLLISION + SHARED_GUARDED + regular file` → `PRESERVE_SHARED` с exact current digest;
+- прочий `COLLISION` → `BLOCK`;
 - `SYMLINK` → `BLOCK`;
 - `NON_FILE` → `BLOCK`.
 
@@ -74,6 +79,7 @@ Default для любого пути, которого нет в package manifes
 - повторно проверяет source `MANIFEST.json`/`SHA256SUMS.txt`, требует чистый source Git worktree и совпадение фактического `HEAD` с exact `source_revision`; dirty/untracked source bytes не могут выдаваться за старый commit;
 - принимает только plan, который полностью совпадает с текущим package inventory, ownership и source digests; forged READY plan блокируется;
 - для `KEEP_EXACT` только повторно доказывает exact target и никогда не присваивает provenance;
+- для `PRESERVE_SHARED` повторно доказывает **consumer digest из plan**, не staging-ит и не пишет path; forged preserve на `FRAMEWORK_PRIVATE`, absent/exact path или без валидного отличающегося SHA-256 блокируется до mutation;
 - для `CREATE_PLANNED` перед каждой записью заново проверяет parent chain и запрещает symlink/non-directory escape;
 - создаёт fully-written staging file в том же filesystem и публикует target через no-replace hard-link. Если target появился между plan и apply, он **не перезаписывается**;
 - хранит self-sealed SHA-256 transaction journal под `.adwf-runtime/managed-surface/transactions/`, привязанный к exact source revision, manifest digest, canonical plan digest и consumer-root digest; изменение journal без canonical reseal детектируется как tamper;
@@ -91,6 +97,7 @@ Transaction snapshot содержит optional binding fields `transaction_id`, 
 Консервативное правило provenance:
 
 - путь, который **уже существовал exact** до adoption, не становится автоматически `managed_by_adwf=true`;
+- отличающийся `SHARED_GUARDED`, сохранённый через `PRESERVE_SHARED`, также остаётся `managed_by_adwf=false`; snapshot хранит package identity, но не превращает consumer bytes в ADWF ownership;
 - ADWF auto-own только файл, который plan видел `ABSENT` и текущая transaction реально создала;
 - failed/partial apply не создаёт committed snapshot.
 
@@ -102,6 +109,7 @@ Transaction snapshot содержит optional binding fields `transaction_id`, 
 
 - exact unchanged файл, созданный transaction, rollback-eligible;
 - concurrent/foreign target не удаляется;
+- `PRESERVE_SHARED` re-verify выполняется и при recovery: consumer drift возвращает `RECOVERY_BLOCKED`, но shared path не удаляется и не восстанавливается из framework bytes;
 - если созданный ADWF файл был изменён после записи, recovery сохраняет его и возвращает `RECOVERY_BLOCKED`;
 - созданные transaction directories удаляются только если они пусты; consumer files внутри них сохраняются;
 - staging drift/symlink и ambiguous provenance блокируют destructive cleanup;
@@ -223,7 +231,7 @@ python .adwf/scripts/validate_managed_surface.py \
 
 ## Что намеренно ещё не реализовано
 
-После LIFECYCLE-003 всё ещё **не** реализованы:
+После LIFECYCLE-006 всё ещё **не** реализованы:
 
 - upgrade между ADWF revisions;
 - migration consumer data;
