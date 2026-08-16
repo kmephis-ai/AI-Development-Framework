@@ -1,0 +1,66 @@
++`run_preview.py` выполняет Project Pack `install` и `start` в том же independent exact-revision clone. `capture_preview()` получает source root этого clone, поэтому local source attestation доказывает тот же exact HEAD/tree. Preview manifest и trusted bridge file сохраняются только в canonical ignored `.adwf-runtime` через отдельный `runtime_root`.
++
++Framework-owned Playwright helper commands также получают minimal environment, но остаются framework tools, а не authority из Project Pack.
++
++## Network truth boundary
++
++Project Pack network field остаётся strict requirement:
++
++- `NONE`;
++- `LOOPBACK`;
++- `PACKAGE_REGISTRY`;
++- `PACKAGE_REGISTRY_AND_LOOPBACK`.
++
++Portable v1 runtime **не имеет доказанного packet/domain confinement primitive** одновременно для поддерживаемых hosted/local platforms. Поэтому runtime evidence всегда разделяет:
++
++- `declared_network` — что требует pack;
++- `network_enforcement = DECLARATION_ONLY_NOT_ENFORCED` — что реально доказано execution layer.
++
++Наличие network declaration никогда не преобразуется в `ENFORCED`/sandbox PASS. Package command может завершиться функционально, но это не является доказательством сетевой изоляции. Full network sandbox/hardening остаётся отдельной capability и требует реального provider/OS primitive + evidence.
++
++## Runtime evidence
++
++Каждая bounded session сохраняет ignored machine-readable record:
++
++`.adwf-runtime/project-execution/PEX-<id>.json`
++
++Record содержит только безопасную metadata:
++
++- exact source HEAD/tree;
++- exact pack ID/digest;
++- названия переданных env variables без значений;
++- declared network + truthful enforcement status;
++- data isolation mode;
++- per-command argv digest, return code и mutation counters;
++- canonical source integrity;
++- reason codes;
++- self-sealed SHA-256.
++
++Raw command output и environment values в evidence не входят. Self-seal обнаруживает локальную подмену record, но не превращает его в provider-attested evidence сам по себе.
++
++## Fail-closed examples
++
++Execution блокируется при:
++
++- missing/unmaterialized Project Pack для consumer runtime;
++- stale/substituted pack digest;
++- safety projection mismatch;
++- dirty/ambiguous canonical source;
++- command substitution относительно pack binding;
++- detached clone HEAD/tree drift;
++- tracked mutation;
++- canonical source mutation;
++- malformed/tampered runtime evidence.
++
++## Truth boundary
++
++`ENVSAFE-001` доказывает implementation portable environment/data baseline. Он **не** доказывает:
++
++- OS/container/kernel sandbox;
++- package-registry-only domain egress;
++- защиту от произвольного malicious process, имеющего возможность исследовать весь host filesystem/process space;
++- heterogeneous consumer conformance;
++- production secret isolation;
++- real consumer runtime outcome.
++
++Поэтому `PROJECT_RUNTIME_SAFETY` и `PROJECT_PACKS` не становятся `LIVE_VERIFIED` только из-за unit/self-tests, CI или merge. Нужен отдельный downstream consumer/provider evidence cycle.
