@@ -1,0 +1,103 @@
+name: ADWF AGENTQUAL-001 Structural Readback
+
+on:
+  push:
+    branches:
+      - agent/diag-agentqual001-structural-087ed559
+
+permissions:
+  contents: read
+  checks: write
+
+env:
+  BASE_SHA: 6483a41b20cedcc17721800b164e8bce1d20ec33
+  CANDIDATE_SHA: 087ed559594070c4e44e1f4ad2916c3b46e6a45b
+  CANDIDATE_TREE: d4fbdaaf491bdcf92d4616293d318ae5e1091e81
+
+jobs:
+  readback:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd
+        with:
+          ref: agent/diag-agentqual001-structural-087ed559
+          fetch-depth: 0
+      - uses: actions/setup-python@a309ff8b426b58ec0e2a45f0f869d46889d02405
+        with:
+          python-version: "3.12.10"
+      - name: Rebuild exact candidate
+        shell: bash
+        run: |
+          set -euo pipefail
+          rm -rf /tmp/agentqual-readback
+          git worktree add --detach /tmp/agentqual-readback "$BASE_SHA"
+          python .transport/agentqual001-v2/apply.py /tmp/agentqual-readback
+          python .transport/agentqual001-v2/harden.py /tmp/agentqual-readback
+          python .transport/agentqual001-v2/testfix.py /tmp/agentqual-readback
+          cd /tmp/agentqual-readback
+          python .adwf/scripts/docs_freshness.py --write --reviewed-at 2026-08-16T20:30:00Z --valid-until 2026-11-16T20:30:00Z
+          python .adwf/scripts/generate_manifest.py
+          git add -A
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git commit -q -m "AGENTQUAL-001: structural readback candidate"
+          test "$(git rev-parse HEAD^{tree})" = "$CANDIDATE_TREE"
+      - name: Execute exact structural command set
+        shell: bash
+        run: |
+          set +e
+          cd /tmp/agentqual-readback
+          python - <<'PY'
+          import json, subprocess
+          commands = [
+            ['python','.adwf/scripts/validate_framework.py'],
+            ['python','.adwf/scripts/validate_pipeline_ir.py'],
+            ['python','.adwf/adwf.py','doctor','--scope','package_integrity'],
+            ['python','.adwf/adwf.py','doctor','--scope','config_health'],
+            ['python','.adwf/adwf.py','self-test'],
+          ]
+          results=[]
+          for command in commands:
+              proc=subprocess.run(command,text=True,capture_output=True,check=False,timeout=600)
+              combined=((proc.stdout or '')+'\n'+(proc.stderr or '')).strip()
+              results.append({'command':' '.join(command),'exit_code':proc.returncode,'tail':combined[-3500:]})
+          with open('/tmp/agentqual-structural-results.json','w',encoding='utf-8') as handle:
+              json.dump(results,handle,ensure_ascii=False,indent=2)
+          print(json.dumps(results,ensure_ascii=False,indent=2))
+          PY
+          exit 0
+      - name: Publish exact candidate structural diagnostic check
+        shell: bash
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          import json, os, urllib.request
+          results=json.load(open('/tmp/agentqual-structural-results.json',encoding='utf-8'))
+          failed=[item for item in results if item['exit_code'] != 0]
+          lines=[]
+          for item in results:
+              lines.append(f"## {item['command']}\nexit_code={item['exit_code']}\n```\n{item['tail']}\n```")
+          text='\n\n'.join(lines)
+          payload={
+            'name':'adwf/agentqual-structural-diagnostic',
+            'head_sha':os.environ['CANDIDATE_SHA'],
+            'status':'completed',
+            'conclusion':'failure' if failed else 'success',
+            'output':{
+              'title':'AGENTQUAL-001 structural command readback',
+              'summary':f"failed_commands={len(failed)} exact_tree={os.environ['CANDIDATE_TREE']}",
+              'text':text[:65000]
+            }
+          }
+          req=urllib.request.Request(
+            f"https://api.github.com/repos/{os.environ['GITHUB_REPOSITORY']}/check-runs",
+            data=json.dumps(payload).encode(),method='POST',
+            headers={'Authorization':f"Bearer {os.environ['GITHUB_TOKEN']}",'Accept':'application/vnd.github+json','X-GitHub-Api-Version':'2022-11-28','Content-Type':'application/json'}
+          )
+          with urllib.request.urlopen(req,timeout=30) as response:
+              created=json.load(response)
+          print(json.dumps({'check_run_id':created.get('id'),'failed':[item['command'] for item in failed]},sort_keys=True))
+          PY
