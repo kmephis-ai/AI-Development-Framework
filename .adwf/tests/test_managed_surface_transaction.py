@@ -285,6 +285,45 @@ class ManagedSurfaceTransactionTests(unittest.TestCase):
         finally:
             temp.cleanup(); consumer.cleanup()
 
+    def test_15_retry_after_clean_rollback_commits_and_then_is_idempotent(self) -> None:
+        temp, source, revision = self.source_repo(); consumer = tempfile.TemporaryDirectory()
+        try:
+            target = Path(consumer.name); product = target / "product.txt"; product.write_text("keep\n", encoding="utf-8")
+            plan = self.plan(source, target, revision)
+            failed = apply_adoption(source, target, plan, fault_after_writes=1)
+            self.assertEqual(failed["status"], "ROLLED_BACK")
+            self.assertEqual(product.read_text(encoding="utf-8"), "keep\n")
+            retried = apply_adoption(source, target, plan)
+            self.assertEqual(retried["status"], "COMMITTED")
+            self.assertEqual(retried["transaction_id"], failed["transaction_id"])
+            self.assertEqual(product.read_text(encoding="utf-8"), "keep\n")
+            repeated = apply_adoption(source, target, plan)
+            self.assertEqual(repeated["status"], "ALREADY_COMMITTED")
+            self.assertFalse(repeated["write_performed"])
+            self.assertEqual(product.read_text(encoding="utf-8"), "keep\n")
+        finally:
+            temp.cleanup(); consumer.cleanup()
+
+    def test_16_adoption_recovery_required_resumes_with_adoption_semantics(self) -> None:
+        temp, source, revision = self.source_repo(); consumer = tempfile.TemporaryDirectory()
+        try:
+            target = Path(consumer.name); plan = self.plan(source, target, revision)
+            committed = apply_adoption(source, target, plan)
+            path = self.journal_path(target, committed["transaction_id"])
+            journal = strict_load(path)
+            journal["status"] = "RECOVERY_REQUIRED"
+            journal["snapshot_path"] = None
+            journal["snapshot_sha256"] = None
+            from lib.managed_surface_transaction import _seal_transaction
+            journal = _seal_transaction(journal)
+            path.write_text(json.dumps(journal, indent=2) + "\n", encoding="utf-8")
+            Path(target, committed["snapshot_path"]).unlink()
+            resumed = apply_adoption(source, target, plan)
+            self.assertEqual(resumed["status"], "COMMITTED")
+            self.assertEqual(resumed["transaction_id"], committed["transaction_id"])
+        finally:
+            temp.cleanup(); consumer.cleanup()
+
     def test_14_no_replace_link_failure_never_falls_back_to_overwrite(self) -> None:
         temp, source, revision = self.source_repo(); consumer = tempfile.TemporaryDirectory()
         try:

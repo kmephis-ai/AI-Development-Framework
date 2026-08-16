@@ -562,18 +562,7 @@ def apply_adoption(
                 }
             if journal["status"] == "RECOVERY_BLOCKED":
                 raise ManagedSurfaceError("TRANSACTION_RECOVERY_BLOCKED")
-            if journal["status"] == "RECOVERY_REQUIRED":
-                blockers, _ = _recover_detach_locked(source_root, target_root, store, journal)
-                if blockers:
-                    journal["status"] = "RECOVERY_BLOCKED"
-                    journal["last_error"] = ";".join(blockers)
-                    store.save(journal)
-                    raise ManagedSurfaceError("DETACH_TRANSACTION_RECOVERY_BLOCKED")
-                journal["status"] = "ROLLED_BACK"
-                journal["last_error"] = None
-                store.save(journal)
             if journal["status"] == "ROLLED_BACK":
-                _assert_detach_plan_matches_current(source_root, target_root, stored_snapshot, plan)
                 for entry in journal["entries"]:
                     entry["state"] = "PENDING"
                     entry["staging_path"] = None

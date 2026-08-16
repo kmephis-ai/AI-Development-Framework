@@ -2,7 +2,7 @@
   "$schema": ".adwf/schemas/decision-requirement-traceability.schema.json",
   "schema_version": 1,
   "role": "CANONICAL_DECISION_REQUIREMENT_TRACEABILITY",
-  "revision": 6,
+  "revision": 7,
   "records": [
     {
       "id": "INTENT-FOUNDATION-20260815",
@@ -190,6 +190,13 @@
       "issue_number": 68,
       "ai_work_package_id": null,
       "ref_sha256": "31e50fa79462cf627a5919e6a40c29c990fc86aa6e1b4ddcf99b95413c782159"
+    },
+    {
+      "id": "WORKREF-LIFECYCLE-004",
+      "roadmap_id": "LIFECYCLE-004",
+      "issue_number": 70,
+      "ai_work_package_id": null,
+      "ref_sha256": "ae07da9855681b6889d84478f46d97e625dc93c8527d854734754521e326e6f2"
     }
   ],
   "evidence_refs": [],
@@ -347,7 +354,14 @@
       "from": "CAPREF-PROJECT-RUNTIME-SAFETY",
       "to": "WORKREF-ENVSAFE-001",
       "edge_sha256": "7945171d649f34a9fc4946f69a550d97de7fe340feba81ffa847e59f8181456b"
+    },
+    {
+      "id": "EDGE-CAP-WORK-LIFECYCLE-004",
+      "type": "CAPABILITY_TO_WORK",
+      "from": "CAPREF-MANAGED-SURFACE-CONTRACT",
+      "to": "WORKREF-LIFECYCLE-004",
+      "edge_sha256": "594965af8b73d795eeea77aa4c967516c0328ff6a9ef410767383d9d9e34e69e"
     }
   ],
-  "graph_sha256": "8b04fddb259cdbc7a85d1d0cf72523485e0c358c6b8179ec2a2d24bd92fd1012"
+  "graph_sha256": "d8da2f6224ef4349fc3e41acb553044eac264cffb9dc0c81e6596cb2a9bb3d5b"
 }

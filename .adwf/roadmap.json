@@ -118,6 +118,14 @@
             "PACKSDK-001"
           ],
           "product_impact": false
+        },
+        {
+          "roadmap_id": "LIFECYCLE-004",
+          "title_ru": "Adoption Resume Regression Repair after Guarded Detach",
+          "dependencies": [
+            "ENVSAFE-001"
+          ],
+          "product_impact": false
         }
       ]
     }

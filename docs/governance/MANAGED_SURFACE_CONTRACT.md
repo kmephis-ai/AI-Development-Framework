@@ -107,6 +107,10 @@ Transaction snapshot содержит optional binding fields `transaction_id`, 
 - staging drift/symlink и ambiguous provenance блокируют destructive cleanup;
 - отдельный `--recover-transaction <id>` повторяет recovery идемпотентно.
 
+### Retry/resume regression invariant
+
+`LIFECYCLE-004` закрывает regression, внесённый при добавлении guarded detach: adoption journal никогда не передаётся detach-only recovery helpers. После clean rollback повторный exact READY adoption plan снова выполняется adoption state machine и обязан детерминированно перейти в `COMMITTED`; следующий повтор возвращает `ALREADY_COMMITTED`. Adoption `RECOVERY_REQUIRED` также продолжает только adoption semantics. Detach state/snapshot variables не входят в adoption retry authority.
+
 ## Detach plan
 
 `plan_detach()` также read-only.
