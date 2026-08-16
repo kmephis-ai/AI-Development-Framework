@@ -1,0 +1,70 @@
+name: ADWF AGENTQUAL-001 PR Structural Diagnostic
+
+on:
+  push:
+    branches:
+      - agent/materialize-agentqual001-v2-6483a41b
+
+permissions:
+  contents: write
+
+env:
+  BASE_SHA: 6483a41b20cedcc17721800b164e8bce1d20ec33
+
+jobs:
+  diagnose:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd
+        with:
+          ref: agent/materialize-agentqual001-v2-6483a41b
+          fetch-depth: 0
+      - uses: actions/setup-python@a309ff8b426b58ec0e2a45f0f869d46889d02405
+        with:
+          python-version: "3.12.10"
+      - name: Rebuild exact candidate
+        shell: bash
+        run: |
+          set -euo pipefail
+          rm -rf /tmp/agentqual-prdiag
+          git worktree add --detach /tmp/agentqual-prdiag "$BASE_SHA"
+          python .transport/agentqual001-v2/apply.py /tmp/agentqual-prdiag
+          python .transport/agentqual001-v2/harden.py /tmp/agentqual-prdiag
+          python .transport/agentqual001-v2/testfix.py /tmp/agentqual-prdiag
+          cd /tmp/agentqual-prdiag
+          python .adwf/scripts/docs_freshness.py --write --reviewed-at 2026-08-16T20:30:00Z --valid-until 2026-11-16T20:30:00Z
+          python .adwf/scripts/generate_manifest.py
+          git add -A
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git commit -q -m "AGENTQUAL-001: PR structural diagnostic candidate"
+          test "$(git rev-parse HEAD^{tree})" = "d4fbdaaf491bdcf92d4616293d318ae5e1091e81"
+      - name: Capture exact PR structural commands
+        shell: bash
+        run: |
+          set +e
+          : > /tmp/pr-structural-diag.txt
+          cd /tmp/agentqual-prdiag
+          for cmd in \
+            "python .adwf/scripts/validate_framework.py" \
+            "python .adwf/scripts/validate_pipeline_ir.py" \
+            "python .adwf/adwf.py doctor --scope package_integrity" \
+            "python .adwf/adwf.py doctor --scope config_health" \
+            "python .adwf/adwf.py self-test"
+          do
+            echo "=== $cmd ===" >> /tmp/pr-structural-diag.txt
+            bash -lc "$cmd" > /tmp/one.out 2>&1
+            code=$?
+            echo "exit_code=$code" >> /tmp/pr-structural-diag.txt
+            tail -n 180 /tmp/one.out >> /tmp/pr-structural-diag.txt
+            echo >> /tmp/pr-structural-diag.txt
+          done
+          set -e
+          cp /tmp/pr-structural-diag.txt "$GITHUB_WORKSPACE/.transport/agentqual001-v2/last-pr-structural-diagnostic.txt"
+          cd "$GITHUB_WORKSPACE"
+          git add .transport/agentqual001-v2/last-pr-structural-diagnostic.txt
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git commit -m "AGENTQUAL-001: capture PR structural diagnostic" || true
+          git push origin HEAD:refs/heads/agent/materialize-agentqual001-v2-6483a41b
