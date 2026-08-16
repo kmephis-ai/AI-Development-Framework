@@ -519,6 +519,29 @@
       "live_evidence": [
         "certification:CERT-UPGRADE-003-PRIHRASH-EXTERNAL"
       ]
+    },
+    {
+      "id": "CREATIVE_AGENT_QUALIFICATION",
+      "status": "LIVE_NOT_VERIFIED",
+      "execution_mode": "OPTIONAL_ADAPTER",
+      "owner_claim_ru": "ADWF принимает заменяемый Creative Agent command adapter только через строгую versioned qualification declaration/report; invocation authority ограничена exact work package, а creative result остаётся low-trust до trusted/provider verification.",
+      "entrypoints": [
+        ".adwf/scripts/qualify_creative_agent.py"
+      ],
+      "production_paths": [
+        ".adwf/lib/creative_agent_qualification.py",
+        ".adwf/creative-agent-adapters.json",
+        ".adwf/creative-agent-qualification.json",
+        ".adwf/schemas/creative-agent-adapters.schema.json",
+        ".adwf/schemas/creative-agent-qualification-report.schema.json",
+        ".adwf/lib/action_executors.py"
+      ],
+      "verification": [
+        ".adwf/tests/test_creative_agent_qualification.py",
+        ".adwf/tests/test_ai_work_contracts.py"
+      ],
+      "live_boundary": "Synthetic reference-local qualification доказывает fail-closed invocation contract, exact package/result binding и zero-cost offline boundary. LIVE_VERIFIED требует реальный внешний creative adapter/agent result, привязанный к exact AIWorkPackage, плюс downstream trusted/provider exact-SHA evidence; deterministic reference adapter не является AI/provider/live proof.",
+      "live_evidence": []
     }
   ]
 }

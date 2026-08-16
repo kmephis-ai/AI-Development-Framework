@@ -2,7 +2,7 @@
   "$schema": ".adwf/schemas/decision-requirement-traceability.schema.json",
   "schema_version": 1,
   "role": "CANONICAL_DECISION_REQUIREMENT_TRACEABILITY",
-  "revision": 18,
+  "revision": 19,
   "records": [
     {
       "id": "INTENT-FOUNDATION-20260815",
@@ -300,6 +300,28 @@
       "source_path": null,
       "source_sha256": null,
       "record_sha256": "9661c1919a2a30a92ea1cc6b02e4393ce348aa34099648ec79aeed9fc8f509e1"
+    },
+    {
+      "id": "REQ-AGENTQUAL-001",
+      "kind": "REQUIREMENT",
+      "version": 1,
+      "status": "ACTIVE",
+      "title_ru": "Creative Agent invocation должна иметь квалифицированный versioned boundary",
+      "statement_ru": "Raw replaceable creative executor не получает authority только из env command: adapter обязан декларировать phase/invocation/cost/network/secrets/filesystem/result-channel semantics и быть exact-package/result bound; synthetic qualification не становится trusted или live creative evidence.",
+      "source_path": null,
+      "source_sha256": null,
+      "record_sha256": "632a19c87bd5fde1bbae5d4fe3dd3415948391fbaba8de4274cd032e486b3af1"
+    },
+    {
+      "id": "DEC-AGENTQUAL-001",
+      "kind": "DECISION",
+      "version": 1,
+      "status": "ACCEPTED",
+      "title_ru": "Квалификация ограничивает invocation authority, но не повышает trust creative output",
+      "statement_ru": "Добавить provider-neutral versioned adapter registry + qualification report; mandatory reference adapter остаётся local/offline/zero-cost/secret-filtered/package-scoped. Low-trust AIWorkResult по-прежнему требует существующую trusted/provider verification, а GitHub Agent Inbox остаётся low-trust channel.",
+      "source_path": null,
+      "source_sha256": null,
+      "record_sha256": "3e756fb8cffa56b83fef2e29ad4b6a6c9fab44c5fe3ab691b7f2188bd6667d89"
     }
   ],
   "capability_refs": [
@@ -352,6 +374,11 @@
       "id": "CAPREF-REFERENCE-EDGE-CONFORMANCE",
       "capability_id": "REFERENCE_EDGE_CONFORMANCE",
       "ref_sha256": "2b5681c34f75a62cc57fbca47286ce7db6d2f3c861c9eaeb26639049a7531ba5"
+    },
+    {
+      "id": "CAPREF-CREATIVE-AGENT-QUALIFICATION",
+      "capability_id": "CREATIVE_AGENT_QUALIFICATION",
+      "ref_sha256": "606dca2658376b27aff3084807aecb4e12457ece0ee9ed222b18dc8f6d8601de"
     }
   ],
   "work_unit_refs": [
@@ -480,6 +507,13 @@
       "issue_number": 97,
       "ai_work_package_id": null,
       "ref_sha256": "9f1eda66bbadd24878e748303fa8dcc8dc8ffabd73323554eb6e1389a9b52ac3"
+    },
+    {
+      "id": "WORKREF-AGENTQUAL-001",
+      "roadmap_id": "AGENTQUAL-001",
+      "issue_number": 99,
+      "ai_work_package_id": null,
+      "ref_sha256": "c9c9fb8b7d1175999f2225690c925ec8521a03df52f869c7fae36c47c0a7433f"
     }
   ],
   "evidence_refs": [],
@@ -966,7 +1000,35 @@
       "from": "CAPREF-REFERENCE-EDGE-CONFORMANCE",
       "to": "WORKREF-EDGEREF-001",
       "edge_sha256": "e964bfc64aa67668f551752322b00512cbe90b4ddfe556072c12e81e176e51b3"
+    },
+    {
+      "id": "EDGE-REQ-DEC-AGENTQUAL-001",
+      "type": "REQUIREMENT_TO_DECISION",
+      "from": "REQ-AGENTQUAL-001",
+      "to": "DEC-AGENTQUAL-001",
+      "edge_sha256": "9632c988ace97a954be961230b50922c9e183608d45ede78ea064b1b86350b7e"
+    },
+    {
+      "id": "EDGE-DEC-CAP-AGENTQUAL-001",
+      "type": "DECISION_TO_CAPABILITY",
+      "from": "DEC-AGENTQUAL-001",
+      "to": "CAPREF-CREATIVE-AGENT-QUALIFICATION",
+      "edge_sha256": "e7b1849be66107c1d5d879a09bc1d397f7617f867f8828599afa72851ef2226a"
+    },
+    {
+      "id": "EDGE-CAP-WORK-AGENTQUAL-001",
+      "type": "CAPABILITY_TO_WORK",
+      "from": "CAPREF-CREATIVE-AGENT-QUALIFICATION",
+      "to": "WORKREF-AGENTQUAL-001",
+      "edge_sha256": "cc332beb75e5966e621ca287e406bb5d271f4b06463b932c3acb6526d848bf72"
+    },
+    {
+      "id": "EDGE-INTENT-REQ-AGENTQUAL-001",
+      "type": "INTENT_TO_REQUIREMENT",
+      "from": "INTENT-FOUNDATION-20260815",
+      "to": "REQ-AGENTQUAL-001",
+      "edge_sha256": "f029f767db14d0b71fc517b6ff138429b3ca7639822985879495de2c6d209387"
     }
   ],
-  "graph_sha256": "c5c54d4494e4eb640fa8adbb06345d1e4029784bf14a380489a5239ed195cb15"
+  "graph_sha256": "82308ff565b8741f93ae0659374bd31150f294673d8174064abc77f7b484aa21"
 }

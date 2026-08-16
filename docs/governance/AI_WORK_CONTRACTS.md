@@ -84,3 +84,7 @@ Runtime Supervisor создаёт package нативно. GitHub Agent Inbox с�
 ## Что не входит в этот capability
 
 AI Work Contracts не являются долговременным Decision/Requirement Ledger. Цепочка `Owner Intent → Requirement → Decision → Capability → Feature → Work Unit → Evidence` реализуется отдельным следующим capability, чтобы не смешивать execution contract и product/architecture traceability в один oversized work unit.
+
+## Qualified Creative Agent invocation boundary
+
+`AGENTQUAL-001` не повышает trust creative output. Command executor принимается только через versioned Creative Agent qualification registry/report; raw `ADWF_AGENT_COMMAND` без qualified adapter блокируется. Qualified command получает secret-filtered environment и exact `AIWorkPackage`, а возвращаемый `AIWorkResult` остаётся `LOW_TRUST` до downstream trusted/provider verification. `reference-local` является deterministic offline qualification fixture, а не внешним AI/provider evidence.

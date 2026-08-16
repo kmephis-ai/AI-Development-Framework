@@ -9,13 +9,14 @@ from __future__ import annotations
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any,Callable
-import json,os,re,shlex,subprocess,sys
+import json,os,re,subprocess,sys
 from .github_auth import detect_repository,discover_token
 from .github_provider import GitHubClient
 from .strict_json import loads as strict_loads
 from .work_memory import WorkMemoryStore
 from .delivery_adapters import promote_reference, observe_reference, run_command_adapter
 from .ai_work_contracts import canonicalize_low_trust_claim
+from .creative_agent_qualification import command_argv,load_qualified_command_adapter,sanitized_agent_environment,verify_local_command_result
 
 SHA=re.compile(r'^[0-9a-f]{40}$')
 
@@ -85,22 +86,43 @@ def workspace_executor(root:Path,state:dict[str,Any],key:str,envelope:dict[str,A
 
 
 def _run_agent_command(root:Path,state:dict[str,Any],key:str,envelope:dict[str,Any])->dict[str,Any]|None:
-    command=os.environ.get('ADWF_AGENT_COMMAND','').strip()
-    if not command:return None
-    request=root/'.adwf-runtime/supervisor/requests'/f'{key}.json';result=root/'.adwf-runtime/supervisor/results'/f'{key}.json'
-    env={**os.environ,'ADWF_ACTION_REQUEST':str(request),'ADWF_ACTION_RESULT':str(result),'ADWF_RUN_ID':state['run_id'],'ADWF_PHASE':state['phase']}
-    proc=subprocess.run(shlex.split(command),cwd=root,env=env,text=True,capture_output=True,check=False,timeout=int(os.environ.get('ADWF_AGENT_TIMEOUT_SECONDS','1800')))
-    if proc.returncode:return _result(state,key,'FAIL',reason_codes=['AGENT_COMMAND_FAILED'],metadata={'exit_code':proc.returncode,'stderr_tail':proc.stderr[-500:]})
-    if not result.is_file():return _result(state,key,'FAIL',reason_codes=['AGENT_RESULT_MISSING'])
-    value=strict_loads(result.read_text(encoding='utf-8'))
-    if not isinstance(value,dict):return _result(state,key,'FAIL',reason_codes=['AGENT_RESULT_INVALID'])
+    raw_command=os.environ.get('ADWF_AGENT_COMMAND','').strip()
+    adapter_id=os.environ.get('ADWF_AGENT_ADAPTER_ID','').strip()
+    if not raw_command and not adapter_id:return None
+    if raw_command and not adapter_id:return _result(state,key,'FAIL',reason_codes=['AGENT_COMMAND_UNQUALIFIED'])
+    if raw_command and adapter_id:return _result(state,key,'FAIL',reason_codes=['AGENT_COMMAND_OVERRIDE_FORBIDDEN'])
+    try:
+        adapter=load_qualified_command_adapter(root,adapter_id,state['phase'])
+    except (OSError,ValueError,json.JSONDecodeError) as exc:
+        return _result(state,key,'FAIL',reason_codes=['AGENT_ADAPTER_UNQUALIFIED'],metadata={'contract_error':str(exc)[:300]})
+    if adapter.get('kind')=='REFERENCE_DETERMINISTIC' and os.environ.get('ADWF_ALLOW_REFERENCE_AGENT')!='1':
+        return _result(state,key,'FAIL',reason_codes=['REFERENCE_AGENT_RUNTIME_FORBIDDEN'])
     package=envelope.get('work_package')
     if not isinstance(package,dict):return _result(state,key,'FAIL',reason_codes=['AI_WORK_PACKAGE_MISSING'])
+    if envelope.get('work_package_digest') not in {None,package.get('package_digest')}:
+        return _result(state,key,'FAIL',reason_codes=['AI_WORK_PACKAGE_DIGEST_MISMATCH'])
+    request=root/'.adwf-runtime/supervisor/requests'/f'{key}.json';result=root/'.adwf-runtime/supervisor/results'/f'{key}.json'
+    try:
+        argv=command_argv(root,adapter)
+        env=sanitized_agent_environment(os.environ,request=request,result=result,state=state,adapter=adapter)
+        proc=subprocess.run(argv,cwd=root,env=env,text=True,capture_output=True,check=False,timeout=int(adapter['timeout_seconds']))
+    except subprocess.TimeoutExpired:
+        return _result(state,key,'FAIL',reason_codes=['AGENT_COMMAND_TIMEOUT'])
+    except (OSError,ValueError) as exc:
+        return _result(state,key,'FAIL',reason_codes=['AGENT_COMMAND_START_FAILED'],metadata={'contract_error':str(exc)[:300]})
+    if proc.returncode:return _result(state,key,'FAIL',reason_codes=['AGENT_COMMAND_FAILED'],metadata={'exit_code':proc.returncode,'stderr_tail':proc.stderr[-500:]})
+    if not result.is_file():return _result(state,key,'FAIL',reason_codes=['AGENT_RESULT_MISSING'])
+    try:value=strict_loads(result.read_text(encoding='utf-8'))
+    except (OSError,ValueError,json.JSONDecodeError) as exc:
+        return _result(state,key,'FAIL',reason_codes=['AGENT_RESULT_INVALID'],metadata={'contract_error':str(exc)[:300]})
+    if not isinstance(value,dict):return _result(state,key,'FAIL',reason_codes=['AGENT_RESULT_INVALID'])
     try:work_result=canonicalize_low_trust_claim(value,package=package)
     except ValueError as exc:return _result(state,key,'FAIL',reason_codes=['AGENT_RESULT_CONTRACT_INVALID'],metadata={'contract_error':str(exc)[:300]})
+    local_errors=verify_local_command_result(root,package,work_result)
+    if local_errors:return _result(state,key,'FAIL',reason_codes=['AGENT_RESULT_LOCAL_BINDING_INVALID'],metadata={'binding_errors':local_errors})
     return {'phase':state['phase'],'outcome':work_result['outcome'],'idempotency_key':key,'subject_sha':work_result.get('head_sha'),
             'preview_digest':state.get('preview_digest'),'evidence_refs':[],'reason_codes':work_result['reason_codes'],
-            'transient':work_result['outcome']=='RETRY','cost_usd':0,'metadata':{'source':'LOW_TRUST_AGENT_COMMAND','ai_work_result':work_result}}
+            'transient':work_result['outcome']=='RETRY','cost_usd':0,'metadata':{'source':'LOW_TRUST_AGENT_COMMAND','adapter_id':adapter['id'],'adapter_version':adapter['version'],'ai_work_result':work_result}}
 
 
 def creative_executor(root:Path,state:dict[str,Any],key:str,envelope:dict[str,Any])->dict[str,Any]|ExecutorWait:
