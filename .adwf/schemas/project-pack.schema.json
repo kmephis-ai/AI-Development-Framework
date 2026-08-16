@@ -1,0 +1,578 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "ADWF Project Pack Definition v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "$schema",
+    "schema_version",
+    "role",
+    "id",
+    "language",
+    "detect",
+    "commands",
+    "preview",
+    "safety"
+  ],
+  "properties": {
+    "$schema": {
+      "const": ".adwf/schemas/project-pack.schema.json"
+    },
+    "schema_version": {
+      "const": 1
+    },
+    "role": {
+      "const": "PROJECT_PACK_DEFINITION"
+    },
+    "id": {
+      "type": "string",
+      "pattern": "^[a-z][a-z0-9-]{1,31}$"
+    },
+    "language": {
+      "enum": [
+        "javascript",
+        "python",
+        "go"
+      ]
+    },
+    "detect": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "dependency": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[A-Za-z0-9@_./+-]+$"
+        },
+        "files": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 8,
+          "uniqueItems": true,
+          "items": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 160
+          }
+        },
+        "contains": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 8,
+          "uniqueItems": true,
+          "items": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 80
+          }
+        },
+        "scan_files": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 8,
+          "uniqueItems": true,
+          "items": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 160
+          }
+        }
+      }
+    },
+    "commands": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "lint": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "command",
+            "phases"
+          ],
+          "properties": {
+            "command": {
+              "type": "array",
+              "maxItems": 32,
+              "items": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 512
+              }
+            },
+            "requires_script": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 128,
+              "pattern": "^[A-Za-z0-9_.:-]+$"
+            },
+            "requires_file": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 160
+            },
+            "phases": {
+              "type": "array",
+              "minItems": 1,
+              "maxItems": 4,
+              "uniqueItems": true,
+              "items": {
+                "enum": [
+                  "bootstrap",
+                  "pr",
+                  "main",
+                  "runtime"
+                ]
+              }
+            }
+          }
+        },
+        "unit": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "command",
+            "phases"
+          ],
+          "properties": {
+            "command": {
+              "type": "array",
+              "maxItems": 32,
+              "items": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 512
+              }
+            },
+            "requires_script": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 128,
+              "pattern": "^[A-Za-z0-9_.:-]+$"
+            },
+            "requires_file": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 160
+            },
+            "phases": {
+              "type": "array",
+              "minItems": 1,
+              "maxItems": 4,
+              "uniqueItems": true,
+              "items": {
+                "enum": [
+                  "bootstrap",
+                  "pr",
+                  "main",
+                  "runtime"
+                ]
+              }
+            }
+          }
+        },
+        "integration": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "command",
+            "phases"
+          ],
+          "properties": {
+            "command": {
+              "type": "array",
+              "maxItems": 32,
+              "items": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 512
+              }
+            },
+            "requires_script": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 128,
+              "pattern": "^[A-Za-z0-9_.:-]+$"
+            },
+            "requires_file": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 160
+            },
+            "phases": {
+              "type": "array",
+              "minItems": 1,
+              "maxItems": 4,
+              "uniqueItems": true,
+              "items": {
+                "enum": [
+                  "bootstrap",
+                  "pr",
+                  "main",
+                  "runtime"
+                ]
+              }
+            }
+          }
+        },
+        "build": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "command",
+            "phases"
+          ],
+          "properties": {
+            "command": {
+              "type": "array",
+              "maxItems": 32,
+              "items": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 512
+              }
+            },
+            "requires_script": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 128,
+              "pattern": "^[A-Za-z0-9_.:-]+$"
+            },
+            "requires_file": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 160
+            },
+            "phases": {
+              "type": "array",
+              "minItems": 1,
+              "maxItems": 4,
+              "uniqueItems": true,
+              "items": {
+                "enum": [
+                  "bootstrap",
+                  "pr",
+                  "main",
+                  "runtime"
+                ]
+              }
+            }
+          }
+        },
+        "smoke": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "command",
+            "phases"
+          ],
+          "properties": {
+            "command": {
+              "type": "array",
+              "maxItems": 32,
+              "items": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 512
+              }
+            },
+            "requires_script": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 128,
+              "pattern": "^[A-Za-z0-9_.:-]+$"
+            },
+            "requires_file": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 160
+            },
+            "phases": {
+              "type": "array",
+              "minItems": 1,
+              "maxItems": 4,
+              "uniqueItems": true,
+              "items": {
+                "enum": [
+                  "bootstrap",
+                  "pr",
+                  "main",
+                  "runtime"
+                ]
+              }
+            }
+          }
+        },
+        "golden_paths": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "command",
+            "phases"
+          ],
+          "properties": {
+            "command": {
+              "type": "array",
+              "maxItems": 32,
+              "items": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 512
+              }
+            },
+            "requires_script": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 128,
+              "pattern": "^[A-Za-z0-9_.:-]+$"
+            },
+            "requires_file": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 160
+            },
+            "phases": {
+              "type": "array",
+              "minItems": 1,
+              "maxItems": 4,
+              "uniqueItems": true,
+              "items": {
+                "enum": [
+                  "bootstrap",
+                  "pr",
+                  "main",
+                  "runtime"
+                ]
+              }
+            }
+          }
+        },
+        "e2e": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "command",
+            "phases"
+          ],
+          "properties": {
+            "command": {
+              "type": "array",
+              "maxItems": 32,
+              "items": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 512
+              }
+            },
+            "requires_script": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 128,
+              "pattern": "^[A-Za-z0-9_.:-]+$"
+            },
+            "requires_file": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 160
+            },
+            "phases": {
+              "type": "array",
+              "minItems": 1,
+              "maxItems": 4,
+              "uniqueItems": true,
+              "items": {
+                "enum": [
+                  "bootstrap",
+                  "pr",
+                  "main",
+                  "runtime"
+                ]
+              }
+            }
+          }
+        },
+        "install": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "command",
+            "phases"
+          ],
+          "properties": {
+            "command": {
+              "type": "array",
+              "maxItems": 32,
+              "items": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 512
+              }
+            },
+            "requires_script": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 128,
+              "pattern": "^[A-Za-z0-9_.:-]+$"
+            },
+            "requires_file": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 160
+            },
+            "phases": {
+              "type": "array",
+              "minItems": 1,
+              "maxItems": 4,
+              "uniqueItems": true,
+              "items": {
+                "enum": [
+                  "bootstrap",
+                  "pr",
+                  "main",
+                  "runtime"
+                ]
+              }
+            }
+          }
+        },
+        "start": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "command",
+            "phases"
+          ],
+          "properties": {
+            "command": {
+              "type": "array",
+              "maxItems": 32,
+              "items": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 512
+              }
+            },
+            "requires_script": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 128,
+              "pattern": "^[A-Za-z0-9_.:-]+$"
+            },
+            "requires_file": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 160
+            },
+            "phases": {
+              "type": "array",
+              "minItems": 1,
+              "maxItems": 4,
+              "uniqueItems": true,
+              "items": {
+                "enum": [
+                  "bootstrap",
+                  "pr",
+                  "main",
+                  "runtime"
+                ]
+              }
+            }
+          }
+        }
+      }
+    },
+    "preview": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "desktop": {
+          "type": "array",
+          "minItems": 2,
+          "maxItems": 2,
+          "items": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 10000
+          }
+        },
+        "mobile": {
+          "type": "array",
+          "minItems": 2,
+          "maxItems": 2,
+          "items": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 10000
+          }
+        },
+        "golden_paths": {
+          "type": "array",
+          "maxItems": 32,
+          "uniqueItems": true,
+          "items": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 256
+          }
+        },
+        "default_url": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 256
+        },
+        "health_path": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 256
+        }
+      }
+    },
+    "safety": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "monetary_budget_usd",
+        "secrets",
+        "network",
+        "environment",
+        "data_access"
+      ],
+      "properties": {
+        "monetary_budget_usd": {
+          "const": 0
+        },
+        "secrets": {
+          "const": "FORBIDDEN"
+        },
+        "network": {
+          "enum": [
+            "NONE",
+            "LOOPBACK",
+            "PACKAGE_REGISTRY",
+            "PACKAGE_REGISTRY_AND_LOOPBACK"
+          ]
+        },
+        "environment": {
+          "const": "PROCESS_MINIMAL"
+        },
+        "data_access": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "read_scope",
+            "write_scope"
+          ],
+          "properties": {
+            "read_scope": {
+              "const": "PROJECT_TREE"
+            },
+            "write_scope": {
+              "const": "TOOL_OUTPUTS_ONLY"
+            }
+          }
+        }
+      }
+    }
+  }
+}

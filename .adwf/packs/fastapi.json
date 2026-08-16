@@ -1,9 +1,16 @@
 {
+  "$schema": ".adwf/schemas/project-pack.schema.json",
+  "schema_version": 1,
+  "role": "PROJECT_PACK_DEFINITION",
   "id": "fastapi",
   "language": "python",
   "detect": {
     "contains": [
       "fastapi"
+    ],
+    "scan_files": [
+      "pyproject.toml",
+      "requirements.txt"
     ]
   },
   "commands": {
@@ -54,5 +61,15 @@
   "preview": {
     "default_url": "http://127.0.0.1:8000",
     "health_path": "/docs"
+  },
+  "safety": {
+    "monetary_budget_usd": 0,
+    "secrets": "FORBIDDEN",
+    "network": "PACKAGE_REGISTRY_AND_LOOPBACK",
+    "environment": "PROCESS_MINIMAL",
+    "data_access": {
+      "read_scope": "PROJECT_TREE",
+      "write_scope": "TOOL_OUTPUTS_ONLY"
+    }
   }
 }

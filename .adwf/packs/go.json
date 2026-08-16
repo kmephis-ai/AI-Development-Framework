@@ -1,1 +1,47 @@
-{"id":"go","language":"go","detect":{"files":["go.mod"]},"commands":{"unit":{"command":["go","test","./..."],"phases":["pr","main"]},"build":{"command":["go","build","./..."],"phases":["pr","main"]}},"preview":{}}
+{
+  "$schema": ".adwf/schemas/project-pack.schema.json",
+  "schema_version": 1,
+  "role": "PROJECT_PACK_DEFINITION",
+  "id": "go",
+  "language": "go",
+  "detect": {
+    "files": [
+      "go.mod"
+    ]
+  },
+  "commands": {
+    "unit": {
+      "command": [
+        "go",
+        "test",
+        "./..."
+      ],
+      "phases": [
+        "pr",
+        "main"
+      ]
+    },
+    "build": {
+      "command": [
+        "go",
+        "build",
+        "./..."
+      ],
+      "phases": [
+        "pr",
+        "main"
+      ]
+    }
+  },
+  "preview": {},
+  "safety": {
+    "monetary_budget_usd": 0,
+    "secrets": "FORBIDDEN",
+    "network": "PACKAGE_REGISTRY",
+    "environment": "PROCESS_MINIMAL",
+    "data_access": {
+      "read_scope": "PROJECT_TREE",
+      "write_scope": "TOOL_OUTPUTS_ONLY"
+    }
+  }
+}

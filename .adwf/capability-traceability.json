@@ -138,9 +138,9 @@
     },
     {
       "id": "PROJECT_PACKS",
-      "status": "IMPLEMENTED",
+      "status": "LIVE_NOT_VERIFIED",
       "execution_mode": "CORE",
-      "owner_claim_ru": "Project Pack не только определяется, но и детерминированно материализует runtime/build/preview configuration через governance flow.",
+      "owner_claim_ru": "Project Pack проходит строгий versioned SDK contract, получает exact digest и только после fail-closed safety validation детерминированно материализует разрешённые runtime/build/preview настройки.",
       "entrypoints": [
         ".adwf/adwf.py",
         ".adwf/scripts/github_bootstrap.py"
@@ -148,12 +148,16 @@
       "production_paths": [
         ".adwf/lib/pack_materializer.py",
         ".adwf/lib/github_bootstrap.py",
-        ".adwf/packs"
+        ".adwf/packs",
+        ".adwf/lib/project_packs.py",
+        ".adwf/schemas/project-pack.schema.json"
       ],
       "verification": [
+        ".adwf/tests/test_project_pack_sdk.py",
         ".adwf/tests/test_v16_remediation.py"
       ],
-      "live_evidence": []
+      "live_evidence": [],
+      "live_boundary": "LIVE_VERIFIED требует downstream provider/runtime evidence от реального consumer, привязанного к exact pack digest; strict schema/unit/CI доказывают SDK implementation, но не heterogeneous consumer conformance."
     },
     {
       "id": "PUBLIC_SAFE_RUNTIME_LEDGER",

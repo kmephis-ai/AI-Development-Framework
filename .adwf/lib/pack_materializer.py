@@ -27,10 +27,11 @@ def materialize_project_pack(project_root:str|Path,framework_root:str|Path,*,app
     pp=cfg.setdefault('project_packs',{})
     desired_runtime={name:{'command':entry.get('command'),'available':entry.get('available',False),'phases':entry.get('phases') or []} for name,entry in (pack.get('commands') or {}).items() if name in {'install','start'}}
     desired_preview=pack.get('preview') or {}
-    for key,value in [('selected',pack['pack']),('materialized',True),('runtime_commands',desired_runtime),('preview',desired_preview)]:
+    desired_safety=pack.get('safety') or {}
+    for key,value in [('selected',pack['pack']),('selected_digest',pack.get('pack_digest')),('materialized',True),('runtime_commands',desired_runtime),('preview',desired_preview),('safety',desired_safety)]:
         if pp.get(key)!=value:changed.append(f'project_packs.{key}')
         pp[key]=value
     if not changed:
-        return {'status':'ALREADY_MATERIALIZED','pack':pack['pack'],'changed':[],'preview':desired_preview,'write_performed':False,'config_path':str(cfg_path),'desired_config':cfg}
+        return {'status':'ALREADY_MATERIALIZED','pack':pack['pack'],'pack_digest':pack.get('pack_digest'),'changed':[],'preview':desired_preview,'safety':desired_safety,'write_performed':False,'config_path':str(cfg_path),'desired_config':cfg}
     if apply:_atomic(cfg_path,cfg)
-    return {'status':'APPLIED' if apply else 'READY_TO_APPLY','pack':pack['pack'],'changed':changed,'preview':desired_preview,'write_performed':apply,'config_path':str(cfg_path),'desired_config':cfg if not apply else None}
+    return {'status':'APPLIED' if apply else 'READY_TO_APPLY','pack':pack['pack'],'pack_digest':pack.get('pack_digest'),'changed':changed,'preview':desired_preview,'safety':desired_safety,'write_performed':apply,'config_path':str(cfg_path),'desired_config':cfg if not apply else None}

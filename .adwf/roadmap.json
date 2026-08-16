@@ -102,6 +102,14 @@
             "LIFECYCLE-002"
           ],
           "product_impact": false
+        },
+        {
+          "roadmap_id": "PACKSDK-001",
+          "title_ru": "Formal Project Pack Contract + Safety Declarations v1",
+          "dependencies": [
+            "LIFECYCLE-003"
+          ],
+          "product_impact": false
         }
       ]
     }
