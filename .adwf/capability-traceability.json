@@ -338,7 +338,7 @@
       "id": "MANAGED_SURFACE_CONTRACT",
       "status": "LIVE_NOT_VERIFIED",
       "execution_mode": "CORE",
-      "owner_claim_ru": "ADWF отличает framework-private, shared-guarded и consumer-owned поверхности, строит fail-closed lifecycle plan и явно применяет adoption транзакционно без перезаписи существующих consumer paths; guarded detach удаляет только provenance-bound exact managed private paths.",
+      "owner_claim_ru": "ADWF отличает framework-private, shared-guarded и consumer-owned поверхности; существующие отличающиеся regular-file SHARED_GUARDED paths adoption сохраняет как exact-digest verification-only без write/ownership authority, а guarded detach удаляет только provenance-bound exact managed private paths.",
       "entrypoints": [
         ".adwf/scripts/validate_managed_surface.py"
       ],

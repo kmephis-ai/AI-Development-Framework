@@ -166,6 +166,14 @@
             "UPGRADE-001"
           ],
           "product_impact": false
+        },
+        {
+          "roadmap_id": "LIFECYCLE-006",
+          "title_ru": "Сохранение существующих SHARED_GUARDED файлов при adoption v1",
+          "dependencies": [
+            "UPGRADE-002"
+          ],
+          "product_impact": false
         }
       ]
     }
