@@ -150,6 +150,14 @@
             "WEBREF-001"
           ],
           "product_impact": false
+        },
+        {
+          "roadmap_id": "UPGRADE-001",
+          "title_ru": "Consumer Framework Upgrade Planning + Compatibility Contract v1",
+          "dependencies": [
+            "ASREF-001"
+          ],
+          "product_impact": false
         }
       ]
     }
