@@ -1,0 +1,112 @@
+name: ADWF GOV-021 Post-Merge Live Certification
+
+on:
+  push:
+    branches:
+      - agent/postmerge-gov021-81da2e96
+
+permissions:
+  contents: read
+  checks: write
+
+env:
+  PYTHONDONTWRITEBYTECODE: "1"
+  MERGE_SHA: 81da2e96f9e2abac47f23e942c7c1866f34ed6d6
+  MERGE_TREE: a5dd370aca67d5ba29e5fc285d1c364f33232edd
+
+jobs:
+  certify:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd
+        with:
+          ref: ${{ env.MERGE_SHA }}
+          persist-credentials: false
+          fetch-depth: 1
+      - uses: actions/setup-python@a309ff8b426b58ec0e2a45f0f869d46889d02405
+        with:
+          python-version: "3.12.10"
+      - name: Verify exact canonical merge and offline capability contract
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "$MERGE_SHA"
+          test "$(git rev-parse HEAD^{tree})" = "$MERGE_TREE"
+          test -z "$(git status --porcelain)"
+          python .adwf/scripts/validate_capabilities.py
+      - name: Fresh provider readback and exact-merge certification check
+        shell: bash
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: |
+          python - <<'PY'
+          import json
+          import os
+          import sys
+          from pathlib import Path
+
+          root = Path.cwd()
+          sys.path.insert(0, str(root / ".adwf"))
+          from lib.capability_live_evidence import verify_provider_certification
+          from lib.github_provider import GitHubClient
+
+          repo = os.environ["GITHUB_REPOSITORY"]
+          token = os.environ["GITHUB_TOKEN"]
+          merge_sha = os.environ["MERGE_SHA"]
+          merge_tree = os.environ["MERGE_TREE"]
+          client = GitHubClient(repo, token)
+
+          main_ref = client.get(f"/repos/{repo}/git/ref/heads/main")
+          current_main = str((main_ref.get("object") or {}).get("sha") or "")
+          if current_main != merge_sha:
+              raise SystemExit(f"POSTMERGE_MAIN_DRIFT:{current_main}")
+          merge_commit = client.get(f"/repos/{repo}/git/commits/{merge_sha}")
+          actual_tree = str((merge_commit.get("tree") or {}).get("sha") or "")
+          if actual_tree != merge_tree:
+              raise SystemExit(f"POSTMERGE_TREE_MISMATCH:{actual_tree}")
+
+          registry = json.loads((root / ".adwf" / "capability-live-evidence.json").read_text(encoding="utf-8"))
+          certs = registry.get("certifications") or []
+          if len(certs) != 1:
+              raise SystemExit(f"POSTMERGE_CERT_COUNT:{len(certs)}")
+          cert = certs[0]
+          if cert.get("id") != "CERT-UPGRADE-003-PRIHRASH-EXTERNAL":
+              raise SystemExit("POSTMERGE_CERT_ID_MISMATCH")
+
+          result = verify_provider_certification(client, cert)
+          if result.get("verified") is not True:
+              raise SystemExit("POSTMERGE_PROVIDER_NOT_VERIFIED:" + ",".join(result.get("reason_codes") or []))
+
+          provider = cert.get("provider") or {}
+          subject = cert.get("subject") or {}
+          consumer = cert.get("consumer") or {}
+          text = (
+              f"merge_sha={merge_sha} tree={merge_tree}\n"
+              f"certification_id={cert.get('id')} registry_sha256={registry.get('registry_sha256')}\n"
+              f"certified_subject={subject.get('sha')} proof_run={provider.get('workflow_run_id')} proof_check={provider.get('check_run_id')}\n"
+              f"consumer={consumer.get('repository')}@{consumer.get('sha')} tree={consumer.get('tree')}\n"
+              f"external_source_unchanged={str(cert.get('external_source_unchanged')).lower()} write_back_performed={str(cert.get('write_back_performed')).lower()}"
+          )
+          payload = {
+              "name": "adwf/capability-live-evidence-provider",
+              "head_sha": merge_sha,
+              "status": "completed",
+              "conclusion": "success",
+              "output": {
+                  "title": "GOV-021 post-merge provider live evidence — PASS",
+                  "summary": "PASS: canonical merge independently re-read the durable external-consumer certification from GitHub.",
+                  "text": text,
+              },
+          }
+          created = client.post(f"/repos/{repo}/check-runs", payload)
+          print(json.dumps({
+              "status": "PASS",
+              "merge_sha": merge_sha,
+              "merge_tree": merge_tree,
+              "check_run_id": created.get("id"),
+              "certification_id": cert.get("id"),
+              "registry_sha256": registry.get("registry_sha256"),
+              "provider_result": result,
+          }, ensure_ascii=False, sort_keys=True))
+          PY
