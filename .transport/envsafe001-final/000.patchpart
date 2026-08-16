@@ -1,0 +1,277 @@
+diff --git a/.adwf/capability-traceability.json b/.adwf/capability-traceability.json
+index 9d4a66a..9f5a711 100644
+--- a/.adwf/capability-traceability.json
++++ b/.adwf/capability-traceability.json
+@@ -358,6 +358,28 @@
+       ],
+       "live_boundary": "LIVE_VERIFIED требует evidence от реального consumer repository: transactional adoption + durable snapshot и последующий guarded detach/recovery outcome с доказательством сохранности shared/pre-existing/consumer-owned data; synthetic/unit/CI tests подтверждают implementation, но не live consumer truth.",
+       "live_evidence": []
++    },
++    {
++      "id": "PROJECT_RUNTIME_SAFETY",
++      "status": "LIVE_NOT_VERIFIED",
++      "execution_mode": "CORE",
++      "owner_claim_ru": "Consumer Project Pack commands привязаны к exact validated pack digest, получают минимальное child environment и исполняются в независимом exact-revision Git clone без автоматического переноса записей обратно в canonical project tree.",
++      "entrypoints": [
++        ".adwf/scripts/run_project_gates.py",
++        ".adwf/scripts/run_preview.py"
++      ],
++      "production_paths": [
++        ".adwf/lib/project_execution.py",
++        ".adwf/lib/preview_engine.py",
++        ".adwf/schemas/project-execution-evidence.schema.json"
++      ],
++      "verification": [
++        ".adwf/tests/test_project_execution_safety.py",
++        ".adwf/tests/test_project_pack_sdk.py",
++        ".adwf/tests/test_v15_executive.py"
++      ],
++      "live_boundary": "LIVE_VERIFIED требует real consumer/provider evidence, привязанное к exact pack digest и source revision. Portable v1 доказывает direct env minimization и canonical-tree isolation, но network остаётся DECLARATION_ONLY_NOT_ENFORCED и не выдаётся за OS/domain sandbox.",
++      "live_evidence": []
+     }
+   ]
+ }
+diff --git a/.adwf/decision-requirement-traceability.json b/.adwf/decision-requirement-traceability.json
+index 4b9ac71..be0a7b2 100644
+--- a/.adwf/decision-requirement-traceability.json
++++ b/.adwf/decision-requirement-traceability.json
+@@ -2,7 +2,7 @@
+   "$schema": ".adwf/schemas/decision-requirement-traceability.schema.json",
+   "schema_version": 1,
+   "role": "CANONICAL_DECISION_REQUIREMENT_TRACEABILITY",
+-  "revision": 5,
++  "revision": 6,
+   "records": [
+     {
+       "id": "INTENT-FOUNDATION-20260815",
+@@ -102,6 +102,28 @@
+       "source_path": null,
+       "source_sha256": null,
+       "record_sha256": "f21064652a42364530ade11fbec9234052ed12512d40d9082257530824d42e67"
++    },
++    {
++      "id": "REQ-ENVSAFE-001",
++      "kind": "REQUIREMENT",
++      "version": 1,
++      "status": "ACTIVE",
++      "title_ru": "Project command safety declaration должна иметь реальный runtime enforcement baseline",
++      "statement_ru": "Consumer Project Pack command не должен наследовать secrets или исполняться прямо в canonical checkout; exact pack/config binding, environment minimization, data-write isolation и network enforcement truth должны проверяться fail-closed до/после execution.",
++      "source_path": null,
++      "source_sha256": null,
++      "record_sha256": "2a4e26d9dc451cf779dbbcc7f71f467cc6cc6375605bc4ae08d190a34238d6b3"
++    },
++    {
++      "id": "DEC-ENVSAFE-001",
++      "kind": "DECISION",
++      "version": 1,
++      "status": "ACCEPTED",
++      "title_ru": "Portable baseline использует independent exact Git clone и truthful network non-enforcement",
++      "statement_ru": "Выполнять consumer project commands в independent local Git clone exact HEAD/tree с minimal child environment, exact pack digest/safety binding, tracked-mutation/canonical-integrity postconditions и self-sealed runtime evidence; network declaration хранить отдельно от enforcement и не заявлять packet/domain sandbox без provider/OS primitive.",
++      "source_path": null,
++      "source_sha256": null,
++      "record_sha256": "bf565176beacb15c98b873661b240b8aa53d4ce4a7b9db2294677147e9855156"
+     }
+   ],
+   "capability_refs": [
+@@ -119,6 +141,11 @@
+       "id": "CAPREF-PROJECT-PACKS",
+       "capability_id": "PROJECT_PACKS",
+       "ref_sha256": "fe2bc5b3d913f52c38249fe11db8122b7ecd4959b7f1f91b9a8e71c0c5c99205"
++    },
++    {
++      "id": "CAPREF-PROJECT-RUNTIME-SAFETY",
++      "capability_id": "PROJECT_RUNTIME_SAFETY",
++      "ref_sha256": "c32087126a6ecd2b239d9987449f24d9f4fae6f3b2a4b470b2dab88aaab55ee0"
+     }
+   ],
+   "work_unit_refs": [
+@@ -156,6 +183,13 @@
+       "issue_number": 66,
+       "ai_work_package_id": null,
+       "ref_sha256": "6c602509b44fd6ed1d10c9358d0ec19f7aa78277cf65a44698c0ea64f68e3c12"
++    },
++    {
++      "id": "WORKREF-ENVSAFE-001",
++      "roadmap_id": "ENVSAFE-001",
++      "issue_number": 68,
++      "ai_work_package_id": null,
++      "ref_sha256": "31e50fa79462cf627a5919e6a40c29c990fc86aa6e1b4ddcf99b95413c782159"
+     }
+   ],
+   "evidence_refs": [],
+@@ -285,7 +319,35 @@
+       "from": "CAPREF-PROJECT-PACKS",
+       "to": "WORKREF-PACKSDK-001",
+       "edge_sha256": "3b199d2f391e09be82a02094a7a15a6378d177f98f82cf969b5db90dcbc64e4b"
++    },
++    {
++      "id": "EDGE-INTENT-REQ-ENVSAFE-001",
++      "type": "INTENT_TO_REQUIREMENT",
++      "from": "INTENT-FOUNDATION-20260815",
++      "to": "REQ-ENVSAFE-001",
++      "edge_sha256": "b17c2620063151e88573be38443b253b707408954e8e4677a9f181d242cf3d66"
++    },
++    {
++      "id": "EDGE-REQ-DEC-ENVSAFE-001",
++      "type": "REQUIREMENT_TO_DECISION",
++      "from": "REQ-ENVSAFE-001",
++      "to": "DEC-ENVSAFE-001",
++      "edge_sha256": "63146deec21c1f60d204877097998c2ea663435143d606f3fb4f1ea52e34e12a"
++    },
++    {
++      "id": "EDGE-DEC-CAP-ENVSAFE-001",
++      "type": "DECISION_TO_CAPABILITY",
++      "from": "DEC-ENVSAFE-001",
++      "to": "CAPREF-PROJECT-RUNTIME-SAFETY",
++      "edge_sha256": "0e14881f77e402971e9a0e9602169684a8630f70a6f460851987d501864057f2"
++    },
++    {
++      "id": "EDGE-CAP-WORK-ENVSAFE-001",
++      "type": "CAPABILITY_TO_WORK",
++      "from": "CAPREF-PROJECT-RUNTIME-SAFETY",
++      "to": "WORKREF-ENVSAFE-001",
++      "edge_sha256": "7945171d649f34a9fc4946f69a550d97de7fe340feba81ffa847e59f8181456b"
+     }
+   ],
+-  "graph_sha256": "0e084384c208f79d26bc0c175d4c6c3d0e3c79615c1d23135f09789c8b1d777f"
++  "graph_sha256": "8b04fddb259cdbc7a85d1d0cf72523485e0c358c6b8179ec2a2d24bd92fd1012"
+ }
+diff --git a/.adwf/docs-registry.json b/.adwf/docs-registry.json
+index e541ff8..5a1d530 100644
+--- a/.adwf/docs-registry.json
++++ b/.adwf/docs-registry.json
+@@ -11,9 +11,9 @@
+         ".github/workflows/**"
+       ],
+       "mode": "generated-status-block+manual",
+-      "source_digest": "dbbcd487fe0f54654d03f4cb8f269e62776fc317a4e780ed1b595c463f0b3a05",
+-      "reviewed_at": "2026-08-16T07:00:00Z",
+-      "valid_until": "2026-11-16T07:00:00Z"
++      "source_digest": "521a78ed77861e4364ce4ffb84930de4dad423dfd6a50853b3e240a96ffdce13",
++      "reviewed_at": "2026-08-16T07:35:00Z",
++      "valid_until": "2026-11-16T07:35:00Z"
+     },
+     {
+       "path": "AGENTS.md",
+@@ -24,9 +24,9 @@
+         "skills/**"
+       ],
+       "mode": "manual-governance",
+-      "source_digest": "ec7f8d012cc47ddb2606bfbbe744efdcb8d4d9331503ebe972be4c392e61a4ee",
+-      "reviewed_at": "2026-08-16T07:00:00Z",
+-      "valid_until": "2026-11-16T07:00:00Z"
++      "source_digest": "830eff8e7516c0e5cb53f1d235b7c8921a105652a988089f3dee6ab8514836e1",
++      "reviewed_at": "2026-08-16T07:35:00Z",
++      "valid_until": "2026-11-16T07:35:00Z"
+     },
+     {
+       "path": "docs/architecture/CI_CD_ARCHITECTURE.md",
+@@ -37,9 +37,9 @@
+         ".adwf/scripts/**"
+       ],
+       "mode": "architecture",
+-      "source_digest": "83f6f84c8f6407611d8f0744ebf21f744e085d82f6fc8e525de1178f7bcf671c",
+-      "reviewed_at": "2026-08-16T07:00:00Z",
+-      "valid_until": "2026-11-16T07:00:00Z"
++      "source_digest": "e7b58e8faef4a93ec51304204f1da8a679323b2eab2deac2e07143aa3c9eb300",
++      "reviewed_at": "2026-08-16T07:35:00Z",
++      "valid_until": "2026-11-16T07:35:00Z"
+     },
+     {
+       "path": "CONTROL_CENTER.md",
+@@ -50,8 +50,8 @@
+       ],
+       "mode": "generated",
+       "source_digest": "bf76d0c9ddcd11614474038c97c363480abdaa7bba2d46f2f65af1b6a1bed5f7",
+-      "reviewed_at": "2026-08-16T07:00:00Z",
+-      "valid_until": "2026-11-16T07:00:00Z"
++      "reviewed_at": "2026-08-16T07:35:00Z",
++      "valid_until": "2026-11-16T07:35:00Z"
+     },
+     {
+       "path": "docs/V1_6_IMPLEMENTATION_REPORT.md",
+@@ -65,9 +65,9 @@
+         ".adwf/scripts/validate_capabilities.py"
+       ],
+       "mode": "implementation-certification",
+-      "source_digest": "b67d0ef085fad889a7fa7d9ec383b526dde35f4a7fd6b7590441297be2af61db",
+-      "reviewed_at": "2026-08-16T07:00:00Z",
+-      "valid_until": "2026-11-16T07:00:00Z"
++      "source_digest": "84e0f7168b05e21dd7962079b6c246b96b3714a12c978d5010f77bb5e57c2186",
++      "reviewed_at": "2026-08-16T07:35:00Z",
++      "valid_until": "2026-11-16T07:35:00Z"
+     },
+     {
+       "path": "docs/operations/OWNER_AI_GUIDE.md",
+@@ -79,8 +79,8 @@
+       ],
+       "mode": "owner-guide",
+       "source_digest": "825bce6785f2038c6acd5cf1e48eb9a914a18fed713efa8eb2be6e28d104e2ed",
+-      "reviewed_at": "2026-08-16T07:00:00Z",
+-      "valid_until": "2026-11-16T07:00:00Z"
++      "reviewed_at": "2026-08-16T07:35:00Z",
++      "valid_until": "2026-11-16T07:35:00Z"
+     },
+     {
+       "path": "docs/governance/RECOVERY_PLAYBOOK.md",
+@@ -92,8 +92,8 @@
+       ],
+       "mode": "governance",
+       "source_digest": "68f0c11d641d731c0a6560fe566f0aeb307aed37ed5bd812cf1773ef4ca7b3e4",
+-      "reviewed_at": "2026-08-16T07:00:00Z",
+-      "valid_until": "2026-11-16T07:00:00Z"
++      "reviewed_at": "2026-08-16T07:35:00Z",
++      "valid_until": "2026-11-16T07:35:00Z"
+     },
+     {
+       "path": "docs/operations/FREE_LIMITS_AND_NOTIFICATIONS.md",
+@@ -105,8 +105,8 @@
+       ],
+       "mode": "provider-facts",
+       "source_digest": "61094eb026194041ef8d6e7dd8a0efc3c17182b12bbb3313cc6460ce342d60a9",
+-      "reviewed_at": "2026-08-16T07:00:00Z",
+-      "valid_until": "2026-11-16T07:00:00Z"
++      "reviewed_at": "2026-08-16T07:35:00Z",
++      "valid_until": "2026-11-16T07:35:00Z"
+     },
+     {
+       "path": "docs/operations/SKILL_OPERATING_LAYER.md",
+@@ -122,8 +122,8 @@
+       ],
+       "mode": "operations",
+       "source_digest": "b73efed85abf805badba59d14e7328e81a3613d39892d641b8c4eb2d686cf566",
+-      "reviewed_at": "2026-08-16T07:00:00Z",
+-      "valid_until": "2026-11-16T07:00:00Z"
++      "reviewed_at": "2026-08-16T07:35:00Z",
++      "valid_until": "2026-11-16T07:35:00Z"
+     },
+     {
+       "path": "docs/governance/AI_WORK_CONTRACTS.md",
+@@ -138,8 +138,8 @@
+       ],
+       "mode": "governance",
+       "source_digest": "252af6d74df0e9aee929aad28fe3f56ad33a6a6e7a4180cf2dc3f89180d9f4b5",
+-      "reviewed_at": "2026-08-16T07:00:00Z",
+-      "valid_until": "2026-11-16T07:00:00Z"
++      "reviewed_at": "2026-08-16T07:35:00Z",
++      "valid_until": "2026-11-16T07:35:00Z"
+     },
+     {
+       "path": "docs/governance/DECISION_REQUIREMENT_TRACEABILITY.md",
+@@ -153,9 +153,9 @@
+         ".adwf/roadmap.json"
+       ],
+       "mode": "governance",
+-      "source_digest": "d60e89d179b09cb36c485f05913e88d1d0a4574c50f2b5a10b24d0c4d0184be7",
+-      "reviewed_at": "2026-08-16T07:00:00Z",
+-      "valid_until": "2026-11-16T07:00:00Z"
++      "source_digest": "8e1868c318b717a9f2dc07d61e2a7197b63423af057431d23ba4ce6b9f5b4157",
++      "reviewed_at": "2026-08-16T07:35:00Z",
++      "valid_until": "2026-11-16T07:35:00Z"
+     },
+     {
+       "path": "docs/governance/PROJECT_PACK_SDK.md",
+@@ -164,12 +164,32 @@
+         ".adwf/lib/project_packs.py",
+         ".adwf/lib/pack_materializer.py",
+         ".adwf/schemas/project-pack.schema.json",
