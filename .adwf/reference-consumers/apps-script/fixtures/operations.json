@@ -1,0 +1,14 @@
+{
+  "sheet": "Operations",
+  "rows": [
+    ["kind", "amount"],
+    ["income", 1250],
+    ["expense", 300],
+    ["expense", 125],
+    ["income", 50]
+  ],
+  "expected": {
+    "income": 1300,
+    "expense": 425
+  }
+}

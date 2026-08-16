@@ -42,7 +42,10 @@
       "pattern": "^RCF-[0-9a-f]{32}$"
     },
     "consumer_class": {
-      "const": "STANDARD_WEB"
+      "enum": [
+        "STANDARD_WEB",
+        "APPS_SCRIPT_DATA_CENTRIC"
+      ]
     },
     "reference_kind": {
       "const": "SYNTHETIC_REFERENCE_CONSUMER"
@@ -108,7 +111,10 @@
       ],
       "properties": {
         "id": {
-          "const": "react"
+          "enum": [
+            "react",
+            "apps-script"
+          ]
         },
         "digest": {
           "type": "string",
@@ -213,45 +219,75 @@
       ],
       "properties": {
         "status": {
-          "const": "PASS"
+          "enum": [
+            "PASS",
+            "NOT_APPLICABLE"
+          ]
         },
         "capture_mode": {
           "enum": [
             "LIVE_BROWSER",
-            "SIMULATED_TEST"
+            "SIMULATED_TEST",
+            "NOT_APPLICABLE"
           ]
         },
         "head_sha": {
-          "type": "string",
+          "type": [
+            "string",
+            "null"
+          ],
           "pattern": "^[0-9a-f]{40}$"
         },
         "pack_digest": {
-          "type": "string",
+          "type": [
+            "string",
+            "null"
+          ],
           "format": "sha256"
         },
         "execution_id": {
-          "type": "string",
+          "type": [
+            "string",
+            "null"
+          ],
           "pattern": "^PEX-[0-9a-f]{32}$"
         },
         "execution_evidence_sha256": {
-          "type": "string",
+          "type": [
+            "string",
+            "null"
+          ],
           "format": "sha256"
         },
         "preview_digest": {
-          "type": "string",
+          "type": [
+            "string",
+            "null"
+          ],
           "format": "sha256"
         },
         "attestation_id": {
-          "type": "string",
+          "type": [
+            "string",
+            "null"
+          ],
           "format": "sha256"
         },
         "screenshot_digests": {
           "type": "array",
-          "minItems": 1,
+          "minItems": 0,
           "items": {
             "type": "string",
             "format": "sha256"
           }
+        },
+        "reason": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "minLength": 1,
+          "maxLength": 128
         }
       }
     },
@@ -374,10 +410,16 @@
       ],
       "properties": {
         "project_name": {
-          "const": "ADWF Reference Web Consumer"
+          "enum": [
+            "ADWF Reference Web Consumer",
+            "ADWF Reference Apps Script Consumer"
+          ]
         },
         "project_type": {
-          "const": "react"
+          "enum": [
+            "react",
+            "apps-script"
+          ]
         },
         "runtime_product": {
           "const": true
@@ -389,7 +431,10 @@
           "const": "PRIVATE"
         },
         "pack_selected": {
-          "const": "react"
+          "enum": [
+            "react",
+            "apps-script"
+          ]
         },
         "pack_digest": {
           "type": "string",
@@ -397,6 +442,50 @@
         },
         "pack_materialized": {
           "const": true
+        }
+      }
+    },
+    "functional": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "status",
+        "mode",
+        "gate_execution_id",
+        "script_sha256",
+        "manifest_sha256",
+        "fixture_sha256",
+        "google_credentials_required",
+        "external_network_required"
+      ],
+      "properties": {
+        "status": {
+          "const": "PASS"
+        },
+        "mode": {
+          "const": "LOCAL_DETERMINISTIC_APPS_SCRIPT_SHIM"
+        },
+        "gate_execution_id": {
+          "type": "string",
+          "pattern": "^PEX-[0-9a-f]{32}$"
+        },
+        "script_sha256": {
+          "type": "string",
+          "format": "sha256"
+        },
+        "manifest_sha256": {
+          "type": "string",
+          "format": "sha256"
+        },
+        "fixture_sha256": {
+          "type": "string",
+          "format": "sha256"
+        },
+        "google_credentials_required": {
+          "const": false
+        },
+        "external_network_required": {
+          "const": false
         }
       }
     }

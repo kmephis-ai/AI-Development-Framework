@@ -422,6 +422,27 @@
       ],
       "live_boundary": "REFERENCE_CONFORMANCE_REPORT доказывает встроенный synthetic/reference harness и exact evidence binding. LIVE_VERIFIED требует отдельного реального downstream web consumer repository/provider cycle; reference fixture, CI и provider-side synthetic run не являются такой live evidence. Shared-guarded merge и generalized re-adoption/upgrade epoch semantics beyond the distinct-plan reference path остаются отдельными lifecycle capabilities.",
       "live_evidence": []
+    },
+    {
+      "id": "REFERENCE_APPS_SCRIPT_CONFORMANCE",
+      "status": "LIVE_NOT_VERIFIED",
+      "execution_mode": "CORE",
+      "owner_claim_ru": "ADWF может прогнать отдельный synthetic Apps Script/data-centric consumer через transactional adoption, sealed consumer profile/apps-script Project Pack, isolated local-only gates и guarded detach, связывая functional proof с exact execution evidence без подмены local shim реальным Google runtime.",
+      "entrypoints": [
+        ".adwf/scripts/reference_apps_script_conformance.py"
+      ],
+      "production_paths": [
+        ".adwf/lib/reference_conformance.py",
+        ".adwf/schemas/reference-conformance-report.schema.json",
+        ".adwf/packs/apps-script.json",
+        ".adwf/reference-consumers/apps-script"
+      ],
+      "verification": [
+        ".adwf/tests/test_reference_apps_script_conformance.py",
+        ".adwf/tests/test_project_pack_sdk.py"
+      ],
+      "live_boundary": "REFERENCE_CONFORMANCE_REPORT доказывает synthetic/local Apps Script reference path без Google credentials/network/deployment. LIVE_VERIFIED требует отдельного реального downstream Apps Script consumer repository и actual Google runtime/provider evidence, привязанного к exact consumer revision и apps-script pack digest; local Node vm shim, CI и provider-side synthetic run не считаются такой live evidence.",
+      "live_evidence": []
     }
   ]
 }

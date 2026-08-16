@@ -11,7 +11,7 @@ import sys
 
 ROOT=Path(__file__).resolve().parents[2]
 sys.path.insert(0,str(ROOT/'.adwf'))
-from lib.project_packs import ProjectPackError, detect_pack, load_packs, pack_digest
+from lib.project_packs import ProjectPackError, detect_pack, load_packs, pack_digest, validate_pack_definition
 from lib.pack_materializer import materialize_project_pack
 
 
@@ -31,7 +31,7 @@ class ProjectPackSdkTests(unittest.TestCase):
 
     def test_all_builtin_packs_are_strict_and_digest_stable(self):
         a=load_packs(ROOT);b=load_packs(ROOT)
-        self.assertEqual(set(a),{'react','vue','angular','fastapi','node','python','go'})
+        self.assertEqual(set(a),{'apps-script','react','vue','angular','fastapi','node','python','go'})
         self.assertEqual({k:v['digest'] for k,v in a.items()},{k:v['digest'] for k,v in b.items()})
         self.assertTrue(all(len(v['digest'])==64 for v in a.values()))
 
@@ -41,6 +41,30 @@ class ProjectPackSdkTests(unittest.TestCase):
             out=detect_pack(p,ROOT)
             self.assertEqual(out['pack'],'react');self.assertEqual(out['candidates'][:2],['react','node'])
             self.assertEqual(out['pack_digest'],load_packs(ROOT)['react']['digest'])
+
+
+    def test_apps_script_marker_wins_over_generic_node_without_network_install(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            p=Path(tmp)
+            (p/'appsscript.json').write_text('{"runtimeVersion":"V8"}\n',encoding='utf-8')
+            (p/'package.json').write_text(json.dumps({'scripts':{'lint':'node x','test':'node x','build':'node x'}}),encoding='utf-8')
+            out=detect_pack(p,ROOT)
+            self.assertEqual(out['pack'],'apps-script')
+            self.assertEqual(out['candidates'][:2],['apps-script','node'])
+            definition=out['definition']
+            self.assertEqual(definition['safety']['network'],'NONE')
+            self.assertNotIn('install',definition['commands'])
+            self.assertEqual(definition['preview'],{})
+
+    def test_apps_script_pack_rejects_network_install_or_preview_expansion(self):
+        definition=copy.deepcopy(load_packs(ROOT)['apps-script']['definition'])
+        definition['safety']['network']='PACKAGE_REGISTRY'
+        definition['commands']['install']={'command':['npm','ci'],'phases':['pr']}
+        definition['preview']={'default_url':'http://127.0.0.1:4173'}
+        errors=validate_pack_definition(definition,ROOT,path=Path('apps-script.json'))
+        self.assertIn('APPS_SCRIPT_NETWORK_MUST_BE_NONE',errors)
+        self.assertIn('APPS_SCRIPT_INSTALL_COMMAND_FORBIDDEN',errors)
+        self.assertIn('APPS_SCRIPT_PREVIEW_RUNTIME_FORBIDDEN',errors)
 
     def test_fastapi_contains_detection_is_definition_driven(self):
         with tempfile.TemporaryDirectory() as tmp:
