@@ -6,6 +6,7 @@ import argparse,base64,hashlib,json,os,re,sys,tempfile
 ROOT=Path(__file__).resolve().parents[2];sys.path.insert(0,str(ROOT/'.adwf'))
 from lib.github_auth import detect_repository,discover_token
 from lib.github_provider import GitHubClient
+from lib.provider_contracts import ProviderContractError
 from lib.strict_json import loads as strict_loads
 SHA=re.compile(r'^[0-9a-f]{40}$');DIGEST=re.compile(r'^[0-9a-f]{64}$');PREFIX='ADWF_PREVIEW_ATTESTATION_V1='
 PREVIEW_STEP='Exact-revision Playwright preview'
@@ -67,7 +68,11 @@ def collect(client:GitHubClient,event:dict)->dict:
     # is unavailable, the provider call fails and certification remains fail-closed.
     jid=job.get('id')
     if not isinstance(jid,int):return {'status':'NOT_VERIFIED','reason':'PREVIEW_JOB_ID_INVALID','head_sha':sha}
-    marker=_decode(client.job_logs(jid))
+    try:
+        logs=client.job_logs(jid)
+    except ProviderContractError:
+        return {'status':'NOT_VERIFIED','reason':'PREVIEW_LOG_READBACK_UNAVAILABLE','head_sha':sha,'workflow_run_id':rid,'job_id':jid}
+    marker=_decode(logs)
     if marker is None:return {'status':'NOT_VERIFIED','reason':'SINGLE_PREVIEW_LOG_MARKER_REQUIRED','matches':0,'head_sha':sha}
     value=marker
     if value.get('schema_version')!=1 or value.get('head_sha')!=sha or DIGEST.fullmatch(str(value.get('preview_digest') or '')) is None:return {'status':'NOT_VERIFIED','reason':'PREVIEW_MARKER_BINDING_INVALID','head_sha':sha}
