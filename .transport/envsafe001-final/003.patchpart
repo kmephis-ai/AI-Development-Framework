@@ -1,0 +1,244 @@
++        canonical_ok = self._canonical_ok()
++        self._canonical_integrity = "PASS" if canonical_ok else "BLOCK"
++        if not canonical_ok:
++            self._reason_codes.append("PROJECT_CANONICAL_SOURCE_MUTATED")
++        evidence = {
++            "$schema": ".adwf/schemas/project-execution-evidence.schema.json",
++            "schema_version": 1,
++            "role": "PROJECT_EXECUTION_EVIDENCE",
++            "execution_id": self.execution_id,
++            "purpose": self.purpose,
++            "head_sha": self._head,
++            "tree_sha": self._tree,
++            "pack_id": self.binding["pack"],
++            "pack_digest": self.binding["pack_digest"],
++            "environment_policy": "PROCESS_MINIMAL",
++            "environment_names": sorted(self._env or {}),
++            "secret_like_inherited": False,
++            "declared_network": self.binding["safety"]["network"],
++            "network_enforcement": NETWORK_ENFORCEMENT,
++            "data_write_policy": "DISPOSABLE_INDEPENDENT_GIT_CLONE",
++            "canonical_source_integrity": self._canonical_integrity,
++            "commands": copy.deepcopy(self._records),
++            "outcome": "PASS" if self._canonical_integrity == "PASS" and not self._reason_codes else "BLOCK",
++            "reason_codes": list(dict.fromkeys(self._reason_codes)),
++            "created_at": datetime.now(timezone.utc).isoformat().replace("+00:00", "Z"),
++        }
++        return _seal_evidence(evidence)
++
++    def _persist_evidence(self) -> dict[str, Any]:
++        evidence = self._build_evidence()
++        errors = validate_execution_evidence(
++            evidence, self.framework_root, expected_head=self._head, expected_pack_digest=self.binding["pack_digest"],
++        )
++        if errors:
++            raise ProjectExecutionError("PROJECT_EXECUTION_EVIDENCE_INVALID:" + errors[0])
++        target = self.project_root / ".adwf-runtime/project-execution" / f"{self.execution_id}.json"
++        target.parent.mkdir(parents=True, exist_ok=True)
++        fd, temp_name = tempfile.mkstemp(prefix=target.name + ".", dir=target.parent)
++        try:
++            with os.fdopen(fd, "w", encoding="utf-8") as handle:
++                json.dump(evidence, handle, ensure_ascii=False, indent=2)
++                handle.write("\n")
++                handle.flush(); os.fsync(handle.fileno())
++            os.replace(temp_name, target)
++        finally:
++            if os.path.exists(temp_name):
++                os.unlink(temp_name)
++        self.evidence = evidence
++        return evidence
++
++    def __exit__(self, exc_type, exc, tb) -> bool:
++        if exc is not None and isinstance(exc, ProjectExecutionError):
++            self._reason_codes.append(str(exc).split(":", 1)[0])
++        evidence_error: Exception | None = None
++        try:
++            self._persist_evidence()
++        except Exception as persist_exc:  # fail closed after cleanup
++            evidence_error = persist_exc
++        finally:
++            if self._tmp is not None:
++                self._tmp.cleanup(); self._tmp = None
++                self.workspace = None
++        if exc is not None:
++            return False
++        if evidence_error is not None:
++            raise evidence_error
++        return False
+diff --git a/.adwf/roadmap.json b/.adwf/roadmap.json
+index 4a3b5fc..5ec78e0 100644
+--- a/.adwf/roadmap.json
++++ b/.adwf/roadmap.json
+@@ -110,6 +110,14 @@
+             "LIFECYCLE-003"
+           ],
+           "product_impact": false
++        },
++        {
++          "roadmap_id": "ENVSAFE-001",
++          "title_ru": "Project Command Runtime Environment/Data Safety Envelope v1",
++          "dependencies": [
++            "PACKSDK-001"
++          ],
++          "product_impact": false
+         }
+       ]
+     }
+diff --git a/.adwf/schemas/project-execution-evidence.schema.json b/.adwf/schemas/project-execution-evidence.schema.json
+new file mode 100644
+index 0000000..1ec2fbd
+--- /dev/null
++++ b/.adwf/schemas/project-execution-evidence.schema.json
+@@ -0,0 +1,57 @@
++{
++  "$schema": "https://json-schema.org/draft/2020-12/schema",
++  "title": "ADWF Project Execution Evidence v1",
++  "type": "object",
++  "additionalProperties": false,
++  "required": [
++    "$schema", "schema_version", "role", "execution_id", "purpose", "head_sha", "tree_sha",
++    "pack_id", "pack_digest", "environment_policy", "environment_names", "secret_like_inherited",
++    "declared_network", "network_enforcement", "data_write_policy", "canonical_source_integrity",
++    "commands", "outcome", "reason_codes", "created_at", "evidence_sha256"
++  ],
++  "properties": {
++    "$schema": {"const": ".adwf/schemas/project-execution-evidence.schema.json"},
++    "schema_version": {"const": 1},
++    "role": {"const": "PROJECT_EXECUTION_EVIDENCE"},
++    "execution_id": {"type": "string", "pattern": "^PEX-[0-9a-f]{32}$"},
++    "purpose": {"type": "string", "minLength": 1, "maxLength": 64},
++    "head_sha": {"type": "string", "pattern": "^[0-9a-f]{40}$"},
++    "tree_sha": {"type": "string", "pattern": "^[0-9a-f]{40}$"},
++    "pack_id": {"type": "string", "minLength": 1, "maxLength": 32},
++    "pack_digest": {"type": "string", "format": "sha256"},
++    "environment_policy": {"const": "PROCESS_MINIMAL"},
++    "environment_names": {
++      "type": "array", "uniqueItems": true, "items": {"type": "string", "minLength": 1, "maxLength": 64}
++    },
++    "secret_like_inherited": {"const": false},
++    "declared_network": {"enum": ["NONE", "LOOPBACK", "PACKAGE_REGISTRY", "PACKAGE_REGISTRY_AND_LOOPBACK"]},
++    "network_enforcement": {"const": "DECLARATION_ONLY_NOT_ENFORCED"},
++    "data_write_policy": {"const": "DISPOSABLE_INDEPENDENT_GIT_CLONE"},
++    "canonical_source_integrity": {"enum": ["PASS", "BLOCK"]},
++    "commands": {
++      "type": "array",
++      "items": {
++        "type": "object",
++        "additionalProperties": false,
++        "required": [
++          "name", "kind", "argv_sha256", "returncode", "safety_status", "reason_codes",
++          "tracked_mutation_count", "untracked_output_count"
++        ],
++        "properties": {
++          "name": {"type": "string", "minLength": 1, "maxLength": 64},
++          "kind": {"enum": ["PACK_COMMAND", "FRAMEWORK_TOOL"]},
++          "argv_sha256": {"type": "string", "format": "sha256"},
++          "returncode": {"type": "integer", "minimum": -2147483648, "maximum": 2147483647},
++          "safety_status": {"enum": ["PASS", "BLOCK"]},
++          "reason_codes": {"type": "array", "uniqueItems": true, "items": {"type": "string", "minLength": 1, "maxLength": 128}},
++          "tracked_mutation_count": {"type": "integer", "minimum": 0},
++          "untracked_output_count": {"type": "integer", "minimum": 0}
++        }
++      }
++    },
++    "outcome": {"enum": ["PASS", "BLOCK"]},
++    "reason_codes": {"type": "array", "uniqueItems": true, "items": {"type": "string", "minLength": 1, "maxLength": 128}},
++    "created_at": {"type": "string", "minLength": 20, "maxLength": 64},
++    "evidence_sha256": {"type": "string", "format": "sha256"}
++  }
++}
+diff --git a/.adwf/scripts/run_preview.py b/.adwf/scripts/run_preview.py
+index 17a723b..d6c9371 100644
+--- a/.adwf/scripts/run_preview.py
++++ b/.adwf/scripts/run_preview.py
+@@ -1,40 +1,136 @@
+ #!/usr/bin/env python3
+-"""Start the exact checked-out project revision and capture Playwright preview."""
++"""Start exact consumer revision in a disposable safety envelope and capture preview."""
+ from __future__ import annotations
++
+ from pathlib import Path
+-import argparse,json,subprocess,sys,time,urllib.request,os,signal,base64
+-ROOT=Path(__file__).resolve().parents[2];sys.path.insert(0,str(ROOT/'.adwf'))
+-from lib.project_packs import commands_for_pack
+-from lib.preview_engine import capture_preview
+-
+-def wait(url:str,timeout:int=60)->None:
+-    end=time.time()+timeout
+-    while time.time()<end:
++import argparse
++import base64
++import json
++import os
++import signal
++import subprocess
++import sys
++import time
++import urllib.request
++
++ROOT = Path(__file__).resolve().parents[2]
++sys.path.insert(0, str(ROOT / ".adwf"))
++from lib.preview_engine import capture_preview  # noqa: E402
++from lib.project_execution import ProjectExecutionError, ProjectExecutionSession, load_bound_project_pack  # noqa: E402
++
++
++def wait(url: str, timeout: int = 60) -> None:
++    end = time.time() + timeout
++    while time.time() < end:
+         try:
+-            with urllib.request.urlopen(url,timeout=2) as r:
+-                if r.status<500:return
+-        except Exception:time.sleep(.5)
+-    raise ValueError('PREVIEW_SERVER_NOT_READY')
+-
+-def main()->int:
+-    p=argparse.ArgumentParser();p.add_argument('--install-playwright',action='store_true');p.add_argument('--baseline-url');p.add_argument('--output');args=p.parse_args()
+-    head=subprocess.check_output(['git','rev-parse','HEAD'],cwd=ROOT,text=True).strip();pack=commands_for_pack(ROOT,ROOT);definition=pack.get('definition') or {};commands=pack.get('commands') or {};preview=pack.get('preview') or {};start=commands.get('start') or {}
+-    command=start.get('command') if start.get('available') is True else None;url=preview.get('default_url')
+-    if not command or not url:print(json.dumps({'status':'NOT_APPLICABLE','reason':'PROJECT_PACK_HAS_NO_PREVIEW_START','pack':pack.get('pack')}));return 0
+-    install=commands.get('install') or {}
+-    if install.get('available') is True and install.get('command'):
+-        proc=subprocess.run(install['command'],cwd=ROOT,check=False)
+-        if proc.returncode:return proc.returncode
+-    server=subprocess.Popen(command,cwd=ROOT,stdout=subprocess.DEVNULL,stderr=subprocess.STDOUT,start_new_session=True)
++            opener = urllib.request.build_opener(urllib.request.ProxyHandler({}))
++            with opener.open(url, timeout=2) as response:
++                if response.status < 500:
++                    return
++        except Exception:
++            time.sleep(0.5)
++    raise ValueError("PREVIEW_SERVER_NOT_READY")
++
++
++def _framework_self_host() -> bool:
+     try:
+-        wait(str(url));manifest=capture_preview(ROOT,url=str(url),head_sha=head,baseline_url=args.baseline_url,output_dir=args.output,install=args.install_playwright)
+-        marker={'schema_version':1,'head_sha':manifest['head_sha'],'preview_digest':manifest['preview_digest'],'attestation_id':manifest['attestation_id'],'source_attestation':manifest['source_attestation'],'runtime_environment':manifest['runtime_environment'],'screenshot_digests':[x.get('sha256') for x in manifest.get('screenshots') or []],'accessibility_status':(manifest.get('accessibility') or {}).get('status')}
+-        encoded=base64.urlsafe_b64encode(json.dumps(marker,ensure_ascii=False,sort_keys=True,separators=(',',':')).encode()).decode().rstrip('=')
+-        print(json.dumps(manifest,ensure_ascii=False,indent=2));print('ADWF_PREVIEW_ATTESTATION_V1='+encoded);return 0
+-    finally:
+-        if server.poll() is None:
+-            try:os.killpg(server.pid,signal.SIGTERM)
+-            except Exception:server.terminate()
+-            try:server.wait(timeout=5)
+-            except subprocess.TimeoutExpired:server.kill()
+-if __name__=='__main__':raise SystemExit(main())
++        config = json.loads((ROOT / ".adwf/config.json").read_text(encoding="utf-8"))
++    except Exception:
++        return False
++    project = config.get("project") or {}
++    return project.get("type") == "framework" and project.get("runtime_product") is False
++
++
++def main() -> int:
++    parser = argparse.ArgumentParser()
++    parser.add_argument("--install-playwright", action="store_true")
++    parser.add_argument("--baseline-url")
++    parser.add_argument("--output")
++    args = parser.parse_args()
++    if _framework_self_host():
++        print(json.dumps({"status": "NOT_APPLICABLE", "reason": "FRAMEWORK_SELF_HOST_PROJECT_PACK_NOT_APPLICABLE"}))
++        return 0
++    try:
++        binding = load_bound_project_pack(ROOT, ROOT)
++        commands = binding.get("commands") or {}
