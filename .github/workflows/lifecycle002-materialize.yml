@@ -35,13 +35,17 @@ jobs:
           set -euo pipefail
           cat .github/lifecycle002.exact00 \
               .github/lifecycle002.exact01 \
-              .github/lifecycle002.exact02 \
+              .github/lifecycle002.exact02a \
+              .github/lifecycle002.exact02b \
+              .github/lifecycle002.exact02c \
+              .github/lifecycle002.exact02d \
               .github/lifecycle002.exact03 \
               .github/lifecycle002.exact04 \
               .github/lifecycle002.exact05 \
               .github/lifecycle002.exact06 \
               .github/lifecycle002.exact07 > /tmp/lifecycle002.patch.gz.b64
           test "$(wc -c < /tmp/lifecycle002.patch.gz.b64 | tr -d ' ')" = '31232'
+          test "$(sha256sum /tmp/lifecycle002.patch.gz.b64 | awk '{print $1}')" = '8925b142ca35792e70086316965de3c395f022553c4593b4d88697dda52bd14e'
           REMOTE_MAIN="$(git ls-remote origin refs/heads/main | awk '{print $1}')"
           test "$REMOTE_MAIN" = "$BASE_SHA"
           git checkout --detach "$BASE_SHA"
