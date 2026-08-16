@@ -34,7 +34,8 @@ def _source_attestation(project:Path,url:str,head_sha:str,provided:dict[str,Any]
     return {'mode':'REMOTE_PROVIDER_ATTESTED','verified':True,'head_sha':head_sha,'deployment_id':att.get('deployment_id'),'provider':att.get('provider'),'readback_id':att.get('readback_id')}
 
 def capture_preview(root:str|Path,*,url:str,head_sha:str,baseline_url:str|None=None,output_dir:str|Path|None=None,install:bool=False,
-                    command_runner:Callable[[list[str],Path,int],subprocess.CompletedProcess[str]]|None=None,source_attestation:dict[str,Any]|None=None)->dict[str,Any]:
+                    command_runner:Callable[[list[str],Path,int],subprocess.CompletedProcess[str]]|None=None,source_attestation:dict[str,Any]|None=None,
+                    runtime_root:str|Path|None=None)->dict[str,Any]:
     if SHA.fullmatch(str(head_sha)) is None:raise ValueError('PREVIEW_SHA_INVALID')
     target_url=validate_preview_url(url);base_url=validate_preview_url(baseline_url) if baseline_url else None
     project=Path(root).resolve();attestation=_source_attestation(project,target_url,head_sha,source_attestation)
@@ -68,6 +69,9 @@ def capture_preview(root:str|Path,*,url:str,head_sha:str,baseline_url:str|None=N
     if provider.is_file():
         try:refs=list(json.loads(provider.read_text(encoding='utf-8')).get('evidence_refs') or [])
         except Exception:refs=[]
-    att_file={'schema_version':1,'attestation_id':manifest['attestation_id'],'head_sha':head_sha,'preview_digest':manifest['preview_digest'],'source_attestation':attestation,'runtime_environment':runtime,'evidence_refs':refs,'manifest_path':str((out/'preview-manifest.json').relative_to(project)) if project in (out/'preview-manifest.json').parents else str(out/'preview-manifest.json')}
-    runtime_path=project/'.adwf-runtime/preview-attestation.json';runtime_path.parent.mkdir(parents=True,exist_ok=True);runtime_path.write_text(json.dumps(att_file,ensure_ascii=False,indent=2)+'\n',encoding='utf-8')
+    runtime_base=Path(runtime_root).resolve() if runtime_root is not None else project
+    manifest_file=(out/'preview-manifest.json').resolve()
+    manifest_path=str(manifest_file.relative_to(runtime_base)) if runtime_base in manifest_file.parents else (str(manifest_file.relative_to(project)) if project in manifest_file.parents else manifest_file.name)
+    att_file={'schema_version':1,'attestation_id':manifest['attestation_id'],'head_sha':head_sha,'preview_digest':manifest['preview_digest'],'source_attestation':attestation,'runtime_environment':runtime,'evidence_refs':refs,'manifest_path':manifest_path}
+    runtime_path=runtime_base/'.adwf-runtime/preview-attestation.json';runtime_path.parent.mkdir(parents=True,exist_ok=True);runtime_path.write_text(json.dumps(att_file,ensure_ascii=False,indent=2)+'\n',encoding='utf-8')
     return manifest

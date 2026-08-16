@@ -2,7 +2,7 @@
   "$schema": ".adwf/schemas/decision-requirement-traceability.schema.json",
   "schema_version": 1,
   "role": "CANONICAL_DECISION_REQUIREMENT_TRACEABILITY",
-  "revision": 5,
+  "revision": 6,
   "records": [
     {
       "id": "INTENT-FOUNDATION-20260815",
@@ -102,6 +102,28 @@
       "source_path": null,
       "source_sha256": null,
       "record_sha256": "f21064652a42364530ade11fbec9234052ed12512d40d9082257530824d42e67"
+    },
+    {
+      "id": "REQ-ENVSAFE-001",
+      "kind": "REQUIREMENT",
+      "version": 1,
+      "status": "ACTIVE",
+      "title_ru": "Project command safety declaration должна иметь реальный runtime enforcement baseline",
+      "statement_ru": "Consumer Project Pack command не должен наследовать secrets или исполняться прямо в canonical checkout; exact pack/config binding, environment minimization, data-write isolation и network enforcement truth должны проверяться fail-closed до/после execution.",
+      "source_path": null,
+      "source_sha256": null,
+      "record_sha256": "2a4e26d9dc451cf779dbbcc7f71f467cc6cc6375605bc4ae08d190a34238d6b3"
+    },
+    {
+      "id": "DEC-ENVSAFE-001",
+      "kind": "DECISION",
+      "version": 1,
+      "status": "ACCEPTED",
+      "title_ru": "Portable baseline использует independent exact Git clone и truthful network non-enforcement",
+      "statement_ru": "Выполнять consumer project commands в independent local Git clone exact HEAD/tree с minimal child environment, exact pack digest/safety binding, tracked-mutation/canonical-integrity postconditions и self-sealed runtime evidence; network declaration хранить отдельно от enforcement и не заявлять packet/domain sandbox без provider/OS primitive.",
+      "source_path": null,
+      "source_sha256": null,
+      "record_sha256": "bf565176beacb15c98b873661b240b8aa53d4ce4a7b9db2294677147e9855156"
     }
   ],
   "capability_refs": [
@@ -119,6 +141,11 @@
       "id": "CAPREF-PROJECT-PACKS",
       "capability_id": "PROJECT_PACKS",
       "ref_sha256": "fe2bc5b3d913f52c38249fe11db8122b7ecd4959b7f1f91b9a8e71c0c5c99205"
+    },
+    {
+      "id": "CAPREF-PROJECT-RUNTIME-SAFETY",
+      "capability_id": "PROJECT_RUNTIME_SAFETY",
+      "ref_sha256": "c32087126a6ecd2b239d9987449f24d9f4fae6f3b2a4b470b2dab88aaab55ee0"
     }
   ],
   "work_unit_refs": [
@@ -156,6 +183,13 @@
       "issue_number": 66,
       "ai_work_package_id": null,
       "ref_sha256": "6c602509b44fd6ed1d10c9358d0ec19f7aa78277cf65a44698c0ea64f68e3c12"
+    },
+    {
+      "id": "WORKREF-ENVSAFE-001",
+      "roadmap_id": "ENVSAFE-001",
+      "issue_number": 68,
+      "ai_work_package_id": null,
+      "ref_sha256": "31e50fa79462cf627a5919e6a40c29c990fc86aa6e1b4ddcf99b95413c782159"
     }
   ],
   "evidence_refs": [],
@@ -285,7 +319,35 @@
       "from": "CAPREF-PROJECT-PACKS",
       "to": "WORKREF-PACKSDK-001",
       "edge_sha256": "3b199d2f391e09be82a02094a7a15a6378d177f98f82cf969b5db90dcbc64e4b"
+    },
+    {
+      "id": "EDGE-INTENT-REQ-ENVSAFE-001",
+      "type": "INTENT_TO_REQUIREMENT",
+      "from": "INTENT-FOUNDATION-20260815",
+      "to": "REQ-ENVSAFE-001",
+      "edge_sha256": "b17c2620063151e88573be38443b253b707408954e8e4677a9f181d242cf3d66"
+    },
+    {
+      "id": "EDGE-REQ-DEC-ENVSAFE-001",
+      "type": "REQUIREMENT_TO_DECISION",
+      "from": "REQ-ENVSAFE-001",
+      "to": "DEC-ENVSAFE-001",
+      "edge_sha256": "63146deec21c1f60d204877097998c2ea663435143d606f3fb4f1ea52e34e12a"
+    },
+    {
+      "id": "EDGE-DEC-CAP-ENVSAFE-001",
+      "type": "DECISION_TO_CAPABILITY",
+      "from": "DEC-ENVSAFE-001",
+      "to": "CAPREF-PROJECT-RUNTIME-SAFETY",
+      "edge_sha256": "0e14881f77e402971e9a0e9602169684a8630f70a6f460851987d501864057f2"
+    },
+    {
+      "id": "EDGE-CAP-WORK-ENVSAFE-001",
+      "type": "CAPABILITY_TO_WORK",
+      "from": "CAPREF-PROJECT-RUNTIME-SAFETY",
+      "to": "WORKREF-ENVSAFE-001",
+      "edge_sha256": "7945171d649f34a9fc4946f69a550d97de7fe340feba81ffa847e59f8181456b"
     }
   ],
-  "graph_sha256": "0e084384c208f79d26bc0c175d4c6c3d0e3c79615c1d23135f09789c8b1d777f"
+  "graph_sha256": "8b04fddb259cdbc7a85d1d0cf72523485e0c358c6b8179ec2a2d24bd92fd1012"
 }

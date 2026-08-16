@@ -11,9 +11,9 @@
         ".github/workflows/**"
       ],
       "mode": "generated-status-block+manual",
-      "source_digest": "dbbcd487fe0f54654d03f4cb8f269e62776fc317a4e780ed1b595c463f0b3a05",
-      "reviewed_at": "2026-08-16T07:00:00Z",
-      "valid_until": "2026-11-16T07:00:00Z"
+      "source_digest": "521a78ed77861e4364ce4ffb84930de4dad423dfd6a50853b3e240a96ffdce13",
+      "reviewed_at": "2026-08-16T07:35:00Z",
+      "valid_until": "2026-11-16T07:35:00Z"
     },
     {
       "path": "AGENTS.md",
@@ -24,9 +24,9 @@
         "skills/**"
       ],
       "mode": "manual-governance",
-      "source_digest": "ec7f8d012cc47ddb2606bfbbe744efdcb8d4d9331503ebe972be4c392e61a4ee",
-      "reviewed_at": "2026-08-16T07:00:00Z",
-      "valid_until": "2026-11-16T07:00:00Z"
+      "source_digest": "830eff8e7516c0e5cb53f1d235b7c8921a105652a988089f3dee6ab8514836e1",
+      "reviewed_at": "2026-08-16T07:35:00Z",
+      "valid_until": "2026-11-16T07:35:00Z"
     },
     {
       "path": "docs/architecture/CI_CD_ARCHITECTURE.md",
@@ -37,9 +37,9 @@
         ".adwf/scripts/**"
       ],
       "mode": "architecture",
-      "source_digest": "83f6f84c8f6407611d8f0744ebf21f744e085d82f6fc8e525de1178f7bcf671c",
-      "reviewed_at": "2026-08-16T07:00:00Z",
-      "valid_until": "2026-11-16T07:00:00Z"
+      "source_digest": "e7b58e8faef4a93ec51304204f1da8a679323b2eab2deac2e07143aa3c9eb300",
+      "reviewed_at": "2026-08-16T07:35:00Z",
+      "valid_until": "2026-11-16T07:35:00Z"
     },
     {
       "path": "CONTROL_CENTER.md",
@@ -50,8 +50,8 @@
       ],
       "mode": "generated",
       "source_digest": "bf76d0c9ddcd11614474038c97c363480abdaa7bba2d46f2f65af1b6a1bed5f7",
-      "reviewed_at": "2026-08-16T07:00:00Z",
-      "valid_until": "2026-11-16T07:00:00Z"
+      "reviewed_at": "2026-08-16T07:35:00Z",
+      "valid_until": "2026-11-16T07:35:00Z"
     },
     {
       "path": "docs/V1_6_IMPLEMENTATION_REPORT.md",
@@ -65,9 +65,9 @@
         ".adwf/scripts/validate_capabilities.py"
       ],
       "mode": "implementation-certification",
-      "source_digest": "b67d0ef085fad889a7fa7d9ec383b526dde35f4a7fd6b7590441297be2af61db",
-      "reviewed_at": "2026-08-16T07:00:00Z",
-      "valid_until": "2026-11-16T07:00:00Z"
+      "source_digest": "84e0f7168b05e21dd7962079b6c246b96b3714a12c978d5010f77bb5e57c2186",
+      "reviewed_at": "2026-08-16T07:35:00Z",
+      "valid_until": "2026-11-16T07:35:00Z"
     },
     {
       "path": "docs/operations/OWNER_AI_GUIDE.md",
@@ -79,8 +79,8 @@
       ],
       "mode": "owner-guide",
       "source_digest": "825bce6785f2038c6acd5cf1e48eb9a914a18fed713efa8eb2be6e28d104e2ed",
-      "reviewed_at": "2026-08-16T07:00:00Z",
-      "valid_until": "2026-11-16T07:00:00Z"
+      "reviewed_at": "2026-08-16T07:35:00Z",
+      "valid_until": "2026-11-16T07:35:00Z"
     },
     {
       "path": "docs/governance/RECOVERY_PLAYBOOK.md",
@@ -92,8 +92,8 @@
       ],
       "mode": "governance",
       "source_digest": "68f0c11d641d731c0a6560fe566f0aeb307aed37ed5bd812cf1773ef4ca7b3e4",
-      "reviewed_at": "2026-08-16T07:00:00Z",
-      "valid_until": "2026-11-16T07:00:00Z"
+      "reviewed_at": "2026-08-16T07:35:00Z",
+      "valid_until": "2026-11-16T07:35:00Z"
     },
     {
       "path": "docs/operations/FREE_LIMITS_AND_NOTIFICATIONS.md",
@@ -105,8 +105,8 @@
       ],
       "mode": "provider-facts",
       "source_digest": "61094eb026194041ef8d6e7dd8a0efc3c17182b12bbb3313cc6460ce342d60a9",
-      "reviewed_at": "2026-08-16T07:00:00Z",
-      "valid_until": "2026-11-16T07:00:00Z"
+      "reviewed_at": "2026-08-16T07:35:00Z",
+      "valid_until": "2026-11-16T07:35:00Z"
     },
     {
       "path": "docs/operations/SKILL_OPERATING_LAYER.md",
@@ -122,8 +122,8 @@
       ],
       "mode": "operations",
       "source_digest": "b73efed85abf805badba59d14e7328e81a3613d39892d641b8c4eb2d686cf566",
-      "reviewed_at": "2026-08-16T07:00:00Z",
-      "valid_until": "2026-11-16T07:00:00Z"
+      "reviewed_at": "2026-08-16T07:35:00Z",
+      "valid_until": "2026-11-16T07:35:00Z"
     },
     {
       "path": "docs/governance/AI_WORK_CONTRACTS.md",
@@ -138,8 +138,8 @@
       ],
       "mode": "governance",
       "source_digest": "252af6d74df0e9aee929aad28fe3f56ad33a6a6e7a4180cf2dc3f89180d9f4b5",
-      "reviewed_at": "2026-08-16T07:00:00Z",
-      "valid_until": "2026-11-16T07:00:00Z"
+      "reviewed_at": "2026-08-16T07:35:00Z",
+      "valid_until": "2026-11-16T07:35:00Z"
     },
     {
       "path": "docs/governance/DECISION_REQUIREMENT_TRACEABILITY.md",
@@ -153,9 +153,9 @@
         ".adwf/roadmap.json"
       ],
       "mode": "governance",
-      "source_digest": "d60e89d179b09cb36c485f05913e88d1d0a4574c50f2b5a10b24d0c4d0184be7",
-      "reviewed_at": "2026-08-16T07:00:00Z",
-      "valid_until": "2026-11-16T07:00:00Z"
+      "source_digest": "8e1868c318b717a9f2dc07d61e2a7197b63423af057431d23ba4ce6b9f5b4157",
+      "reviewed_at": "2026-08-16T07:35:00Z",
+      "valid_until": "2026-11-16T07:35:00Z"
     },
     {
       "path": "docs/governance/PROJECT_PACK_SDK.md",
@@ -164,12 +164,32 @@
         ".adwf/lib/project_packs.py",
         ".adwf/lib/pack_materializer.py",
         ".adwf/schemas/project-pack.schema.json",
-        ".adwf/scripts/validate_project_packs.py"
+        ".adwf/scripts/validate_project_packs.py",
+        ".adwf/lib/project_execution.py",
+        ".adwf/scripts/run_project_gates.py",
+        ".adwf/scripts/run_preview.py"
       ],
       "mode": "governance-contract",
-      "source_digest": "08028f77fe2ab3731fd08821e198ddfccbe426cc671d4cd410f759e41482ea42",
-      "reviewed_at": "2026-08-16T07:00:00Z",
-      "valid_until": "2026-11-16T07:00:00Z"
+      "source_digest": "e6dfcfe880c0cfeec373559ab05ce5f83200ac4e3f22daee2535a1da985ee2c2",
+      "reviewed_at": "2026-08-16T07:35:00Z",
+      "valid_until": "2026-11-16T07:35:00Z"
+    },
+    {
+      "path": "docs/governance/PROJECT_RUNTIME_SAFETY.md",
+      "watched": [
+        ".adwf/lib/project_execution.py",
+        ".adwf/lib/preview_engine.py",
+        ".adwf/scripts/run_project_gates.py",
+        ".adwf/scripts/run_preview.py",
+        ".adwf/schemas/project-execution-evidence.schema.json",
+        ".adwf/tests/test_project_execution_safety.py",
+        ".adwf/lib/project_packs.py",
+        ".adwf/lib/pack_materializer.py"
+      ],
+      "mode": "governance-contract",
+      "source_digest": "eccd2d32561f461ba092337245a4589c42028bd262ab11a0047c06a403fb8b13",
+      "reviewed_at": "2026-08-16T07:35:00Z",
+      "valid_until": "2026-11-16T07:35:00Z"
     }
   ]
 }

@@ -77,6 +77,10 @@ The SDK blocks before execution/materialization when a definition contains:
 - malformed detection or unknown pack registration;
 - any schema/type violation.
 
+## Runtime enforcement follow-up
+
+`ENVSAFE-001` добавляет отдельный [Project Command Runtime Environment/Data Safety Envelope](PROJECT_RUNTIME_SAFETY.md). SDK definition остаётся declaration layer: runtime повторно связывает selected pack/digest/safety с current validated definition, очищает direct child environment и выполняет consumer commands только в disposable exact-revision clone. Network declaration при этом **не** выдаётся за packet/domain enforcement.
+
 ## Truth boundary
 
 Formal SDK tests prove implementation and exact definition identity. They do **not** prove that React, Apps Script or Wiren Board consumers work end-to-end. `PROJECT_PACKS` remains `LIVE_NOT_VERIFIED` until downstream reference consumer/provider evidence is attached to exact pack digests.
