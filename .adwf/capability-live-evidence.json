@@ -1,0 +1,52 @@
+{
+  "$schema": ".adwf/schemas/capability-live-evidence-certification.schema.json",
+  "schema_version": 1,
+  "role": "CANONICAL_CAPABILITY_LIVE_EVIDENCE_CERTIFICATIONS",
+  "certifications": [
+    {
+      "id": "CERT-UPGRADE-003-PRIHRASH-EXTERNAL",
+      "evidence_class": "REAL_EXTERNAL_CONSUMER_UPGRADE",
+      "capability_ids": [
+        "CONSUMER_FRAMEWORK_UPGRADE_PLANNING",
+        "CONSUMER_FRAMEWORK_UPGRADE_TRANSACTION"
+      ],
+      "subject": {
+        "sha": "b2b9c76471c35458306f0dc54cf5be0c744e1787",
+        "tree": "c43c973f16b9cabc0115c1fa4830761f4d51a098"
+      },
+      "provider": {
+        "provider": "github",
+        "repository": "kmephis-ai/AI-Development-Framework",
+        "workflow_run_id": 31964580894,
+        "workflow_name": "ADWF UPGRADE-003 Post-Merge External Consumer Proof",
+        "workflow_run_head_sha": "32dd35a350cf54155df30c051681ccfadf52b281",
+        "check_run_id": 95207824231,
+        "check_name": "adwf/external-consumer-upgrade-proof",
+        "check_app_id": 15368,
+        "check_app_slug": "github-actions"
+      },
+      "report_sha256": "8f5443da480c0fc980585adf0d93acc386056449ed909d58d6dd475de26e7752",
+      "consumer": {
+        "repository": "kmephis-ai/PrihRashOnline-v2",
+        "sha": "00659d0e423e4baf222b056e732b576887200891",
+        "tree": "c47ddccf2b13f50fc171f005ef3197fce20b25c5"
+      },
+      "framework": {
+        "source_sha": "91056fc9153b3b3275a99c64adaf245122073bca",
+        "source_tree": "1d62da5aa55e8fb66402394b0eca85fcaa357e57",
+        "target_sha": "b2b9c76471c35458306f0dc54cf5be0c744e1787",
+        "target_tree": "c43c973f16b9cabc0115c1fa4830761f4d51a098"
+      },
+      "transitions": {
+        "adoption": "COMMITTED",
+        "upgrade_b": "COMMITTED",
+        "rollback_a": "ROLLED_BACK",
+        "retry_b": "COMMITTED"
+      },
+      "external_source_unchanged": true,
+      "write_back_performed": false,
+      "certification_sha256": "8028e8edb27b3785f72965c1e3278de20f263a8b200beea958a2ee1caed7bee2"
+    }
+  ],
+  "registry_sha256": "49cd3fad5d658afb8d1872c1be4487547e56925fffd60d268fa50e57c62ecaa4"
+}

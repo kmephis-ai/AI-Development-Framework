@@ -2,7 +2,7 @@
   "$schema": ".adwf/schemas/decision-requirement-traceability.schema.json",
   "schema_version": 1,
   "role": "CANONICAL_DECISION_REQUIREMENT_TRACEABILITY",
-  "revision": 16,
+  "revision": 17,
   "records": [
     {
       "id": "INTENT-FOUNDATION-20260815",
@@ -267,6 +267,17 @@
       "source_path": null,
       "source_sha256": null,
       "record_sha256": "d4822f99511e5478ee6704f71bc65313565a75aa47ac480fa1c10e10f5b990ba"
+    },
+    {
+      "id": "DEC-GOV-021",
+      "kind": "DECISION",
+      "version": 1,
+      "status": "ACCEPTED",
+      "title_ru": "LIVE_VERIFIED только через provider-resolved durable certification",
+      "statement_ru": "Capability Truth может перейти в LIVE_VERIFIED только по strict self-sealed certification, которая привязана к exact immutable provider proof и при изменении заново проверяется trusted provider controller; formatted evidence string не является доказательством.",
+      "source_path": null,
+      "source_sha256": null,
+      "record_sha256": "b4da63774d67969f1b38bf070f52d14a82c48c53c7cdcfb39e3d4216c3742e1f"
     }
   ],
   "capability_refs": [
@@ -428,6 +439,13 @@
       "issue_number": 86,
       "ai_work_package_id": null,
       "ref_sha256": "b6150f57213a950065bf9452e02dc43a5ebe24806890ae5d0c820a227a9f1d73"
+    },
+    {
+      "id": "WORKREF-GOV-021",
+      "roadmap_id": "GOV-021",
+      "issue_number": 95,
+      "ai_work_package_id": null,
+      "ref_sha256": "34313c6a342f4bdf744608f0272c1df099145c03e4a62f6ae9f48f7f659a3919"
     }
   ],
   "evidence_refs": [],
@@ -851,7 +869,42 @@
       "from": "CAPREF-CONSUMER-FRAMEWORK-UPGRADE-TRANSACTION",
       "to": "WORKREF-UPGRADE-003",
       "edge_sha256": "a9864e73a875f39938eda4b4412327c04ac1e3f8337d06771448cdb3c81bcee1"
+    },
+    {
+      "id": "EDGE-REQ-DEC-GOV-021",
+      "type": "REQUIREMENT_TO_DECISION",
+      "from": "REQ-UPGRADE-002",
+      "to": "DEC-GOV-021",
+      "edge_sha256": "09ef015155cef17d72c6151b4d3d166133a80c10d9ca81c8284e71a9f7d7d1e6"
+    },
+    {
+      "id": "EDGE-DEC-CAP-UPLAN-GOV-021",
+      "type": "DECISION_TO_CAPABILITY",
+      "from": "DEC-GOV-021",
+      "to": "CAPREF-CONSUMER-FRAMEWORK-UPGRADE-PLANNING",
+      "edge_sha256": "ea5034e18536ef29ea2b9670c22802c30f10ecb3036f6af903c2d006c2ab0e32"
+    },
+    {
+      "id": "EDGE-DEC-CAP-UTX-GOV-021",
+      "type": "DECISION_TO_CAPABILITY",
+      "from": "DEC-GOV-021",
+      "to": "CAPREF-CONSUMER-FRAMEWORK-UPGRADE-TRANSACTION",
+      "edge_sha256": "b8f60dcdc5e4a37c473b6af7ae35bacb988695fb8bcbef76bbec1a50e4fb01dc"
+    },
+    {
+      "id": "EDGE-CAP-UPLAN-WORK-GOV-021",
+      "type": "CAPABILITY_TO_WORK",
+      "from": "CAPREF-CONSUMER-FRAMEWORK-UPGRADE-PLANNING",
+      "to": "WORKREF-GOV-021",
+      "edge_sha256": "1b21db8bcee833526eaed78ed97beaa0f38c44d4f6ed7b1500abe44b7ab86287"
+    },
+    {
+      "id": "EDGE-CAP-UTX-WORK-GOV-021",
+      "type": "CAPABILITY_TO_WORK",
+      "from": "CAPREF-CONSUMER-FRAMEWORK-UPGRADE-TRANSACTION",
+      "to": "WORKREF-GOV-021",
+      "edge_sha256": "4a00cc3f51f886535ccfb26707d586e19f76235beb19fe7aafb86e2c043ce3c5"
     }
   ],
-  "graph_sha256": "ee5ed90b7d6763a2a0703f6289bf118003a3370c2f017502e1c53ca31b1f01a7"
+  "graph_sha256": "398fe6f952cf5848b02337b423d9510ed279966d7861109a1975ea9e27f15939"
 }

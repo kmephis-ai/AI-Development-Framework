@@ -96,7 +96,8 @@
             "type": "array",
             "items": {
               "type": "string",
-              "minLength": 3
+              "minLength": 3,
+              "pattern": "^certification:[A-Z0-9_-]+$"
             }
           }
         }

@@ -16,13 +16,14 @@ ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT / ".adwf"))
 from lib.contracts import validate  # noqa: E402
 from lib.strict_json import load  # noqa: E402
+from lib.capability_live_evidence import resolve_capability_live_evidence  # noqa: E402
 
 TRUTH_STATUSES = {
     "NOT_DESIGNED", "DESIGNED_ONLY", "PARTIAL", "IMPLEMENTED",
     "LIVE_NOT_VERIFIED", "LIVE_VERIFIED", "DEPRECATED", "BLOCKED",
 }
 IMPLEMENTED_STATES = {"PARTIAL", "IMPLEMENTED", "LIVE_NOT_VERIFIED", "LIVE_VERIFIED"}
-LIVE_REF = re.compile(r"^(?:provider|runtime|github|evidence):[A-Za-z0-9._:/#-]+$")
+LIVE_REF = re.compile(r"^certification:[A-Z0-9_-]+$")
 
 
 def _path_exists(value: str, root: Path = ROOT) -> bool:
@@ -85,10 +86,16 @@ def validate_truth_payload(
                 value = str(ref)
                 if not LIVE_REF.fullmatch(value):
                     errors.append("CAPABILITY_LIVE_EVIDENCE_INVALID:" + cid + ":" + value)
-                if "test_" in value:
-                    errors.append("CAPABILITY_TEST_EVIDENCE_CANNOT_BE_LIVE:" + cid)
         elif live_evidence:
             errors.append("CAPABILITY_LIVE_EVIDENCE_WITHOUT_LIVE_VERIFIED:" + cid)
+
+    if any(str(item.get("status") or "") == "LIVE_VERIFIED" for item in trace.get("capabilities") or []):
+        try:
+            registry = load(root / ".adwf/capability-live-evidence.json")
+            cert_schema = load(root / ".adwf/schemas/capability-live-evidence-certification.schema.json")
+            errors.extend(resolve_capability_live_evidence(trace, registry, schema=cert_schema))
+        except (OSError, ValueError) as exc:
+            errors.append("CAPABILITY_LIVE_CERTIFICATION_UNREADABLE:" + type(exc).__name__)
 
     required = {
         "TRUSTED_GATE", "DURABLE_FULL_LOOP", "OWNER_WAKEUP_CONTINUE", "SINGLE_SSOT",

@@ -446,7 +446,7 @@
     },
     {
       "id": "CONSUMER_FRAMEWORK_UPGRADE_PLANNING",
-      "status": "LIVE_NOT_VERIFIED",
+      "status": "LIVE_VERIFIED",
       "execution_mode": "CORE",
       "owner_claim_ru": "ADWF строит self-sealed exact-revision read-only compatibility/upgrade plan A→B и различает package identity от exact preserved consumer preimage для non-managed paths.",
       "entrypoints": [
@@ -457,19 +457,25 @@
         ".adwf/consumer-upgrade-migrations.json",
         ".adwf/schemas/consumer-upgrade-compatibility.schema.json",
         ".adwf/schemas/consumer-upgrade-plan.schema.json",
-        ".adwf/schemas/consumer-upgrade-migrations.schema.json"
+        ".adwf/schemas/consumer-upgrade-migrations.schema.json",
+        ".adwf/lib/capability_live_evidence.py",
+        ".adwf/capability-live-evidence.json",
+        ".adwf/schemas/capability-live-evidence-certification.schema.json"
       ],
       "verification": [
         ".adwf/tests/test_consumer_upgrade_core.py",
         ".adwf/tests/test_consumer_upgrade_adversarial.py",
-        ".adwf/tests/test_external_consumer_upgrade_proof.py"
+        ".adwf/tests/test_external_consumer_upgrade_proof.py",
+        ".adwf/tests/test_capability_live_evidence.py"
       ],
-      "live_boundary": "LIVE_VERIFIED запрещён по evidence UPGRADE-001: unit/CI/provider validation доказывают только deterministic planning/compatibility. Safe framework upgrade требует отдельный transactional apply/recovery executor и real consumer exact A→B→rollback→B evidence с сохранностью consumer/shared data; UPGRADE-003 harness/tests сами по себе не являются live evidence — требуется exact provider proof на реальном внешнем consumer snapshot.",
-      "live_evidence": []
+      "live_boundary": "LIVE_VERIFIED основан только на durable provider-resolved certification UPGRADE-003: exact real external consumer snapshot прошёл provider-attested planning + transactional A→B→rollback→B proof с byte-preservation; synthetic/reference/unit evidence не принимается.",
+      "live_evidence": [
+        "certification:CERT-UPGRADE-003-PRIHRASH-EXTERNAL"
+      ]
     },
     {
       "id": "CONSUMER_FRAMEWORK_UPGRADE_TRANSACTION",
-      "status": "LIVE_NOT_VERIFIED",
+      "status": "LIVE_VERIFIED",
       "execution_mode": "CORE",
       "owner_claim_ru": "ADWF применяет sealed READY upgrade plan A→B как durable fail-closed transaction; preserved pre-existing bytes проверяются по immutable preserved_sha256 и никогда не становятся mutation authority.",
       "entrypoints": [
@@ -477,15 +483,21 @@
       ],
       "production_paths": [
         ".adwf/lib/consumer_upgrade_transaction.py",
-        ".adwf/schemas/consumer-upgrade-transaction.schema.json"
+        ".adwf/schemas/consumer-upgrade-transaction.schema.json",
+        ".adwf/lib/capability_live_evidence.py",
+        ".adwf/capability-live-evidence.json",
+        ".adwf/schemas/capability-live-evidence-certification.schema.json"
       ],
       "verification": [
         ".adwf/tests/test_consumer_upgrade_transaction.py",
         ".adwf/tests/test_consumer_upgrade_transaction_adversarial.py",
-        ".adwf/tests/test_external_consumer_upgrade_proof.py"
+        ".adwf/tests/test_external_consumer_upgrade_proof.py",
+        ".adwf/tests/test_capability_live_evidence.py"
       ],
-      "live_boundary": "LIVE_VERIFIED запрещён по evidence UPGRADE-002: deterministic/adversarial fixtures доказывают executor/recovery semantics, но не real external consumer exact A→B→rollback→B и не PrihRash adoption readiness; UPGRADE-003 harness/tests сами по себе не являются live evidence — требуется exact provider proof на реальном внешнем consumer snapshot.",
-      "live_evidence": []
+      "live_boundary": "LIVE_VERIFIED основан только на durable provider-resolved certification UPGRADE-003: exact real external consumer snapshot прошёл transactional A→B→rollback→B provider proof, preserved consumer bytes остались неизменны и write-back во внешний repository отсутствовал.",
+      "live_evidence": [
+        "certification:CERT-UPGRADE-003-PRIHRASH-EXTERNAL"
+      ]
     }
   ]
 }
