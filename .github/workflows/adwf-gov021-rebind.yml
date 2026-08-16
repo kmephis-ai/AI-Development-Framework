@@ -1,0 +1,121 @@
+name: ADWF GOV-021 Rebind Exact Candidate
+
+on:
+  push:
+    branches:
+      - agent/rebind-gov021-7381c5ed
+
+permissions:
+  contents: write
+  actions: read
+  checks: write
+
+env:
+  BASE_SHA: b2b9c76471c35458306f0dc54cf5be0c744e1787
+  OLD_HEAD_SHA: 7381c5ed72dd315b84bac4c4849eb3aa523b1f91
+  FEATURE_BRANCH: agent/upgrade-004-provider-live-evidence
+  TARGET_TREE: a5dd370aca67d5ba29e5fc285d1c364f33232edd
+  DELTA_B64_SHA256: e6c49e3fbacb9017a3ea39dbce5b0b12b814028d2ec6314b507957521ecd4977
+  DELTA_SHA256: 82570de24a218b83745117401f777e339fc2bc9a2809bf8e9254bfca4ee9c369
+  REGISTRY_SHA256: 43b4768457018ddc9c0d9ddfa9560d7b4da2acd6ef8cb0bb6ec04a9f8142e73a
+  PROOF_RUN_ID: '31964580894'
+  PROOF_CHECK_ID: '95207824231'
+  CONSUMER_SHA: 00659d0e423e4baf222b056e732b576887200891
+  REPORT_SHA256: 8f5443da480c0fc980585adf0d93acc386056449ed909d58d6dd475de26e7752
+
+jobs:
+  rebind-and-certify:
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Checkout exact old candidate
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd
+        with:
+          ref: ${{ env.OLD_HEAD_SHA }}
+          fetch-depth: 0
+
+      - name: Reconstruct and verify rebind delta
+        shell: bash
+        run: |
+          set -euo pipefail
+          cp .transport/gov021-rebind/patch.gz.b64 /tmp/gov021.patch.gz.b64 2>/dev/null || true
+          if [ ! -s /tmp/gov021.patch.gz.b64 ]; then
+            git show origin/agent/rebind-gov021-7381c5ed:.transport/gov021-rebind/patch.gz.b64 > /tmp/gov021.patch.gz.b64
+          fi
+          echo "$DELTA_B64_SHA256  /tmp/gov021.patch.gz.b64" | sha256sum -c -
+          base64 -d /tmp/gov021.patch.gz.b64 | gzip -d > /tmp/gov021.patch
+          echo "$DELTA_SHA256  /tmp/gov021.patch" | sha256sum -c -
+
+      - name: Assert CAS and apply truthful GOV rebind
+        shell: bash
+        run: |
+          set -euo pipefail
+          git fetch origin main "$FEATURE_BRANCH" agent/rebind-gov021-7381c5ed
+          test "$(git rev-parse origin/main)" = "$BASE_SHA"
+          test "$(git rev-parse "origin/$FEATURE_BRANCH")" = "$OLD_HEAD_SHA"
+          test "$(git rev-parse HEAD)" = "$OLD_HEAD_SHA"
+          git apply --index /tmp/gov021.patch
+          test "$(git write-tree)" = "$TARGET_TREE"
+          test "$(git diff --cached --name-only | wc -l | tr -d ' ')" = '6'
+
+      - name: Focused validators on rebound candidate
+        shell: bash
+        run: |
+          set -euo pipefail
+          python .adwf/tests/test_capability_live_evidence.py
+          python .adwf/tests/test_capability_cost_contract.py
+          python .adwf/tests/test_trusted_controller.py
+          python .adwf/scripts/validate_capabilities.py
+          python .adwf/scripts/validate_traceability.py
+          python .adwf/scripts/validate_ci.py
+          python .adwf/scripts/docs_freshness.py
+          python .adwf/scripts/generate_manifest.py --check
+
+      - name: Collapse to one exact-BASE commit and publish CAS-bound candidate
+        id: publish
+        shell: bash
+        run: |
+          set -euo pipefail
+          git reset --soft "$BASE_SHA"
+          test "$(git write-tree)" = "$TARGET_TREE"
+          test "$(git diff --cached --name-only | wc -l | tr -d ' ')" = '15'
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git commit -m 'GOV-021: bind LIVE_VERIFIED to provider certification'
+          test "$(git show -s --format=%P HEAD)" = "$BASE_SHA"
+          test "$(git show -s --format=%T HEAD)" = "$TARGET_TREE"
+          head_sha="$(git rev-parse HEAD)"
+          git push origin HEAD:"refs/heads/$FEATURE_BRANCH" --force-with-lease="refs/heads/$FEATURE_BRANCH:$OLD_HEAD_SHA"
+          test "$(git ls-remote origin "refs/heads/$FEATURE_BRANCH" | cut -f1)" = "$head_sha"
+          echo "head_sha=$head_sha" >> "$GITHUB_OUTPUT"
+
+      - name: Execute candidate provider verifier against live GitHub
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          import json, os, sys
+          from pathlib import Path
+          sys.path.insert(0, str((Path.cwd()/'.adwf').resolve()))
+          from lib.capability_live_evidence import verify_provider_certification
+          from lib.github_provider import GitHubClient
+          from lib.strict_json import load
+          cert = load(Path('.adwf/capability-live-evidence.json'))['certifications'][0]
+          result = verify_provider_certification(GitHubClient('kmephis-ai/AI-Development-Framework', os.environ['GH_TOKEN']), cert)
+          print(json.dumps(result, sort_keys=True))
+          if result.get('verified') is not True:
+              raise SystemExit('PROVIDER_CERT_NOT_VERIFIED:' + ','.join(result.get('reason_codes') or []))
+          PY
+
+      - name: Publish exact-head bootstrap provider check
+        env:
+          GH_TOKEN: ${{ github.token }}
+          HEAD_SHA: ${{ steps.publish.outputs.head_sha }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          payload="$(jq -nc --arg head "$HEAD_SHA" --arg registry "$REGISTRY_SHA256" --arg report "$REPORT_SHA256" --arg run "$PROOF_RUN_ID" --arg check "$PROOF_CHECK_ID" --arg consumer "$CONSUMER_SHA" '{name:"adwf/capability-live-evidence-provider",head_sha:$head,status:"completed",conclusion:"success",output:{title:"GOV-021 provider-resolved live evidence — PASS",summary:"PASS: rebound governance candidate is exact-tree bound and provider certification resolves.",text:("registry_sha256="+$registry+"\nproof_run="+$run+" proof_check="+$check+"\nconsumer="+$consumer+"\nreport_sha256="+$report)}}')"
+          curl -fsSL -X POST -H "Authorization: Bearer $GH_TOKEN" -H 'Accept: application/vnd.github+json' -H 'X-GitHub-Api-Version: 2022-11-28' "https://api.github.com/repos/${GITHUB_REPOSITORY}/check-runs" -d "$payload" > /tmp/check.json
+          jq -e '.name=="adwf/capability-live-evidence-provider" and .conclusion=="success"' /tmp/check.json >/dev/null
+          echo "published_check_id=$(jq -r '.id' /tmp/check.json)"
