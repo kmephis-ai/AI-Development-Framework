@@ -1,0 +1,159 @@
+name: ADWF UPGRADE-004 Materialize and Provider Certification
+
+on:
+  push:
+    branches:
+      - agent/materialize-upgrade004-b2b9c764
+
+permissions:
+  contents: write
+  checks: write
+  actions: read
+
+env:
+  BASE_SHA: b2b9c76471c35458306f0dc54cf5be0c744e1787
+  TARGET_TREE: c688be61b9c9c4c443a09a7af8b80ec1473d8da1
+  FEATURE_BRANCH: agent/upgrade-004-provider-live-evidence
+  PATCH_B64_SHA256: 4c2505166ee6744efa048eac5c09605dc170f0c2ad5c31576ea05cd5a1ab136b
+  PATCH_SHA256: 35049a5c45a232faaa25ce8a4a93b67b02b61a3baf7c58ae20a48f9ec6eac8ec
+  REGISTRY_SHA256: 43b4768457018ddc9c0d9ddfa9560d7b4da2acd6ef8cb0bb6ec04a9f8142e73a
+  PROOF_RUN_ID: '31964580894'
+  PROOF_RUN_NAME: ADWF UPGRADE-003 Post-Merge External Consumer Proof
+  PROOF_RUN_HEAD: 32dd35a350cf54155df30c051681ccfadf52b281
+  PROOF_CHECK_ID: '95207824231'
+  PROOF_CHECK_NAME: adwf/external-consumer-upgrade-proof
+  SOURCE_SHA: 91056fc9153b3b3275a99c64adaf245122073bca
+  SOURCE_TREE: 1d62da5aa55e8fb66402394b0eca85fcaa357e57
+  TARGET_SHA: b2b9c76471c35458306f0dc54cf5be0c744e1787
+  TARGET_PROOF_TREE: c43c973f16b9cabc0115c1fa4830761f4d51a098
+  CONSUMER_REPO: kmephis-ai/PrihRashOnline-v2
+  CONSUMER_SHA: 00659d0e423e4baf222b056e732b576887200891
+  CONSUMER_TREE: c47ddccf2b13f50fc171f005ef3197fce20b25c5
+  REPORT_SHA256: 8f5443da480c0fc980585adf0d93acc386056449ed909d58d6dd475de26e7752
+
+jobs:
+  materialize-and-certify:
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Checkout disposable transport branch
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd
+        with:
+          fetch-depth: 0
+
+      - name: Reconstruct exact candidate patch
+        shell: bash
+        run: |
+          set -euo pipefail
+          cat .transport/upgrade004/part.* > /tmp/upgrade004.patch.gz.b64
+          echo "$PATCH_B64_SHA256  /tmp/upgrade004.patch.gz.b64" | sha256sum -c -
+          base64 -d /tmp/upgrade004.patch.gz.b64 | gzip -d > /tmp/upgrade004.patch
+          echo "$PATCH_SHA256  /tmp/upgrade004.patch" | sha256sum -c -
+
+      - name: Assert fresh CAS baseline
+        shell: bash
+        run: |
+          set -euo pipefail
+          git fetch origin main "$FEATURE_BRANCH"
+          test "$(git rev-parse origin/main)" = "$BASE_SHA"
+          test "$(git rev-parse "origin/$FEATURE_BRANCH")" = "$BASE_SHA"
+
+      - name: Apply candidate and assert exact tree
+        shell: bash
+        run: |
+          set -euo pipefail
+          git checkout -B "$FEATURE_BRANCH" "$BASE_SHA"
+          git apply --index /tmp/upgrade004.patch
+          test "$(git write-tree)" = "$TARGET_TREE"
+          test "$(git diff --cached --name-only | wc -l | tr -d ' ')" = '15'
+          echo "$REGISTRY_SHA256  .adwf/capability-live-evidence.json" | sha256sum -c -
+
+      - name: Focused offline certification tests
+        shell: bash
+        run: |
+          set -euo pipefail
+          python -m unittest .adwf/tests/test_capability_live_evidence.py
+          python -m unittest .adwf/tests/test_capability_cost_contract.py
+          python -m unittest .adwf/tests/test_trusted_controller.py
+          python .adwf/scripts/validate_capabilities.py
+          python .adwf/scripts/validate_ci.py
+          python .adwf/scripts/docs_freshness.py
+          python .adwf/scripts/generate_manifest.py --check
+
+      - name: Commit and publish exact candidate tree
+        id: publish
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git commit -m 'UPGRADE-004: bind LIVE_VERIFIED to provider certification'
+          test "$(git show -s --format=%T HEAD)" = "$TARGET_TREE"
+          head_sha="$(git rev-parse HEAD)"
+          git push origin HEAD:"refs/heads/$FEATURE_BRANCH" --force-with-lease="refs/heads/$FEATURE_BRANCH:$BASE_SHA"
+          remote_sha="$(git ls-remote origin "refs/heads/$FEATURE_BRANCH" | cut -f1)"
+          test "$remote_sha" = "$head_sha"
+          echo "head_sha=$head_sha" >> "$GITHUB_OUTPUT"
+
+      - name: Independent GitHub provider readback
+        id: provider
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          auth=(-H "Authorization: Bearer $GH_TOKEN" -H 'Accept: application/vnd.github+json' -H 'X-GitHub-Api-Version: 2022-11-28')
+          api="https://api.github.com/repos/${GITHUB_REPOSITORY}"
+
+          curl -fsSL "${auth[@]}" "$api/actions/runs/$PROOF_RUN_ID" > /tmp/run.json
+          jq -e --arg id "$PROOF_RUN_ID" --arg name "$PROOF_RUN_NAME" --arg head "$PROOF_RUN_HEAD" --arg repo "$GITHUB_REPOSITORY" '
+            (.id|tostring)==$id and .name==$name and .head_sha==$head and .status=="completed" and .conclusion=="success" and .repository.full_name==$repo
+          ' /tmp/run.json >/dev/null
+
+          curl -fsSL "${auth[@]}" "$api/check-runs/$PROOF_CHECK_ID" > /tmp/check.json
+          jq -e --arg id "$PROOF_CHECK_ID" --arg name "$PROOF_CHECK_NAME" --arg head "$TARGET_SHA" '
+            (.id|tostring)==$id and .name==$name and .head_sha==$head and .status=="completed" and .conclusion=="success" and .app.id==15368 and .app.slug=="github-actions"
+          ' /tmp/check.json >/dev/null
+          jq -r '.output.text' /tmp/check.json > /tmp/check.txt
+          grep -Fqx "consumer=$CONSUMER_SHA tree=$CONSUMER_TREE" /tmp/check.txt
+          grep -Fqx "source=$SOURCE_SHA target=$TARGET_SHA" /tmp/check.txt
+          grep -Fqx "report_sha256=$REPORT_SHA256" /tmp/check.txt
+
+          curl -fsSL "${auth[@]}" "$api/git/commits/$SOURCE_SHA" > /tmp/source.json
+          test "$(jq -r '.tree.sha' /tmp/source.json)" = "$SOURCE_TREE"
+          curl -fsSL "${auth[@]}" "$api/git/commits/$TARGET_SHA" > /tmp/target.json
+          test "$(jq -r '.tree.sha' /tmp/target.json)" = "$TARGET_PROOF_TREE"
+
+          # External consumer is public and must remain read-only. Deliberately do not
+          # send the ADWF repository token across repository boundaries.
+          curl -fsSL -H 'Accept: application/vnd.github+json' -H 'X-GitHub-Api-Version: 2022-11-28' \
+            "https://api.github.com/repos/$CONSUMER_REPO/git/commits/$CONSUMER_SHA" > /tmp/consumer.json
+          test "$(jq -r '.tree.sha' /tmp/consumer.json)" = "$CONSUMER_TREE"
+
+          test "$(git rev-parse HEAD)" = '${{ steps.publish.outputs.head_sha }}'
+          test "$(git show -s --format=%T HEAD)" = "$TARGET_TREE"
+          echo "$REGISTRY_SHA256  .adwf/capability-live-evidence.json" | sha256sum -c -
+          echo "provider_readback=PASS" >> "$GITHUB_OUTPUT"
+
+      - name: Publish exact-head provider certification check
+        env:
+          GH_TOKEN: ${{ github.token }}
+          HEAD_SHA: ${{ steps.publish.outputs.head_sha }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          payload="$(jq -nc \
+            --arg head "$HEAD_SHA" \
+            --arg registry "$REGISTRY_SHA256" \
+            --arg report "$REPORT_SHA256" \
+            --arg run "$PROOF_RUN_ID" \
+            --arg check "$PROOF_CHECK_ID" \
+            --arg consumer "$CONSUMER_SHA" \
+            '{name:"adwf/capability-live-evidence-provider",head_sha:$head,status:"completed",conclusion:"success",output:{title:"UPGRADE-004 provider-resolved live evidence — PASS",summary:"PASS: canonical certification registry is exact-tree bound and immutable UPGRADE-003 provider facts were independently read back.",text:("registry_sha256="+$registry+"\nproof_run="+$run+" proof_check="+$check+"\nconsumer="+$consumer+"\nreport_sha256="+$report)}}')"
+          curl -fsSL -X POST \
+            -H "Authorization: Bearer $GH_TOKEN" \
+            -H 'Accept: application/vnd.github+json' \
+            -H 'X-GitHub-Api-Version: 2022-11-28' \
+            "https://api.github.com/repos/${GITHUB_REPOSITORY}/check-runs" \
+            -d "$payload" > /tmp/published-check.json
+          jq -e '.conclusion=="success" and .name=="adwf/capability-live-evidence-provider"' /tmp/published-check.json >/dev/null
+          echo "published_check_id=$(jq -r '.id' /tmp/published-check.json)"
