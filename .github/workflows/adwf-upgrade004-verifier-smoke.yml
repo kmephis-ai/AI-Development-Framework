@@ -1,0 +1,59 @@
+name: ADWF UPGRADE-004 Candidate Verifier Smoke
+
+on:
+  push:
+    branches:
+      - agent/verify-upgrade004-provider-helper-7381c5ed
+
+permissions:
+  contents: read
+  actions: read
+  checks: read
+
+env:
+  CANDIDATE_SHA: 7381c5ed72dd315b84bac4c4849eb3aa523b1f91
+  CANDIDATE_TREE: c688be61b9c9c4c443a09a7af8b80ec1473d8da1
+
+jobs:
+  candidate-verifier-smoke:
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Checkout exact candidate
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd
+        with:
+          ref: ${{ env.CANDIDATE_SHA }}
+          persist-credentials: false
+          fetch-depth: 1
+
+      - name: Assert exact candidate identity
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "$CANDIDATE_SHA"
+          test "$(git show -s --format=%T HEAD)" = "$CANDIDATE_TREE"
+
+      - name: Execute candidate provider verifier against live GitHub
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          import json
+          import os
+          import sys
+          from pathlib import Path
+
+          sys.path.insert(0, str((Path.cwd() / '.adwf').resolve()))
+          from lib.capability_live_evidence import verify_provider_certification
+          from lib.github_provider import GitHubClient
+          from lib.strict_json import load
+
+          registry = load(Path('.adwf/capability-live-evidence.json'))
+          certification = registry['certifications'][0]
+          client = GitHubClient('kmephis-ai/AI-Development-Framework', os.environ['GH_TOKEN'])
+          result = verify_provider_certification(client, certification)
+          print(json.dumps(result, sort_keys=True))
+          if result.get('verified') is not True:
+              raise SystemExit('CANDIDATE_PROVIDER_VERIFIER_FAILED:' + ','.join(result.get('reason_codes') or []))
+          PY
