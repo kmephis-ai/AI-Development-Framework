@@ -1,4 +1,5 @@
-# Retry after writer branch reset to exact BASE.
+# Hybrid publisher: reserved workflow files are staged by the GitHub connector;
+# this job applies the checksum-bound remainder and proves the exact final tree.
 name: ADWF Candidate Publisher CONSUMER_ROUTE-001
 
 on:
@@ -14,7 +15,7 @@ jobs:
     runs-on: ubuntu-24.04
     timeout-minutes: 10
     env:
-      BASE_SHA: ad52ebf201e224ccb4f0f1c614da763f6965bd75
+      TARGET_STAGE_SHA: e806b7acae2961242822d2a2c0167839d97aa5a0
       TARGET_BRANCH: agent/consumer-route-001-native-gate-routing
       EXPECTED_PAYLOAD_SHA256: b4842932bd7591d24974070fae69ffda95240a9390e82f18e71c88306830db9b
       EXPECTED_PATCH_SHA256: 6e6947f6f2183fa031290c340e1ed0102b3654aa73df489768797e603195ee2c
@@ -38,31 +39,35 @@ jobs:
           base64 --decode /tmp/candidate.patch.b64 | gzip -dc > /tmp/candidate.patch
           echo "${EXPECTED_PATCH_SHA256}  /tmp/candidate.patch" | sha256sum -c -
 
-      - name: Verify target writer remains exact BASE
+      - name: Verify reserved workflow stage
         shell: bash
         run: |
           set -euo pipefail
           git fetch --no-tags origin "refs/heads/${TARGET_BRANCH}:refs/remotes/origin/${TARGET_BRANCH}"
           ACTUAL_TARGET="$(git rev-parse refs/remotes/origin/${TARGET_BRANCH})"
           echo "target_sha=${ACTUAL_TARGET}"
-          test "${ACTUAL_TARGET}" = "${BASE_SHA}"
+          test "${ACTUAL_TARGET}" = "${TARGET_STAGE_SHA}"
 
-      - name: Prepare exact BASE checkout
+      - name: Prepare exact staged checkout
         shell: bash
         run: |
           set -euo pipefail
-          git reset --hard "${BASE_SHA}"
-          ACTUAL_HEAD="$(git rev-parse HEAD)"
-          echo "base_head=${ACTUAL_HEAD}"
-          test "${ACTUAL_HEAD}" = "${BASE_SHA}"
+          git reset --hard "${TARGET_STAGE_SHA}"
+          test "$(git rev-parse HEAD)" = "${TARGET_STAGE_SHA}"
           git clean -fdx
 
-      - name: Apply candidate patch
+      - name: Apply checksum-bound non-workflow remainder
         shell: bash
         run: |
           set -euo pipefail
-          git apply --check /tmp/candidate.patch
-          git apply /tmp/candidate.patch
+          git apply --check \
+            --exclude=.github/workflows/adwf-main.yml \
+            --exclude=.github/workflows/adwf-pr.yml \
+            /tmp/candidate.patch
+          git apply \
+            --exclude=.github/workflows/adwf-main.yml \
+            --exclude=.github/workflows/adwf-pr.yml \
+            /tmp/candidate.patch
           git add -A
           git diff --cached --check
 
