@@ -1,0 +1,142 @@
+name: ADWF CONSUMER_INSTR_FIX-001 Materializer
+
+on:
+  push:
+    branches:
+      - agent/materializer-CONSUMER_INSTR_FIX-001-20260817-a1
+
+permissions:
+  contents: write
+
+env:
+  SOURCE_SHA: afe77d7f455285d81e8e70cea0e972b0b734dc0d
+  SOURCE_TREE: 36a9219f5ea596bfcdbe5e0737ecf945680ca4d9
+  TARGET_BRANCH: agent/materialized-CONSUMER_INSTR_FIX-001-20260817-a1
+  EXPECTED_TREE: 5a7098c9ac509e9be1e17d578eedfb4fc887774f
+  PATCH_B64_SHA256: 50721f3db8c920593e6cb32f8024718006bf3858af54e6aeaa9722c3b04fddba
+  PATCH_SHA256: fbae0767374fe607955a141211f64c1b63ca266a1c4588779d262858521384cf
+  REVIEWED_AT: 2026-08-17T17:28:04Z
+  VALID_UNTIL: 2026-11-17T17:28:04Z
+  PYTHONDONTWRITEBYTECODE: '1'
+
+jobs:
+  materialize:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - name: Checkout transport helper
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Capture and verify bounded patch transport
+        shell: bash
+        run: |
+          set -euo pipefail
+          cp .github/materializer/consumer-instr-fix-001.patch.gz.b64 /tmp/fix.patch.gz.b64
+          printf '%s  %s\n' "${PATCH_B64_SHA256}" /tmp/fix.patch.gz.b64 | sha256sum -c -
+
+      - name: Checkout exact canonical source
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd
+        with:
+          ref: ${{ env.SOURCE_SHA }}
+          fetch-depth: 0
+          persist-credentials: true
+          clean: true
+
+      - name: Apply bounded repair to exact source
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "${SOURCE_SHA}"
+          test "$(git rev-parse HEAD^{tree})" = "${SOURCE_TREE}"
+          git checkout -B materialized "${SOURCE_SHA}"
+          base64 -d /tmp/fix.patch.gz.b64 | gzip -d > /tmp/fix.patch
+          printf '%s  %s\n' "${PATCH_SHA256}" /tmp/fix.patch | sha256sum -c -
+          git apply --check /tmp/fix.patch
+          git apply /tmp/fix.patch
+          git diff --check
+
+      - name: Canonical rematerialization fixed point
+        shell: bash
+        run: |
+          set -euo pipefail
+          python .adwf/scripts/docs_freshness.py --write --reviewed-at "${REVIEWED_AT}" --valid-until "${VALID_UNTIL}"
+          python .adwf/scripts/generate_manifest.py
+          first="$(git diff -- .adwf/docs-registry.json MANIFEST.json SHA256SUMS.txt | sha256sum | awk '{print $1}')"
+          python .adwf/scripts/docs_freshness.py --write --reviewed-at "${REVIEWED_AT}" --valid-until "${VALID_UNTIL}"
+          python .adwf/scripts/generate_manifest.py
+          second="$(git diff -- .adwf/docs-registry.json MANIFEST.json SHA256SUMS.txt | sha256sum | awk '{print $1}')"
+          test "${first}" = "${second}"
+          python .adwf/scripts/docs_freshness.py
+          python .adwf/scripts/generate_manifest.py --check
+
+      - name: Focused and regression suites
+        shell: bash
+        run: |
+          set -euo pipefail
+          python .adwf/tests/test_consumer_instructions.py
+          python .adwf/tests/test_consumer_upgrade_core.py
+          python .adwf/tests/test_consumer_instruction_upgrade_transaction.py
+          python .adwf/tests/test_consumer_upgrade_adversarial.py
+          python .adwf/tests/test_consumer_upgrade_transaction.py
+          python .adwf/tests/test_consumer_upgrade_transaction_adversarial.py
+          python .adwf/tests/test_consumer_upgrade_connected.py
+          python .adwf/tests/test_managed_surface.py
+          PYTHONPATH=.adwf:.adwf/tests python .adwf/tests/test_external_consumer_upgrade_proof.py
+
+      - name: Canonical validators
+        shell: bash
+        run: |
+          set -euo pipefail
+          python .adwf/scripts/validate_framework.py
+          python .adwf/scripts/validate_docs.py
+          python .adwf/scripts/docs_freshness.py
+          python .adwf/scripts/generate_manifest.py --check
+          python .adwf/scripts/validate_managed_surface.py
+          python .adwf/scripts/validate_pipeline_ir.py
+          python .adwf/scripts/validate_ci.py
+          python .adwf/adwf.py doctor --scope package_integrity
+          python .adwf/adwf.py doctor --scope config_health
+          git diff --check
+
+      - name: Full framework self-test
+        shell: bash
+        run: |
+          set -euo pipefail
+          python .adwf/adwf.py self-test
+
+      - name: Verify exact candidate tree and publish disposable candidate
+        shell: bash
+        run: |
+          set -euo pipefail
+          cat > /tmp/expected-paths <<'EOF'
+          .adwf/docs-registry.json
+          .adwf/lib/consumer_instructions.py
+          .adwf/lib/consumer_upgrade.py
+          .adwf/lib/consumer_upgrade_transaction.py
+          .adwf/tests/consumer_upgrade_transaction_fixture.py
+          .adwf/tests/test_consumer_instruction_upgrade_transaction.py
+          .adwf/tests/test_consumer_instructions.py
+          .adwf/tests/test_consumer_upgrade_core.py
+          MANIFEST.json
+          SHA256SUMS.txt
+          docs/governance/CONSUMER_FRAMEWORK_UPGRADE_PLANNING.md
+          docs/governance/CONSUMER_INSTRUCTION_CONTRACT.md
+          EOF
+          git diff --name-only "${SOURCE_SHA}" | sort > /tmp/actual-paths
+          diff -u /tmp/expected-paths /tmp/actual-paths
+          test -z "$(git status --porcelain --untracked-files=all | awk '$1 == "??" {print}')"
+          git add -A
+          tree="$(git write-tree)"
+          echo "candidate_tree=${tree}"
+          test "${tree}" = "${EXPECTED_TREE}"
+          git config user.name 'ADWF Autonomous Writer'
+          git config user.email 'adwf-writer@example.invalid'
+          git commit -m 'CONSUMER_INSTR_FIX-001: harden legacy and invariant state'
+          test "$(git rev-parse HEAD^)" = "${SOURCE_SHA}"
+          test "$(git rev-parse HEAD^{tree})" = "${EXPECTED_TREE}"
+          remote_target="$(git ls-remote origin "refs/heads/${TARGET_BRANCH}" | awk '{print $1}')"
+          test "${remote_target}" = "${SOURCE_SHA}"
+          git push origin "HEAD:refs/heads/${TARGET_BRANCH}"
