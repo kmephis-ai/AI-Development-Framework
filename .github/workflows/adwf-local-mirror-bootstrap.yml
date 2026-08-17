@@ -1,0 +1,41 @@
+name: ADWF Local Git Mirror Bootstrap
+
+on:
+  push:
+    branches:
+      - agent/local-mirror-prihrash-adoption-adwf-20260817-b1
+
+permissions:
+  contents: read
+
+jobs:
+  bundle:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd
+        with:
+          ref: f17a49a22b9608297e96977e0af7f4cb0c573fc7
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Build exact bundle
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "f17a49a22b9608297e96977e0af7f4cb0c573fc7"
+          git fsck --full
+          git bundle create /tmp/adwf-prihrash-adoption.bundle HEAD
+          git bundle verify /tmp/adwf-prihrash-adoption.bundle
+          {
+            echo "SOURCE_SHA=$(git rev-parse HEAD)"
+            echo "SOURCE_TREE=$(git rev-parse HEAD^{tree})"
+            echo "BUNDLE_SHA256=$(sha256sum /tmp/adwf-prihrash-adoption.bundle | awk '{print $1}')"
+          } > /tmp/adwf-prihrash-adoption.manifest
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: adwf-prihrash-adoption-f17a49a
+          path: |
+            /tmp/adwf-prihrash-adoption.bundle
+            /tmp/adwf-prihrash-adoption.manifest
+          retention-days: 1
+          if-no-files-found: error
