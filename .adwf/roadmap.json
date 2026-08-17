@@ -254,6 +254,14 @@
             "CONSUMER_GATE-001"
           ],
           "product_impact": false
+        },
+        {
+          "roadmap_id": "CONSUMER_WAIT-001",
+          "title_ru": "Bounded Native Gate Wait for Real Consumer CI Latency",
+          "dependencies": [
+            "CONSUMER_ROUTE-001"
+          ],
+          "product_impact": false
         }
       ]
     }
