@@ -20,7 +20,7 @@ def compile_github_readback(root,client,*,subject_sha:str,repository:dict[str,An
     integration_ids={int((c.get('app') or {}).get('id')) for c in matched.values() if c is not None}
     expected_integration_id=next(iter(integration_ids)) if len(integration_ids)==1 and all(matched.values()) else None
     rules=verify_rulesets(rulesets,expected_integration_id=expected_integration_id);anchor_rules=verify_runtime_anchor_ruleset(rulesets)
-    pr_runs=[r for r in client.runs() if r.get('head_sha')==subject_sha and r.get('name')=='ADWF PR' and r.get('conclusion')=='success']
+    pr_runs=[r for r in client.recent_runs(limit=100,event='pull_request') if r.get('event')=='pull_request' and r.get('head_sha')==subject_sha and r.get('name')=='ADWF PR' and r.get('conclusion')=='success']
     runner_verified=False; runner='NOT_VERIFIED'; larger=False
     if pr_runs:
         jobs=client.jobs(int(pr_runs[0]['id']))
