@@ -1,0 +1,68 @@
+name: ADWF Session Persist Roadmap ID Repair
+
+on:
+  push:
+    branches:
+      - agent/repair-session-persist-roadmap-id-20260818-a1
+
+permissions:
+  contents: write
+
+env:
+  WRITER_BRANCH: agent/SESSION-PERSIST-001-runtime-ledger-continuity
+  WRITER_SHA: 0ac6f3a59fdf3864a42af25eaec4e40343a0266b
+
+jobs:
+  repair:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd
+        with:
+          ref: ${{ env.WRITER_BRANCH }}
+          fetch-depth: 0
+          persist-credentials: true
+
+      - uses: actions/setup-python@a309ff8b426b58ec0e2a45f0f869d46889d02405
+        with:
+          python-version: "3.12.10"
+
+      - name: Verify exact writer baseline
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "${WRITER_SHA}"
+          test "$(git hash-object .adwf/tests/test_session_continuity_persistence.py)" = "eb08c1c6fd160d96be129557825507b5607cd8c8"
+
+      - name: Repair machine Roadmap ID and regenerate integrity
+        shell: bash
+        env:
+          PYTHONDONTWRITEBYTECODE: "1"
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          from pathlib import Path
+          p = Path('.adwf/tests/test_session_continuity_persistence.py')
+          s = p.read_text(encoding='utf-8')
+          s = s.replace("'roadmap_id': 'SESSION-PERSIST-001'", "'roadmap_id': 'SESSION_PERSIST-001'")
+          s = s.replace("checkpoint_id='SESSION-PERSIST-001:0001'", "checkpoint_id='SESSION_PERSIST-001:0001'")
+          s = s.replace("roadmap_id='SESSION-PERSIST-001'", "roadmap_id='SESSION_PERSIST-001'")
+          p.write_text(s, encoding='utf-8')
+          PY
+          python -m unittest discover -s .adwf/tests -p 'test_session_continuity_persistence.py'
+          python .adwf/scripts/generate_manifest.py
+          python .adwf/scripts/generate_manifest.py --check
+          test "$(git hash-object .adwf/tests/test_session_continuity_persistence.py)" = "c0a633258c0f994e9d4cd677cd86360dbb41b250"
+          test "$(git hash-object MANIFEST.json)" = "9afceba1fbd92ca825764713a498fe15255dd28b"
+          test "$(git hash-object SHA256SUMS.txt)" = "e0b3d9530188ab2c4d9f36b93f793dc1caec35ff"
+          git diff --check
+
+      - name: Fast-forward repair to writer branch
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name "adwf-roadmap-id-repair"
+          git config user.email "adwf-roadmap-id-repair@users.noreply.github.com"
+          git add .adwf/tests/test_session_continuity_persistence.py MANIFEST.json SHA256SUMS.txt
+          git commit -m "[SESSION_PERSIST-001] Repair machine Roadmap ID contract"
+          git push origin "HEAD:refs/heads/${WRITER_BRANCH}"
