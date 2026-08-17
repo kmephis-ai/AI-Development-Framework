@@ -90,6 +90,18 @@ class ConsumerCIRouteTests(unittest.TestCase):
         self.assertIn("consumer_ci.py delegate --phase pr", pr)
         self.assertIn("consumer_ci.py delegate --phase main", main)
         self.assertIn("Framework contract suite", main)
+        control = (ROOT / ".github/workflows/adwf-control.yml").read_text(encoding="utf-8")
+        self.assertIn("control-route:", control)
+        self.assertIn("Resolve trusted control mode", control)
+        self.assertIn("consumer_ci.py classify-current", control)
+        self.assertIn("if: needs.control-route.outputs.mode == 'SELF_HOST_CANONICAL'", control)
+        self.assertIn("consumer-observer:", control)
+        self.assertIn("if: needs.control-route.outputs.mode == 'CONSUMER_NATIVE'", control)
+        observer = control.split("  consumer-observer:", 1)[1]
+        self.assertIn("contents: read", observer)
+        self.assertNotIn("contents: write", observer)
+        self.assertNotIn("issues: write", observer)
+        self.assertNotIn("pull-requests: write", observer)
 
     def test_native_delegation_exact_success_and_failure(self):
         with tempfile.TemporaryDirectory() as t:

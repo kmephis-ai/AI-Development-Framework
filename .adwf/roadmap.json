@@ -262,6 +262,14 @@
             "CONSUMER_ROUTE-001"
           ],
           "product_impact": false
+        },
+        {
+          "roadmap_id": "CONSUMER_CONTROL-001",
+          "title_ru": "Consumer-aware Trusted Control Routing v1",
+          "dependencies": [
+            "CONSUMER_WAIT-001"
+          ],
+          "product_impact": false
         }
       ]
     }

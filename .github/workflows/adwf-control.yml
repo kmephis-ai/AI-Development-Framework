@@ -27,7 +27,28 @@ concurrency:
   group: adwf-control-${{ github.repository }}
   cancel-in-progress: false
 jobs:
+  control-route:
+    permissions:
+      contents: read
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    outputs:
+      mode: ${{ steps.control-mode.outputs.mode }}
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd
+        with:
+          ref: ${{ github.event.repository.default_branch }}
+          persist-credentials: false
+          fetch-depth: 1
+      - uses: actions/setup-python@a309ff8b426b58ec0e2a45f0f869d46889d02405
+        with:
+          python-version: "3.12.10"
+      - name: Resolve trusted control mode
+        id: control-mode
+        run: python .adwf/scripts/consumer_ci.py classify-current --repository "${{ github.repository }}" --github-output "$GITHUB_OUTPUT"
   trusted-controller:
+    needs: control-route
+    if: needs.control-route.outputs.mode == 'SELF_HOST_CANONICAL'
     permissions:
       contents: write
       actions: read
@@ -113,3 +134,21 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ github.token }}
         run: python .adwf/scripts/sync_dashboard_issue.py --apply
+  consumer-observer:
+    needs: control-route
+    if: needs.control-route.outputs.mode == 'CONSUMER_NATIVE'
+    permissions:
+      contents: read
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd
+        with:
+          ref: ${{ github.event.repository.default_branch }}
+          persist-credentials: false
+          fetch-depth: 1
+      - uses: actions/setup-python@a309ff8b426b58ec0e2a45f0f869d46889d02405
+        with:
+          python-version: "3.12.10"
+      - name: Revalidate installed consumer control boundary
+        run: python .adwf/scripts/consumer_ci.py classify-current --repository "${{ github.repository }}"
