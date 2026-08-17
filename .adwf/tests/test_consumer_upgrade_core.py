@@ -113,4 +113,26 @@ class ConsumerUpgradeCoreTests(unittest.TestCase):
                 self.compat(source, target, consumer, snapshot)
         finally: temp.cleanup()
 
+    def test_09_resealed_tampered_target_instruction_policy_fails_closed(self):
+        temp, source, target, consumer, snapshot = prepared(ROOT)
+        try:
+            path = target / ".adwf/consumer-instruction-policy.json"
+            policy = json.loads(path.read_text(encoding="utf-8"))
+            policy["router"]["mode"] = "FRAMEWORK_MANAGED"
+            path.write_text(json.dumps(policy, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+            seal_inventory(target)
+            with self.assertRaisesRegex(ConsumerUpgradeError, "UPGRADE_TARGET_INSTRUCTION_POLICY_INVALID"):
+                self.compat(source, target, consumer, snapshot)
+        finally: temp.cleanup()
+
+    def test_10_consumer_invariants_symlink_fails_closed_before_write(self):
+        temp, source, target, consumer, snapshot = prepared(ROOT)
+        try:
+            invariants = consumer / ".adwf-consumer/INVARIANTS.md"
+            invariants.parent.mkdir(parents=True, exist_ok=True)
+            invariants.symlink_to(consumer / "README.md")
+            with self.assertRaisesRegex(ConsumerUpgradeError, "UPGRADE_CONSUMER_INSTRUCTION_SURFACE_INVALID"):
+                self.compat(source, target, consumer, snapshot)
+        finally: temp.cleanup()
+
 if __name__ == "__main__": unittest.main()

@@ -82,6 +82,25 @@ def load_consumer_instruction_policy(root: str | Path, inventory: dict[str, Any]
     return policy
 
 
+def validate_consumer_invariants_surface(consumer_root: str | Path, policy: dict[str, Any]) -> None:
+    """Require the consumer-owned invariants path to be absent or a regular file via real directories."""
+    root = Path(consumer_root).resolve()
+    rel = _safe_rel(str((policy.get("consumer_invariants") or {}).get("path") or ""))
+    pure = PurePosixPath(rel)
+    current = root
+    for part in pure.parts[:-1]:
+        current = current / part
+        if current.is_symlink():
+            raise ConsumerInstructionError("CONSUMER_INSTRUCTION_INVARIANTS_PATH_AMBIGUOUS:SYMLINK_PARENT")
+        if current.exists() and not current.is_dir():
+            raise ConsumerInstructionError("CONSUMER_INSTRUCTION_INVARIANTS_PATH_AMBIGUOUS:NON_DIRECTORY_PARENT")
+    path = root / rel
+    if path.is_symlink():
+        raise ConsumerInstructionError("CONSUMER_INSTRUCTION_INVARIANTS_PATH_AMBIGUOUS:SYMLINK")
+    if path.exists() and not path.is_file():
+        raise ConsumerInstructionError("CONSUMER_INSTRUCTION_INVARIANTS_PATH_AMBIGUOUS:NON_FILE")
+
+
 def legacy_preexisting_router_transition_allowed(
     policy: dict[str, Any], *, path: str, source_ownership: str, target_ownership: str, target_present: bool,
 ) -> bool:
