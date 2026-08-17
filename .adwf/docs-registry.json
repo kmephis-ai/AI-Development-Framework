@@ -11,7 +11,7 @@
         ".github/workflows/**"
       ],
       "mode": "generated-status-block+manual",
-      "source_digest": "9db55e44a463219a6e8b63bf555c1d145d4048b9b8d73ae1c784f3f5b6ff1a19",
+      "source_digest": "8e236fd262292766ab24375473f0d060e6ec709de6a231379f29bcead684322b",
       "reviewed_at": "2026-08-17T17:28:04Z",
       "valid_until": "2026-11-17T17:28:04Z"
     },
@@ -24,7 +24,7 @@
         "skills/**"
       ],
       "mode": "manual-governance",
-      "source_digest": "84daaae2beda35a07c41a0e0ba9b12bd1fae0b4414987cbc2f593348dd225a4e",
+      "source_digest": "f36ad7a601254ca887da7ab7fe167bfa6d60349a07ed7cedc022385bc6455ac6",
       "reviewed_at": "2026-08-17T17:28:04Z",
       "valid_until": "2026-11-17T17:28:04Z"
     },
@@ -65,7 +65,7 @@
         ".adwf/scripts/validate_capabilities.py"
       ],
       "mode": "implementation-certification",
-      "source_digest": "47c7515fd55e036a77d5b810e19562bdc919fe44e0fae34f89d8cf194acf3857",
+      "source_digest": "7e40ed8b38540e26d620e1eaeab3e7b3c4903c4225e59a5f2181b82822ee7d42",
       "reviewed_at": "2026-08-17T17:28:04Z",
       "valid_until": "2026-11-17T17:28:04Z"
     },
@@ -296,7 +296,7 @@
         ".adwf/decision-requirement-traceability.json"
       ],
       "mode": "governance-contract",
-      "source_digest": "6d907b426e61c8b1a4d10e9b1b0bdfc19f8de856aff2767facaafca07f7d1643",
+      "source_digest": "9167cd15d062d74a350f27a133404b9f7ae95c3404ccaf9a660dc9eb2e669542",
       "reviewed_at": "2026-08-17T17:28:04Z",
       "valid_until": "2026-11-17T17:28:04Z"
     },
@@ -314,7 +314,7 @@
         ".adwf/decision-requirement-traceability.json"
       ],
       "mode": "governance-contract",
-      "source_digest": "4d6dd8b0d4ae5ba0948c715316d4ec09ea312f92340c9d5894182f438e42e878",
+      "source_digest": "aeb4ed4d543fcb31925fe31371e5830754246ff8c638bd86d0d0b3ee65db3abf",
       "reviewed_at": "2026-08-17T17:28:04Z",
       "valid_until": "2026-11-17T17:28:04Z"
     },
@@ -370,7 +370,7 @@
         ".adwf/tests/test_consumer_upgrade_transaction.py"
       ],
       "mode": "governance-contract",
-      "source_digest": "faaf7f236788ffdb5bbbbbcb0011c17dffbc994959190bf52aaba43d59967525",
+      "source_digest": "63a631e930b693b73e031473d71a3e41e12d8feacd7ea509525ac85bf35031cc",
       "reviewed_at": "2026-08-17T17:28:04Z",
       "valid_until": "2026-11-17T17:28:04Z"
     },
