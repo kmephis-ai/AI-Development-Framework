@@ -521,6 +521,27 @@
       ]
     },
     {
+      "id": "CONSUMER_FRAMEWORK_UPGRADE_CONNECTED",
+      "status": "LIVE_NOT_VERIFIED",
+      "execution_mode": "CORE",
+      "owner_claim_ru": "ADWF завершает connected consumer framework upgrade только после core COMMITTED, provider-durable перепроекции installation/operations/gates, fresh-session readback и доказуемого rollback; checkout path rebind остаётся session-local locator, а не новой mutation authority.",
+      "entrypoints": [
+        ".adwf/scripts/apply_consumer_upgrade.py"
+      ],
+      "production_paths": [
+        ".adwf/lib/consumer_upgrade_projection.py",
+        ".adwf/lib/consumer_installation.py",
+        ".adwf/lib/consumer_upgrade_transaction.py"
+      ],
+      "verification": [
+        ".adwf/tests/test_consumer_upgrade_connected.py",
+        ".adwf/tests/test_consumer_upgrade_transaction.py",
+        ".adwf/tests/test_consumer_upgrade_transaction_adversarial.py"
+      ],
+      "live_boundary": "LIVE_NOT_VERIFIED: implementation/focused/self-test evidence не заменяет реальный provider-backed upgrade уже подключённого consumer. LIVE_VERIFIED допустим только после exact downstream PrihRash A→B provider PR, rollback/re-apply proof и post-merge fresh-session installation/operations/gates readback без product/FIN-TRUTH drift.",
+      "live_evidence": []
+    },
+    {
       "id": "CREATIVE_AGENT_QUALIFICATION",
       "status": "LIVE_NOT_VERIFIED",
       "execution_mode": "OPTIONAL_ADAPTER",

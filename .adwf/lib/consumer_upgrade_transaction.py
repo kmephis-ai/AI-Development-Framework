@@ -276,6 +276,9 @@ def _trusted_source_snapshot(source_root: Path, target_root: Path, consumer: Pat
             "UPGRADE_APPLY_SOURCE_INSTALLATION_PROVENANCE_INVALID:" + str(exc).split(":", 1)[0]
         ) from exc
     installed_snapshot = _snapshot_from_record(installation)
+    # Durable installation identity carries the historical checkout locator.
+    # A fresh session may rebind only that locator after full proof validation.
+    installed_snapshot["consumer_root_sha256"] = _root_sha(consumer)
     if installed_snapshot != snapshot:
         raise ConsumerUpgradeError("UPGRADE_APPLY_SOURCE_INSTALLATION_SNAPSHOT_PROVENANCE_MISMATCH")
 

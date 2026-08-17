@@ -246,7 +246,11 @@ def rebind_snapshot_for_fresh_session(consumer_root: str | Path, framework_root:
     if repository is None:
         raise ConsumerInstallationError("INSTALLATION_CONSUMER_REPOSITORY_NOT_VERIFIABLE")
     validate_fresh_session(consumer, framework, expected_repository=repository)
-    return _snapshot_from_record(load_record(consumer, framework))
+    snapshot = _snapshot_from_record(load_record(consumer, framework))
+    # The absolute checkout path is session-local, not durable installation identity.
+    # Rebind only after every durable proof/managed byte/profile check above passed.
+    snapshot["consumer_root_sha256"] = hashlib.sha256(str(consumer).encode("utf-8")).hexdigest()
+    return snapshot
 
 
 def validate_fresh_session(
