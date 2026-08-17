@@ -1,0 +1,116 @@
+name: ADWF CONSUMER_PROJ-001 Rebase Materializer
+
+on:
+  push:
+    branches:
+      - agent/materializer-CONSUMER_PROJ-001-20260817-a
+
+permissions:
+  contents: write
+
+jobs:
+  materialize:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    env:
+      BASE_MAIN_SHA: ea0491fdd1399a804728167c7ef44a498b3635e1
+      FEATURE_SHA: 9028935f99155303347322099509804188073a58
+      EXPECTED_TREE: c2056b65e7bfdadd881357e5fbe115bdd32fbc8b
+      STAGING_BRANCH: agent/materialized-CONSUMER_PROJ-001-20260817-a
+      REVIEWED_AT: 2026-08-17T16:55:17Z
+      VALID_UNTIL: 2026-11-17T16:55:17Z
+    steps:
+      - name: Checkout trusted materializer source without credentials
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Reconstruct exact feature on certified main
+        shell: bash
+        run: |
+          set -euo pipefail
+          git fetch --no-tags origin \
+            "+refs/heads/main:refs/remotes/origin/main" \
+            "+refs/heads/agent/CONSUMER_PROJ-001-connected-upgrade-proof:refs/remotes/origin/feature"
+          test "$(git rev-parse refs/remotes/origin/main)" = "$BASE_MAIN_SHA"
+          test "$(git rev-parse refs/remotes/origin/feature)" = "$FEATURE_SHA"
+          git checkout --detach "$FEATURE_SHA"
+          git config user.name 'ADWF Autonomous Writer'
+          git config user.email 'adwf-writer@example.invalid'
+          set +e
+          git merge --no-commit --no-ff "$BASE_MAIN_SHA"
+          merge_rc=$?
+          set -e
+          test "$merge_rc" -eq 1
+          mapfile -t conflicts < <(git diff --name-only --diff-filter=U | LC_ALL=C sort)
+          expected=(.adwf/docs-registry.json MANIFEST.json SHA256SUMS.txt)
+          test "${#conflicts[@]}" -eq "${#expected[@]}"
+          for i in "${!expected[@]}"; do test "${conflicts[$i]}" = "${expected[$i]}"; done
+          git checkout --theirs -- .adwf/docs-registry.json MANIFEST.json SHA256SUMS.txt
+          git add .adwf/docs-registry.json MANIFEST.json SHA256SUMS.txt
+          test -z "$(git diff --name-only --diff-filter=U)"
+
+      - name: Canonically materialize generated integrity artifacts
+        shell: bash
+        run: |
+          set -euo pipefail
+          python .adwf/scripts/docs_freshness.py --write --reviewed-at "$REVIEWED_AT" --valid-until "$VALID_UNTIL"
+          python .adwf/scripts/generate_manifest.py
+          git add .adwf/docs-registry.json MANIFEST.json SHA256SUMS.txt
+          python .adwf/scripts/docs_freshness.py
+          python .adwf/scripts/generate_manifest.py --check
+          git diff --check
+
+      - name: Run focused consumer and trusted-controller regressions
+        shell: bash
+        run: |
+          set -euo pipefail
+          export PYTHONPATH="$PWD/.adwf${PYTHONPATH:+:$PYTHONPATH}"
+          python .adwf/tests/test_consumer_upgrade_connected.py
+          python .adwf/tests/test_consumer_upgrade_core.py
+          python .adwf/tests/test_consumer_upgrade_adversarial.py
+          python .adwf/tests/test_consumer_upgrade_transaction.py
+          python .adwf/tests/test_consumer_upgrade_transaction_adversarial.py
+          python .adwf/tests/test_consumer_installation.py
+          python .adwf/tests/test_external_consumer_upgrade_proof.py
+          python .adwf/tests/test_trusted_controller.py
+          python .adwf/tests/test_standing_owner_authorization.py
+          python .adwf/tests/test_v16_remediation.py
+
+      - name: Run canonical validators and full self-test
+        shell: bash
+        run: |
+          set -euo pipefail
+          export PYTHONPATH="$PWD/.adwf${PYTHONPATH:+:$PYTHONPATH}"
+          python .adwf/scripts/validate_capabilities.py
+          python .adwf/scripts/docs_freshness.py
+          python .adwf/scripts/validate_managed_surface.py
+          python .adwf/scripts/validate_docs.py
+          python .adwf/scripts/validate_pipeline_ir.py
+          python .adwf/scripts/validate_ci.py
+          python .adwf/scripts/validate_framework.py
+          python .adwf/scripts/generate_manifest.py --check
+          python .adwf/adwf.py self-test
+
+      - name: Seal exact merge commit and verify tree
+        shell: bash
+        run: |
+          set -euo pipefail
+          git commit -m 'chore(CONSUMER_PROJ-001): rebase on certified GOV-025 main'
+          test "$(git show -s --format='%P' HEAD)" = "$FEATURE_SHA $BASE_MAIN_SHA"
+          actual_tree="$(git rev-parse HEAD^{tree})"
+          echo "candidate_commit=$(git rev-parse HEAD)"
+          echo "candidate_tree=$actual_tree"
+          test "$actual_tree" = "$EXPECTED_TREE"
+          test -z "$(git status --porcelain)"
+
+      - name: Publish only staging ref with regular fast-forward push
+        shell: bash
+        env:
+          PUSH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          auth="$(printf 'x-access-token:%s' "$PUSH_TOKEN" | base64 -w0)"
+          git -c "http.https://github.com/.extraheader=AUTHORIZATION: basic $auth" \
+            push origin "HEAD:refs/heads/$STAGING_BRANCH"
