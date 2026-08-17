@@ -1,0 +1,135 @@
+name: ADWF GOV-027 Materializer
+
+on:
+  push:
+    branches:
+      - agent/materializer-GOV-027-20260817-a1
+
+permissions:
+  contents: write
+
+env:
+  SOURCE_SHA: afe77d7f455285d81e8e70cea0e972b0b734dc0d
+  SOURCE_TREE: 36a9219f5ea596bfcdbe5e0737ecf945680ca4d9
+  TARGET_BRANCH: agent/materialized-GOV-027-20260817-a1
+  EXPECTED_TREE: 3a390623a58cf532f37bb9453e8fdfefddb0455e
+  PATCH_B64_SHA256: 3539489cd14b43d7527e87f9a42350627a028ad006c3f7a7f2393f082f38db24
+  PATCH_SHA256: d91153f1726212a2b396d644fafbaf3ae6d89c67522c5a1b58a7306279ce9a5f
+  REVIEWED_AT: 2026-08-17T17:28:04Z
+  VALID_UNTIL: 2026-11-17T17:28:04Z
+  PYTHONDONTWRITEBYTECODE: '1'
+
+jobs:
+  materialize:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - name: Checkout transport helper
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Capture and verify bounded patch transport
+        shell: bash
+        run: |
+          set -euo pipefail
+          cp .github/materializer/gov-027.patch.gz.b64 /tmp/gov027.patch.gz.b64
+          printf '%s  %s\n' "${PATCH_B64_SHA256}" /tmp/gov027.patch.gz.b64 | sha256sum -c -
+
+      - name: Checkout exact canonical source
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd
+        with:
+          ref: ${{ env.SOURCE_SHA }}
+          fetch-depth: 0
+          persist-credentials: true
+          clean: true
+
+      - name: Apply bounded repair to exact source
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "${SOURCE_SHA}"
+          test "$(git rev-parse HEAD^{tree})" = "${SOURCE_TREE}"
+          git checkout -B materialized "${SOURCE_SHA}"
+          base64 -d /tmp/gov027.patch.gz.b64 | gzip -d > /tmp/gov027.patch
+          printf '%s  %s\n' "${PATCH_SHA256}" /tmp/gov027.patch | sha256sum -c -
+          git apply --check /tmp/gov027.patch
+          git apply /tmp/gov027.patch
+          git diff --check
+
+      - name: Canonical rematerialization fixed point
+        shell: bash
+        run: |
+          set -euo pipefail
+          python .adwf/scripts/docs_freshness.py --write --reviewed-at "${REVIEWED_AT}" --valid-until "${VALID_UNTIL}"
+          python .adwf/scripts/generate_manifest.py
+          first="$(git diff -- .adwf/docs-registry.json MANIFEST.json SHA256SUMS.txt | sha256sum | awk '{print $1}')"
+          python .adwf/scripts/docs_freshness.py --write --reviewed-at "${REVIEWED_AT}" --valid-until "${VALID_UNTIL}"
+          python .adwf/scripts/generate_manifest.py
+          second="$(git diff -- .adwf/docs-registry.json MANIFEST.json SHA256SUMS.txt | sha256sum | awk '{print $1}')"
+          test "${first}" = "${second}"
+          python .adwf/scripts/docs_freshness.py
+          python .adwf/scripts/generate_manifest.py --check
+
+      - name: Focused trusted readback regressions
+        shell: bash
+        run: |
+          set -euo pipefail
+          python .adwf/tests/test_github_readback_recent_runs.py
+          python .adwf/tests/test_provider_http_mock.py
+          python .adwf/tests/test_github_metrics_collector.py
+          python .adwf/tests/test_trusted_controller.py
+          python .adwf/tests/test_standing_owner_authorization.py
+          python .adwf/tests/test_v16_remediation.py
+          python .adwf/tests/test_v14_trust.py
+
+      - name: Canonical validators
+        shell: bash
+        run: |
+          set -euo pipefail
+          python .adwf/scripts/validate_framework.py
+          python .adwf/scripts/validate_docs.py
+          python .adwf/scripts/docs_freshness.py
+          python .adwf/scripts/generate_manifest.py --check
+          python .adwf/scripts/validate_managed_surface.py
+          python .adwf/scripts/validate_pipeline_ir.py
+          python .adwf/scripts/validate_ci.py
+          python .adwf/adwf.py doctor --scope package_integrity
+          python .adwf/adwf.py doctor --scope config_health
+          git diff --check
+
+      - name: Full framework self-test
+        shell: bash
+        run: |
+          set -euo pipefail
+          python .adwf/adwf.py self-test
+
+      - name: Verify exact candidate tree and publish disposable candidate
+        shell: bash
+        run: |
+          set -euo pipefail
+          cat > /tmp/expected-paths <<'EOF'
+          .adwf/docs-registry.json
+          .adwf/lib/github_readback.py
+          .adwf/tests/test_github_readback_recent_runs.py
+          MANIFEST.json
+          SHA256SUMS.txt
+          docs/governance/TRUST_AND_SELF_AUDIT.md
+          EOF
+          git diff --name-only "${SOURCE_SHA}" | sort > /tmp/actual-paths
+          sort /tmp/expected-paths -o /tmp/expected-paths
+          diff -u /tmp/expected-paths /tmp/actual-paths
+          test -z "$(git status --porcelain --untracked-files=all | awk '$1 == "??" {print}')"
+          git add -A
+          tree="$(git write-tree)"
+          echo "candidate_tree=${tree}"
+          test "${tree}" = "${EXPECTED_TREE}"
+          git config user.name 'ADWF Autonomous Writer'
+          git config user.email 'adwf-writer@example.invalid'
+          git commit -m 'GOV-027: bound trusted reconciliation run lookup'
+          test "$(git rev-parse HEAD^)" = "${SOURCE_SHA}"
+          test "$(git rev-parse HEAD^{tree})" = "${EXPECTED_TREE}"
+          remote_target="$(git ls-remote origin "refs/heads/${TARGET_BRANCH}" | awk '{print $1}')"
+          test "${remote_target}" = "${SOURCE_SHA}"
+          git push origin "HEAD:refs/heads/${TARGET_BRANCH}"
