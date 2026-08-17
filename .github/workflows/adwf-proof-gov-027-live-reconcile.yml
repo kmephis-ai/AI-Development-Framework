@@ -1,0 +1,66 @@
+name: ADWF GOV-027 Live Reconciliation Proof
+
+on:
+  push:
+    branches:
+      - agent/proof-GOV-027-live-reconcile-20260817-a1
+
+permissions:
+  contents: read
+  actions: read
+  checks: read
+  issues: read
+  pull-requests: read
+
+jobs:
+  live-proof:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - name: Checkout exact GOV-027 candidate
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd
+        with:
+          ref: ac9d0c676373448829b754ad802fa4f409204173
+          fetch-depth: 1
+          persist-credentials: false
+
+      - uses: actions/setup-python@a309ff8b426b58ec0e2a45f0f869d46889d02405
+        with:
+          python-version: "3.12.10"
+
+      - name: Verify exact candidate identity
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "ac9d0c676373448829b754ad802fa4f409204173"
+          test "$(git rev-parse HEAD^{tree})" = "3a390623a58cf532f37bb9453e8fdfefddb0455e"
+          python .adwf/adwf.py doctor --scope package_integrity
+          python .adwf/adwf.py doctor --scope config_health
+
+      - name: Live long-history reconciliation with candidate code
+        shell: bash
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+          GITHUB_REPOSITORY: ${{ github.repository }}
+        run: |
+          set -euo pipefail
+          python .adwf/scripts/github_reconcile.py --subject-sha "2abf6862c94eef25c83e116fe9cc667beaf1b6c6" > /tmp/reconcile.json
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          data=json.loads(Path('/tmp/reconcile.json').read_text(encoding='utf-8'))
+          rb=data['provider_readback']
+          assert rb['readback_verified'] is True, rb
+          assert rb['runner_verified'] is True, rb
+          assert rb['runner'] == 'ubuntu-24.04', rb
+          print(json.dumps({
+              'subject_sha':'2abf6862c94eef25c83e116fe9cc667beaf1b6c6',
+              'candidate_sha':'ac9d0c676373448829b754ad802fa4f409204173',
+              'readback_verified':rb['readback_verified'],
+              'facts_readback_verified':rb.get('facts_readback_verified'),
+              'runner_verified':rb['runner_verified'],
+              'runner':rb['runner'],
+              'ruleset_status':(rb.get('ruleset') or {}).get('status'),
+          }, sort_keys=True))
+          PY
+          git diff --exit-code
