@@ -17,6 +17,11 @@ import stat
 import tempfile
 
 from .consumer_profile import PROFILE_REL, ConsumerProfileError, build_consumer_profile, load_consumer_profile
+from .consumer_installation import (
+    ConsumerInstallationError, _snapshot_from_record, load_record as load_installation_record,
+    validate_fresh_session as validate_installation_fresh_session,
+)
+from .github_auth import detect_repository
 from .consumer_upgrade import (
     ConsumerUpgradeError, _canonical, _file_sha, _path_state, _root_sha, _safe_rel, _verify_revision,
     validate_upgrade_compatibility, validate_upgrade_plan,
@@ -233,26 +238,46 @@ def _trusted_source_snapshot(source_root: Path, target_root: Path, consumer: Pat
             raise ConsumerUpgradeError("UPGRADE_APPLY_SOURCE_UPGRADE_SNAPSHOT_PROVENANCE_MISMATCH")
         return
 
-    # Initial adoption provenance.
+    # Initial adoption provenance remains authoritative whenever its exact journal exists.
+    # A committed provider-durable installation record is only a fresh-session fallback
+    # when that ignored runtime journal is absent; it never overrides invalid runtime state.
     try:
         adoption_store = AdoptionTransactionStore(source_root, consumer, txid, create=False)
         adoption = adoption_store.load()
     except ManagedSurfaceError as exc:
         raise ConsumerUpgradeError("UPGRADE_APPLY_SOURCE_ADOPTION_PROVENANCE_INVALID:" + str(exc).split(":", 1)[0]) from exc
-    if adoption is None or adoption.get("status") != "COMMITTED":
-        raise ConsumerUpgradeError("UPGRADE_APPLY_SOURCE_ADOPTION_NOT_COMMITTED")
-    if adoption.get("source_revision") != snapshot.get("source_revision"):
-        raise ConsumerUpgradeError("UPGRADE_APPLY_SOURCE_ADOPTION_REVISION_MISMATCH")
-    if adoption.get("source_manifest_sha256") != snapshot.get("source_manifest_sha256"):
-        raise ConsumerUpgradeError("UPGRADE_APPLY_SOURCE_ADOPTION_MANIFEST_MISMATCH")
-    if not adoption_store.snapshot.is_file() or adoption_store.snapshot.is_symlink():
-        raise ConsumerUpgradeError("UPGRADE_APPLY_SOURCE_ADOPTION_SNAPSHOT_MISSING")
+    if adoption is not None:
+        if adoption.get("status") != "COMMITTED":
+            raise ConsumerUpgradeError("UPGRADE_APPLY_SOURCE_ADOPTION_NOT_COMMITTED")
+        if adoption.get("source_revision") != snapshot.get("source_revision"):
+            raise ConsumerUpgradeError("UPGRADE_APPLY_SOURCE_ADOPTION_REVISION_MISMATCH")
+        if adoption.get("source_manifest_sha256") != snapshot.get("source_manifest_sha256"):
+            raise ConsumerUpgradeError("UPGRADE_APPLY_SOURCE_ADOPTION_MANIFEST_MISMATCH")
+        if not adoption_store.snapshot.is_file() or adoption_store.snapshot.is_symlink():
+            raise ConsumerUpgradeError("UPGRADE_APPLY_SOURCE_ADOPTION_SNAPSHOT_MISSING")
+        try:
+            stored = strict_load(adoption_store.snapshot)
+        except Exception as exc:
+            raise ConsumerUpgradeError("UPGRADE_APPLY_SOURCE_ADOPTION_SNAPSHOT_INVALID:" + type(exc).__name__) from exc
+        if stored != snapshot or _bytes_sha(adoption_store.snapshot.read_bytes()) != adoption.get("snapshot_sha256"):
+            raise ConsumerUpgradeError("UPGRADE_APPLY_SOURCE_ADOPTION_SNAPSHOT_PROVENANCE_MISMATCH")
+        return
+
+    repository = detect_repository(consumer)
+    if repository is None:
+        raise ConsumerUpgradeError("UPGRADE_APPLY_INSTALLATION_REPOSITORY_NOT_VERIFIABLE")
     try:
-        stored = strict_load(adoption_store.snapshot)
-    except Exception as exc:
-        raise ConsumerUpgradeError("UPGRADE_APPLY_SOURCE_ADOPTION_SNAPSHOT_INVALID:" + type(exc).__name__) from exc
-    if stored != snapshot or _bytes_sha(adoption_store.snapshot.read_bytes()) != adoption.get("snapshot_sha256"):
-        raise ConsumerUpgradeError("UPGRADE_APPLY_SOURCE_ADOPTION_SNAPSHOT_PROVENANCE_MISMATCH")
+        validate_installation_fresh_session(
+            consumer, source_root, expected_repository=repository,
+        )
+        installation = load_installation_record(consumer, source_root)
+    except ConsumerInstallationError as exc:
+        raise ConsumerUpgradeError(
+            "UPGRADE_APPLY_SOURCE_INSTALLATION_PROVENANCE_INVALID:" + str(exc).split(":", 1)[0]
+        ) from exc
+    installed_snapshot = _snapshot_from_record(installation)
+    if installed_snapshot != snapshot:
+        raise ConsumerUpgradeError("UPGRADE_APPLY_SOURCE_INSTALLATION_SNAPSHOT_PROVENANCE_MISMATCH")
 
 
 def _build_target_profile(consumer: Path, source_root: Path, target_root: Path, compatibility: dict[str, Any]) -> tuple[dict[str, Any], bytes]:

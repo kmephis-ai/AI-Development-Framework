@@ -25,6 +25,7 @@ FRAMEWORK_FILES = (
     ".adwf/schemas/consumer-upgrade-migrations.schema.json",
     ".adwf/schemas/consumer-upgrade-compatibility.schema.json",
     ".adwf/schemas/consumer-upgrade-plan.schema.json",
+    ".adwf/schemas/consumer-installation-record.schema.json",
 )
 
 
