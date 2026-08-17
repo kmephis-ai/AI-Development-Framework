@@ -39,9 +39,11 @@ jobs:
           base64 --decode /tmp/candidate.patch.b64 | gzip -dc > /tmp/candidate.patch
           echo "${EXPECTED_PATCH_SHA256}  /tmp/candidate.patch" | sha256sum -c -
 
+          git fetch --no-tags origin "refs/heads/${TARGET_BRANCH}:refs/remotes/origin/${TARGET_BRANCH}"
+          test "$(git rev-parse refs/remotes/origin/${TARGET_BRANCH})" = "${BASE_SHA}"
+
           git checkout --detach "${BASE_SHA}"
           test "$(git rev-parse HEAD)" = "${BASE_SHA}"
-          test "$(git rev-parse refs/remotes/origin/${TARGET_BRANCH})" = "${BASE_SHA}"
 
           git apply --check /tmp/candidate.patch
           git apply /tmp/candidate.patch
