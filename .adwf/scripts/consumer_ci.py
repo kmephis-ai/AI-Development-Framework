@@ -10,7 +10,7 @@ import time
 
 ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT / ".adwf"))
-from lib.consumer_ci import ConsumerCIRouteError, resolve_route, delegate_native_phase  # noqa: E402
+from lib.consumer_ci import ConsumerCIRouteError, classify_current, resolve_route, delegate_native_phase  # noqa: E402
 from lib.github_provider import GitHubClient  # noqa: E402
 
 
@@ -30,6 +30,9 @@ def main() -> int:
     route.add_argument("--anchor-sha")
     route.add_argument("--repository", required=True)
     route.add_argument("--github-output")
+    classify = sub.add_parser("classify-current")
+    classify.add_argument("--repository", required=True)
+    classify.add_argument("--github-output")
     delegate = sub.add_parser("delegate")
     delegate.add_argument("--phase", choices=["pr", "main"], required=True)
     delegate.add_argument("--subject-sha", required=True)
@@ -41,6 +44,12 @@ def main() -> int:
         if args.command == "route":
             result = resolve_route(ROOT, ROOT, phase=args.phase, subject_sha=args.subject_sha, anchor_sha=args.anchor_sha, expected_repository=args.repository)
             _write_output(args.github_output, "mode", result["mode"])
+            print(json.dumps(result, ensure_ascii=False, sort_keys=True))
+            return 0
+        if args.command == "classify-current":
+            result = classify_current(ROOT, ROOT, expected_repository=args.repository)
+            _write_output(args.github_output, "mode", result["mode"])
+            _write_output(args.github_output, "verified_managed_files", str(result.get("verified_managed_files", 0)))
             print(json.dumps(result, ensure_ascii=False, sort_keys=True))
             return 0
         token = os.environ.get("GITHUB_TOKEN", "")
