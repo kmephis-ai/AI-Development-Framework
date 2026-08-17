@@ -6,7 +6,7 @@ ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT / ".adwf")); sys.path.insert(0, str(ROOT / ".adwf/tests"))
 from consumer_upgrade_fixture import build_framework  # noqa: E402
 from lib.consumer_instructions import (  # noqa: E402
-    ConsumerInstructionError, load_consumer_instruction_policy, validate_consumer_router,
+    ConsumerInstructionError, load_consumer_instruction_policy, validate_consumer_instruction_state, validate_consumer_router,
 )
 from lib.managed_surface import load_source_inventory  # noqa: E402
 
@@ -57,6 +57,16 @@ class ConsumerInstructionContractTests(unittest.TestCase):
             seal_inventory(framework)
             with self.assertRaisesRegex(ConsumerInstructionError, "ROUTER_OWNERSHIP_INVALID"):
                 load_consumer_instruction_policy(framework, load_source_inventory(framework))
+
+    def test_05_consumer_invariant_object_must_be_regular_file_when_present(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp); framework = root / "framework"; consumer = root / "consumer"
+            framework.mkdir(); consumer.mkdir(); build_framework(framework, ROOT)
+            policy = load_consumer_instruction_policy(framework, load_source_inventory(framework))
+            invariant = consumer / ".adwf-consumer/INVARIANTS.md"
+            invariant.mkdir(parents=True)
+            with self.assertRaisesRegex(ConsumerInstructionError, "INVARIANTS_REGULAR_FILE_REQUIRED"):
+                validate_consumer_instruction_state(consumer, policy)
 
 
 if __name__ == "__main__": unittest.main()

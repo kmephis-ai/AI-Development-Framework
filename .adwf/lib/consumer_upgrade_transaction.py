@@ -19,7 +19,7 @@ import tempfile
 from .consumer_profile import PROFILE_REL, ConsumerProfileError, build_consumer_profile, load_consumer_profile
 from .consumer_instructions import (
     ConsumerInstructionError, legacy_preexisting_router_transition_allowed,
-    load_consumer_instruction_policy,
+    load_consumer_instruction_policy, validate_consumer_instruction_state,
 )
 from .consumer_installation import (
     ConsumerInstallationError, _snapshot_from_record, load_record as load_installation_record,
@@ -368,6 +368,7 @@ def _preflight(
     target_inventory = load_source_inventory(target_root)
     try:
         target_instruction_policy = load_consumer_instruction_policy(target_root, target_inventory)
+        validate_consumer_instruction_state(consumer, target_instruction_policy)
     except ConsumerInstructionError as exc:
         raise ConsumerUpgradeError("UPGRADE_APPLY_TARGET_INSTRUCTION_POLICY_INVALID:" + str(exc)) from exc
 
