@@ -1,0 +1,116 @@
+name: ADWF CONSUMER_INSTR_FIX-001 D1 Materializer
+
+on:
+  push:
+    branches:
+      - agent/materializer-CONSUMER-INSTR-FIX-001-20260817-d1
+
+permissions:
+  contents: write
+
+env:
+  BASE_SHA: 4cb2aab0966f7a38f09b516f118c7ad6b2985242
+  SOURCE_SHA: c9072adcb819ab013a0fd625d162282e85b5a711
+  TARGET_BRANCH: agent/materialized-CONSUMER-INSTR-FIX-001-20260817-d1
+  REVIEWED_AT: 2026-08-17T17:28:04Z
+  VALID_UNTIL: 2026-11-17T17:28:04Z
+  PYTHONDONTWRITEBYTECODE: '1'
+
+jobs:
+  materialize:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 35
+    steps:
+      - name: Checkout exact semantic candidate
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd
+        with:
+          ref: ${{ env.SOURCE_SHA }}
+          fetch-depth: 0
+          persist-credentials: true
+      - uses: actions/setup-python@a309ff8b426b58ec0e2a45f0f869d46889d02405
+        with:
+          python-version: '3.12.10'
+      - name: Verify exact source and base
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "${SOURCE_SHA}"
+          test "$(git rev-parse HEAD^)" = "${BASE_SHA}"
+          git diff --check "${BASE_SHA}" "${SOURCE_SHA}"
+      - name: Canonical rematerialization fixed point
+        shell: bash
+        run: |
+          set -euo pipefail
+          python .adwf/scripts/docs_freshness.py --write --reviewed-at "${REVIEWED_AT}" --valid-until "${VALID_UNTIL}"
+          python .adwf/scripts/generate_manifest.py
+          first="$(git diff -- .adwf/docs-registry.json MANIFEST.json SHA256SUMS.txt | sha256sum | awk '{print $1}')"
+          python .adwf/scripts/docs_freshness.py --write --reviewed-at "${REVIEWED_AT}" --valid-until "${VALID_UNTIL}"
+          python .adwf/scripts/generate_manifest.py
+          second="$(git diff -- .adwf/docs-registry.json MANIFEST.json SHA256SUMS.txt | sha256sum | awk '{print $1}')"
+          test "${first}" = "${second}"
+          python .adwf/scripts/docs_freshness.py
+          python .adwf/scripts/generate_manifest.py --check
+      - name: Focused consumer instruction and upgrade regressions
+        shell: bash
+        run: |
+          set -euo pipefail
+          python .adwf/tests/test_consumer_instructions.py
+          python .adwf/tests/test_consumer_instruction_upgrade_transaction.py
+          python .adwf/tests/test_consumer_upgrade_core.py
+          python .adwf/tests/test_consumer_upgrade_adversarial.py
+          python .adwf/tests/test_consumer_upgrade_transaction.py
+          python .adwf/tests/test_consumer_upgrade_transaction_adversarial.py
+          python .adwf/tests/test_consumer_upgrade_connected.py
+          PYTHONPATH=.adwf:.adwf/tests python .adwf/tests/test_external_consumer_upgrade_proof.py
+          python .adwf/tests/test_managed_surface.py
+      - name: Canonical validators
+        shell: bash
+        run: |
+          set -euo pipefail
+          python .adwf/scripts/validate_framework.py
+          python .adwf/scripts/validate_docs.py
+          python .adwf/scripts/docs_freshness.py
+          python .adwf/scripts/generate_manifest.py --check
+          python .adwf/scripts/validate_managed_surface.py
+          python .adwf/scripts/validate_pipeline_ir.py
+          python .adwf/scripts/validate_ci.py
+          python .adwf/adwf.py doctor --scope package_integrity
+          python .adwf/adwf.py doctor --scope config_health
+          git diff --check
+      - name: Full framework self-test
+        shell: bash
+        run: |
+          set -euo pipefail
+          python .adwf/adwf.py self-test
+      - name: Verify bounded tree and publish disposable candidate
+        shell: bash
+        run: |
+          set -euo pipefail
+          cat > /tmp/expected-paths <<'EOF'
+          .adwf/docs-registry.json
+          .adwf/lib/consumer_instructions.py
+          .adwf/lib/consumer_upgrade.py
+          .adwf/lib/consumer_upgrade_transaction.py
+          .adwf/tests/consumer_upgrade_transaction_fixture.py
+          .adwf/tests/test_consumer_instruction_upgrade_transaction.py
+          .adwf/tests/test_consumer_instructions.py
+          .adwf/tests/test_consumer_upgrade_core.py
+          MANIFEST.json
+          SHA256SUMS.txt
+          docs/governance/CONSUMER_FRAMEWORK_UPGRADE_PLANNING.md
+          docs/governance/CONSUMER_INSTRUCTION_CONTRACT.md
+          EOF
+          git add -A
+          git diff --cached --name-only "${BASE_SHA}" | sort > /tmp/actual-paths
+          sort /tmp/expected-paths -o /tmp/expected-paths
+          diff -u /tmp/expected-paths /tmp/actual-paths
+          tree="$(git write-tree)"
+          echo "candidate_tree=${tree}"
+          git config user.name 'ADWF Autonomous Writer'
+          git config user.email 'adwf-writer@example.invalid'
+          git commit -m 'CONSUMER_INSTR_FIX-001: rematerialize on certified GOV-027 main'
+          test "$(git rev-parse HEAD^)" = "${SOURCE_SHA}"
+          test "$(git rev-parse HEAD^{tree})" = "${tree}"
+          remote_target="$(git ls-remote origin "refs/heads/${TARGET_BRANCH}" | awk '{print $1}')"
+          test "${remote_target}" = "${SOURCE_SHA}"
+          git push origin "HEAD:refs/heads/${TARGET_BRANCH}"
