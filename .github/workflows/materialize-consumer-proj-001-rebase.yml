@@ -67,12 +67,9 @@ jobs:
           python .adwf/scripts/validate_pipeline_ir.py
           python .adwf/scripts/validate_ci.py
           python .adwf/scripts/validate_framework.py
-          python -m pytest -q \
-            .adwf/tests/test_consumer_installation.py \
-            .adwf/tests/test_consumer_upgrade_connected.py \
-            .adwf/tests/test_consumer_upgrade_transaction.py \
-            .adwf/tests/test_consumer_upgrade_transaction_adversarial.py \
-            .adwf/tests/test_trusted_controller.py
+          python -m unittest discover -s .adwf/tests -p 'test_consumer_upgrade*.py' -q
+          python -m unittest discover -s .adwf/tests -p 'test_consumer_installation.py' -q
+          python -m unittest discover -s .adwf/tests -p 'test_trusted_controller.py' -q
 
       - name: Commit and publish non-force
         shell: bash
