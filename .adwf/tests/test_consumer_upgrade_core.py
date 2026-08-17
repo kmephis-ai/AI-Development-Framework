@@ -1,6 +1,6 @@
 from __future__ import annotations
 from pathlib import Path
-import copy, json, sys, unittest
+import copy, hashlib, json, sys, unittest
 from unittest.mock import patch
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -65,6 +65,52 @@ class ConsumerUpgradeCoreTests(unittest.TestCase):
             with self.assertRaisesRegex(ConsumerUpgradeError, "UPGRADE_COMPATIBILITY_DIGEST_MISMATCH"): validate_upgrade_compatibility(forged, target)
             plan = self.plan(source, target, consumer, snapshot); forged_plan = copy.deepcopy(plan); forged_plan["plan_sha256"] = "0" * 64
             with self.assertRaisesRegex(ConsumerUpgradeError, "UPGRADE_PLAN_DIGEST_MISMATCH"): validate_upgrade_plan(forged_plan, compatibility, target)
+        finally: temp.cleanup()
+
+    def test_06_legacy_preexisting_agents_router_change_is_ready_only_under_instruction_policy(self):
+        temp, source, target, consumer, snapshot = prepared(ROOT)
+        try:
+            consumer_bytes = b"# Legacy consumer AGENTS\nproduct invariant remains here\n"
+            (consumer / "AGENTS.md").write_bytes(consumer_bytes)
+            source_item = next(item for item in snapshot["entries"] if item["path"] == "AGENTS.md")
+            source_item["managed_by_adwf"] = False
+            source_item["preserved_sha256"] = hashlib.sha256(consumer_bytes).hexdigest()
+            (target / "AGENTS.md").write_text("# Framework package router revision v2\n", encoding="utf-8")
+            seal_inventory(target)
+            result = self.plan(source, target, consumer, snapshot)
+            entry = next(item for item in result["entries"] if item["path"] == "AGENTS.md")
+            self.assertEqual(entry["action"], "PRESERVE_PREEXISTING")
+            self.assertNotEqual(entry["source_sha256"], entry["target_sha256"])
+            self.assertEqual(result["status"], "READY")
+            self.assertEqual(result["findings"], [])
+            self.assertEqual((consumer / "AGENTS.md").read_bytes(), consumer_bytes)
+        finally: temp.cleanup()
+
+    def test_07_non_instruction_preexisting_shared_change_remains_human_required(self):
+        temp, source, target, consumer, snapshot = prepared(ROOT)
+        try:
+            consumer_bytes = b"consumer-owned readme\n"
+            (consumer / "README.md").write_bytes(consumer_bytes)
+            source_item = next(item for item in snapshot["entries"] if item["path"] == "README.md")
+            source_item["managed_by_adwf"] = False
+            source_item["preserved_sha256"] = hashlib.sha256(consumer_bytes).hexdigest()
+            (target / "README.md").write_text("shared-v2\n", encoding="utf-8")
+            seal_inventory(target)
+            result = self.compat(source, target, consumer, snapshot)
+            self.assertEqual(result["status"], "HUMAN_REQUIRED")
+            self.assertIn(
+                {"severity": "HUMAN_REQUIRED", "code": "UPGRADE_PREEXISTING_PATH_CHANGE", "subject": "README.md"},
+                result["findings"],
+            )
+        finally: temp.cleanup()
+
+    def test_08_missing_target_instruction_policy_fails_closed(self):
+        temp, source, target, consumer, snapshot = prepared(ROOT)
+        try:
+            (target / ".adwf/consumer-instruction-policy.json").unlink()
+            seal_inventory(target)
+            with self.assertRaisesRegex(ConsumerUpgradeError, "UPGRADE_TARGET_INSTRUCTION_POLICY_INVALID"):
+                self.compat(source, target, consumer, snapshot)
         finally: temp.cleanup()
 
 if __name__ == "__main__": unittest.main()

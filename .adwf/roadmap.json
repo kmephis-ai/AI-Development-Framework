@@ -270,6 +270,14 @@
             "CONSUMER_WAIT-001"
           ],
           "product_impact": false
+        },
+        {
+          "roadmap_id": "CONSUMER_INSTR-001",
+          "title_ru": "Layered AI Instruction Ownership for Connected Consumers v1",
+          "dependencies": [
+            "CONSUMER_CONTROL-001"
+          ],
+          "product_impact": false
         }
       ]
     }

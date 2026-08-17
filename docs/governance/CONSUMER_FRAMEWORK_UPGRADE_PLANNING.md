@@ -47,6 +47,8 @@ Planner строит A↔B diff по framework package inventory и отдель
 
 Pre-existing managed entries сохраняются. Shared-guarded paths сохраняются. Новая версия ADWF не получает silent overwrite authority над такими путями даже тогда, когда target package содержит новый вариант файла.
 
+Единственное bounded semantic исключение v1 задаёт `Consumer Instruction Contract`: pre-existing `AGENTS.md` с `managed_by_adwf=false` может оставаться `PRESERVE_PREEXISTING` без `HUMAN_REQUIRED` при изменившихся package bytes, если exact target `.adwf/consumer-instruction-policy.json` валиден и подтверждает неизменную роль `AGENTS.md` как `SHARED_GUARDED / CONSUMER_PRESERVED` router. Consumer bytes при этом не записываются. Это правило не распространяется на остальные shared paths. См. `docs/governance/CONSUMER_INSTRUCTION_CONTRACT.md`.
+
 ## Compatibility contracts
 
 UPGRADE-001 проверяет переходы для framework config schema, Consumer Profile schema, Managed Surface snapshot schema, Project Pack и optional Skill bindings.

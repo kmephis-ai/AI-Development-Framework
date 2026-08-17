@@ -12,6 +12,9 @@ FRAMEWORK_FILES = (
     ".adwf/config.json",
     ".adwf/managed-surface-policy.json",
     ".adwf/consumer-upgrade-migrations.json",
+    ".adwf/consumer-instruction-policy.json",
+    ".adwf/instructions/CORE.md",
+    ".adwf/instructions/AGENTS_ROUTER.template.md",
     ".adwf/packs/apps-script.json",
     ".adwf/schemas/config.schema.json",
     ".adwf/schemas/consumer-profile.schema.json",
@@ -22,6 +25,7 @@ FRAMEWORK_FILES = (
     ".adwf/schemas/managed-surface-transaction.schema.json",
     ".adwf/schemas/managed-surface-detach-transaction.schema.json",
     ".adwf/schemas/consumer-upgrade-transaction.schema.json",
+    ".adwf/schemas/consumer-instruction-policy.schema.json",
     ".adwf/schemas/consumer-upgrade-migrations.schema.json",
     ".adwf/schemas/consumer-upgrade-compatibility.schema.json",
     ".adwf/schemas/consumer-upgrade-plan.schema.json",
@@ -56,9 +60,10 @@ def build_framework(root: Path, canonical_root: Path) -> None:
         dst.write_bytes((canonical_root / rel).read_bytes())
     policy_path = root / ".adwf/managed-surface-policy.json"
     policy = json.loads(policy_path.read_text(encoding="utf-8"))
-    policy["shared_guarded_paths"] = ["README.md"]
+    policy["shared_guarded_paths"] = ["AGENTS.md", "README.md"]
     policy_path.write_text(json.dumps(policy, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
     (root / ".adwf/private.txt").write_text("private-v1\n", encoding="utf-8")
+    (root / "AGENTS.md").write_text((canonical_root / "AGENTS.md").read_text(encoding="utf-8"), encoding="utf-8")
     (root / "README.md").write_text("shared-v1\n", encoding="utf-8")
     (root / "skills").mkdir(parents=True, exist_ok=True)
     (root / "skills/registry.json").write_text(json.dumps({
