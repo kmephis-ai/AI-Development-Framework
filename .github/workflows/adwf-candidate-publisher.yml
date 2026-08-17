@@ -10,8 +10,8 @@ permissions:
 
 env:
   BASE_SHA: 4285ab53714841a2646e6d658e0b8d8a25b4d264
-  PARENT_SHA: 3a407e6fde74a112815c17fef13e7d8feab52499
-  EXPECTED_TREE: b17a261a0353c373148b16032394415b8ee56cad
+  PARENT_SHA: 71cfea65366ab2c2bb26911ab1c32ad383aef46c
+  EXPECTED_TREE: 36a9219f5ea596bfcdbe5e0737ecf945680ca4d9
   WRITER_BRANCH: agent/CONSUMER_INSTR-001-layered-instructions
 
 jobs:
@@ -25,13 +25,23 @@ jobs:
           fetch-depth: 0
           persist-credentials: false
 
-      - name: Preserve review chronology and publish exact correction
+      - uses: actions/setup-python@a309ff8b426b58ec0e2a45f0f869d46889d02405
+        with:
+          python-version: "3.12.10"
+
+      - name: Materialize trust-pure exact candidate and publish fast-forward only
         env:
           GITHUB_TOKEN: ${{ github.token }}
         shell: bash
         run: |
           set -euo pipefail
 
+          # These self-host convenience edits are outside the bounded consumer contract
+          # and were correctly rejected by the exact BASE trust classifier.
+          git checkout "$BASE_SHA" -- AGENTS.md
+          rm -f docs/decisions/ADR-001-CONSUMER-INSTRUCTION-LAYERS.md
+
+          python .adwf/scripts/docs_freshness.py --write
           python - <<'PY'
           import json, subprocess
           from pathlib import Path
@@ -47,11 +57,14 @@ jobs:
                   item['valid_until'] = old['valid_until']
           path.write_text(json.dumps(current, ensure_ascii=False, indent=2) + '\n', encoding='utf-8')
           PY
-
           python .adwf/scripts/generate_manifest.py
+
           python .adwf/tests/test_consumer_instructions.py
           python .adwf/tests/test_consumer_upgrade_core.py
           python .adwf/tests/test_consumer_instruction_upgrade_transaction.py
+          python .adwf/tests/test_consumer_upgrade_adversarial.py
+          python .adwf/tests/test_consumer_upgrade_transaction_adversarial.py
+          python .adwf/tests/test_consumer_upgrade_connected.py
           python .adwf/scripts/validate_framework.py
           python .adwf/scripts/validate_managed_surface.py
           git diff --check
@@ -71,7 +84,7 @@ jobs:
           export GIT_AUTHOR_EMAIL='41898282+github-actions[bot]@users.noreply.github.com'
           export GIT_COMMITTER_NAME="$GIT_AUTHOR_NAME"
           export GIT_COMMITTER_EMAIL="$GIT_AUTHOR_EMAIL"
-          COMMIT="$(printf '%s\n' 'CONSUMER_INSTR-001: preserve docs review chronology' | git commit-tree "$TREE" -p "$PARENT_SHA")"
+          COMMIT="$(printf '%s\n' 'CONSUMER_INSTR-001: remove reserved self-host edits from candidate' | git commit-tree "$TREE" -p "$PARENT_SHA")"
           printf 'candidate_commit=%s\n' "$COMMIT"
           git push origin "$COMMIT:refs/heads/$WRITER_BRANCH"
           AFTER="$(git ls-remote origin "refs/heads/${WRITER_BRANCH}" | awk '{print $1}')"
