@@ -35,8 +35,9 @@ jobs:
           ACTUAL_FEATURE="$(git ls-remote origin "refs/heads/${FEATURE_BRANCH}" | awk '{print $1}')"
           test "${ACTUAL_MAIN}" = "${MAIN_SHA}"
           test "${ACTUAL_FEATURE}" = "${FEATURE_SHA}"
-          git cat-file -e "${MAIN_SHA}^{commit}"
-          git cat-file -e "${FEATURE_SHA}^{commit}"
+          git fetch --no-tags origin "refs/heads/main:refs/remotes/origin/exact-main" "refs/heads/${FEATURE_BRANCH}:refs/remotes/origin/exact-feature"
+          test "$(git rev-parse refs/remotes/origin/exact-main)" = "${MAIN_SHA}"
+          test "$(git rev-parse refs/remotes/origin/exact-feature)" = "${FEATURE_SHA}"
       - name: Reconstruct bounded merge-sync candidate
         shell: bash
         run: |
@@ -49,13 +50,8 @@ jobs:
           MERGE_RC=$?
           set -e
           test "${MERGE_RC}" -eq 1
-          mapfile -t UNMERGED < <(git diff --name-only --diff-filter=U)
-          printf '%s\n' "${UNMERGED[@]}" > /tmp/unmerged.txt
-          cat > /tmp/expected-unmerged.txt <<'EOF'
-.adwf/docs-registry.json
-MANIFEST.json
-SHA256SUMS.txt
-EOF
+          git diff --name-only --diff-filter=U | LC_ALL=C sort > /tmp/unmerged.txt
+          printf '%s\n' '.adwf/docs-registry.json' 'MANIFEST.json' 'SHA256SUMS.txt' | LC_ALL=C sort > /tmp/expected-unmerged.txt
           diff -u /tmp/expected-unmerged.txt /tmp/unmerged.txt
           git checkout --theirs -- .adwf/docs-registry.json MANIFEST.json SHA256SUMS.txt
           export PYTHONPATH="$PWD/.adwf${PYTHONPATH:+:$PYTHONPATH}"
@@ -63,23 +59,8 @@ EOF
           python .adwf/scripts/generate_manifest.py
           git add .adwf/docs-registry.json MANIFEST.json SHA256SUMS.txt
           test -z "$(git diff --name-only --diff-filter=U)"
-          mapfile -t CHANGED < <(git diff --name-only "${MAIN_SHA}" | LC_ALL=C sort)
-          printf '%s\n' "${CHANGED[@]}" > /tmp/changed.txt
-          cat > /tmp/expected-changed.txt <<'EOF'
-.adwf/capability-traceability.json
-.adwf/docs-registry.json
-.adwf/lib/consumer_installation.py
-.adwf/lib/consumer_upgrade_projection.py
-.adwf/lib/consumer_upgrade_transaction.py
-.adwf/scripts/apply_consumer_upgrade.py
-.adwf/tests/consumer_upgrade_fixture.py
-.adwf/tests/test_consumer_upgrade_connected.py
-MANIFEST.json
-SHA256SUMS.txt
-docs/governance/CONSUMER_FRAMEWORK_UPGRADE_TRANSACTION.md
-docs/governance/CONSUMER_INSTALLATION_RECORD.md
-EOF
-          LC_ALL=C sort -o /tmp/expected-changed.txt /tmp/expected-changed.txt
+          git diff --name-only "${MAIN_SHA}" | LC_ALL=C sort > /tmp/changed.txt
+          printf '%s\n' '.adwf/capability-traceability.json' '.adwf/docs-registry.json' '.adwf/lib/consumer_installation.py' '.adwf/lib/consumer_upgrade_projection.py' '.adwf/lib/consumer_upgrade_transaction.py' '.adwf/scripts/apply_consumer_upgrade.py' '.adwf/tests/consumer_upgrade_fixture.py' '.adwf/tests/test_consumer_upgrade_connected.py' 'MANIFEST.json' 'SHA256SUMS.txt' 'docs/governance/CONSUMER_FRAMEWORK_UPGRADE_TRANSACTION.md' 'docs/governance/CONSUMER_INSTALLATION_RECORD.md' | LC_ALL=C sort > /tmp/expected-changed.txt
           diff -u /tmp/expected-changed.txt /tmp/changed.txt
           git diff --check "${MAIN_SHA}"
       - name: Verify focused connected-upgrade contract
