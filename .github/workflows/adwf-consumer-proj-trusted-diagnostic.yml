@@ -1,0 +1,51 @@
+name: ADWF CONSUMER_PROJ-001 Trusted Diagnostic
+
+on:
+  push:
+    branches:
+      - agent/local-mirror-CONSUMER_PROJ-001-20260817-a
+
+permissions:
+  actions: read
+  checks: read
+  contents: read
+  pull-requests: read
+  statuses: read
+
+jobs:
+  diagnose:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd
+        with:
+          ref: main
+          persist-credentials: false
+          fetch-depth: 2
+      - uses: actions/setup-python@a309ff8b426b58ec0e2a45f0f869d46889d02405
+        with:
+          python-version: '3.12.10'
+      - name: Evaluate exact BASE trusted gate read-only
+        shell: bash
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+          GITHUB_REPOSITORY: kmephis-ai/AI-Development-Framework
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          import json, os, sys, traceback
+          from pathlib import Path
+          root=Path.cwd(); sys.path.insert(0,str(root)); sys.path.insert(0,str(root/'.adwf'))
+          from lib.github_provider import GitHubClient
+          from scripts.publish_trusted_gate import evaluate_trusted_gate
+          repo=os.environ['GITHUB_REPOSITORY']; client=GitHubClient(repo,os.environ['GITHUB_TOKEN'])
+          wr=client.get(f'/repos/{repo}/actions/runs/32038100019')
+          try:
+              result=evaluate_trusted_gate(client,repo,wr)
+              print('DIAGNOSTIC_RESULT='+json.dumps(result,ensure_ascii=False,sort_keys=True))
+          except Exception as exc:
+              print('DIAGNOSTIC_EXCEPTION_TYPE='+type(exc).__name__)
+              print('DIAGNOSTIC_EXCEPTION_REPR='+repr(exc))
+              traceback.print_exc()
+              raise
+          PY
