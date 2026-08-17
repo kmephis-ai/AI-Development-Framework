@@ -19,7 +19,7 @@ from .consumer_profile import (
 )
 from .consumer_instructions import (
     ConsumerInstructionError, legacy_preexisting_router_transition_allowed,
-    load_consumer_instruction_policy,
+    load_consumer_instruction_policy, validate_consumer_instruction_state,
 )
 from .contracts import validate
 from .managed_surface import _validate_snapshot, load_source_inventory
@@ -424,6 +424,7 @@ def build_upgrade_compatibility(
     target_inventory = load_source_inventory(target_root)
     try:
         target_instruction_policy = load_consumer_instruction_policy(target_root, target_inventory)
+        validate_consumer_instruction_state(consumer, target_instruction_policy)
     except ConsumerInstructionError as exc:
         raise ConsumerUpgradeError("UPGRADE_TARGET_INSTRUCTION_POLICY_INVALID:" + str(exc)) from exc
     _validate_snapshot(snapshot, source_root)

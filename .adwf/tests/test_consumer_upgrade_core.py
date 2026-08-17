@@ -113,4 +113,13 @@ class ConsumerUpgradeCoreTests(unittest.TestCase):
                 self.compat(source, target, consumer, snapshot)
         finally: temp.cleanup()
 
+    def test_09_consumer_invariant_type_ambiguity_blocks_planning(self):
+        temp, source, target, consumer, snapshot = prepared(ROOT)
+        try:
+            invariant = consumer / ".adwf-consumer/INVARIANTS.md"
+            invariant.mkdir(parents=True)
+            with self.assertRaisesRegex(ConsumerUpgradeError, "UPGRADE_TARGET_INSTRUCTION_POLICY_INVALID"):
+                self.compat(source, target, consumer, snapshot)
+        finally: temp.cleanup()
+
 if __name__ == "__main__": unittest.main()
