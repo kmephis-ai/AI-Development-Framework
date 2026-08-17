@@ -3,8 +3,8 @@
   "version": "1.6.0",
   "schema_version": 3,
   "scope": "FRAMEWORK_OWNED_TRUST_BOUNDARY",
-  "file_count_excluding_manifests": 534,
-  "total_bytes_excluding_manifests": 2650860,
+  "file_count_excluding_manifests": 535,
+  "total_bytes_excluding_manifests": 2655616,
   "files": [
     ".adwf/SETUP_CHECKLIST.md",
     ".adwf/actions-lock.json",
@@ -326,6 +326,7 @@
     ".adwf/tests/test_consumer_ci.py",
     ".adwf/tests/test_consumer_gates.py",
     ".adwf/tests/test_consumer_installation.py",
+    ".adwf/tests/test_consumer_main_trigger.py",
     ".adwf/tests/test_consumer_operational.py",
     ".adwf/tests/test_consumer_profile.py",
     ".adwf/tests/test_consumer_upgrade_adversarial.py",
