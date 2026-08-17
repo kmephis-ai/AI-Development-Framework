@@ -42,6 +42,17 @@ FORBIDDEN_TEXT_PATTERNS = (
     re.compile(r"\bgh[opusr]_[A-Za-z0-9]{20,}\b"),
     re.compile(r"-----BEGIN (?:RSA |EC |OPENSSH )?PRIVATE KEY-----"),
 )
+FORBIDDEN_PRIVATE_TEXT_PATTERNS = (
+    re.compile(r"\bchain[ _-]*of[ _-]*thought\b", re.IGNORECASE),
+    re.compile(r"\b(?:private|hidden|internal)[ _-]+reasoning\b", re.IGNORECASE),
+    re.compile(r"\breasoning[ _-]+trace\b", re.IGNORECASE),
+    re.compile(r"\braw[ _-]+prompt\b", re.IGNORECASE),
+    re.compile(r"\bchat[ _-]+transcript\b", re.IGNORECASE),
+    re.compile(
+        r"\b(?:conversation|session|chat)[ _-]*(?:id|identifier|token)\b\s*(?::|=)\s*\S+",
+        re.IGNORECASE,
+    ),
+)
 
 
 def _now() -> str:
@@ -69,6 +80,10 @@ def _scan_public_safe(value: Any, *, path: str = "$") -> list[str]:
         for pattern in FORBIDDEN_TEXT_PATTERNS:
             if pattern.search(value):
                 errors.append(f"CONTINUITY_FORBIDDEN_SECRET_LIKE_TEXT:{path}")
+                break
+        for pattern in FORBIDDEN_PRIVATE_TEXT_PATTERNS:
+            if pattern.search(value):
+                errors.append(f"CONTINUITY_FORBIDDEN_PRIVATE_TEXT:{path}")
                 break
     return errors
 

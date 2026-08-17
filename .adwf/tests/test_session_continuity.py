@@ -15,10 +15,10 @@ HEAD = 'b' * 40
 
 def checkpoint(**updates):
     data = build_checkpoint(
-        checkpoint_id='SESSION-CORE-001:0001',
+        checkpoint_id='SESSION_CORE-001:0001',
         checkpoint_revision=0,
         project_identity='kmephis-ai/AI-Development-Framework',
-        roadmap_id='SESSION-CORE-001',
+        roadmap_id='SESSION_CORE-001',
         issue_id='142',
         main_sha=MAIN,
         pr_number=143,
@@ -61,6 +61,23 @@ class SessionContinuityTests(unittest.TestCase):
         value['checkpoint_digest'] = checkpoint_digest(value)
         errors = validate_checkpoint(value)
         self.assertTrue(any(item.startswith('CONTINUITY_FORBIDDEN_FIELD') for item in errors))
+
+    def test_private_reasoning_and_session_identifier_in_allowed_values_are_rejected(self):
+        value = checkpoint(safe_handover_summary='Chain-of-thought: hidden private analysis.')
+        value['checkpoint_digest'] = checkpoint_digest(value)
+        errors = validate_checkpoint(value)
+        self.assertTrue(any(item.startswith('CONTINUITY_FORBIDDEN_PRIVATE_TEXT') for item in errors))
+
+        value = checkpoint()
+        value['pending_external']['object_ref'] = 'conversation_id=private-thread-123'
+        value['checkpoint_digest'] = checkpoint_digest(value)
+        errors = validate_checkpoint(value)
+        self.assertTrue(any(item.startswith('CONTINUITY_FORBIDDEN_PRIVATE_TEXT') for item in errors))
+
+    def test_legitimate_lease_uuid_is_not_treated_as_private_session_identifier(self):
+        value = checkpoint(lease_identity='574233d2-6de7-43ec-8966-1d60fddb4ce2')
+        value['checkpoint_digest'] = checkpoint_digest(value)
+        self.assertEqual(validate_checkpoint(value), [])
 
     def test_commit_pr_merge_are_not_natural_boundaries(self):
         for boundary in ('COMMIT', 'PR_CREATED', 'MERGE'):
