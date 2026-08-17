@@ -1,0 +1,47 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "ADWF Consumer Operational Binding v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "$schema", "schema_version", "role", "mode", "consumer_repository",
+    "consumer_profile_sha256", "installation_record_sha256", "roadmap",
+    "work_items", "project_state", "safety", "mutation_authority", "binding_sha256"
+  ],
+  "properties": {
+    "$schema": {"const": ".adwf/schemas/consumer-operational-binding.schema.json"},
+    "schema_version": {"const": 1},
+    "role": {"const": "CONSUMER_OPERATIONAL_BINDING"},
+    "mode": {"const": "CONSUMER_NATIVE"},
+    "consumer_repository": {"type": "string", "pattern": "^[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+$"},
+    "consumer_profile_sha256": {"type": "string", "format": "sha256"},
+    "installation_record_sha256": {"type": "string", "format": "sha256"},
+    "roadmap": {
+      "type": "object", "additionalProperties": false, "required": ["kind", "path"],
+      "properties": {
+        "kind": {"const": "MARKDOWN_FILE"},
+        "path": {"type": "string", "minLength": 1, "maxLength": 512}
+      }
+    },
+    "work_items": {
+      "type": "object", "additionalProperties": false, "required": ["provider", "repository"],
+      "properties": {
+        "provider": {"const": "GITHUB_ISSUES"},
+        "repository": {"type": "string", "pattern": "^[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+$"}
+      }
+    },
+    "project_state": {
+      "type": "object", "additionalProperties": false, "required": ["kind"],
+      "properties": {"kind": {"const": "PROVIDER_NATIVE_NOT_MATERIALIZED"}}
+    },
+    "safety": {
+      "type": "object", "additionalProperties": false, "required": ["monetary_budget_usd", "secrets"],
+      "properties": {
+        "monetary_budget_usd": {"const": 0},
+        "secrets": {"const": "FORBIDDEN"}
+      }
+    },
+    "mutation_authority": {"const": "NONE_BINDING_IS_REFERENCE_ONLY"},
+    "binding_sha256": {"type": "string", "format": "sha256"}
+  }
+}

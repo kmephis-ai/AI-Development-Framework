@@ -560,6 +560,25 @@
       ],
       "live_boundary": "LIVE_VERIFIED требует реального downstream consumer/provider evidence после committed adoption и fresh provider checkout. Deterministic/adversarial fixture, CI и self-host merge доказывают implementation, но не означают, что PrihRash уже ADWF-managed.",
       "live_evidence": []
+    },
+    {
+      "id": "CONSUMER_OPERATIONAL_BINDING",
+      "status": "LIVE_NOT_VERIFIED",
+      "execution_mode": "CORE",
+      "owner_claim_ru": "ADWF различает self-host и установленный consumer: consumer-owned sealed operational binding связывает продукт с его native Roadmap/GitHub Issues identity и не позволяет молча использовать framework Roadmap как product truth.",
+      "entrypoints": [
+        ".adwf/adwf.py"
+      ],
+      "production_paths": [
+        ".adwf/lib/consumer_operational.py",
+        ".adwf/lib/roadmap_view.py",
+        ".adwf/schemas/consumer-operational-binding.schema.json"
+      ],
+      "verification": [
+        ".adwf/tests/test_consumer_operational.py"
+      ],
+      "live_boundary": "LIVE_VERIFIED требует реального downstream consumer/provider evidence, где после clean provider checkout operational binding разрешает native product Roadmap/work source и ADWF не использует self-host Roadmap. Fixture/CI доказывают implementation, но не означают PrihRash adoption.",
+      "live_evidence": []
     }
   ]
 }
