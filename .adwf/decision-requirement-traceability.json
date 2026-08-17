@@ -2,7 +2,7 @@
   "$schema": ".adwf/schemas/decision-requirement-traceability.schema.json",
   "schema_version": 1,
   "role": "CANONICAL_DECISION_REQUIREMENT_TRACEABILITY",
-  "revision": 19,
+  "revision": 20,
   "records": [
     {
       "id": "INTENT-FOUNDATION-20260815",
@@ -322,6 +322,28 @@
       "source_path": null,
       "source_sha256": null,
       "record_sha256": "3e756fb8cffa56b83fef2e29ad4b6a6c9fab44c5fe3ab691b7f2188bd6667d89"
+    },
+    {
+      "id": "REQ-CONSUMER_INSTALL-001",
+      "kind": "REQUIREMENT",
+      "version": 1,
+      "status": "ACTIVE",
+      "title_ru": "Долгоживущее consumer-подключение требует provider-durable installation provenance",
+      "statement_ru": "После committed adoption новая чистая GitHub/AI-сессия должна без ignored .adwf-runtime доказать exact framework revision/tree/manifest, Managed Surface ownership, Consumer Profile и Project Pack binding; запись не должна давать mutation authority.",
+      "source_path": null,
+      "source_sha256": null,
+      "record_sha256": "1eaadd4898b9eb00a97f73cda3b76c43a9ce529c2436336153c9a8b57fb84f4a"
+    },
+    {
+      "id": "DEC-CONSUMER_INSTALL-001",
+      "kind": "DECISION",
+      "version": 1,
+      "status": "ACCEPTED",
+      "title_ru": "Installation Record хранится в consumer-owned preserved surface как proof-only contract",
+      "statement_ru": "Хранить strict self-sealed .adwf-consumer/installation.json вне framework package inventory; он связывает committed adoption/snapshot semantics и exact installed bytes, но не заменяет lifecycle journals/planners и не разрешает write/delete/upgrade сам по себе.",
+      "source_path": null,
+      "source_sha256": null,
+      "record_sha256": "1476f108ac9ccc3ab22ea3644f91c20ba151c65f68f69f7bd3ea44cdef993dd7"
     }
   ],
   "capability_refs": [
@@ -379,6 +401,11 @@
       "id": "CAPREF-CREATIVE-AGENT-QUALIFICATION",
       "capability_id": "CREATIVE_AGENT_QUALIFICATION",
       "ref_sha256": "606dca2658376b27aff3084807aecb4e12457ece0ee9ed222b18dc8f6d8601de"
+    },
+    {
+      "id": "CAPREF-CONSUMER-INSTALLATION-PROVENANCE",
+      "capability_id": "CONSUMER_INSTALLATION_PROVENANCE",
+      "ref_sha256": "b8c4b8db1b09485890b37880d04ab86671e68a0d4659a643159becb0c47ee7e2"
     }
   ],
   "work_unit_refs": [
@@ -514,6 +541,13 @@
       "issue_number": 99,
       "ai_work_package_id": null,
       "ref_sha256": "c9c9fb8b7d1175999f2225690c925ec8521a03df52f869c7fae36c47c0a7433f"
+    },
+    {
+      "id": "WORKREF-CONSUMER_INSTALL-001",
+      "roadmap_id": "CONSUMER_INSTALL-001",
+      "issue_number": 102,
+      "ai_work_package_id": null,
+      "ref_sha256": "866e42c011bb9fd9ffd901902720e1d39db2e0fb2ab8b4943cbddfc57dce65a8"
     }
   ],
   "evidence_refs": [],
@@ -1028,7 +1062,35 @@
       "from": "INTENT-FOUNDATION-20260815",
       "to": "REQ-AGENTQUAL-001",
       "edge_sha256": "f029f767db14d0b71fc517b6ff138429b3ca7639822985879495de2c6d209387"
+    },
+    {
+      "id": "EDGE-INTENT-REQ-CONSUMER_INSTALL-001",
+      "type": "INTENT_TO_REQUIREMENT",
+      "from": "INTENT-FOUNDATION-20260815",
+      "to": "REQ-CONSUMER_INSTALL-001",
+      "edge_sha256": "8482254fd4079845df19df42262f3a8f299b53e1676b39631b0163751501ce95"
+    },
+    {
+      "id": "EDGE-REQ-DEC-CONSUMER_INSTALL-001",
+      "type": "REQUIREMENT_TO_DECISION",
+      "from": "REQ-CONSUMER_INSTALL-001",
+      "to": "DEC-CONSUMER_INSTALL-001",
+      "edge_sha256": "901071c8ead51ca074e46d38ebbafb5edd7ea219d38299a8eb340e5ee52d0785"
+    },
+    {
+      "id": "EDGE-DEC-CAP-CONSUMER_INSTALL-001",
+      "type": "DECISION_TO_CAPABILITY",
+      "from": "DEC-CONSUMER_INSTALL-001",
+      "to": "CAPREF-CONSUMER-INSTALLATION-PROVENANCE",
+      "edge_sha256": "77ffdc2ecd20a2a47b3b7f77423bf1bfb879f0c91b6e852a703df63364790412"
+    },
+    {
+      "id": "EDGE-CAP-WORK-CONSUMER_INSTALL-001",
+      "type": "CAPABILITY_TO_WORK",
+      "from": "CAPREF-CONSUMER-INSTALLATION-PROVENANCE",
+      "to": "WORKREF-CONSUMER_INSTALL-001",
+      "edge_sha256": "401dcb5cf00e41f97f7bc43d211edabafcc9e1cccce3e5a920ffa75ae624552d"
     }
   ],
-  "graph_sha256": "82308ff565b8741f93ae0659374bd31150f294673d8174064abc77f7b484aa21"
+  "graph_sha256": "09345a3895f6f8dba37421efe0b34ea4bc232fe02a084ce72b20b2b48ca12e85"
 }
