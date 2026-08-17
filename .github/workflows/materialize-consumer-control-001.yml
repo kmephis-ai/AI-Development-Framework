@@ -1,0 +1,48 @@
+name: Materialize GOV-023 projections
+
+on:
+  push:
+    branches:
+      - agent/materialize-consumer-control-001-20260817
+
+permissions:
+  contents: write
+
+jobs:
+  materialize:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd
+        with:
+          ref: agent/consumer-control-001-native-control-routing-v2
+          fetch-depth: 0
+          persist-credentials: true
+      - uses: actions/setup-python@a309ff8b426b58ec0e2a45f0f869d46889d02405
+        with:
+          python-version: "3.12.10"
+      - name: Materialize canonical projections
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "0fdaf994cf1e4130832ccb5927069cdcc6a667fe"
+          python .adwf/scripts/docs_freshness.py --write --reviewed-at 2026-08-17T07:22:00Z --valid-until 2026-11-17T07:22:00Z
+          python .adwf/scripts/generate_manifest.py
+          python .adwf/scripts/validate_framework.py
+          git status --short
+          git diff --name-only | sort > /tmp/changed.txt
+          printf '%s\n' '.adwf/docs-registry.json' 'MANIFEST.json' 'SHA256SUMS.txt' | sort > /tmp/expected.txt
+          diff -u /tmp/expected.txt /tmp/changed.txt
+      - name: Publish generated projections only
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name 'adwf-materializer'
+          git config user.email 'adwf-materializer@users.noreply.github.com'
+          git add .adwf/docs-registry.json MANIFEST.json SHA256SUMS.txt
+          if git diff --cached --quiet; then
+            echo 'No projection changes required'
+            exit 0
+          fi
+          git commit -m 'GOV-023: materialize generated integrity projections'
+          git push origin HEAD:agent/consumer-control-001-native-control-routing-v2
