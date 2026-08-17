@@ -1,0 +1,79 @@
+name: Materialize final CONSUMER_PROV-001
+
+on:
+  push:
+    branches:
+      - agent/materialize-CONSUMER_PROV-001-final-20260817-c
+
+permissions:
+  contents: write
+
+env:
+  EXPECTED_WRITER_HEAD: f3d260fa47bf477d274a06b067444c86d38326fa
+  WRITER_BRANCH: agent/CONSUMER_PROV-001-durable-upgrade-rebind
+
+jobs:
+  materialize:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd
+        with:
+          fetch-depth: 0
+          persist-credentials: true
+
+      - name: Bind exact writer candidate
+        shell: bash
+        run: |
+          set -euo pipefail
+          remote_sha="$(git ls-remote origin "refs/heads/${WRITER_BRANCH}" | awk '{print $1}')"
+          test "${remote_sha}" = "${EXPECTED_WRITER_HEAD}"
+          git checkout --detach "${EXPECTED_WRITER_HEAD}"
+
+      - name: Canonically materialize freshness and manifests
+        shell: bash
+        run: |
+          set -euo pipefail
+          python .adwf/scripts/docs_freshness.py --write --reviewed-at 2026-08-17T12:10:00Z --valid-until 2026-11-17T12:10:00Z
+          python .adwf/scripts/generate_manifest.py
+          mapfile -t changed < <(git diff --name-only)
+          printf '%s\n' "${changed[@]}"
+          for path in "${changed[@]}"; do
+            case "$path" in
+              .adwf/docs-registry.json|MANIFEST.json|SHA256SUMS.txt) ;;
+              *) echo "::error::Unexpected materializer mutation: $path"; exit 1 ;;
+            esac
+          done
+
+      - name: Verify exact candidate
+        shell: bash
+        run: |
+          set -euo pipefail
+          python -m py_compile .adwf/lib/consumer_installation.py .adwf/lib/consumer_upgrade_transaction.py .adwf/scripts/plan_consumer_upgrade.py .adwf/scripts/apply_consumer_upgrade.py
+          python .adwf/tests/test_consumer_upgrade_core.py
+          python .adwf/tests/test_consumer_upgrade_adversarial.py
+          python .adwf/tests/test_consumer_upgrade_transaction.py
+          python .adwf/tests/test_consumer_upgrade_transaction_adversarial.py
+          python .adwf/tests/test_consumer_installation.py
+          PYTHONPATH=.adwf:.adwf/tests python .adwf/tests/test_external_consumer_upgrade_proof.py
+          python .adwf/scripts/docs_freshness.py
+          python .adwf/scripts/generate_manifest.py --check
+          python .adwf/scripts/validate_ci.py
+          python .adwf/scripts/validate_framework.py
+          python .adwf/adwf.py self-test
+
+      - name: CAS publish generated finalization
+        shell: bash
+        run: |
+          set -euo pipefail
+          remote_sha="$(git ls-remote origin "refs/heads/${WRITER_BRANCH}" | awk '{print $1}')"
+          test "${remote_sha}" = "${EXPECTED_WRITER_HEAD}"
+          git add .adwf/docs-registry.json MANIFEST.json SHA256SUMS.txt
+          git diff --cached --check
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git commit -m "chore(CONSUMER_PROV-001): materialize final generated artifacts"
+          candidate_sha="$(git rev-parse HEAD)"
+          candidate_tree="$(git rev-parse HEAD^{tree})"
+          git push origin "HEAD:refs/heads/${WRITER_BRANCH}"
+          printf 'candidate_sha=%s\ncandidate_tree=%s\n' "$candidate_sha" "$candidate_tree" >> "$GITHUB_STEP_SUMMARY"
