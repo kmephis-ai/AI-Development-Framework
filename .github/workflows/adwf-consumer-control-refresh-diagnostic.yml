@@ -1,0 +1,59 @@
+name: ADWF Consumer Control Refresh Diagnostic
+
+on:
+  push:
+    branches:
+      - agent/diag-consumer-control-001-20260817-a1
+
+permissions:
+  contents: read
+
+jobs:
+  diagnose-refreshed:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd
+        with:
+          ref: daea37c1af3e03afced20c9bb8d61e89d95f7e8e
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: actions/setup-python@a309ff8b426b58ec0e2a45f0f869d46889d02405
+        with:
+          python-version: "3.12.4"
+      - name: Materialize canonical generated refresh in workspace
+        shell: bash
+        run: |
+          set -euo pipefail
+          python .adwf/scripts/docs_freshness.py --write --reviewed-at 2026-08-17T07:24:00Z --valid-until 2026-11-17T07:24:00Z
+          python .adwf/scripts/generate_manifest.py
+      - name: Run post-refresh diagnostic matrix
+        shell: bash
+        run: |
+          set -u
+          : > /tmp/diagnostics-refreshed.txt
+          run_one() {
+            name="$1"; shift
+            echo "===== ${name} =====" | tee -a /tmp/diagnostics-refreshed.txt
+            set +e
+            "$@" >> /tmp/diagnostics-refreshed.txt 2>&1
+            rc=$?
+            set -e
+            echo "RC=${rc}" | tee -a /tmp/diagnostics-refreshed.txt
+            echo | tee -a /tmp/diagnostics-refreshed.txt
+          }
+          set -e
+          run_one docs_freshness python .adwf/scripts/docs_freshness.py
+          run_one validate_docs python .adwf/scripts/validate_docs.py
+          run_one validate_managed_surface python .adwf/scripts/validate_managed_surface.py
+          run_one manifest_check python .adwf/scripts/generate_manifest.py --check
+          run_one validate_framework python .adwf/scripts/validate_framework.py
+          run_one doctor_package python .adwf/adwf.py doctor --scope package_integrity
+          run_one doctor_config python .adwf/adwf.py doctor --scope config_health
+          cat /tmp/diagnostics-refreshed.txt
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: consumer-control-refresh-diagnostics-daea37c
+          path: /tmp/diagnostics-refreshed.txt
+          retention-days: 1
+          if-no-files-found: error
