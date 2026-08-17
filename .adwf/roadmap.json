@@ -246,6 +246,14 @@
             "CONSUMER_OPS-001"
           ],
           "product_impact": false
+        },
+        {
+          "roadmap_id": "CONSUMER_ROUTE-001",
+          "title_ru": "Consumer-aware CI Routing + Native Gate Delegation v1",
+          "dependencies": [
+            "CONSUMER_GATE-001"
+          ],
+          "product_impact": false
         }
       ]
     }

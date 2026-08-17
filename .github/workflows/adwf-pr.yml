@@ -5,6 +5,7 @@ on:
     types: [opened, synchronize, reopened, edited, ready_for_review]
 permissions:
   contents: read
+  checks: read
 env:
   PYTHONDONTWRITEBYTECODE: "1"
 concurrency:
@@ -23,10 +24,18 @@ jobs:
       - uses: actions/setup-python@a309ff8b426b58ec0e2a45f0f869d46889d02405
         with:
           python-version: "3.12.10"
+      - name: Resolve ADWF CI route
+        id: ci-route
+        env:
+          ADWF_BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          ADWF_HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        run: python .adwf/scripts/consumer_ci.py route --phase pr --anchor-sha "$ADWF_BASE_SHA" --subject-sha "$ADWF_HEAD_SHA" --repository "${{ github.repository }}" --github-output "$GITHUB_OUTPUT"
       - name: Route change impact first
         id: impact
+        if: steps.ci-route.outputs.mode == 'SELF_HOST_CANONICAL'
         run: python .adwf/scripts/impact_router.py --base "${{ github.event.pull_request.base.sha }}" --head "${{ github.event.pull_request.head.sha }}"
       - name: Universal safety guard
+        if: steps.ci-route.outputs.mode == 'SELF_HOST_CANONICAL'
         env:
           ADWF_BASE_SHA: ${{ github.event.pull_request.base.sha }}
           ADWF_HEAD_SHA: ${{ github.event.pull_request.head.sha }}
@@ -35,7 +44,7 @@ jobs:
           python .adwf/adwf.py provider-check --input .adwf/requests/github-public-standard.json
           python .adwf/scripts/validate_pr.py --event "$GITHUB_EVENT_PATH" --base-sha "$ADWF_BASE_SHA" --head-sha "$ADWF_HEAD_SHA"
       - name: Framework structural/contracts gate
-        if: steps.impact.outputs.full_framework == 'true'
+        if: steps.ci-route.outputs.mode == 'SELF_HOST_CANONICAL' && steps.impact.outputs.full_framework == 'true'
         run: |
           python .adwf/scripts/validate_framework.py
           python .adwf/scripts/validate_pipeline_ir.py
@@ -43,13 +52,20 @@ jobs:
           python .adwf/adwf.py doctor --scope config_health
           python .adwf/adwf.py self-test
       - name: Executable documentation contracts
-        if: steps.impact.outputs.docs == 'true' || steps.impact.outputs.full_framework == 'true'
+        if: steps.ci-route.outputs.mode == 'SELF_HOST_CANONICAL' && (steps.impact.outputs.docs == 'true' || steps.impact.outputs.full_framework == 'true')
         run: python .adwf/scripts/validate_docs.py
       - name: Provider contract suite
-        if: steps.impact.outputs.provider == 'true'
+        if: steps.ci-route.outputs.mode == 'SELF_HOST_CANONICAL' && steps.impact.outputs.provider == 'true'
         run: python -m unittest discover -s .adwf/tests -p 'test_provider*.py' -q
       - name: Relevant project PR gates
+        if: steps.ci-route.outputs.mode == 'SELF_HOST_CANONICAL'
         run: python .adwf/scripts/run_project_gates.py --phase pr
+      - name: Bound consumer native PR gates
+        if: steps.ci-route.outputs.mode == 'CONSUMER_NATIVE'
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+          ADWF_HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        run: python .adwf/scripts/consumer_ci.py delegate --phase pr --subject-sha "$ADWF_HEAD_SHA" --repository "${{ github.repository }}"
       - name: Exact-revision Playwright preview
-        if: steps.impact.outputs.preview == 'true'
+        if: steps.ci-route.outputs.mode == 'SELF_HOST_CANONICAL' && steps.impact.outputs.preview == 'true'
         run: python .adwf/scripts/run_preview.py --install-playwright
