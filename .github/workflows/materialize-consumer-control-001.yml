@@ -31,7 +31,7 @@ jobs:
           python .adwf/scripts/validate_framework.py
           git status --short
           git diff --name-only | sort > /tmp/changed.txt
-          printf '%s\n' '.adwf/docs-registry.json' 'MANIFEST.json' 'SHA256SUMS.txt' | sort > /tmp/expected.txt
+          printf '%s\n' 'MANIFEST.json' 'SHA256SUMS.txt' | sort > /tmp/expected.txt
           diff -u /tmp/expected.txt /tmp/changed.txt
       - name: Publish generated projections only
         shell: bash
@@ -39,10 +39,7 @@ jobs:
           set -euo pipefail
           git config user.name 'adwf-materializer'
           git config user.email 'adwf-materializer@users.noreply.github.com'
-          git add .adwf/docs-registry.json MANIFEST.json SHA256SUMS.txt
-          if git diff --cached --quiet; then
-            echo 'No projection changes required'
-            exit 0
-          fi
+          git add MANIFEST.json SHA256SUMS.txt
+          git diff --cached --quiet && { echo '::error::Expected manifest projections were not produced'; exit 1; }
           git commit -m 'GOV-023: materialize generated integrity projections'
           git push origin HEAD:agent/consumer-control-001-native-control-routing-v2
