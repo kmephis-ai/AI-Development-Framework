@@ -7,6 +7,7 @@ from typing import Any
 import re
 
 from .strict_json import loads as strict_loads
+from .consumer_operational import resolve_operational_context
 
 IMPLEMENTED = {"REVIEW", "VERIFICATION", "DONE"}
 PLANNING = {"BACKLOG", "PLANNED", "SPECIFIED", "READY", "BLOCKED", "HOLD", "HUMAN_REQUIRED"}
@@ -191,6 +192,31 @@ def build_roadmap_view(
     root: str | Path, state: dict[str, Any], *, now: datetime | None = None
 ) -> dict[str, Any]:
     base = Path(root).resolve()
+    operational = resolve_operational_context(base, base)
+    if operational["mode"] == "CONSUMER_NATIVE":
+        return {
+            "schema_version": 1,
+            "operating_mode": "CONSUMER_NATIVE",
+            "roadmap_source": operational["roadmap"],
+            "work_item_source": operational["work_items"],
+            "project_state": operational["project_state"],
+            "binding_sha256": operational["binding_sha256"],
+            "goals": [],
+            "summary": {
+                "status": "NATIVE_SOURCE_BOUND_NOT_MATERIALIZED",
+                "total": 0,
+                "implemented": 0.0,
+                "verified": 0.0,
+                "product_done": 0.0,
+                "outcome_ready": 0.0,
+                "verification_gap": 0.0,
+                "false_progress": False,
+            },
+            "active": None,
+            "critical_path": [],
+            "ready_frontier": [],
+            "mutation_authority": operational["mutation_authority"],
+        }
     template = _load_template(base)
     items = state.get("work_items") or []
     by_id = {str(item.get("roadmap_id") or item.get("id")): item for item in items}

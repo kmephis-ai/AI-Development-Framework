@@ -230,6 +230,14 @@
             "AGENTQUAL-001"
           ],
           "product_impact": false
+        },
+        {
+          "roadmap_id": "CONSUMER_OPS-001",
+          "title_ru": "Consumer Operational State + Native Roadmap Binding v1",
+          "dependencies": [
+            "CONSUMER_INSTALL-001"
+          ],
+          "product_impact": false
         }
       ]
     }

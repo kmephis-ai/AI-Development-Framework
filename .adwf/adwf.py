@@ -42,6 +42,7 @@ from lib.runtime_supervisor import RuntimeSupervisor
 from lib.work_memory import WorkMemoryStore
 from lib.preview_engine import capture_preview
 from lib.roadmap_view import build_roadmap_view
+from lib.consumer_operational import ConsumerOperationalError, resolve_operational_context
 from lib.project_packs import commands_for_pack
 from lib.pack_materializer import materialize_project_pack
 from lib.portfolio import portfolio_view, register_project
@@ -561,7 +562,15 @@ def cmd_preview(args) -> int:
         emit({"status":"NOT_VERIFIED","reason":str(exc)}); return 5
 
 def cmd_roadmap_view(args) -> int:
-    state=load_json(args.state or active_state_path(ROOT)); emit(build_roadmap_view(ROOT,state)); return 0
+    try:
+        operational = resolve_operational_context(ROOT, ROOT)
+        if operational["mode"] == "CONSUMER_NATIVE":
+            state = {}
+        else:
+            state = load_json(args.state or active_state_path(ROOT))
+        emit(build_roadmap_view(ROOT, state)); return 0
+    except (ConsumerOperationalError, OSError, ValueError) as exc:
+        emit({"status":"BLOCK","reason":str(exc)}); return 5
 
 def cmd_runtime_tick(args) -> int:
     try:

@@ -2,7 +2,7 @@
   "$schema": ".adwf/schemas/decision-requirement-traceability.schema.json",
   "schema_version": 1,
   "role": "CANONICAL_DECISION_REQUIREMENT_TRACEABILITY",
-  "revision": 20,
+  "revision": 21,
   "records": [
     {
       "id": "INTENT-FOUNDATION-20260815",
@@ -344,6 +344,28 @@
       "source_path": null,
       "source_sha256": null,
       "record_sha256": "1476f108ac9ccc3ab22ea3644f91c20ba151c65f68f69f7bd3ea44cdef993dd7"
+    },
+    {
+      "id": "REQ-CONSUMER_OPS-001",
+      "kind": "REQUIREMENT",
+      "version": 1,
+      "status": "ACTIVE",
+      "title_ru": "Consumer не должен наследовать self-host Roadmap/state ADWF",
+      "statement_ru": "Установленный consumer обязан явно связывать ADWF со своим native Roadmap/work SSOT; отсутствие, stale или ambiguous binding блокирует operating mode и не допускает fallback к .adwf/roadmap.json/.adwf/project-state.json как product truth.",
+      "source_path": null,
+      "source_sha256": null,
+      "record_sha256": "ce1b0c8b580baa57c0cc84ecbac3aae129780936cceb8bdd82740b440da080e9"
+    },
+    {
+      "id": "DEC-CONSUMER_OPS-001",
+      "kind": "DECISION",
+      "version": 1,
+      "status": "ACCEPTED",
+      "title_ru": "Использовать proof-only consumer-owned operational binding без копирования Roadmap",
+      "statement_ru": "Хранить strict self-sealed .adwf-consumer/operations.json, связанный с Consumer Profile/Installation Record; v1 ссылается на native Markdown Roadmap + GitHub Issues repository identity, запрещает framework/internal paths и не получает mutation authority.",
+      "source_path": null,
+      "source_sha256": null,
+      "record_sha256": "2c2397717037a8b5f84921e04bf13717804f8dc838757f4b199f253953929585"
     }
   ],
   "capability_refs": [
@@ -406,6 +428,11 @@
       "id": "CAPREF-CONSUMER-INSTALLATION-PROVENANCE",
       "capability_id": "CONSUMER_INSTALLATION_PROVENANCE",
       "ref_sha256": "b8c4b8db1b09485890b37880d04ab86671e68a0d4659a643159becb0c47ee7e2"
+    },
+    {
+      "id": "CAPREF-CONSUMER-OPERATIONAL-BINDING",
+      "capability_id": "CONSUMER_OPERATIONAL_BINDING",
+      "ref_sha256": "340943d826a1429d57b66d3dc9a7cf9715e816dd817e50bd87bc76b6f0d5a5b9"
     }
   ],
   "work_unit_refs": [
@@ -548,6 +575,13 @@
       "issue_number": 102,
       "ai_work_package_id": null,
       "ref_sha256": "866e42c011bb9fd9ffd901902720e1d39db2e0fb2ab8b4943cbddfc57dce65a8"
+    },
+    {
+      "id": "WORKREF-CONSUMER_OPS-001",
+      "roadmap_id": "CONSUMER_OPS-001",
+      "issue_number": 104,
+      "ai_work_package_id": null,
+      "ref_sha256": "7bd3b77450440dda9765a537e35a5b6644bffe435df60cb2630b5295720df686"
     }
   ],
   "evidence_refs": [],
@@ -1090,7 +1124,35 @@
       "from": "CAPREF-CONSUMER-INSTALLATION-PROVENANCE",
       "to": "WORKREF-CONSUMER_INSTALL-001",
       "edge_sha256": "401dcb5cf00e41f97f7bc43d211edabafcc9e1cccce3e5a920ffa75ae624552d"
+    },
+    {
+      "id": "EDGE-INTENT-REQ-CONSUMER_OPS-001",
+      "type": "INTENT_TO_REQUIREMENT",
+      "from": "INTENT-FOUNDATION-20260815",
+      "to": "REQ-CONSUMER_OPS-001",
+      "edge_sha256": "f624d843d060a4fdd9382ece245b0da5228dfa9c4b0283b890ee6bdf0c624757"
+    },
+    {
+      "id": "EDGE-REQ-DEC-CONSUMER_OPS-001",
+      "type": "REQUIREMENT_TO_DECISION",
+      "from": "REQ-CONSUMER_OPS-001",
+      "to": "DEC-CONSUMER_OPS-001",
+      "edge_sha256": "717ff3a63683ce663fef89bdafddbb87f7b466062adac8fa2dcdd7e7240d2484"
+    },
+    {
+      "id": "EDGE-DEC-CAP-CONSUMER_OPS-001",
+      "type": "DECISION_TO_CAPABILITY",
+      "from": "DEC-CONSUMER_OPS-001",
+      "to": "CAPREF-CONSUMER-OPERATIONAL-BINDING",
+      "edge_sha256": "cdd0fce69412adc971b0f815d80f57bb51338cbd0044f5cc1255adda407b6a4e"
+    },
+    {
+      "id": "EDGE-CAP-WORK-CONSUMER_OPS-001",
+      "type": "CAPABILITY_TO_WORK",
+      "from": "CAPREF-CONSUMER-OPERATIONAL-BINDING",
+      "to": "WORKREF-CONSUMER_OPS-001",
+      "edge_sha256": "2679e1fbb44454d33f349ece9e0f8957a764ec469887132e34653424bac0df8c"
     }
   ],
-  "graph_sha256": "09345a3895f6f8dba37421efe0b34ea4bc232fe02a084ce72b20b2b48ca12e85"
+  "graph_sha256": "7488b3b9563476a6578fe3e74ef8e0e78dd3908951adb5d91ea00c0cb8c0eee6"
 }
