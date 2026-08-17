@@ -1,0 +1,70 @@
+name: ADWF GOV-025 Exact Candidate Materializer V2
+
+on:
+  push:
+    branches:
+      - agent/gov025-materializer-20260817-d
+
+permissions:
+  contents: write
+
+env:
+  BASE_SHA: a41a366fc940ebc96f8d58cf8a83ea7fdaaf2416
+  WRITER_BRANCH: agent/gov-025-trusted-tree-readback-recovery
+
+jobs:
+  materialize:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd
+        with:
+          fetch-depth: 0
+          persist-credentials: true
+      - uses: actions/setup-python@e797f83bcb11b83ae66e0230d6156d7c80228e7c
+        with:
+          python-version: '3.13'
+      - name: Verify exact provider preimages
+        shell: bash
+        run: |
+          set -euo pipefail
+          cp .gov025/patch.gz.b64 /tmp/gov025.patch.gz.b64
+          git fetch origin main "$WRITER_BRANCH"
+          test "$(git rev-parse origin/main)" = "$BASE_SHA"
+          test "$(git rev-parse origin/$WRITER_BRANCH)" = "$BASE_SHA"
+          git checkout -B "$WRITER_BRANCH" "$BASE_SHA"
+      - name: Apply bounded GOV-025 patch
+        shell: bash
+        run: |
+          set -euo pipefail
+          base64 -d /tmp/gov025.patch.gz.b64 | gzip -d > /tmp/gov025.patch
+          git apply --check /tmp/gov025.patch
+          git apply /tmp/gov025.patch
+          git diff --check
+      - name: Verify bounded repair
+        shell: bash
+        run: |
+          set -euo pipefail
+          python .adwf/tests/test_standing_owner_authorization.py
+          python .adwf/scripts/validate_ci.py
+          python .adwf/scripts/validate_framework.py
+          python .adwf/scripts/validate_docs.py
+          python .adwf/scripts/validate_managed_surface.py
+          python .adwf/scripts/validate_capabilities.py
+          python .adwf/scripts/generate_manifest.py --check
+          python .adwf/scripts/docs_freshness.py
+          python .adwf/adwf.py self-test
+      - name: Publish exact candidate non-force
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name 'ADWF Provider Materializer'
+          git config user.email 'adwf-materializer@example.invalid'
+          git add -A
+          git commit -m 'GOV-025: recover trusted diff from provider Git objects'
+          CANDIDATE_SHA="$(git rev-parse HEAD)"
+          CANDIDATE_TREE="$(git rev-parse HEAD^{tree})"
+          echo "candidate_sha=$CANDIDATE_SHA"
+          echo "candidate_tree=$CANDIDATE_TREE"
+          test "$(git rev-parse HEAD^)" = "$BASE_SHA"
+          git push origin "HEAD:refs/heads/$WRITER_BRANCH"
