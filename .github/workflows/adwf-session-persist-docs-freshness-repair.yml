@@ -1,0 +1,63 @@
+name: ADWF Session Persist Docs Freshness Repair
+
+on:
+  push:
+    branches:
+      - agent/repair-session-persist-docs-freshness-20260818-a1
+
+permissions:
+  contents: write
+
+env:
+  WRITER_BRANCH: agent/SESSION-PERSIST-001-runtime-ledger-continuity
+  WRITER_SHA: cc91390cc45d20641f4ad0a974352eb2a021ebe1
+
+jobs:
+  repair:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd
+        with:
+          ref: ${{ env.WRITER_BRANCH }}
+          fetch-depth: 0
+          persist-credentials: true
+
+      - uses: actions/setup-python@a309ff8b426b58ec0e2a45f0f869d46889d02405
+        with:
+          python-version: "3.12.10"
+
+      - name: Verify exact stale baseline
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "${WRITER_SHA}"
+          test "$(git hash-object .adwf/docs-registry.json)" = "4517f817d306f8f1993ef16d454a05ff23c921f9"
+          test "$(git hash-object MANIFEST.json)" = "9afceba1fbd92ca825764713a498fe15255dd28b"
+          test "$(git hash-object SHA256SUMS.txt)" = "e0b3d9530188ab2c4d9f36b93f793dc1caec35ff"
+
+      - name: Refresh canonical docs projection
+        shell: bash
+        env:
+          PYTHONDONTWRITEBYTECODE: "1"
+        run: |
+          set -euo pipefail
+          python .adwf/scripts/docs_freshness.py --write --reviewed-at 2026-08-17T21:21:00Z --valid-until 2026-11-17T21:21:00Z
+          python .adwf/scripts/generate_manifest.py
+          test "$(git hash-object .adwf/docs-registry.json)" = "cbd7aa730299d20146cc397284a66da0b2d207d3"
+          test "$(git hash-object MANIFEST.json)" = "9afceba1fbd92ca825764713a498fe15255dd28b"
+          test "$(git hash-object SHA256SUMS.txt)" = "9bc47e4553cf6253eba4f5a953adb1c74a3e9901"
+          python .adwf/scripts/docs_freshness.py
+          python .adwf/scripts/generate_manifest.py --check
+          python .adwf/scripts/validate_framework.py
+          git diff --check
+
+      - name: Fast-forward repair to writer branch
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name "adwf-docs-freshness-repair"
+          git config user.email "adwf-docs-freshness-repair@users.noreply.github.com"
+          git add .adwf/docs-registry.json MANIFEST.json SHA256SUMS.txt
+          git commit -m "[SESSION_PERSIST-001] Refresh final documentation projection"
+          git push origin "HEAD:refs/heads/${WRITER_BRANCH}"
