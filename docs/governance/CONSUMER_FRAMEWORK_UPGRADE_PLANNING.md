@@ -74,7 +74,7 @@ Compatibility result и upgrade plan имеют собственные SHA-256 s
 
 ## CLI contract
 
-`.adwf/scripts/plan_consumer_upgrade.py` является read-only entrypoint. Он принимает source/target roots, exact revisions, consumer root, snapshot и optional Skill bindings и печатает JSON bundle из compatibility result и plan.
+`.adwf/scripts/plan_consumer_upgrade.py` является read-only entrypoint. Он принимает source/target roots, exact revisions, consumer root, optional snapshot и optional Skill bindings и печатает JSON bundle из compatibility result и plan. Если snapshot явно не передан после fresh provider checkout, CLI может восстановить **только exact adopted snapshot** из provider-durable Installation Record через полный fresh-session rebind: repository identity, source SHA/tree/MANIFEST, Consumer Profile, snapshot digest и все managed/preserved bytes повторно проверяются. Это не добавляет write authority planning-слою.
 
 Exit code `0` разрешён только для `READY`. `HUMAN_REQUIRED`, `BLOCK` или invalid/tampered input возвращают non-zero и machine-readable BLOCK/HUMAN_REQUIRED result. CLI не содержит флага apply.
 
