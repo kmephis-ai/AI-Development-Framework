@@ -6,11 +6,15 @@ They are never work authority and never override fresh provider truth.
 from __future__ import annotations
 
 from datetime import datetime, timezone
+from functools import lru_cache
+from pathlib import Path
 from typing import Any
 import copy
 import hashlib
 import json
 import re
+
+from .contracts import validate as validate_contract
 
 SCHEMA_VERSION = 1
 BOUNDARY_TYPES = {
@@ -65,6 +69,16 @@ def checkpoint_digest(value: dict[str, Any]) -> str:
     return hashlib.sha256(encoded).hexdigest()
 
 
+@lru_cache(maxsize=1)
+def _checkpoint_schema() -> dict[str, Any]:
+    path = Path(__file__).resolve().parents[1] / "schemas" / "session-continuity-checkpoint.schema.json"
+    return json.loads(path.read_text(encoding="utf-8"))
+
+
+def _schema_errors(value: dict[str, Any]) -> list[str]:
+    return [f"CONTINUITY_SCHEMA:{finding.path}:{finding.code}" for finding in validate_contract(value, _checkpoint_schema())]
+
+
 def _scan_public_safe(value: Any, *, path: str = "$") -> list[str]:
     errors: list[str] = []
     if isinstance(value, dict):
@@ -92,6 +106,7 @@ def validate_checkpoint(value: dict[str, Any]) -> list[str]:
     errors: list[str] = []
     if not isinstance(value, dict):
         return ["CONTINUITY_CHECKPOINT_NOT_OBJECT"]
+    errors.extend(_schema_errors(value))
     if value.get("schema_version") != SCHEMA_VERSION:
         errors.append("CONTINUITY_SCHEMA_VERSION")
     if not str(value.get("checkpoint_id") or "").strip():
