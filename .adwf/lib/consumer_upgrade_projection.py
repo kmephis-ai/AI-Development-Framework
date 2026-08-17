@@ -27,7 +27,11 @@ from .consumer_operational import (
     BINDING_REL, ConsumerOperationalError, build_binding as build_operational_binding,
     load_binding as load_operational_binding,
 )
-from .consumer_upgrade import ConsumerUpgradeError, _file_sha, _root_sha
+from .consumer_upgrade import (
+    ConsumerUpgradeError, _file_sha, _root_sha,
+    validate_upgrade_compatibility, validate_upgrade_plan,
+)
+from .github_auth import detect_repository
 from .consumer_upgrade_transaction import (
     RUNTIME_REL, UpgradeTransactionStore, _fsync_directory, _transaction_identity,
     apply_upgrade, recover_upgrade, rollback_upgrade,
@@ -351,6 +355,69 @@ def rollback_connected_upgrade(source_root: Path, target_root: Path, consumer: P
     _save_journal(journal_path, journal)
     return {"status": "ROLLED_BACK", "transaction_id": txid, "blockers": [], "write_performed": True}
 
+
+
+def probe_connected_upgrade_committed(
+    source_root: Path, target_root: Path, consumer: Path,
+    compatibility: dict[str, Any], plan: dict[str, Any],
+) -> dict[str, Any] | None:
+    """Return a no-write success when the exact requested A→B plan is already durably at B.
+
+    This does not derive mutation authority from the Installation Record.  It only
+    recognizes an already-completed target state after the sealed upgrade plan,
+    target installation, operational binding and native gate binding all validate.
+    If the consumer is still exact A, return None so normal source-authority
+    reconstruction and the mutating executor can proceed.
+    """
+    source_root = Path(source_root).resolve(); target_root = Path(target_root).resolve(); consumer = Path(consumer).resolve()
+    validate_upgrade_compatibility(compatibility, target_root)
+    validate_upgrade_plan(plan, compatibility, target_root)
+    if compatibility.get("status") != "PASS" or plan.get("status") != "READY" or plan.get("findings") != []:
+        raise ConsumerUpgradeProjectionError("UPGRADE_PROJECTION_IDEMPOTENT_READY_PLAN_REQUIRED")
+    repository = detect_repository(consumer)
+    if repository is None:
+        raise ConsumerUpgradeProjectionError("UPGRADE_PROJECTION_IDEMPOTENT_REPOSITORY_NOT_VERIFIABLE")
+
+    # Read the proof using the target schema first.  A source-bound record is a
+    # normal pre-upgrade state; verify it under A and let the mutating path run.
+    try:
+        current = load_installation_record(consumer, target_root)
+    except ConsumerInstallationError:
+        try:
+            validate_fresh_session(consumer, source_root, expected_repository=repository)
+        except ConsumerInstallationError as exc:
+            raise ConsumerUpgradeProjectionError("UPGRADE_PROJECTION_IDEMPOTENT_PROOF_INVALID:" + str(exc).split(":", 1)[0]) from exc
+        return None
+
+    current_revision = current.get("framework", {}).get("source_sha")
+    if current_revision == plan.get("source_revision"):
+        try:
+            validate_fresh_session(consumer, source_root, expected_repository=repository)
+        except ConsumerInstallationError as exc:
+            raise ConsumerUpgradeProjectionError("UPGRADE_PROJECTION_IDEMPOTENT_SOURCE_INVALID:" + str(exc).split(":", 1)[0]) from exc
+        return None
+    if current_revision != plan.get("target_revision"):
+        raise ConsumerUpgradeProjectionError("UPGRADE_PROJECTION_IDEMPOTENT_UNEXPECTED_REVISION")
+
+    try:
+        verified = validate_fresh_session(consumer, target_root, expected_repository=repository)
+        operations = load_operational_binding(consumer, target_root)
+        gates = load_gate_binding(consumer, target_root)
+    except (ConsumerInstallationError, ConsumerOperationalError, ConsumerGateError) as exc:
+        raise ConsumerUpgradeProjectionError("UPGRADE_PROJECTION_IDEMPOTENT_TARGET_INVALID:" + str(exc).split(":", 1)[0]) from exc
+    if current.get("framework", {}).get("manifest_sha256") != plan.get("target_manifest_sha256"):
+        raise ConsumerUpgradeProjectionError("UPGRADE_PROJECTION_IDEMPOTENT_TARGET_MANIFEST_MISMATCH")
+    if current.get("adoption", {}).get("plan_sha256") != plan.get("plan_sha256"):
+        raise ConsumerUpgradeProjectionError("UPGRADE_PROJECTION_IDEMPOTENT_PLAN_MISMATCH")
+    return {
+        "status": "ALREADY_COMMITTED",
+        "transaction_id": current.get("adoption", {}).get("transaction_id"),
+        "projection_status": "COMMITTED",
+        "write_performed": False,
+        "framework_source_sha": verified.get("framework_source_sha"),
+        "roadmap_path": operations.get("roadmap", {}).get("path"),
+        "required_phases": gates.get("required_phases"),
+    }
 
 def apply_connected_upgrade(
     source_root: Path, target_root: Path, consumer: Path,

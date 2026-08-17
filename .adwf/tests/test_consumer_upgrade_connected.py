@@ -13,7 +13,7 @@ from lib.consumer_operational import build_binding as build_ops, load_binding as
 from lib.consumer_upgrade import _root_sha  # noqa: E402
 from lib.consumer_upgrade_projection import (  # noqa: E402
     ConsumerUpgradeProjectionError, apply_connected_upgrade, prepare_projection,
-    recover_connected_upgrade, rollback_connected_upgrade,
+    probe_connected_upgrade_committed, recover_connected_upgrade, rollback_connected_upgrade,
 )
 from lib.consumer_upgrade_transaction import apply_upgrade  # noqa: E402
 
@@ -79,7 +79,7 @@ class ConnectedUpgradeTests(unittest.TestCase):
                 self.assertEqual(load_ops(c,t)["roadmap"]["path"],"docs/ROADMAP.md")
                 self.assertEqual(load_gates(c,t)["phases"],PHASES)
                 self.assertEqual(validate_fresh_session(c,t,expected_repository=REPO)["status"],"VERIFIED")
-                again=apply_connected_upgrade(s,t,c,comp,plan,rebound)
+                again=probe_connected_upgrade_committed(s,t,c,comp,plan)
                 self.assertEqual(again["status"],"ALREADY_COMMITTED"); self.assertFalse(again["write_performed"])
                 rolled=rollback_connected_upgrade(s,t,c,result["transaction_id"])
                 self.assertEqual(rolled["status"],"ROLLED_BACK")
@@ -87,7 +87,22 @@ class ConnectedUpgradeTests(unittest.TestCase):
                 self.assertEqual(validate_fresh_session(c,s,expected_repository=REPO)["status"],"VERIFIED")
         finally: temp.cleanup()
 
-    def test_03_crash_after_core_commit_can_finish_projection(self):
+    def test_03_fresh_b_without_runtime_is_idempotent_no_write(self):
+        temp,s,t,c,snap,comp,plan=self._prepared()
+        try:
+            with patch.dict(os.environ,{"GITHUB_REPOSITORY":REPO}), self._ctx(s,t), patch("lib.consumer_upgrade._verify_revision",return_value=None), patch("lib.consumer_upgrade_transaction._verify_revision",return_value=None):
+                rebound=rebind_snapshot_for_fresh_session(c,s)
+                result=apply_connected_upgrade(s,t,c,comp,plan,rebound)
+                self.assertEqual(result["status"],"COMMITTED")
+                shutil.rmtree(c/".adwf-runtime")
+                before={rel:(c/rel).read_bytes() for rel in (".adwf-consumer/installation.json",".adwf-consumer/operations.json",".adwf-consumer/gates.json")}
+                completed=probe_connected_upgrade_committed(s,t,c,comp,plan)
+                self.assertEqual(completed["status"],"ALREADY_COMMITTED")
+                self.assertFalse(completed["write_performed"])
+                for rel,payload in before.items(): self.assertEqual((c/rel).read_bytes(),payload)
+        finally: temp.cleanup()
+
+    def test_04_crash_after_core_commit_can_finish_projection(self):
         temp,s,t,c,snap,comp,plan=self._prepared()
         try:
             with patch.dict(os.environ,{"GITHUB_REPOSITORY":REPO}), self._ctx(s,t), patch("lib.consumer_upgrade._verify_revision",return_value=None), patch("lib.consumer_upgrade_transaction._verify_revision",return_value=None):
@@ -100,7 +115,7 @@ class ConnectedUpgradeTests(unittest.TestCase):
                 self.assertEqual(load_record(c,t)["framework"]["source_sha"],B)
         finally: temp.cleanup()
 
-    def test_04_projection_failure_rolls_back_core_and_sidecars(self):
+    def test_05_projection_failure_rolls_back_core_and_sidecars(self):
         temp,s,t,c,snap,comp,plan=self._prepared()
         try:
             before={rel:(c/rel).read_bytes() for rel in (".adwf-consumer/installation.json",".adwf-consumer/operations.json",".adwf-consumer/gates.json")}
@@ -112,7 +127,7 @@ class ConnectedUpgradeTests(unittest.TestCase):
                 self.assertEqual(validate_fresh_session(c,s,expected_repository=REPO)["status"],"VERIFIED")
         finally: temp.cleanup()
 
-    def test_05_foreign_sidecar_blocks_before_partial_restore(self):
+    def test_06_foreign_sidecar_blocks_before_partial_restore(self):
         temp,s,t,c,snap,comp,plan=self._prepared()
         try:
             with patch.dict(os.environ,{"GITHUB_REPOSITORY":REPO}), self._ctx(s,t), patch("lib.consumer_upgrade._verify_revision",return_value=None), patch("lib.consumer_upgrade_transaction._verify_revision",return_value=None):

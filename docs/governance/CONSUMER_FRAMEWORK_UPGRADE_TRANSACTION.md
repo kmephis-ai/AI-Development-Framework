@@ -119,3 +119,7 @@ Focused suite проверяет commit/idempotence, rollback→retry, stale/for
 Fresh-session rebind также отличает durable identity от session-local checkout locator. Исторический `consumer_root_sha256` в Installation Record остаётся частью sealed adoption proof, но после полной fresh-session проверки реконструированный snapshot может заменить **только** этот locator на hash текущего absolute checkout path. Repository identity, framework SHA/tree/MANIFEST, transaction/plan, profile и managed/preserved bytes не меняются и не ослабляются.
 
 Это отдельная connected capability. Наличие unit/self-test evidence не повышает её до `LIVE_VERIFIED`: требуется реальный downstream consumer provider proof `A → B → rollback → B`, exact PR gates и post-merge fresh-session readback.
+
+### Повторный вызов после durable B
+
+После успешной provider-durable B projection повторный exact A→B вызов может завершиться как `ALREADY_COMMITTED` без восстановления A-authority и без записи. Такой no-op разрешён только когда sealed compatibility/plan валидны, текущий Installation Record уже привязан к exact target revision/MANIFEST и тому же `plan_sha256`, а fresh-session проверки installation, native Roadmap binding и native gate binding полностью проходят. Это распознавание уже завершённого состояния не предоставляет Installation Record mutation authority.
