@@ -1,0 +1,35 @@
+{
+  "$schema": ".adwf/schemas/consumer-instruction-policy.schema.json",
+  "schema_version": 1,
+  "role": "CONSUMER_INSTRUCTION_POLICY",
+  "framework_core": {
+    "path": ".adwf/instructions/CORE.md",
+    "ownership": "FRAMEWORK_PRIVATE"
+  },
+  "project_pack": {
+    "source": "CONSUMER_PROFILE_SELECTED_PROJECT_PACK"
+  },
+  "consumer_invariants": {
+    "path": ".adwf-consumer/INVARIANTS.md",
+    "ownership": "CONSUMER_OWNED"
+  },
+  "router": {
+    "path": "AGENTS.md",
+    "ownership": "SHARED_GUARDED",
+    "mode": "CONSUMER_PRESERVED",
+    "contract": "ADWF_CONSUMER_ROUTER_V1",
+    "legacy_preexisting_transition": true
+  },
+  "live_state": {
+    "authority": "PROVIDER_RUNTIME",
+    "durable_instruction_forbidden": true
+  },
+  "invariants": [
+    "FRAMEWORK_CORE_ADWF_MANAGED",
+    "PROJECT_PACK_ADWF_MANAGED",
+    "CONSUMER_INVARIANTS_CONSUMER_OWNED",
+    "ROUTER_CONSUMER_PRESERVED",
+    "LIVE_PROVIDER_STATE_NOT_DURABLE_INSTRUCTION",
+    "NO_SILENT_CONSUMER_INVARIANT_OVERWRITE"
+  ]
+}

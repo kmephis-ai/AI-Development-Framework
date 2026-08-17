@@ -1,0 +1,63 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "ADWF Consumer Instruction Policy v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["$schema", "schema_version", "role", "framework_core", "project_pack", "consumer_invariants", "router", "live_state", "invariants"],
+  "properties": {
+    "$schema": {"const": ".adwf/schemas/consumer-instruction-policy.schema.json"},
+    "schema_version": {"const": 1},
+    "role": {"const": "CONSUMER_INSTRUCTION_POLICY"},
+    "framework_core": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["path", "ownership"],
+      "properties": {
+        "path": {"const": ".adwf/instructions/CORE.md"},
+        "ownership": {"const": "FRAMEWORK_PRIVATE"}
+      }
+    },
+    "project_pack": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["source"],
+      "properties": {"source": {"const": "CONSUMER_PROFILE_SELECTED_PROJECT_PACK"}}
+    },
+    "consumer_invariants": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["path", "ownership"],
+      "properties": {
+        "path": {"const": ".adwf-consumer/INVARIANTS.md"},
+        "ownership": {"const": "CONSUMER_OWNED"}
+      }
+    },
+    "router": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["path", "ownership", "mode", "contract", "legacy_preexisting_transition"],
+      "properties": {
+        "path": {"const": "AGENTS.md"},
+        "ownership": {"const": "SHARED_GUARDED"},
+        "mode": {"const": "CONSUMER_PRESERVED"},
+        "contract": {"const": "ADWF_CONSUMER_ROUTER_V1"},
+        "legacy_preexisting_transition": {"const": true}
+      }
+    },
+    "live_state": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["authority", "durable_instruction_forbidden"],
+      "properties": {
+        "authority": {"const": "PROVIDER_RUNTIME"},
+        "durable_instruction_forbidden": {"const": true}
+      }
+    },
+    "invariants": {
+      "type": "array",
+      "minItems": 5,
+      "uniqueItems": true,
+      "items": {"type": "string", "minLength": 3}
+    }
+  }
+}

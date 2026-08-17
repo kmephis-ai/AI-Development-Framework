@@ -17,6 +17,10 @@ import stat
 import tempfile
 
 from .consumer_profile import PROFILE_REL, ConsumerProfileError, build_consumer_profile, load_consumer_profile
+from .consumer_instructions import (
+    ConsumerInstructionError, legacy_preexisting_router_transition_allowed,
+    load_consumer_instruction_policy,
+)
 from .consumer_installation import (
     ConsumerInstallationError, _snapshot_from_record, load_record as load_installation_record,
     validate_fresh_session as validate_installation_fresh_session,
@@ -362,6 +366,10 @@ def _preflight(
     _validate_static_apply_bindings(source_root, target_root, consumer, compatibility, plan, snapshot)
     source_inventory = load_source_inventory(source_root)
     target_inventory = load_source_inventory(target_root)
+    try:
+        target_instruction_policy = load_consumer_instruction_policy(target_root, target_inventory)
+    except ConsumerInstructionError as exc:
+        raise ConsumerUpgradeError("UPGRADE_APPLY_TARGET_INSTRUCTION_POLICY_INVALID:" + str(exc)) from exc
 
     snap = _source_snapshot_map(snapshot)
     by_path = {str(item["path"]): item for item in plan["entries"]}
@@ -404,7 +412,16 @@ def _preflight(
                 raise ConsumerUpgradeError("UPGRADE_APPLY_SHARED_PRESERVE_INVALID:" + rel)
         elif action == "PRESERVE_PREEXISTING":
             preserved = (source_snap or {}).get("preserved_sha256") or source_sha
-            if not (source_sha and target_sha == source_sha and source_snap and source_snap.get("managed_by_adwf") is False and current_state == "FILE" and current_sha == preserved):
+            exact_unchanged = target_sha == source_sha
+            router_transition = legacy_preexisting_router_transition_allowed(
+                target_instruction_policy, path=rel, source_ownership=str(item.get("source_ownership")),
+                target_ownership=str(item.get("target_ownership")), target_present=target_sha is not None,
+            )
+            if not (
+                source_sha and target_sha and source_snap and source_snap.get("managed_by_adwf") is False
+                and current_state == "FILE" and current_sha == preserved
+                and (exact_unchanged or router_transition)
+            ):
                 raise ConsumerUpgradeError("UPGRADE_APPLY_PREEXISTING_PRESERVE_INVALID:" + rel)
 
     rollback = plan["rollback_prerequisites"]
@@ -698,7 +715,9 @@ def _apply_entry(source_root: Path, target_root: Path, consumer: Path, journal: 
         expected = entry.get("preserved_sha256") if action == "PRESERVE_PREEXISTING" else source_sha
         _assert_existing_parent_chain(consumer, rel)
         state, digest = _path_state(consumer, rel)
-        if state != "FILE" or digest != expected or target_sha != source_sha:
+        if state != "FILE" or digest != expected:
+            raise ConsumerUpgradeError("UPGRADE_PRESERVED_PATH_DRIFT:" + rel)
+        if action != "PRESERVE_PREEXISTING" and target_sha != source_sha:
             raise ConsumerUpgradeError("UPGRADE_PRESERVED_PATH_DRIFT:" + rel)
         entry["state"] = "PRESERVED"; store.save(journal); return
     if entry["state"] == "VERIFIED":

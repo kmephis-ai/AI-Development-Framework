@@ -17,6 +17,10 @@ import subprocess
 from .consumer_profile import (
     PROFILE_REL, ConsumerProfileError, build_consumer_profile, load_consumer_profile,
 )
+from .consumer_instructions import (
+    ConsumerInstructionError, legacy_preexisting_router_transition_allowed,
+    load_consumer_instruction_policy,
+)
 from .contracts import validate
 from .managed_surface import _validate_snapshot, load_source_inventory
 from .strict_json import load as strict_load
@@ -298,7 +302,7 @@ def _severity_status(findings: list[dict[str, str]]) -> str:
 
 def _package_diff(
     source_inventory: dict[str, Any], target_inventory: dict[str, Any], consumer_root: Path,
-    snapshot: dict[str, Any],
+    snapshot: dict[str, Any], target_instruction_policy: dict[str, Any],
 ) -> tuple[list[dict[str, Any]], list[dict[str, str]], dict[str, Any]]:
     source_files = set(source_inventory["files"])
     target_files = set(target_inventory["files"])
@@ -350,7 +354,12 @@ def _package_diff(
                 findings.append({"severity": "BLOCK", "code": "UPGRADE_CONSUMER_DRIFT", "subject": rel})
             elif snap["managed_by_adwf"] is not True:
                 action = "PRESERVE_PREEXISTING"
-                if source_sha != target_sha or rel not in target_files:
+                changed = source_sha != target_sha or rel not in target_files
+                router_transition = legacy_preexisting_router_transition_allowed(
+                    target_instruction_policy, path=rel, source_ownership=source_ownership,
+                    target_ownership=target_ownership, target_present=rel in target_files,
+                )
+                if changed and not router_transition:
                     findings.append({"severity": "HUMAN_REQUIRED", "code": "UPGRADE_PREEXISTING_PATH_CHANGE", "subject": rel})
             elif source_ownership == "SHARED_GUARDED" or target_ownership == "SHARED_GUARDED":
                 action = "PRESERVE_SHARED"
@@ -413,6 +422,10 @@ def build_upgrade_compatibility(
 
     source_inventory = load_source_inventory(source_root)
     target_inventory = load_source_inventory(target_root)
+    try:
+        target_instruction_policy = load_consumer_instruction_policy(target_root, target_inventory)
+    except ConsumerInstructionError as exc:
+        raise ConsumerUpgradeError("UPGRADE_TARGET_INSTRUCTION_POLICY_INVALID:" + str(exc)) from exc
     _validate_snapshot(snapshot, source_root)
     if snapshot.get("source_revision") != source_revision:
         raise ConsumerUpgradeError("UPGRADE_SNAPSHOT_SOURCE_REVISION_STALE")
@@ -472,7 +485,9 @@ def build_upgrade_compatibility(
 
     skills, skill_findings = _skill_compatibility(source_root, target_root, migrations, skill_bindings)
     findings.extend(skill_findings)
-    entries, path_findings, rollback = _package_diff(source_inventory, target_inventory, consumer, snapshot)
+    entries, path_findings, rollback = _package_diff(
+        source_inventory, target_inventory, consumer, snapshot, target_instruction_policy
+    )
     findings.extend(path_findings)
 
     compatibility = {
