@@ -1,0 +1,107 @@
+diff --git a/.adwf/lib/consumer_instructions.py b/.adwf/lib/consumer_instructions.py
+index 7747676..833141b 100644
+--- a/.adwf/lib/consumer_instructions.py
++++ b/.adwf/lib/consumer_instructions.py
+@@ -86,7 +86,15 @@ def validate_consumer_instruction_state(consumer_root: str | Path, policy: dict[
+     """Validate consumer-owned instruction object types without granting write authority."""
+     root = Path(consumer_root).resolve()
+     rel = _safe_rel(str((policy.get("consumer_invariants") or {}).get("path") or ""))
+-    path = root / rel
++    pure = PurePosixPath(rel)
++    current = root
++    for part in pure.parts[:-1]:
++        current = current / part
++        if current.is_symlink():
++            raise ConsumerInstructionError("CONSUMER_INSTRUCTION_INVARIANTS_PARENT_SYMLINK_FORBIDDEN")
++        if current.exists() and not current.is_dir():
++            raise ConsumerInstructionError("CONSUMER_INSTRUCTION_INVARIANTS_PARENT_DIRECTORY_REQUIRED")
++    path = current / pure.parts[-1]
+     if path.is_symlink():
+         raise ConsumerInstructionError("CONSUMER_INSTRUCTION_INVARIANTS_SYMLINK_FORBIDDEN")
+     if path.exists() and not path.is_file():
+diff --git a/.adwf/tests/test_consumer_instructions.py b/.adwf/tests/test_consumer_instructions.py
+index 68bdb73..153790d 100644
+--- a/.adwf/tests/test_consumer_instructions.py
++++ b/.adwf/tests/test_consumer_instructions.py
+@@ -68,5 +68,41 @@ class ConsumerInstructionContractTests(unittest.TestCase):
+             with self.assertRaisesRegex(ConsumerInstructionError, "INVARIANTS_REGULAR_FILE_REQUIRED"):
+                 validate_consumer_instruction_state(consumer, policy)
+ 
++    def test_06_consumer_invariant_final_symlink_is_forbidden(self):
++        with tempfile.TemporaryDirectory() as tmp:
++            root = Path(tmp); framework = root / "framework"; consumer = root / "consumer"
++            framework.mkdir(); consumer.mkdir(); build_framework(framework, ROOT)
++            policy = load_consumer_instruction_policy(framework, load_source_inventory(framework))
++            parent = consumer / ".adwf-consumer"; parent.mkdir()
++            target = consumer / "real-invariants.md"; target.write_text("safe\n", encoding="utf-8")
++            try:
++                (parent / "INVARIANTS.md").symlink_to(target)
++            except OSError as exc:
++                self.skipTest(f"symlink unsupported: {exc}")
++            with self.assertRaisesRegex(ConsumerInstructionError, "INVARIANTS_SYMLINK_FORBIDDEN"):
++                validate_consumer_instruction_state(consumer, policy)
++
++    def test_07_consumer_invariant_parent_symlink_is_forbidden(self):
++        with tempfile.TemporaryDirectory() as tmp:
++            root = Path(tmp); framework = root / "framework"; consumer = root / "consumer"; outside = root / "outside"
++            framework.mkdir(); consumer.mkdir(); outside.mkdir(); build_framework(framework, ROOT)
++            policy = load_consumer_instruction_policy(framework, load_source_inventory(framework))
++            (outside / "INVARIANTS.md").write_text("safe\n", encoding="utf-8")
++            try:
++                (consumer / ".adwf-consumer").symlink_to(outside, target_is_directory=True)
++            except OSError as exc:
++                self.skipTest(f"symlink unsupported: {exc}")
++            with self.assertRaisesRegex(ConsumerInstructionError, "INVARIANTS_PARENT_SYMLINK_FORBIDDEN"):
++                validate_consumer_instruction_state(consumer, policy)
++
++    def test_08_consumer_invariant_parent_must_be_directory(self):
++        with tempfile.TemporaryDirectory() as tmp:
++            root = Path(tmp); framework = root / "framework"; consumer = root / "consumer"
++            framework.mkdir(); consumer.mkdir(); build_framework(framework, ROOT)
++            policy = load_consumer_instruction_policy(framework, load_source_inventory(framework))
++            (consumer / ".adwf-consumer").write_text("not-a-directory\n", encoding="utf-8")
++            with self.assertRaisesRegex(ConsumerInstructionError, "INVARIANTS_PARENT_DIRECTORY_REQUIRED"):
++                validate_consumer_instruction_state(consumer, policy)
++
+ 
+ if __name__ == "__main__": unittest.main()
+diff --git a/.adwf/tests/test_consumer_upgrade_core.py b/.adwf/tests/test_consumer_upgrade_core.py
+index 0339e35..7222767 100644
+--- a/.adwf/tests/test_consumer_upgrade_core.py
++++ b/.adwf/tests/test_consumer_upgrade_core.py
+@@ -1,6 +1,6 @@
+ from __future__ import annotations
+ from pathlib import Path
+-import copy, hashlib, json, sys, unittest
++import copy, hashlib, json, shutil, sys, unittest
+ from unittest.mock import patch
+ 
+ ROOT = Path(__file__).resolve().parents[2]
+@@ -122,4 +122,14 @@ class ConsumerUpgradeCoreTests(unittest.TestCase):
+                 self.compat(source, target, consumer, snapshot)
+         finally: temp.cleanup()
+ 
++    def test_10_consumer_invariant_parent_ambiguity_blocks_planning(self):
++        temp, source, target, consumer, snapshot = prepared(ROOT)
++        try:
++            parent = consumer / ".adwf-consumer"
++            shutil.rmtree(parent)
++            parent.write_text("not-a-directory\n", encoding="utf-8")
++            with self.assertRaisesRegex(ConsumerUpgradeError, "INVARIANTS_PARENT_DIRECTORY_REQUIRED"):
++                self.compat(source, target, consumer, snapshot)
++        finally: temp.cleanup()
++
+ if __name__ == "__main__": unittest.main()
+diff --git a/docs/governance/CONSUMER_INSTRUCTION_CONTRACT.md b/docs/governance/CONSUMER_INSTRUCTION_CONTRACT.md
+index 7074af7..5378802 100644
+--- a/docs/governance/CONSUMER_INSTRUCTION_CONTRACT.md
++++ b/docs/governance/CONSUMER_INSTRUCTION_CONTRACT.md
+@@ -23,7 +23,7 @@ Template `.adwf/instructions/AGENTS_ROUTER.template.md` использует con
+ 
+ ## Consumer invariants
+ 
+-`.adwf-consumer/INVARIANTS.md` намеренно **не входит** в framework package inventory. ADWF package/upgrade/detach не получает write/delete authority над этим path. Попытка включить его в target framework package считается invalid instruction ownership и блокирует upgrade до write. Если consumer уже материализовал этот path, planning/apply принимают только обычный regular file; symlink, directory или другой неоднозначный object type блокируется до upgrade write.
++`.adwf-consumer/INVARIANTS.md` намеренно **не входит** в framework package inventory. ADWF package/upgrade/detach не получает write/delete authority над этим path. Попытка включить его в target framework package считается invalid instruction ownership и блокирует upgrade до write. Если consumer уже материализовал этот path, planning/apply принимают только обычный regular file через реальную directory parent-chain; symlink/non-directory в любом parent component, symlink на конечном path, directory или другой неоднозначный object type блокируется до upgrade write.
+ 
+ Consumer invariants должны содержать только долгоживущие product-specific ограничения. Общие правила Git/CI/writer lifecycle, generic fail-closed semantics и текущий operational state туда не дублируются.
+ 
