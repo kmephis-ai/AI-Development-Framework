@@ -15,3 +15,9 @@ Runtime provenance always wins. If the matching prior UPGRADE-002 journal exists
 Mandatory safety remains `monetary_budget_usd=0` and `secrets=FORBIDDEN`. Credentials, tokens and local absolute paths are not part of the record contract.
 
 This capability proves durable installation provenance on deterministic/adversarial consumers. It does not mean PrihRashOnline-v2 is already ADWF-managed; consumer operating-state/Roadmap and native-gate integration remain separate prerequisites.
+
+## Session-local checkout locator
+
+`managed_surface.consumer_root_sha256` фиксирует locator рабочей директории, существовавшей в момент исходной adoption/projection transaction, и остаётся частью sealed historical record. Он **не является переносимой идентичностью repository**. При fresh-session upgrade rebind ADWF сначала полностью валидирует sealed record, exact source framework, repository identity, profile и каждый managed/preserved byte по историческому snapshot. Только после этого возвращаемая в память копия snapshot получает `consumer_root_sha256` текущего checkout. Сам Installation Record при таком rebind не переписывается и mutation authority не получает.
+
+После успешного connected framework upgrade новый Installation Record строится только из transaction-owned committed B snapshot и exact target framework identity. Старый record не может быть оставлен рядом с B managed files как допустимое publishable состояние; operations/gates proof bindings должны быть атомарно перепривязаны к новому installation/profile hash или вся connected transaction считается незавершённой и rollback/recovery остаётся обязательным.

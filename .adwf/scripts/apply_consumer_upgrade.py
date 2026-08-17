@@ -8,7 +8,7 @@ ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT / ".adwf"))
 from lib.consumer_installation import ConsumerInstallationError, rebind_snapshot_for_fresh_session  # noqa: E402
 from lib.consumer_upgrade import ConsumerUpgradeError  # noqa: E402
-from lib.consumer_upgrade_transaction import apply_upgrade, recover_upgrade, rollback_upgrade  # noqa: E402
+from lib.consumer_upgrade_projection import apply_connected_upgrade, recover_connected_upgrade, rollback_connected_upgrade  # noqa: E402
 from lib.strict_json import load as strict_load  # noqa: E402
 
 
@@ -32,15 +32,15 @@ def main() -> int:
     args = parser.parse_args()
     try:
         if args.operation == "apply":
-            result = apply_upgrade(
+            result = apply_connected_upgrade(
                 args.source_root, args.target_root, args.consumer_root,
                 _obj(args.compatibility, "COMPATIBILITY"), _obj(args.plan, "PLAN"),
                 _obj(args.source_snapshot, "SOURCE_SNAPSHOT") if args.source_snapshot else rebind_snapshot_for_fresh_session(args.consumer_root, args.source_root),
             )
         elif args.operation == "recover":
-            result = recover_upgrade(args.source_root, args.target_root, args.consumer_root, args.transaction_id)
+            result = recover_connected_upgrade(args.source_root, args.target_root, args.consumer_root, args.transaction_id)
         else:
-            result = rollback_upgrade(args.source_root, args.target_root, args.consumer_root, args.transaction_id)
+            result = rollback_connected_upgrade(args.source_root, args.target_root, args.consumer_root, args.transaction_id)
         print(json.dumps(result, ensure_ascii=False, indent=2, sort_keys=True))
         return 0 if result.get("status") in {"COMMITTED", "ALREADY_COMMITTED", "ROLLED_BACK"} else 2
     except (ConsumerInstallationError, ConsumerUpgradeError) as exc:

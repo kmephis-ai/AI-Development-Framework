@@ -102,3 +102,20 @@ Focused suite проверяет commit/idempotence, rollback→retry, stale/for
 ## External consumer proof boundary — UPGRADE-003
 
 `.adwf/scripts/run_external_consumer_upgrade_proof.py` композирует existing adoption/profile/planning/transaction APIs и выполняет `A → B → rollback A → retry B` только в disposable copy exact clean external Git consumer. Все pre-existing tracked regular bytes проверяются по aggregate preservation set на четырёх границах. Harness/tests не повышают capability до `LIVE_VERIFIED`: нужен отдельный GitHub-hosted exact-candidate/merge provider proof; внешний PrihRash checkout остаётся read-only и не получает ADWF files.
+
+## Connected consumer durable proof projection
+
+Для уже подключённого consumer core `UPGRADE-002` остаётся единственным executor managed-file/profile mutation. После его exact `COMMITTED` connected wrapper обязан завершить provider-durable proof transaction до того, как состояние B считается publishable:
+
+1. до core mutation полностью валидируются и сохраняются exact preimages `.adwf-consumer/installation.json`, `operations.json`, `gates.json`;
+2. выполняется неизменённый core `apply_upgrade` и публикуется transaction-owned B snapshot;
+3. из committed B snapshot + exact target framework identity строится новый proof-only Installation Record;
+4. operations binding пересобирается только с прежним native Roadmap/work-item contract, а gates binding — только с прежними native phase declarations/required phases;
+5. три sidecar заменяются только при exact source/known-target digest (CAS-like semantics), затем повторно проходят target fresh-session installation/operations/gates validation;
+6. projection failure не является `COMMITTED`: foreign sidecar блокирует до partial restore, а доказуемая failure path восстанавливает exact A sidecar preimages и вызывает canonical core rollback.
+
+`.adwf-runtime/**` остаётся ignored recovery state. Он не является provider-durable truth и не публикуется в consumer repository.
+
+Fresh-session rebind также отличает durable identity от session-local checkout locator. Исторический `consumer_root_sha256` в Installation Record остаётся частью sealed adoption proof, но после полной fresh-session проверки реконструированный snapshot может заменить **только** этот locator на hash текущего absolute checkout path. Repository identity, framework SHA/tree/MANIFEST, transaction/plan, profile и managed/preserved bytes не меняются и не ослабляются.
+
+Это отдельная connected capability. Наличие unit/self-test evidence не повышает её до `LIVE_VERIFIED`: требуется реальный downstream consumer provider proof `A → B → rollback → B`, exact PR gates и post-merge fresh-session readback.
