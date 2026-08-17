@@ -34,7 +34,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          python .adwf/scripts/docs_freshness.py --write --reviewed-at 2026-08-17T12:10:00Z --valid-until 2026-11-17T12:10:00Z
+          python .adwf/scripts/docs_freshness.py --write --reviewed-at 2026-08-17T12:08:00Z --valid-until 2026-11-17T12:08:00Z
           python .adwf/scripts/generate_manifest.py
           mapfile -t changed < <(git diff --name-only)
           printf '%s\n' "${changed[@]}"
