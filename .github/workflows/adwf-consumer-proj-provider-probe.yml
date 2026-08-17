@@ -1,0 +1,37 @@
+name: ADWF CONSUMER_PROJ-001 Provider Probe
+
+on:
+  push:
+    branches:
+      - agent/local-mirror-CONSUMER_PROJ-001-20260817-a
+
+permissions:
+  contents: read
+  pull-requests: read
+  checks: read
+  actions: read
+
+jobs:
+  probe:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - name: Probe exact trusted-controller endpoints
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          base='https://api.github.com/repos/kmephis-ai/AI-Development-Framework'
+          probe() {
+            name="$1"; url="$2"
+            code="$(curl -sS -o "/tmp/${name}.json" -w '%{http_code}' -H "Authorization: Bearer ${GH_TOKEN}" -H 'Accept: application/vnd.github+json' -H 'X-GitHub-Api-Version: 2022-11-28' "${url}")"
+            echo "PROBE ${name} HTTP=${code}"
+            if [ "${code}" != 200 ]; then cat "/tmp/${name}.json"; fi
+          }
+          probe pr "${base}/pulls/126"
+          probe files "${base}/pulls/126/files?per_page=100"
+          probe checks "${base}/commits/9028935f99155303347322099509804188073a58/check-runs?per_page=100"
+          probe base_ref "${base}/git/ref/heads/main"
+          probe policy "${base}/contents/.adwf/policies/trust-boundary.json?ref=a41a366fc940ebc96f8d58cf8a83ea7fdaaf2416"
+          probe candidate_new "${base}/contents/.adwf/lib/consumer_upgrade_projection.py?ref=9028935f99155303347322099509804188073a58"
