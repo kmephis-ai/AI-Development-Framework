@@ -2,7 +2,7 @@
   "$schema": ".adwf/schemas/decision-requirement-traceability.schema.json",
   "schema_version": 1,
   "role": "CANONICAL_DECISION_REQUIREMENT_TRACEABILITY",
-  "revision": 21,
+  "revision": 22,
   "records": [
     {
       "id": "INTENT-FOUNDATION-20260815",
@@ -366,6 +366,28 @@
       "source_path": null,
       "source_sha256": null,
       "record_sha256": "2c2397717037a8b5f84921e04bf13717804f8dc838757f4b199f253953929585"
+    },
+    {
+      "id": "REQ-CONSUMER-GATE-001",
+      "kind": "REQUIREMENT",
+      "version": 1,
+      "status": "ACTIVE",
+      "title_ru": "Consumer native CI должен быть evidence source без передачи workflow authority",
+      "statement_ru": "Установленный consumer должен declaratively связать pr/main/runtime phases с существующими provider checks и получать VERIFIED только по exact subject SHA, successful completed check и точному GitHub App identity; stale, missing, failing, pending или ambiguous checks блокируют.",
+      "source_path": null,
+      "source_sha256": null,
+      "record_sha256": "970aacb0882ff22fca06bae30b8c5fcaacc4d9a1ba417f7984476745ab51e22b"
+    },
+    {
+      "id": "DEC-CONSUMER-GATE-001",
+      "kind": "DECISION",
+      "version": 1,
+      "status": "ACCEPTED",
+      "title_ru": "Gate delegation реализуется как consumer-owned proof-only binding",
+      "statement_ru": "Хранить strict self-sealed .adwf-consumer/gates.json, связанный с Consumer Profile, Installation Record и Operational Binding; provider resolver проверяет exact check/app/SHA и не может изменять workflows, rulesets, deployments, secrets или product files.",
+      "source_path": null,
+      "source_sha256": null,
+      "record_sha256": "7e2c6ad2d98e0aadc1f0607d6824455b835d31fa1bc5f6326d9f89e45f4b6141"
     }
   ],
   "capability_refs": [
@@ -433,6 +455,11 @@
       "id": "CAPREF-CONSUMER-OPERATIONAL-BINDING",
       "capability_id": "CONSUMER_OPERATIONAL_BINDING",
       "ref_sha256": "340943d826a1429d57b66d3dc9a7cf9715e816dd817e50bd87bc76b6f0d5a5b9"
+    },
+    {
+      "id": "CAPREF-CONSUMER-NATIVE-GATE-BINDING",
+      "capability_id": "CONSUMER_NATIVE_GATE_BINDING",
+      "ref_sha256": "418f9e36d59119e57d70a635b29e86f34419c676832cf128fcc0c99ac33ab35e"
     }
   ],
   "work_unit_refs": [
@@ -582,6 +609,13 @@
       "issue_number": 104,
       "ai_work_package_id": null,
       "ref_sha256": "7bd3b77450440dda9765a537e35a5b6644bffe435df60cb2630b5295720df686"
+    },
+    {
+      "id": "WORKREF-CONSUMER-GATE-001",
+      "roadmap_id": "CONSUMER_GATE-001",
+      "issue_number": 106,
+      "ai_work_package_id": null,
+      "ref_sha256": "3656113568b168b9cdcd23b7e592b070b729f191341b8a583812f2dcb1a96cc8"
     }
   ],
   "evidence_refs": [],
@@ -1152,7 +1186,35 @@
       "from": "CAPREF-CONSUMER-OPERATIONAL-BINDING",
       "to": "WORKREF-CONSUMER_OPS-001",
       "edge_sha256": "2679e1fbb44454d33f349ece9e0f8957a764ec469887132e34653424bac0df8c"
+    },
+    {
+      "id": "EDGE-INTENT-REQ-CONSUMER-GATE-001",
+      "type": "INTENT_TO_REQUIREMENT",
+      "from": "INTENT-FOUNDATION-20260815",
+      "to": "REQ-CONSUMER-GATE-001",
+      "edge_sha256": "f6441d8e6ab876d3337b9fa9f947359107fa79b7fce17c33da3fadb22fff06eb"
+    },
+    {
+      "id": "EDGE-REQ-DEC-CONSUMER-GATE-001",
+      "type": "REQUIREMENT_TO_DECISION",
+      "from": "REQ-CONSUMER-GATE-001",
+      "to": "DEC-CONSUMER-GATE-001",
+      "edge_sha256": "a4daecfadab10c29f3a7d537c1abc461cf970f9759af1da1eae37ea2a74e0d65"
+    },
+    {
+      "id": "EDGE-DEC-CAP-CONSUMER-GATE-001",
+      "type": "DECISION_TO_CAPABILITY",
+      "from": "DEC-CONSUMER-GATE-001",
+      "to": "CAPREF-CONSUMER-NATIVE-GATE-BINDING",
+      "edge_sha256": "7037b5a1ffc9acf574e5a9a6f14beb3fe6841c859e3f88a7530c92d3c6fc7b48"
+    },
+    {
+      "id": "EDGE-CAP-WORK-CONSUMER-GATE-001",
+      "type": "CAPABILITY_TO_WORK",
+      "from": "CAPREF-CONSUMER-NATIVE-GATE-BINDING",
+      "to": "WORKREF-CONSUMER-GATE-001",
+      "edge_sha256": "4e5f4e099fc5673053a95f5275679a3c970b77af4e232618b9143283511695da"
     }
   ],
-  "graph_sha256": "7488b3b9563476a6578fe3e74ef8e0e78dd3908951adb5d91ea00c0cb8c0eee6"
+  "graph_sha256": "acc1e7729397f07927734d5f221c7d1cbaaa5500fc079a2d81f208be69fc115e"
 }

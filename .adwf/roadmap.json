@@ -238,6 +238,14 @@
             "CONSUMER_INSTALL-001"
           ],
           "product_impact": false
+        },
+        {
+          "roadmap_id": "CONSUMER_GATE-001",
+          "title_ru": "Consumer Native Gate Binding + exact provider readback v1",
+          "dependencies": [
+            "CONSUMER_OPS-001"
+          ],
+          "product_impact": false
         }
       ]
     }

@@ -1,0 +1,173 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "ADWF Consumer Native Gate Binding v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "$schema",
+    "schema_version",
+    "role",
+    "consumer_repository",
+    "consumer_profile_sha256",
+    "installation_record_sha256",
+    "operational_binding_sha256",
+    "phases",
+    "required_phases",
+    "safety",
+    "mutation_authority",
+    "binding_sha256"
+  ],
+  "properties": {
+    "$schema": {
+      "const": ".adwf/schemas/consumer-gates.schema.json"
+    },
+    "schema_version": {
+      "const": 1
+    },
+    "role": {
+      "const": "CONSUMER_NATIVE_GATE_BINDING"
+    },
+    "consumer_repository": {
+      "type": "string",
+      "pattern": "^[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+$"
+    },
+    "consumer_profile_sha256": {
+      "type": "string",
+      "format": "sha256"
+    },
+    "installation_record_sha256": {
+      "type": "string",
+      "format": "sha256"
+    },
+    "operational_binding_sha256": {
+      "type": "string",
+      "format": "sha256"
+    },
+    "phases": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "pr",
+        "main",
+        "runtime"
+      ],
+      "properties": {
+        "pr": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "check_name",
+              "app_slug",
+              "app_id"
+            ],
+            "properties": {
+              "check_name": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 128
+              },
+              "app_slug": {
+                "type": "string",
+                "pattern": "^[a-z0-9-]+$"
+              },
+              "app_id": {
+                "type": "integer",
+                "minimum": 1
+              }
+            }
+          }
+        },
+        "main": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "check_name",
+              "app_slug",
+              "app_id"
+            ],
+            "properties": {
+              "check_name": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 128
+              },
+              "app_slug": {
+                "type": "string",
+                "pattern": "^[a-z0-9-]+$"
+              },
+              "app_id": {
+                "type": "integer",
+                "minimum": 1
+              }
+            }
+          }
+        },
+        "runtime": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "check_name",
+              "app_slug",
+              "app_id"
+            ],
+            "properties": {
+              "check_name": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 128
+              },
+              "app_slug": {
+                "type": "string",
+                "pattern": "^[a-z0-9-]+$"
+              },
+              "app_id": {
+                "type": "integer",
+                "minimum": 1
+              }
+            }
+          }
+        }
+      }
+    },
+    "required_phases": {
+      "type": "array",
+      "uniqueItems": true,
+      "items": {
+        "enum": [
+          "pr",
+          "main",
+          "runtime"
+        ]
+      }
+    },
+    "safety": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "monetary_budget_usd",
+        "secrets"
+      ],
+      "properties": {
+        "monetary_budget_usd": {
+          "const": 0
+        },
+        "secrets": {
+          "const": "FORBIDDEN"
+        }
+      }
+    },
+    "mutation_authority": {
+      "const": "NONE_BINDING_IS_REFERENCE_ONLY"
+    },
+    "binding_sha256": {
+      "type": "string",
+      "format": "sha256"
+    }
+  }
+}

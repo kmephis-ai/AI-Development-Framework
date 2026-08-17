@@ -579,6 +579,24 @@
       ],
       "live_boundary": "LIVE_VERIFIED требует реального downstream consumer/provider evidence, где после clean provider checkout operational binding разрешает native product Roadmap/work source и ADWF не использует self-host Roadmap. Fixture/CI доказывают implementation, но не означают PrihRash adoption.",
       "live_evidence": []
+    },
+    {
+      "id": "CONSUMER_NATIVE_GATE_BINDING",
+      "status": "LIVE_NOT_VERIFIED",
+      "execution_mode": "CORE",
+      "owner_claim_ru": "ADWF может привязать существующие native CI checks consumer-проекта к pr/main/runtime phases и принимать PASS только после exact-SHA provider readback точного check/app identity, не получая workflow mutation authority.",
+      "entrypoints": [
+        ".adwf/scripts/consumer_gates.py"
+      ],
+      "production_paths": [
+        ".adwf/lib/consumer_gates.py",
+        ".adwf/schemas/consumer-gates.schema.json"
+      ],
+      "verification": [
+        ".adwf/tests/test_consumer_gates.py"
+      ],
+      "live_boundary": "LIVE_VERIFIED требует реального downstream consumer/provider evidence с exact subject SHA и native checks. Fixture/fake provider и self-host CI доказывают implementation, но не означают, что PrihRash gates уже bound.",
+      "live_evidence": []
     }
   ]
 }
