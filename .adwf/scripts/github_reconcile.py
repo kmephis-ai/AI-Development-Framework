@@ -29,7 +29,7 @@ def main()->int:
     config=strict_loads((ROOT/'.adwf/config.json').read_text(encoding='utf-8'))
     if config.get('provider',{}).get('mode')!='github': raise SystemExit('CANONICAL_PROVIDER_NOT_GITHUB')
     client=GitHubClient(repo,token); repository=client.repo_info(); default_branch=repository.get('default_branch'); branch=client.branch(str(default_branch))
-    issues=[x for x in client.issues() if 'pull_request' not in x]; pulls=client.pulls(); runs=client.runs(); rulesets=client.rulesets()
+    issues=[x for x in client.issues() if 'pull_request' not in x]; pulls=client.pulls(); runs=client.recent_runs(limit=100); rulesets=client.rulesets()
     registry=strict_loads((ROOT/'.adwf/providers.json').read_text(encoding='utf-8')); capability=config.get('cost',{}).get('default_ci_capability')
     request={'provider':capability,'mandatory_ci':True,'automated':True,'projected_cost':0,'projected_units':0,
              'repository_visibility':'PUBLIC' if repository.get('private') is False else 'PRIVATE','runner_class':'standard'}

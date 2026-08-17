@@ -3,9 +3,9 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Any
 from urllib.parse import quote
-import base64
+import base64,re
 from .http_transport import urllib_transport
-from .provider_contracts import Transport, request_json, request_list_pages, request_value, request_bytes, mutate_with_readback
+from .provider_contracts import ProviderContractError, Transport, request_json, request_list_pages, request_value, request_bytes, mutate_with_readback
 
 @dataclass
 class GitHubClient:
@@ -29,6 +29,19 @@ class GitHubClient:
     def issues(self)->list[dict[str,Any]]: return self.list(f"/repos/{self.repo}/issues?state=all&per_page=100")
     def pulls(self)->list[dict[str,Any]]: return self.list(f"/repos/{self.repo}/pulls?state=all&sort=updated&direction=desc&per_page=100")
     def runs(self)->list[dict[str,Any]]: return self.list(f"/repos/{self.repo}/actions/runs?per_page=100",object_key="workflow_runs")
+    def recent_runs(self,*,limit:int=100,event:str|None=None)->list[dict[str,Any]]:
+        if isinstance(limit,bool) or not isinstance(limit,int) or not 1 <= limit <= 100:
+            raise ProviderContractError("PROVIDER_RECENT_RUNS_LIMIT_INVALID")
+        query=f"per_page={limit}"
+        if event is not None:
+            if not isinstance(event,str) or re.fullmatch(r"[A-Za-z0-9_.-]{1,64}",event) is None:
+                raise ProviderContractError("PROVIDER_RECENT_RUNS_EVENT_INVALID")
+            query += "&event=" + quote(event,safe="")
+        value=self.get(f"/repos/{self.repo}/actions/runs?{query}")
+        rows=value.get("workflow_runs")
+        if not isinstance(rows,list) or any(not isinstance(item,dict) for item in rows) or len(rows) > limit:
+            raise ProviderContractError("PROVIDER_RECENT_RUNS_PAYLOAD_INVALID")
+        return rows
     def jobs(self,run_id:int)->list[dict[str,Any]]: return self.list(f"/repos/{self.repo}/actions/runs/{run_id}/jobs?per_page=100",object_key="jobs")
     def job_logs(self,job_id:int)->bytes: return request_bytes(self.transport,"GET",self.url(f"/repos/{self.repo}/actions/jobs/{int(job_id)}/logs"),self.headers,timeout=30,max_attempts=2)[0]
     def issue_comments(self,number:int)->list[dict[str,Any]]: return self.list(f"/repos/{self.repo}/issues/{number}/comments?per_page=100")
