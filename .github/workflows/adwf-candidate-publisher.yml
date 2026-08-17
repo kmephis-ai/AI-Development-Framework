@@ -42,8 +42,9 @@ jobs:
           git fetch --no-tags origin "refs/heads/${TARGET_BRANCH}:refs/remotes/origin/${TARGET_BRANCH}"
           test "$(git rev-parse refs/remotes/origin/${TARGET_BRANCH})" = "${BASE_SHA}"
 
-          git checkout --detach "${BASE_SHA}"
+          git reset --hard "${BASE_SHA}"
           test "$(git rev-parse HEAD)" = "${BASE_SHA}"
+          git clean -fdx
 
           git apply --check /tmp/candidate.patch
           git apply /tmp/candidate.patch
