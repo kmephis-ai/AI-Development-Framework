@@ -8,8 +8,7 @@ ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT / ".adwf"))
 from lib.consumer_installation import ConsumerInstallationError, rebind_snapshot_for_fresh_session  # noqa: E402
 from lib.consumer_upgrade import ConsumerUpgradeError  # noqa: E402
-from lib.consumer_upgrade_projection import apply_upgrade_with_projection  # noqa: E402
-from lib.consumer_upgrade_transaction import recover_upgrade, rollback_upgrade  # noqa: E402
+from lib.consumer_upgrade_transaction import apply_upgrade, recover_upgrade, rollback_upgrade  # noqa: E402
 from lib.strict_json import load as strict_load  # noqa: E402
 
 
@@ -33,7 +32,7 @@ def main() -> int:
     args = parser.parse_args()
     try:
         if args.operation == "apply":
-            result = apply_upgrade_with_projection(
+            result = apply_upgrade(
                 args.source_root, args.target_root, args.consumer_root,
                 _obj(args.compatibility, "COMPATIBILITY"), _obj(args.plan, "PLAN"),
                 _obj(args.source_snapshot, "SOURCE_SNAPSHOT") if args.source_snapshot else rebind_snapshot_for_fresh_session(args.consumer_root, args.source_root),
