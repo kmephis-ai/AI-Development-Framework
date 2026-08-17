@@ -6,11 +6,10 @@ import argparse
 import json
 import os
 import sys
-import time
 
 ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT / ".adwf"))
-from lib.consumer_ci import ConsumerCIRouteError, resolve_route, delegate_native_phase  # noqa: E402
+from lib.consumer_ci import ConsumerCIRouteError, resolve_route, wait_for_native_phase  # noqa: E402
 from lib.github_provider import GitHubClient  # noqa: E402
 
 
@@ -34,7 +33,7 @@ def main() -> int:
     delegate.add_argument("--phase", choices=["pr", "main"], required=True)
     delegate.add_argument("--subject-sha", required=True)
     delegate.add_argument("--repository", required=True)
-    delegate.add_argument("--attempts", type=int, default=12)
+    delegate.add_argument("--attempts", type=int, default=30)
     delegate.add_argument("--interval-seconds", type=int, default=10)
     args = p.parse_args()
     try:
@@ -47,20 +46,15 @@ def main() -> int:
         if not token:
             raise ConsumerCIRouteError("CONSUMER_CI_GITHUB_TOKEN_REQUIRED")
         client = GitHubClient(args.repository, token)
-        last = None
-        attempts = max(1, min(args.attempts, 30))
-        interval = max(0, min(args.interval_seconds, 30))
-        for index in range(attempts):
-            try:
-                result = delegate_native_phase(ROOT, ROOT, client, phase=args.phase, subject_sha=args.subject_sha)
-                print(json.dumps(result, ensure_ascii=False, sort_keys=True))
-                return 0
-            except ConsumerCIRouteError as exc:
-                last = exc
-                if index + 1 < attempts and interval:
-                    time.sleep(interval)
-        assert last is not None
-        raise last
+        result = wait_for_native_phase(
+            ROOT, ROOT, client,
+            phase=args.phase,
+            subject_sha=args.subject_sha,
+            attempts=args.attempts,
+            interval_seconds=args.interval_seconds,
+        )
+        print(json.dumps(result, ensure_ascii=False, sort_keys=True))
+        return 0
     except (ConsumerCIRouteError, OSError, ValueError) as exc:
         print("CONSUMER CI ROUTING: BLOCK", str(exc), file=sys.stderr)
         return 1

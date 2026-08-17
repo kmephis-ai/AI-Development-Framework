@@ -9,6 +9,6 @@
 
 Consumer route не запускает глобальную self-host проверку чужих `.github/workflows/**`/документации и не использует generic Project Pack commands вместо native checks. Делегирование получает только `contents: read` + `checks: read`, использует ephemeral `github.token`, имеет budget `0` и не получает workflow/ruleset/deployment/data mutation authority.
 
-Missing, tampered или incomplete bindings, drift ADWF-managed bytes, repository mismatch, stale/wrong SHA, pending/failing/missing/duplicate check или wrong GitHub App блокируются fail-closed.
+Missing, tampered или incomplete bindings, drift ADWF-managed bytes, repository mismatch, stale/wrong SHA, failing/duplicate check или wrong GitHub App блокируются fail-closed. Pending/missing native check может ожидаться только в bounded polling window: по умолчанию до 30 exact provider readback attempts с интервалом 10 секунд (максимум около 5 минут). Каждый attempt использует те же exact-SHA/check/app/success требования; истечение окна остаётся BLOCK, а не retry-as-success.
 
 Это generic implementation capability. Реальный PrihRash считается подключённым только после отдельного provider proof в `PrihRashOnline-v2#287`.

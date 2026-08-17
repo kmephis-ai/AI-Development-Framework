@@ -2,7 +2,7 @@
   "$schema": ".adwf/schemas/decision-requirement-traceability.schema.json",
   "schema_version": 1,
   "role": "CANONICAL_DECISION_REQUIREMENT_TRACEABILITY",
-  "revision": 23,
+  "revision": 24,
   "records": [
     {
       "id": "INTENT-FOUNDATION-20260815",
@@ -410,6 +410,28 @@
       "source_path": null,
       "source_sha256": null,
       "record_sha256": "019dc1ce664b058aec290b03b3043de237772b5fe69382a8794db5bc33c5c495"
+    },
+    {
+      "id": "REQ-CONSUMER-WAIT-001",
+      "kind": "REQUIREMENT",
+      "version": 1,
+      "status": "ACTIVE",
+      "title_ru": "Consumer native gate delegation должна выдерживать реальную CI latency без ложного FAIL",
+      "statement_ru": "ADWF должен bounded ожидать exact-SHA native provider check достаточно долго для реального consumer CI, сохраняя unique check/app identity, completed+success semantics и fail-closed timeout.",
+      "source_path": null,
+      "source_sha256": null,
+      "record_sha256": "f72c466c24f04c4ec5e2852196ecf6dc24803daa54a66e271808281e5853bdd8"
+    },
+    {
+      "id": "DEC-CONSUMER-WAIT-001",
+      "kind": "DECISION",
+      "version": 1,
+      "status": "ACCEPTED",
+      "title_ru": "Использовать максимум 30 provider readback attempts по 10 секунд",
+      "statement_ru": "Consumer delegation использует bounded wait до примерно 5 минут; каждый readback применяет неизменные exact-SHA/check/app/success требования, а exhaustion остаётся hard BLOCK без retry-as-success.",
+      "source_path": null,
+      "source_sha256": null,
+      "record_sha256": "a2c94dc4ca54a36acf8c42b01fa046b1e49bb3b173c12fd7cc52df7621f0b8ce"
     }
   ],
   "capability_refs": [
@@ -650,6 +672,13 @@
       "issue_number": 108,
       "ai_work_package_id": null,
       "ref_sha256": "ae3686e3561d10fabb1236cca2540ea156fd2afb63a3aca334ff7c73a93b1086"
+    },
+    {
+      "id": "WORKREF-CONSUMER-WAIT-001",
+      "roadmap_id": "CONSUMER_WAIT-001",
+      "issue_number": 112,
+      "ai_work_package_id": null,
+      "ref_sha256": "e8266308bb2a98c69dd512d4924848ebe7d2e1134a2f4b7250dfb794c40be79c"
     }
   ],
   "evidence_refs": [],
@@ -1276,7 +1305,35 @@
       "from": "CAPREF-CONSUMER-CI-ROUTING",
       "to": "WORKREF-CONSUMER-ROUTE-001",
       "edge_sha256": "21ffce537ed9c382d2ce950260ca7216ec67433feebf8fe8b2fbef73166f4cf8"
+    },
+    {
+      "id": "EDGE-INTENT-REQ-CONSUMER-WAIT-001",
+      "type": "INTENT_TO_REQUIREMENT",
+      "from": "INTENT-FOUNDATION-20260815",
+      "to": "REQ-CONSUMER-WAIT-001",
+      "edge_sha256": "1b7d98a7aacbe3adb4e5283f69b609a46b2e6d4d8779520072420e4635b54cca"
+    },
+    {
+      "id": "EDGE-REQ-DEC-CONSUMER-WAIT-001",
+      "type": "REQUIREMENT_TO_DECISION",
+      "from": "REQ-CONSUMER-WAIT-001",
+      "to": "DEC-CONSUMER-WAIT-001",
+      "edge_sha256": "cf1ddc2d3d7fa53f75dcf1009d7812c544472c9d430c53f7e1f2673aec748f03"
+    },
+    {
+      "id": "EDGE-DEC-CAP-CONSUMER-WAIT-001",
+      "type": "DECISION_TO_CAPABILITY",
+      "from": "DEC-CONSUMER-WAIT-001",
+      "to": "CAPREF-CONSUMER-CI-ROUTING",
+      "edge_sha256": "f4ecaa8eb05772dedab37302424204d6a193405d708b462fa176f8ba13c492e6"
+    },
+    {
+      "id": "EDGE-CAP-WORK-CONSUMER-WAIT-001",
+      "type": "CAPABILITY_TO_WORK",
+      "from": "CAPREF-CONSUMER-CI-ROUTING",
+      "to": "WORKREF-CONSUMER-WAIT-001",
+      "edge_sha256": "be515f628f08895dc2a23185c5e911a5c29e011adc65e32801d0ea5ffe10e40a"
     }
   ],
-  "graph_sha256": "d669d6087cc00d5713a1f33b465b28609c9f2ea428cc6f1979c6a9ea5d31b822"
+  "graph_sha256": "239cc47cabdf799aaa02192d57798bffa9a8191c5e860895b12c51b630a548d6"
 }

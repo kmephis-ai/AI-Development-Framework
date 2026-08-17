@@ -10,13 +10,23 @@ import unittest
 
 ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT / ".adwf"))
-from lib.consumer_ci import ConsumerCIRouteError, classify_anchor, classify_current, resolve_route, delegate_native_phase
+from lib.consumer_ci import ConsumerCIRouteError, classify_anchor, classify_current, resolve_route, delegate_native_phase, wait_for_native_phase
 from tests.test_consumer_gates import ConsumerGateTests
 
 
 class Client:
     def __init__(self, checks): self.checks = checks
     def check_runs(self, sha): return copy.deepcopy(self.checks)
+
+
+class SequencedClient:
+    def __init__(self, sequences):
+        self.sequences = [copy.deepcopy(item) for item in sequences]
+        self.calls = 0
+    def check_runs(self, sha):
+        index = min(self.calls, len(self.sequences) - 1)
+        self.calls += 1
+        return copy.deepcopy(self.sequences[index])
 
 
 class ConsumerCIRouteTests(unittest.TestCase):
@@ -89,6 +99,25 @@ class ConsumerCIRouteTests(unittest.TestCase):
             self.assertEqual(result["status"], "VERIFIED")
             with self.assertRaises(ConsumerCIRouteError):
                 delegate_native_phase(consumer, consumer, Client([{**ok, "conclusion": "failure"}]), phase="pr", subject_sha=sha)
+
+    def test_bounded_wait_allows_pending_native_gate_to_finish(self):
+        with tempfile.TemporaryDirectory() as t:
+            _, consumer, _ = ConsumerGateTests()._ready(Path(t)); sha = "e" * 40
+            pending = {"id": 1, "name": "PR Validation", "head_sha": sha, "status": "in_progress", "conclusion": None, "app": {"slug": "github-actions", "id": 15368}}
+            ok = {**pending, "status": "completed", "conclusion": "success"}
+            sleeps = []
+            result = wait_for_native_phase(consumer, consumer, SequencedClient([[pending], [pending], [ok]]), phase="pr", subject_sha=sha, attempts=3, interval_seconds=10, sleep=sleeps.append)
+            self.assertEqual(result["status"], "VERIFIED")
+            self.assertEqual(sleeps, [10, 10])
+
+    def test_bounded_wait_timeout_remains_fail_closed(self):
+        with tempfile.TemporaryDirectory() as t:
+            _, consumer, _ = ConsumerGateTests()._ready(Path(t)); sha = "f" * 40
+            pending = {"id": 1, "name": "PR Validation", "head_sha": sha, "status": "in_progress", "conclusion": None, "app": {"slug": "github-actions", "id": 15368}}
+            sleeps = []
+            with self.assertRaisesRegex(ConsumerCIRouteError, "NATIVE_GATE_NOT_VERIFIED"):
+                wait_for_native_phase(consumer, consumer, SequencedClient([[pending]]), phase="pr", subject_sha=sha, attempts=3, interval_seconds=10, sleep=sleeps.append)
+            self.assertEqual(sleeps, [10, 10])
 
 
 if __name__ == "__main__": unittest.main()

@@ -6,6 +6,7 @@ from typing import Any
 import hashlib
 import re
 import subprocess
+import time
 
 from .consumer_profile import PROFILE_REL, ConsumerProfileError, load_consumer_profile
 from .consumer_installation import RECORD_REL, ConsumerInstallationError, load_record
@@ -147,3 +148,36 @@ def delegate_native_phase(
     if result.get("status") != "VERIFIED":
         raise ConsumerCIRouteError("CONSUMER_CI_NATIVE_GATE_NOT_VERIFIED:" + ",".join(result.get("failures") or ["UNKNOWN"]))
     return result
+
+
+def wait_for_native_phase(
+    project_root: str | Path,
+    framework_root: str | Path,
+    client: Any,
+    *,
+    phase: str,
+    subject_sha: str,
+    attempts: int = 30,
+    interval_seconds: int = 10,
+    sleep: Any = time.sleep,
+) -> dict[str, Any]:
+    """Wait a bounded amount of time for exact native provider evidence.
+
+    Evidence semantics never weaken: every attempt still requires the same exact
+    subject SHA, unique check/app identity, completed status and success
+    conclusion.  Exhausting the bounded window remains a hard block.
+    """
+    bounded_attempts = max(1, min(int(attempts), 30))
+    bounded_interval = max(0, min(int(interval_seconds), 30))
+    last: ConsumerCIRouteError | None = None
+    for index in range(bounded_attempts):
+        try:
+            return delegate_native_phase(
+                project_root, framework_root, client, phase=phase, subject_sha=subject_sha
+            )
+        except ConsumerCIRouteError as exc:
+            last = exc
+            if index + 1 < bounded_attempts and bounded_interval:
+                sleep(bounded_interval)
+    assert last is not None
+    raise last
