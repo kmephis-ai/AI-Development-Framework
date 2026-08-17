@@ -24,11 +24,17 @@ jobs:
           fetch-depth: 0
           persist-credentials: true
 
-      - name: Verify checksum-bound payload
+      - name: Verify split checksum-bound payload
         shell: bash
         run: |
           set -euo pipefail
-          cp .candidate-transport/consumer-wait-001/part-00 /tmp/candidate.patch.b64
+          DIR=.candidate-transport/consumer-wait-001-v2
+          echo "882b4e38498a08adc4fbc7f812fbded9d85cc84e9a694f184d19205f5c68ec42  ${DIR}/part-00" | sha256sum -c -
+          echo "8e10dcf6e6d78445e0f2bf0c71cf6105764c61f18dc68f66e6944e6d79571285  ${DIR}/part-01" | sha256sum -c -
+          echo "105ad12a3426ab1f144ef1d01af44f9920ac94075e09bb353e8c1ffbf74cdf8c  ${DIR}/part-02" | sha256sum -c -
+          echo "9088a6b37acd67cb266096b36d6f154b23e60c474e551a2ec3d346b7e53c0c81  ${DIR}/part-03" | sha256sum -c -
+          echo "c154e01a900704b1c9fd9c5d709da924e693c8a18139abf2afabf56850c186b4  ${DIR}/part-04" | sha256sum -c -
+          cat ${DIR}/part-00 ${DIR}/part-01 ${DIR}/part-02 ${DIR}/part-03 ${DIR}/part-04 > /tmp/candidate.patch.b64
           echo "${EXPECTED_PAYLOAD_SHA256}  /tmp/candidate.patch.b64" | sha256sum -c -
           base64 --decode /tmp/candidate.patch.b64 | gzip -dc > /tmp/candidate.patch
           echo "${EXPECTED_PATCH_SHA256}  /tmp/candidate.patch" | sha256sum -c -
