@@ -1,0 +1,86 @@
+name: Materialize CONSUMER_PROJ-001 certified-base merge
+
+on:
+  push:
+    branches:
+      - agent/local-mirror-CONSUMER_PROJ-001-20260817-c
+
+permissions:
+  contents: write
+
+env:
+  TARGET_BRANCH: agent/CONSUMER_PROJ-001-connected-upgrade-proof
+  EXPECTED_TARGET_HEAD: 9028935f99155303347322099509804188073a58
+  EXPECTED_MAIN: ea0491fdd1399a804728167c7ef44a498b3635e1
+  REVIEWED_AT: 2026-08-17T16:58:00Z
+  VALID_UNTIL: 2026-11-17T16:58:00Z
+
+jobs:
+  materialize:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - name: Checkout target writer branch
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd
+        with:
+          ref: ${{ env.TARGET_BRANCH }}
+          fetch-depth: 0
+
+      - name: Verify immutable heads
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "$EXPECTED_TARGET_HEAD"
+          git fetch origin main --no-tags
+          test "$(git rev-parse origin/main)" = "$EXPECTED_MAIN"
+
+      - name: Merge certified main and regenerate canonical projections
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name 'ADWF Autonomous Writer'
+          git config user.email 'adwf-writer@example.invalid'
+          set +e
+          git merge --no-commit --no-ff "$EXPECTED_MAIN"
+          merge_rc=$?
+          set -e
+          if [[ "$merge_rc" -ne 0 ]]; then
+            conflicts="$(git diff --name-only --diff-filter=U | sort)"
+            expected=$'.adwf/docs-registry.json\nMANIFEST.json\nSHA256SUMS.txt'
+            test "$conflicts" = "$expected"
+            git checkout --theirs .adwf/docs-registry.json MANIFEST.json SHA256SUMS.txt
+            git add .adwf/docs-registry.json MANIFEST.json SHA256SUMS.txt
+          fi
+          python .adwf/scripts/docs_freshness.py --write --reviewed-at "$REVIEWED_AT" --valid-until "$VALID_UNTIL"
+          python .adwf/scripts/generate_manifest.py
+          git add .adwf/docs-registry.json MANIFEST.json SHA256SUMS.txt
+
+      - name: Verify merged candidate
+        shell: bash
+        run: |
+          set -euo pipefail
+          python .adwf/scripts/generate_manifest.py --check
+          python .adwf/scripts/docs_freshness.py
+          python .adwf/scripts/validate_capabilities.py
+          python .adwf/scripts/validate_managed_surface.py
+          python .adwf/scripts/validate_docs.py
+          python .adwf/scripts/validate_pipeline_ir.py
+          python .adwf/scripts/validate_ci.py
+          python .adwf/scripts/validate_framework.py
+          python -m pytest -q \
+            .adwf/tests/test_consumer_installation.py \
+            .adwf/tests/test_consumer_upgrade_connected.py \
+            .adwf/tests/test_consumer_upgrade_transaction.py \
+            .adwf/tests/test_consumer_upgrade_transaction_adversarial.py \
+            .adwf/tests/test_trusted_controller.py
+
+      - name: Commit and publish non-force
+        shell: bash
+        run: |
+          set -euo pipefail
+          git commit -m 'CONSUMER_PROJ-001: merge certified GOV-025 base'
+          new_head="$(git rev-parse HEAD)"
+          git merge-base --is-ancestor "$EXPECTED_TARGET_HEAD" "$new_head"
+          git merge-base --is-ancestor "$EXPECTED_MAIN" "$new_head"
+          git push origin "HEAD:$TARGET_BRANCH"
+          echo "NEW_HEAD=$new_head" >> "$GITHUB_ENV"
