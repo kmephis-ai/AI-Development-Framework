@@ -1,0 +1,94 @@
+name: ADWF CONSUMER_PROJ-001 Publisher
+
+on:
+  push:
+    branches:
+      - agent/local-mirror-CONSUMER_PROJ-001-20260817-a
+
+permissions:
+  contents: write
+
+env:
+  WRITER_BRANCH: agent/CONSUMER_PROJ-001-connected-upgrade-proof
+  EXPECTED_WRITER_SHA: a41a366fc940ebc96f8d58cf8a83ea7fdaaf2416
+  EXPECTED_TREE_SHA: d85e2114fb97348cdb2157c9fa1bdec73db819ec
+  EXPECTED_PATCH_GZ_SHA256: 13c9e1b9c2693bbc97cf1572c3a137363a11db3c2909efbb56f971ec26be0672
+  TRANSPORT_BRANCH: agent/local-mirror-CONSUMER_PROJ-001-20260817-a
+
+jobs:
+  publish:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd
+        with:
+          ref: ${{ env.WRITER_BRANCH }}
+          fetch-depth: 0
+      - name: Verify writer lease and reconstruct exact patch
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "${EXPECTED_WRITER_SHA}"
+          git fetch origin "${TRANSPORT_BRANCH}:refs/remotes/origin/consumer-proj-transport"
+          : > /tmp/patch.b64
+          for n in 00 01 02 03 04; do
+            git show "origin/consumer-proj-transport:.adwf-transport/consumer-proj-001/chunk-${n}.b64" >> /tmp/patch.b64
+          done
+          base64 -d /tmp/patch.b64 > /tmp/consumer-proj.patch.gz
+          echo "${EXPECTED_PATCH_GZ_SHA256}  /tmp/consumer-proj.patch.gz" | sha256sum -c -
+          gzip -t /tmp/consumer-proj.patch.gz
+          gzip -dc /tmp/consumer-proj.patch.gz > /tmp/consumer-proj.patch
+      - name: Apply exact candidate
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name 'ADWF Provider Materializer'
+          git config user.email 'adwf-materializer@example.invalid'
+          git am /tmp/consumer-proj.patch
+          test "$(git rev-parse HEAD^{tree})" = "${EXPECTED_TREE_SHA}"
+          cat > /tmp/expected-files <<'EOF'
+          .adwf/capability-traceability.json
+          .adwf/docs-registry.json
+          .adwf/lib/consumer_installation.py
+          .adwf/lib/consumer_upgrade_projection.py
+          .adwf/lib/consumer_upgrade_transaction.py
+          .adwf/scripts/apply_consumer_upgrade.py
+          .adwf/tests/consumer_upgrade_fixture.py
+          .adwf/tests/test_consumer_upgrade_connected.py
+          MANIFEST.json
+          SHA256SUMS.txt
+          docs/governance/CONSUMER_FRAMEWORK_UPGRADE_TRANSACTION.md
+          docs/governance/CONSUMER_INSTALLATION_RECORD.md
+          EOF
+          git diff --name-only "${EXPECTED_WRITER_SHA}" HEAD | sort > /tmp/actual-files
+          sort -o /tmp/expected-files /tmp/expected-files
+          diff -u /tmp/expected-files /tmp/actual-files
+      - name: Focused regression and canonical checks
+        shell: bash
+        run: |
+          set -euo pipefail
+          export PYTHONPATH="$PWD/.adwf:$PWD/.adwf/tests"
+          for p in test_consumer_installation.py test_consumer_upgrade_core.py test_consumer_upgrade_adversarial.py test_consumer_upgrade_transaction.py test_consumer_upgrade_transaction_adversarial.py test_external_consumer_upgrade_proof.py test_consumer_upgrade_connected.py; do
+            python -m unittest discover -s .adwf/tests -p "$p"
+          done
+          python .adwf/scripts/validate_capabilities.py
+          python .adwf/scripts/docs_freshness.py
+          python .adwf/scripts/generate_manifest.py --check
+          python .adwf/scripts/validate_managed_surface.py
+          python .adwf/scripts/validate_docs.py
+          python .adwf/scripts/validate_pipeline_ir.py
+          python .adwf/scripts/validate_ci.py
+          python .adwf/adwf.py doctor --scope package_integrity --json > /tmp/package.json
+          python - <<'PY'
+          import json
+          value=json.load(open('/tmp/package.json'))
+          assert value['categories']['package_integrity']['status']=='VERIFIED', value
+          assert value['categories']['config_health']['status']=='VERIFIED', value
+          PY
+      - name: CAS-like fast-forward publication
+        shell: bash
+        run: |
+          set -euo pipefail
+          remote_sha="$(git ls-remote origin "refs/heads/${WRITER_BRANCH}" | awk '{print $1}')"
+          test "${remote_sha}" = "${EXPECTED_WRITER_SHA}"
+          git push origin "HEAD:refs/heads/${WRITER_BRANCH}"
