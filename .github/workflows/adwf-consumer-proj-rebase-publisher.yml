@@ -35,22 +35,24 @@ jobs:
           remote_writer="$(git ls-remote origin "refs/heads/${WRITER_BRANCH}" | awk '{print $1}')"
           test "${remote_main}" = "${EXPECTED_BASE_SHA}"
           test "${remote_writer}" = "${EXPECTED_WRITER_SHA}"
-          git fetch origin "refs/heads/${WRITER_BRANCH}:refs/remotes/origin/adwf-writer"
           git cat-file -e "${EXPECTED_WRITER_SHA}^{commit}"
           git cat-file -e "${EXPECTED_BASE_SHA}^{commit}"
           git checkout --detach "${EXPECTED_BASE_SHA}"
-          for p in \
-            .adwf/capability-traceability.json \
-            .adwf/lib/consumer_installation.py \
-            .adwf/lib/consumer_upgrade_projection.py \
-            .adwf/lib/consumer_upgrade_transaction.py \
-            .adwf/scripts/apply_consumer_upgrade.py \
-            .adwf/tests/consumer_upgrade_fixture.py \
-            .adwf/tests/test_consumer_upgrade_connected.py \
-            docs/governance/CONSUMER_FRAMEWORK_UPGRADE_TRANSACTION.md \
-            docs/governance/CONSUMER_INSTALLATION_RECORD.md; do
+          semantic_paths=(
+            .adwf/capability-traceability.json
+            .adwf/lib/consumer_installation.py
+            .adwf/lib/consumer_upgrade_projection.py
+            .adwf/lib/consumer_upgrade_transaction.py
+            .adwf/scripts/apply_consumer_upgrade.py
+            .adwf/tests/consumer_upgrade_fixture.py
+            .adwf/tests/test_consumer_upgrade_connected.py
+            docs/governance/CONSUMER_FRAMEWORK_UPGRADE_TRANSACTION.md
+            docs/governance/CONSUMER_INSTALLATION_RECORD.md
+          )
+          for p in "${semantic_paths[@]}"; do
             git checkout "${EXPECTED_WRITER_SHA}" -- "$p"
           done
+          git restore --staged -- "${semantic_paths[@]}"
           python .adwf/scripts/docs_freshness.py --write --reviewed-at "${DOC_REVIEWED_AT}" --valid-until "${DOC_VALID_UNTIL}"
           python .adwf/scripts/generate_manifest.py
           cat > /tmp/expected-files <<'EOF'
@@ -67,13 +69,13 @@ jobs:
           docs/governance/CONSUMER_FRAMEWORK_UPGRADE_TRANSACTION.md
           docs/governance/CONSUMER_INSTALLATION_RECORD.md
           EOF
-          git diff --name-only "${EXPECTED_BASE_SHA}" | sort > /tmp/actual-files
           sort -o /tmp/expected-files /tmp/expected-files
-          diff -u /tmp/expected-files /tmp/actual-files
           git add -- $(cat /tmp/expected-files)
+          git diff --cached --name-only "${EXPECTED_BASE_SHA}" | sort > /tmp/actual-files
+          diff -u /tmp/expected-files /tmp/actual-files
           tree_sha="$(git write-tree)"
           test "${tree_sha}" = "${EXPECTED_TREE_SHA}"
-          git diff --check "${EXPECTED_BASE_SHA}"
+          git diff --cached --check "${EXPECTED_BASE_SHA}"
           git config user.name 'ADWF Provider Materializer'
           git config user.email 'adwf-materializer@example.invalid'
           candidate_sha="$(printf '%s\n' 'CONSUMER_PROJ-001: exact-main rematerialized candidate' | git commit-tree "${tree_sha}" -p "${EXPECTED_BASE_SHA}")"
