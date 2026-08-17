@@ -1,0 +1,137 @@
+name: ADWF Candidate Review Fix Publisher
+
+on:
+  push:
+    branches:
+      - agent/publish-CONSUMER_INSTR-001-review-fix-20260817-g1
+
+permissions:
+  contents: write
+
+env:
+  PARENT_SHA: af1dad46923ec6b3fe9cd72f07c6b155c1a23b40
+  EXPECTED_TREE: 31c1706ae7334b163c04b448d2dd485b0697484c
+  WRITER_BRANCH: agent/CONSUMER_INSTR-001-layered-instructions
+
+jobs:
+  verify-and-publish:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - uses: actions/setup-python@a309ff8b426b58ec0e2a45f0f869d46889d02405
+        with:
+          python-version: "3.12.10"
+
+      - name: Materialize bounded review repair
+        shell: bash
+        run: |
+          set -euo pipefail
+          git checkout --detach "$PARENT_SHA"
+          cp .adwf/docs-registry.json /tmp/docs-registry-parent.json
+
+          python - <<'PY'
+          from pathlib import Path
+
+          p = Path('.adwf/lib/consumer_instructions.py')
+          s = p.read_text(encoding='utf-8')
+          needle = 'def legacy_preexisting_router_transition_allowed(\n'
+          insert = '''def validate_consumer_invariants_surface(consumer_root: str | Path, policy: dict[str, Any]) -> None:\n    """Require the consumer-owned invariants path to be absent or a regular file via real directories."""\n    root = Path(consumer_root).resolve()\n    rel = _safe_rel(str((policy.get("consumer_invariants") or {}).get("path") or ""))\n    pure = PurePosixPath(rel)\n    current = root\n    for part in pure.parts[:-1]:\n        current = current / part\n        if current.is_symlink():\n            raise ConsumerInstructionError("CONSUMER_INSTRUCTION_INVARIANTS_PATH_AMBIGUOUS:SYMLINK_PARENT")\n        if current.exists() and not current.is_dir():\n            raise ConsumerInstructionError("CONSUMER_INSTRUCTION_INVARIANTS_PATH_AMBIGUOUS:NON_DIRECTORY_PARENT")\n    path = root / rel\n    if path.is_symlink():\n        raise ConsumerInstructionError("CONSUMER_INSTRUCTION_INVARIANTS_PATH_AMBIGUOUS:SYMLINK")\n    if path.exists() and not path.is_file():\n        raise ConsumerInstructionError("CONSUMER_INSTRUCTION_INVARIANTS_PATH_AMBIGUOUS:NON_FILE")\n\n\n'''
+          if needle not in s or 'def validate_consumer_invariants_surface(' in s:
+              raise SystemExit('consumer_instructions transform precondition failed')
+          p.write_text(s.replace(needle, insert + needle, 1), encoding='utf-8')
+
+          p = Path('.adwf/lib/consumer_upgrade.py')
+          s = p.read_text(encoding='utf-8')
+          old = '''    ConsumerInstructionError, legacy_preexisting_router_transition_allowed,\n    load_consumer_instruction_policy,\n'''
+          new = '''    ConsumerInstructionError, legacy_preexisting_router_transition_allowed,\n    load_consumer_instruction_policy, validate_consumer_invariants_surface,\n'''
+          if s.count(old) != 1:
+              raise SystemExit('consumer_upgrade import precondition failed')
+          s = s.replace(old, new, 1)
+          old = '''        target_instruction_policy = load_consumer_instruction_policy(target_root, target_inventory)\n    except ConsumerInstructionError as exc:\n        raise ConsumerUpgradeError("UPGRADE_TARGET_INSTRUCTION_POLICY_INVALID:" + str(exc)) from exc\n'''
+          new = '''        target_instruction_policy = load_consumer_instruction_policy(target_root, target_inventory)\n    except ConsumerInstructionError as exc:\n        raise ConsumerUpgradeError("UPGRADE_TARGET_INSTRUCTION_POLICY_INVALID:" + str(exc)) from exc\n    try:\n        validate_consumer_invariants_surface(consumer, target_instruction_policy)\n    except ConsumerInstructionError as exc:\n        raise ConsumerUpgradeError("UPGRADE_CONSUMER_INSTRUCTION_SURFACE_INVALID:" + str(exc)) from exc\n'''
+          if s.count(old) != 1:
+              raise SystemExit('consumer_upgrade policy precondition failed')
+          p.write_text(s.replace(old, new, 1), encoding='utf-8')
+
+          p = Path('.adwf/lib/consumer_upgrade_transaction.py')
+          s = p.read_text(encoding='utf-8')
+          old = '''    ConsumerInstructionError, legacy_preexisting_router_transition_allowed,\n    load_consumer_instruction_policy,\n'''
+          new = '''    ConsumerInstructionError, legacy_preexisting_router_transition_allowed,\n    load_consumer_instruction_policy, validate_consumer_invariants_surface,\n'''
+          if s.count(old) != 1:
+              raise SystemExit('transaction import precondition failed')
+          s = s.replace(old, new, 1)
+          old = '''        target_instruction_policy = load_consumer_instruction_policy(target_root, target_inventory)\n    except ConsumerInstructionError as exc:\n        raise ConsumerUpgradeError("UPGRADE_APPLY_TARGET_INSTRUCTION_POLICY_INVALID:" + str(exc)) from exc\n'''
+          new = '''        target_instruction_policy = load_consumer_instruction_policy(target_root, target_inventory)\n    except ConsumerInstructionError as exc:\n        raise ConsumerUpgradeError("UPGRADE_APPLY_TARGET_INSTRUCTION_POLICY_INVALID:" + str(exc)) from exc\n    try:\n        validate_consumer_invariants_surface(consumer, target_instruction_policy)\n    except ConsumerInstructionError as exc:\n        raise ConsumerUpgradeError("UPGRADE_APPLY_CONSUMER_INSTRUCTION_SURFACE_INVALID:" + str(exc)) from exc\n'''
+          if s.count(old) != 1:
+              raise SystemExit('transaction policy precondition failed')
+          p.write_text(s.replace(old, new, 1), encoding='utf-8')
+
+          p = Path('.adwf/tests/test_consumer_upgrade_core.py')
+          s = p.read_text(encoding='utf-8')
+          old = '''    def test_08_missing_target_instruction_policy_fails_closed(self):\n        temp, source, target, consumer, snapshot = prepared(ROOT)\n        try:\n            (target / ".adwf/consumer-instruction-policy.json").unlink()\n            seal_inventory(target)\n            with self.assertRaisesRegex(ConsumerUpgradeError, "UPGRADE_TARGET_INSTRUCTION_POLICY_INVALID"):\n                self.compat(source, target, consumer, snapshot)\n        finally: temp.cleanup()\n\nif __name__ == "__main__": unittest.main()\n'''
+          new = '''    def test_08_missing_target_instruction_policy_fails_closed(self):\n        temp, source, target, consumer, snapshot = prepared(ROOT)\n        try:\n            (target / ".adwf/consumer-instruction-policy.json").unlink()\n            seal_inventory(target)\n            with self.assertRaisesRegex(ConsumerUpgradeError, "UPGRADE_TARGET_INSTRUCTION_POLICY_INVALID"):\n                self.compat(source, target, consumer, snapshot)\n        finally: temp.cleanup()\n\n    def test_09_resealed_tampered_target_instruction_policy_fails_closed(self):\n        temp, source, target, consumer, snapshot = prepared(ROOT)\n        try:\n            path = target / ".adwf/consumer-instruction-policy.json"\n            policy = json.loads(path.read_text(encoding="utf-8"))\n            policy["router"]["mode"] = "FRAMEWORK_MANAGED"\n            path.write_text(json.dumps(policy, ensure_ascii=False, indent=2) + "\\n", encoding="utf-8")\n            seal_inventory(target)\n            with self.assertRaisesRegex(ConsumerUpgradeError, "UPGRADE_TARGET_INSTRUCTION_POLICY_INVALID"):\n                self.compat(source, target, consumer, snapshot)\n        finally: temp.cleanup()\n\n    def test_10_consumer_invariants_symlink_fails_closed_before_write(self):\n        temp, source, target, consumer, snapshot = prepared(ROOT)\n        try:\n            invariants = consumer / ".adwf-consumer/INVARIANTS.md"\n            invariants.parent.mkdir(parents=True, exist_ok=True)\n            invariants.symlink_to(consumer / "README.md")\n            with self.assertRaisesRegex(ConsumerUpgradeError, "UPGRADE_CONSUMER_INSTRUCTION_SURFACE_INVALID"):\n                self.compat(source, target, consumer, snapshot)\n        finally: temp.cleanup()\n\nif __name__ == "__main__": unittest.main()\n'''
+          if s.count(old) != 1:
+              raise SystemExit('test transform precondition failed')
+          p.write_text(s.replace(old, new, 1), encoding='utf-8')
+          PY
+
+          python .adwf/scripts/docs_freshness.py --write --reviewed-at 2026-08-17T19:13:00Z --valid-until 2026-11-17T19:13:00Z
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          old = json.loads(Path('/tmp/docs-registry-parent.json').read_text(encoding='utf-8'))
+          path = Path('.adwf/docs-registry.json')
+          cur = json.loads(path.read_text(encoding='utf-8'))
+          old_by = {item['path']: item for item in old['documents']}
+          for item in cur['documents']:
+              prev = old_by.get(item['path'])
+              if prev and item.get('source_digest') == prev.get('source_digest'):
+                  item['reviewed_at'] = prev['reviewed_at']
+                  item['valid_until'] = prev['valid_until']
+          path.write_text(json.dumps(cur, ensure_ascii=False, indent=2) + '\n', encoding='utf-8')
+          PY
+          python .adwf/scripts/generate_manifest.py
+
+      - name: Verify exact repair
+        shell: bash
+        run: |
+          set -euo pipefail
+          python .adwf/tests/test_consumer_instructions.py
+          python .adwf/tests/test_consumer_upgrade_core.py
+          python .adwf/tests/test_consumer_instruction_upgrade_transaction.py
+          python .adwf/tests/test_consumer_upgrade_adversarial.py
+          python .adwf/tests/test_consumer_upgrade_transaction_adversarial.py
+          python .adwf/tests/test_consumer_upgrade_connected.py
+          python .adwf/scripts/docs_freshness.py
+          python .adwf/scripts/validate_managed_surface.py
+          python .adwf/scripts/validate_framework.py
+          git diff --check
+          git add -A
+          TREE="$(git write-tree)"
+          printf 'candidate_tree=%s\n' "$TREE"
+          test "$TREE" = "$EXPECTED_TREE"
+
+      - name: CAS publish exact repair
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          AUTH="$(printf 'x-access-token:%s' "$GITHUB_TOKEN" | base64 -w0 | tr -d '\n')"
+          git config --local http.https://github.com/.extraheader "AUTHORIZATION: basic $AUTH"
+          CURRENT="$(git ls-remote origin "refs/heads/${WRITER_BRANCH}" | awk '{print $1}')"
+          printf 'writer_before=%s\n' "$CURRENT"
+          test "$CURRENT" = "$PARENT_SHA"
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          COMMIT="$(printf '%s\n' 'CONSUMER_INSTR-001: validate consumer invariant surface' | git commit-tree "$EXPECTED_TREE" -p "$PARENT_SHA")"
+          printf 'candidate_commit=%s\n' "$COMMIT"
+          git push origin "$COMMIT:refs/heads/$WRITER_BRANCH"
+          AFTER="$(git ls-remote origin "refs/heads/${WRITER_BRANCH}" | awk '{print $1}')"
+          printf 'writer_after=%s\n' "$AFTER"
+          test "$AFTER" = "$COMMIT"
