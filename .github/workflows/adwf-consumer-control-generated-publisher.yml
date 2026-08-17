@@ -1,0 +1,77 @@
+name: ADWF Consumer Control Generated Publisher
+
+on:
+  push:
+    branches:
+      - agent/refresh-consumer-control-001-20260817-b1
+
+permissions:
+  contents: write
+
+jobs:
+  publish:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    env:
+      TARGET_BRANCH: agent/consumer-control-001-native-control-routing-v2
+      EXPECTED_HEAD: daea37c1af3e03afced20c9bb8d61e89d95f7e8e
+      EXACT_BASE: 8e7adc0172bd1730f21efa89086d70405faf38f2
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd
+        with:
+          ref: daea37c1af3e03afced20c9bb8d61e89d95f7e8e
+          fetch-depth: 0
+          persist-credentials: true
+      - uses: actions/setup-python@a309ff8b426b58ec0e2a45f0f869d46889d02405
+        with:
+          python-version: "3.12.4"
+      - name: Verify immutable target and trusted generators
+        shell: bash
+        run: |
+          set -euo pipefail
+          git fetch --no-tags origin "refs/heads/${TARGET_BRANCH}:refs/remotes/origin/${TARGET_BRANCH}"
+          test "$(git rev-parse HEAD)" = "${EXPECTED_HEAD}"
+          test "$(git rev-parse refs/remotes/origin/${TARGET_BRANCH})" = "${EXPECTED_HEAD}"
+          git diff --quiet "${EXACT_BASE}" "${EXPECTED_HEAD}" -- .adwf/scripts/docs_freshness.py .adwf/scripts/generate_manifest.py
+      - name: Generate exact projections
+        shell: bash
+        run: |
+          set -euo pipefail
+          python .adwf/scripts/docs_freshness.py --write --reviewed-at 2026-08-17T07:24:00Z --valid-until 2026-11-17T07:24:00Z
+          python .adwf/scripts/generate_manifest.py
+          mapfile -t changed < <(git status --porcelain | sed 's/^...//' | sort)
+          expected=(.adwf/docs-registry.json MANIFEST.json SHA256SUMS.txt)
+          test "${#changed[@]}" -eq 3
+          for i in "${!expected[@]}"; do test "${changed[$i]}" = "${expected[$i]}"; done
+      - name: Framework and docs validation
+        shell: bash
+        run: |
+          set -euo pipefail
+          python .adwf/scripts/validate_framework.py
+          python .adwf/scripts/validate_docs.py
+          python .adwf/scripts/generate_manifest.py --check
+      - name: Package and config health
+        shell: bash
+        run: |
+          set -euo pipefail
+          python .adwf/adwf.py doctor --scope package_integrity
+          python .adwf/adwf.py doctor --scope config_health
+      - name: Full ADWF self-test
+        shell: bash
+        run: |
+          set -euo pipefail
+          python .adwf/adwf.py self-test
+      - name: Publish generated-only commit
+        shell: bash
+        run: |
+          set -euo pipefail
+          mapfile -t changed < <(git status --porcelain | sed 's/^...//' | sort)
+          expected=(.adwf/docs-registry.json MANIFEST.json SHA256SUMS.txt)
+          test "${#changed[@]}" -eq 3
+          for i in "${!expected[@]}"; do test "${changed[$i]}" = "${expected[$i]}"; done
+          git add .adwf/docs-registry.json MANIFEST.json SHA256SUMS.txt
+          git diff --cached --check
+          git config user.name "adwf-generated-refresh"
+          git config user.email "adwf-generated-refresh@users.noreply.github.com"
+          git commit -m "CONSUMER_CONTROL-001: refresh generated integrity projections"
+          git push origin "HEAD:refs/heads/${TARGET_BRANCH}"
