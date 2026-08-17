@@ -1,6 +1,4 @@
-# Hybrid publisher: reserved workflow files are staged by the GitHub connector;
-# this job applies the checksum-bound remainder and proves the exact final tree.
-name: ADWF Candidate Publisher CONSUMER_ROUTE-001
+name: ADWF Candidate Refresh CONSUMER_ROUTE-001
 
 on:
   push:
@@ -11,67 +9,52 @@ permissions:
   contents: write
 
 jobs:
-  publish-exact-tree:
+  refresh-exact-tree:
     runs-on: ubuntu-24.04
     timeout-minutes: 10
     env:
-      TARGET_STAGE_SHA: e806b7acae2961242822d2a2c0167839d97aa5a0
+      TARGET_SHA: c32d001e919461c83b0917ad0c6638de646ec197
       TARGET_BRANCH: agent/consumer-route-001-native-gate-routing
-      EXPECTED_PAYLOAD_SHA256: b4842932bd7591d24974070fae69ffda95240a9390e82f18e71c88306830db9b
-      EXPECTED_PATCH_SHA256: 6e6947f6f2183fa031290c340e1ed0102b3654aa73df489768797e603195ee2c
-      EXPECTED_TREE: 550d4eba179cffc6c80239633545eb7068bd0e78
+      EXPECTED_TREE: c1dc5fffb6854a63b413fedc204d1c1ac2d52a57
+      AGENTS_SOURCE_DIGEST: 92623d71694c708481056dc705757d2feb3f97eb7a5aff67513e826e66aea0a8
     steps:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd
         with:
           fetch-depth: 0
           persist-credentials: true
 
-      - name: Verify transport payload
-        shell: bash
-        run: |
-          set -euo pipefail
-          cat \
-            .candidate-transport/consumer-route-001/part-00 \
-            .candidate-transport/consumer-route-001/part-01 \
-            .candidate-transport/consumer-route-001/part-02 \
-            > /tmp/candidate.patch.b64
-          echo "${EXPECTED_PAYLOAD_SHA256}  /tmp/candidate.patch.b64" | sha256sum -c -
-          base64 --decode /tmp/candidate.patch.b64 | gzip -dc > /tmp/candidate.patch
-          echo "${EXPECTED_PATCH_SHA256}  /tmp/candidate.patch" | sha256sum -c -
-
-      - name: Verify reserved workflow stage
+      - name: Verify target exact HEAD
         shell: bash
         run: |
           set -euo pipefail
           git fetch --no-tags origin "refs/heads/${TARGET_BRANCH}:refs/remotes/origin/${TARGET_BRANCH}"
-          ACTUAL_TARGET="$(git rev-parse refs/remotes/origin/${TARGET_BRANCH})"
-          echo "target_sha=${ACTUAL_TARGET}"
-          test "${ACTUAL_TARGET}" = "${TARGET_STAGE_SHA}"
-
-      - name: Prepare exact staged checkout
-        shell: bash
-        run: |
-          set -euo pipefail
-          git reset --hard "${TARGET_STAGE_SHA}"
-          test "$(git rev-parse HEAD)" = "${TARGET_STAGE_SHA}"
+          test "$(git rev-parse refs/remotes/origin/${TARGET_BRANCH})" = "${TARGET_SHA}"
+          git reset --hard "${TARGET_SHA}"
           git clean -fdx
 
-      - name: Apply checksum-bound non-workflow remainder
+      - name: Refresh canonical docs freshness binding
         shell: bash
         run: |
           set -euo pipefail
-          git apply --check \
-            --exclude=.github/workflows/adwf-main.yml \
-            --exclude=.github/workflows/adwf-pr.yml \
-            /tmp/candidate.patch
-          git apply \
-            --exclude=.github/workflows/adwf-main.yml \
-            --exclude=.github/workflows/adwf-pr.yml \
-            /tmp/candidate.patch
-          git add -A
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          path = Path('.adwf/docs-registry.json')
+          value = json.loads(path.read_text(encoding='utf-8'))
+          matches = [item for item in value['documents'] if item.get('path') == 'AGENTS.md']
+          if len(matches) != 1:
+              raise SystemExit('AGENTS_DOC_REGISTRY_BINDING_AMBIGUOUS')
+          matches[0]['source_digest'] = '92623d71694c708481056dc705757d2feb3f97eb7a5aff67513e826e66aea0a8'
+          path.write_text(json.dumps(value, ensure_ascii=False, indent=2) + '\n', encoding='utf-8')
+          PY
+          python .adwf/scripts/generate_manifest.py
+          python .adwf/scripts/docs_freshness.py
+          python .adwf/scripts/generate_manifest.py --check
+          python .adwf/scripts/validate_framework.py
+          git add .adwf/docs-registry.json SHA256SUMS.txt
           git diff --cached --check
 
-      - name: Verify exact candidate tree
+      - name: Verify exact refreshed tree
         shell: bash
         run: |
           set -euo pipefail
@@ -79,12 +62,12 @@ jobs:
           echo "candidate_tree=${ACTUAL_TREE}"
           test "${ACTUAL_TREE}" = "${EXPECTED_TREE}"
 
-      - name: Commit and publish exact candidate
+      - name: Commit and publish refresh
         shell: bash
         run: |
           set -euo pipefail
           git config user.name "adwf-candidate-publisher"
           git config user.email "adwf-candidate-publisher@users.noreply.github.com"
-          git commit -m "CONSUMER_ROUTE-001: route consumer CI to native gates"
+          git commit -m "CONSUMER_ROUTE-001: refresh docs freshness binding"
           test "$(git rev-parse HEAD^{tree})" = "${EXPECTED_TREE}"
           git push origin "HEAD:refs/heads/${TARGET_BRANCH}"
