@@ -18,7 +18,7 @@ def runtime_state(*, revision=1):
     return {
         'schema_version': 1,
         'run_id': 'run-12345678',
-        'roadmap_id': 'SESSION-PERSIST-001',
+        'roadmap_id': 'SESSION_PERSIST-001',
         'issue_id': '145',
         'risk': 'R1',
         'work_type': 'feature',
@@ -48,10 +48,10 @@ def runtime_state(*, revision=1):
 
 def checkpoint(*, main_sha=MAIN, head_sha=HEAD, revision=0):
     return build_checkpoint(
-        checkpoint_id='SESSION-PERSIST-001:0001',
+        checkpoint_id='SESSION_PERSIST-001:0001',
         checkpoint_revision=revision,
         project_identity='kmephis-ai/AI-Development-Framework',
-        roadmap_id='SESSION-PERSIST-001',
+        roadmap_id='SESSION_PERSIST-001',
         issue_id='145',
         main_sha=main_sha,
         pr_number=146,
