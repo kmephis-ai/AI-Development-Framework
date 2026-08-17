@@ -1,0 +1,82 @@
+name: Run CONSUMER_PROV-001 materializer
+
+on:
+  push:
+    branches:
+      - agent/materialize-CONSUMER_PROV-001-20260817-a
+
+permissions:
+  contents: write
+
+env:
+  BASE_SHA: 9b7a6d897ef6c52b83cbab198e6582eeb908b310
+  EXPECTED_TREE: c524cf2181d9dcc86a6a25c35cae7b8a696b0d60
+  WRITER_BRANCH: agent/CONSUMER_PROV-001-durable-upgrade-rebind
+
+jobs:
+  materialize:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd
+        with:
+          fetch-depth: 0
+          persist-credentials: true
+
+      - name: Extract sealed candidate patch from transport definition
+        shell: bash
+        run: |
+          set -euo pipefail
+          source_file=.github/workflows/materialize-consumer-prov-001.yml
+          test -f "$source_file"
+          awk 'found { sub(/^    /, ""); printf "%s", $0 } /^  PATCH_B64: >-$/ { found=1 }' "$source_file" > /tmp/consumer-prov.patch.b64
+          test -s /tmp/consumer-prov.patch.b64
+          base64 -d /tmp/consumer-prov.patch.b64 | gzip -dc > /tmp/consumer-prov.patch
+          test -s /tmp/consumer-prov.patch
+
+      - name: Verify exact writer base and apply exact candidate
+        shell: bash
+        run: |
+          set -euo pipefail
+          git checkout --detach "${BASE_SHA}"
+          test "$(git rev-parse HEAD)" = "${BASE_SHA}"
+          remote_sha="$(git ls-remote origin "refs/heads/${WRITER_BRANCH}" | awk '{print $1}')"
+          test "${remote_sha}" = "${BASE_SHA}"
+          git apply --check /tmp/consumer-prov.patch
+          git apply --index /tmp/consumer-prov.patch
+          actual_tree="$(git write-tree)"
+          test "${actual_tree}" = "${EXPECTED_TREE}"
+
+      - name: Verify candidate
+        shell: bash
+        run: |
+          set -euo pipefail
+          python -m py_compile .adwf/lib/consumer_upgrade_transaction.py .adwf/tests/consumer_upgrade_fixture.py .adwf/tests/test_consumer_upgrade_transaction.py
+          python .adwf/tests/test_consumer_upgrade_core.py
+          python .adwf/tests/test_consumer_upgrade_adversarial.py
+          python .adwf/tests/test_consumer_upgrade_transaction.py
+          python .adwf/tests/test_consumer_upgrade_transaction_adversarial.py
+          python .adwf/tests/test_consumer_installation.py
+          PYTHONPATH=.adwf:.adwf/tests python .adwf/tests/test_external_consumer_upgrade_proof.py
+          python .adwf/scripts/docs_freshness.py
+          python .adwf/scripts/generate_manifest.py --check
+          python .adwf/scripts/validate_framework.py
+          python .adwf/adwf.py self-test
+
+      - name: Commit and publish exact writer candidate
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git write-tree)" = "${EXPECTED_TREE}"
+          remote_sha="$(git ls-remote origin "refs/heads/${WRITER_BRANCH}" | awk '{print $1}')"
+          test "${remote_sha}" = "${BASE_SHA}"
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git commit -m "fix(consumer): rebind durable installation proof for fresh-session upgrade"
+          candidate_sha="$(git rev-parse HEAD)"
+          test "$(git rev-parse HEAD^{tree})" = "${EXPECTED_TREE}"
+          git push origin "HEAD:refs/heads/${WRITER_BRANCH}"
+          {
+            echo "candidate_sha=${candidate_sha}"
+            echo "candidate_tree=${EXPECTED_TREE}"
+          } >> "$GITHUB_STEP_SUMMARY"
