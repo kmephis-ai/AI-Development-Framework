@@ -1,0 +1,153 @@
+name: ADWF CONSUMER_PROJ-001 Rebase Publisher
+
+on:
+  push:
+    branches:
+      - agent/local-publisher-CONSUMER_PROJ-001-rebase-20260817-d
+
+permissions:
+  contents: write
+
+env:
+  WRITER_BRANCH: agent/CONSUMER_PROJ-001-connected-upgrade-proof
+  EXPECTED_WRITER_SHA: 9028935f99155303347322099509804188073a58
+  EXPECTED_BASE_SHA: ea0491fdd1399a804728167c7ef44a498b3635e1
+  EXPECTED_TREE_SHA: fc6fdc224624aaee0630f4cdb1ac390326d50087
+  DOC_REVIEWED_AT: 2026-08-17T16:56:51Z
+  DOC_VALID_UNTIL: 2026-11-17T16:56:51Z
+
+jobs:
+  publish:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd
+        with:
+          ref: ${{ env.EXPECTED_BASE_SHA }}
+          fetch-depth: 0
+          persist-credentials: true
+
+      - name: Verify exact anchors and materialize unchanged feature effect
+        shell: bash
+        run: |
+          set -euo pipefail
+          remote_main="$(git ls-remote origin refs/heads/main | awk '{print $1}')"
+          remote_writer="$(git ls-remote origin "refs/heads/${WRITER_BRANCH}" | awk '{print $1}')"
+          test "${remote_main}" = "${EXPECTED_BASE_SHA}"
+          test "${remote_writer}" = "${EXPECTED_WRITER_SHA}"
+          git fetch origin "refs/heads/${WRITER_BRANCH}:refs/remotes/origin/adwf-writer"
+          git cat-file -e "${EXPECTED_WRITER_SHA}^{commit}"
+          git cat-file -e "${EXPECTED_BASE_SHA}^{commit}"
+          git checkout --detach "${EXPECTED_BASE_SHA}"
+          for p in \
+            .adwf/capability-traceability.json \
+            .adwf/lib/consumer_installation.py \
+            .adwf/lib/consumer_upgrade_projection.py \
+            .adwf/lib/consumer_upgrade_transaction.py \
+            .adwf/scripts/apply_consumer_upgrade.py \
+            .adwf/tests/consumer_upgrade_fixture.py \
+            .adwf/tests/test_consumer_upgrade_connected.py \
+            docs/governance/CONSUMER_FRAMEWORK_UPGRADE_TRANSACTION.md \
+            docs/governance/CONSUMER_INSTALLATION_RECORD.md; do
+            git checkout "${EXPECTED_WRITER_SHA}" -- "$p"
+          done
+          python .adwf/scripts/docs_freshness.py --write --reviewed-at "${DOC_REVIEWED_AT}" --valid-until "${DOC_VALID_UNTIL}"
+          python .adwf/scripts/generate_manifest.py
+          cat > /tmp/expected-files <<'EOF'
+          .adwf/capability-traceability.json
+          .adwf/docs-registry.json
+          .adwf/lib/consumer_installation.py
+          .adwf/lib/consumer_upgrade_projection.py
+          .adwf/lib/consumer_upgrade_transaction.py
+          .adwf/scripts/apply_consumer_upgrade.py
+          .adwf/tests/consumer_upgrade_fixture.py
+          .adwf/tests/test_consumer_upgrade_connected.py
+          MANIFEST.json
+          SHA256SUMS.txt
+          docs/governance/CONSUMER_FRAMEWORK_UPGRADE_TRANSACTION.md
+          docs/governance/CONSUMER_INSTALLATION_RECORD.md
+          EOF
+          git diff --name-only "${EXPECTED_BASE_SHA}" | sort > /tmp/actual-files
+          sort -o /tmp/expected-files /tmp/expected-files
+          diff -u /tmp/expected-files /tmp/actual-files
+          git add -- $(cat /tmp/expected-files)
+          tree_sha="$(git write-tree)"
+          test "${tree_sha}" = "${EXPECTED_TREE_SHA}"
+          git diff --check "${EXPECTED_BASE_SHA}"
+          git config user.name 'ADWF Provider Materializer'
+          git config user.email 'adwf-materializer@example.invalid'
+          candidate_sha="$(printf '%s\n' 'CONSUMER_PROJ-001: exact-main rematerialized candidate' | git commit-tree "${tree_sha}" -p "${EXPECTED_BASE_SHA}")"
+          echo "CANDIDATE_SHA=${candidate_sha}" >> "$GITHUB_ENV"
+          git checkout --detach "${candidate_sha}"
+          test "$(git rev-parse HEAD^{tree})" = "${EXPECTED_TREE_SHA}"
+
+      - name: Verify current BASE authorization classification
+        shell: bash
+        run: |
+          set -euo pipefail
+          export PYTHONPATH="$PWD/.adwf"
+          python - <<'PY'
+          import json, os
+          from lib.trust import classify_git_diff
+          value = classify_git_diff('.', os.environ['EXPECTED_BASE_SHA'], os.environ['CANDIDATE_SHA'])
+          print(json.dumps(value, ensure_ascii=False, sort_keys=True))
+          assert value['result'] == 'ALLOW', value
+          assert value['authorization_mode'] == 'STANDING_OWNER_POLICY', value
+          assert value['human_required'] is False, value
+          assert value['feature_files'] == [], value
+          assert value['manual_required_files'] == [], value
+          assert value['inspection_unverified_files'] == [], value
+          assert value['weakening'] == [], value
+          assert value['standing_policy']['valid'] is True, value
+          assert value['standing_policy']['status'] == 'ACTIVE', value
+          assert value['standing_policy']['revision'] == 1, value
+          PY
+
+      - name: Focused regression and canonical checks
+        shell: bash
+        run: |
+          set -euo pipefail
+          export PYTHONPATH="$PWD/.adwf:$PWD/.adwf/tests"
+          for p in \
+            test_consumer_installation.py \
+            test_consumer_upgrade_core.py \
+            test_consumer_upgrade_adversarial.py \
+            test_consumer_upgrade_transaction.py \
+            test_consumer_upgrade_transaction_adversarial.py \
+            test_external_consumer_upgrade_proof.py \
+            test_consumer_upgrade_connected.py; do
+            python -m unittest discover -s .adwf/tests -p "$p"
+          done
+          python .adwf/scripts/validate_capabilities.py
+          python .adwf/scripts/docs_freshness.py
+          python .adwf/scripts/generate_manifest.py --check
+          python .adwf/scripts/validate_managed_surface.py
+          python .adwf/scripts/validate_docs.py
+          python .adwf/scripts/validate_pipeline_ir.py
+          python .adwf/scripts/validate_ci.py
+          python .adwf/adwf.py doctor --scope package_integrity --json > /tmp/package.json
+          python - <<'PY'
+          import json
+          value=json.load(open('/tmp/package.json'))
+          assert value['categories']['package_integrity']['status']=='VERIFIED', value
+          assert value['categories']['config_health']['status']=='VERIFIED', value
+          PY
+          python .adwf/adwf.py self-test
+
+      - name: Create exact fast-forward merge-style writer commit and publish CAS
+        shell: bash
+        run: |
+          set -euo pipefail
+          tree_sha="$(git rev-parse HEAD^{tree})"
+          test "${tree_sha}" = "${EXPECTED_TREE_SHA}"
+          merge_sha="$(printf '%s\n' 'CONSUMER_PROJ-001: rebase portable durable upgrade proof' | git commit-tree "${tree_sha}" -p "${EXPECTED_WRITER_SHA}" -p "${EXPECTED_BASE_SHA}")"
+          test "$(git rev-parse "${merge_sha}^{tree}")" = "${EXPECTED_TREE_SHA}"
+          test "$(git rev-parse "${merge_sha}^1")" = "${EXPECTED_WRITER_SHA}"
+          test "$(git rev-parse "${merge_sha}^2")" = "${EXPECTED_BASE_SHA}"
+          test "$(git merge-base "${EXPECTED_BASE_SHA}" "${merge_sha}")" = "${EXPECTED_BASE_SHA}"
+          remote_main="$(git ls-remote origin refs/heads/main | awk '{print $1}')"
+          remote_writer="$(git ls-remote origin "refs/heads/${WRITER_BRANCH}" | awk '{print $1}')"
+          test "${remote_main}" = "${EXPECTED_BASE_SHA}"
+          test "${remote_writer}" = "${EXPECTED_WRITER_SHA}"
+          git push origin "${merge_sha}:refs/heads/${WRITER_BRANCH}"
+          echo "MERGE_STYLE_WRITER_SHA=${merge_sha}" >> "$GITHUB_ENV"
