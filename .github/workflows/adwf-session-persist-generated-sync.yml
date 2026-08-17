@@ -1,0 +1,67 @@
+name: ADWF Session Persist Generated Sync
+
+on:
+  push:
+    branches:
+      - agent/generated-sync-session-persist-001-20260818-a1
+
+permissions:
+  contents: write
+
+env:
+  WRITER_BRANCH: agent/SESSION-PERSIST-001-runtime-ledger-continuity
+  WRITER_SHA: e9c723a6fe8b4ea282a54ca75ce4174dae862cc7
+
+jobs:
+  sync-generated:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd
+        with:
+          ref: ${{ env.WRITER_BRANCH }}
+          fetch-depth: 0
+          persist-credentials: true
+
+      - uses: actions/setup-python@a309ff8b426b58ec0e2a45f0f869d46889d02405
+        with:
+          python-version: "3.12.10"
+
+      - name: Verify exact writer inputs
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "${WRITER_SHA}"
+          test "$(git hash-object .adwf/lib/github_runtime_store.py)" = "bb95f618fee3a983297b2806ded73dc1f705195f"
+          test "$(git hash-object .adwf/lib/session_continuity.py)" = "1d0f7ff4e82b2186b1636c8023ee4db3c9494beb"
+          test "$(git hash-object .adwf/scripts/github_runtime_sync.py)" = "70ecff254b90cca02710e04c916e6504ccafbae3"
+          test "$(git hash-object .adwf/tests/test_session_continuity_persistence.py)" = "eb08c1c6fd160d96be129557825507b5607cd8c8"
+          test "$(git hash-object .adwf/docs-registry.json)" = "4517f817d306f8f1993ef16d454a05ff23c921f9"
+
+      - name: Regenerate canonical projections
+        shell: bash
+        env:
+          PYTHONDONTWRITEBYTECODE: "1"
+        run: |
+          set -euo pipefail
+          python .adwf/scripts/docs_freshness.py --write --reviewed-at 2026-08-17T21:21:00Z --valid-until 2026-11-17T21:21:00Z
+          python .adwf/scripts/generate_manifest.py
+          test "$(git hash-object .adwf/docs-registry.json)" = "4517f817d306f8f1993ef16d454a05ff23c921f9"
+          test "$(git hash-object MANIFEST.json)" = "9afceba1fbd92ca825764713a498fe15255dd28b"
+          test "$(git hash-object SHA256SUMS.txt)" = "271dd74f0876798a8657109d84a9e4b78952e91d"
+          python .adwf/scripts/generate_manifest.py --check
+          python .adwf/scripts/docs_freshness.py
+
+      - name: Fast-forward generated projections to writer branch
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name "adwf-generated-sync"
+          git config user.email "adwf-generated-sync@users.noreply.github.com"
+          git add .adwf/docs-registry.json MANIFEST.json SHA256SUMS.txt
+          if git diff --cached --quiet; then
+            echo "Generated projections already current."
+            exit 0
+          fi
+          git commit -m "[SESSION-PERSIST-001] Materialize canonical generated projections"
+          git push origin "HEAD:refs/heads/${WRITER_BRANCH}"
