@@ -1,0 +1,42 @@
+name: CONSUMER_CONTROL-001 Materialize v2
+
+on:
+  push:
+    branches:
+      - agent/consumer-control-001-materializer-v2-20260817
+
+permissions:
+  contents: write
+
+jobs:
+  materialize:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - name: Checkout transport
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd
+        with:
+          path: transport
+          persist-credentials: false
+          fetch-depth: 1
+      - name: Checkout writer
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd
+        with:
+          ref: agent/consumer-control-001-native-control-routing
+          path: target
+          persist-credentials: true
+          fetch-depth: 0
+      - name: Apply bounded non-workflow candidate
+        shell: bash
+        run: |
+          set -euo pipefail
+          [[ "$(git -C target merge-base HEAD f17a49a22b9608297e96977e0af7f4cb0c573fc7)" == "f17a49a22b9608297e96977e0af7f4cb0c573fc7" ]]
+          rm -f target/.adwf/work-in-progress/CONSUMER_CONTROL-001.md
+          rm -f target/docs/governance/CONSUMER_CONTROL_ROUTING.md
+          base64 -d transport/.adwf/consumer-control-001.patch.b64 | gzip -d > /tmp/candidate.patch
+          git -C target apply /tmp/candidate.patch
+          git -C target config user.name 'adwf-candidate-publisher'
+          git -C target config user.email 'adwf-candidate-publisher@users.noreply.github.com'
+          git -C target add -A
+          git -C target commit -m 'CONSUMER_CONTROL-001: route trusted control by consumer mode'
+          git -C target push origin HEAD:agent/consumer-control-001-native-control-routing
