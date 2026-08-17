@@ -13,6 +13,8 @@ env:
   EXPECTED_TREE: ce7ccc7bffb1b6f82edff6ae5de89c622ededbc9
   PATCH_SHA256: 24fb148c11a6cc525e0d97d792eb93778e823933a83c8ce7fc18ff8fb9f582a3
   FEATURE_BRANCH: agent/consumer-install-001-durable-install-record
+  WORK: /tmp/consumer-install-001-work
+  PATCH: /tmp/consumer-install-001.patch
 
 jobs:
   materialize:
@@ -24,24 +26,41 @@ jobs:
           fetch-depth: 0
           persist-credentials: true
 
-      - name: Reconstruct exact candidate and verify
+      - name: Verify exact base
         shell: bash
         run: |
           set -euo pipefail
           git fetch origin main --no-tags
+          echo "main=$(git rev-parse origin/main)"
           test "$(git rev-parse origin/main)" = "${BASE_SHA}"
           test "$(git cat-file -t ${BASE_SHA})" = commit
 
-          cat .transport/consumer-install-001/part-* | base64 -d | gzip -d > /tmp/consumer-install-001.patch
-          echo "${PATCH_SHA256}  /tmp/consumer-install-001.patch" | sha256sum -c -
+      - name: Verify patch transport
+        shell: bash
+        run: |
+          set -euo pipefail
+          ls -l .transport/consumer-install-001/part-*
+          cat .transport/consumer-install-001/part-* | base64 -d | gzip -d > "${PATCH}"
+          sha256sum "${PATCH}"
+          echo "${PATCH_SHA256}  ${PATCH}" | sha256sum -c -
 
-          rm -rf /tmp/consumer-install-001-work
-          git worktree add --detach /tmp/consumer-install-001-work "${BASE_SHA}"
-          cd /tmp/consumer-install-001-work
+      - name: Apply exact candidate
+        shell: bash
+        run: |
+          set -euo pipefail
+          rm -rf "${WORK}"
+          git worktree add --detach "${WORK}" "${BASE_SHA}"
+          cd "${WORK}"
+          git apply --check "${PATCH}"
+          git apply --index "${PATCH}"
+          echo "tree=$(git write-tree)"
+          test "$(git write-tree)" = "${EXPECTED_TREE}"
 
-          git apply --check /tmp/consumer-install-001.patch
-          git apply --index /tmp/consumer-install-001.patch
-
+      - name: Focused and canonical validation
+        shell: bash
+        run: |
+          set -euo pipefail
+          cd "${WORK}"
           python -m unittest .adwf.tests.test_consumer_installation
           python -m unittest discover -s .adwf/tests -p 'test_consumer*.py'
           python .adwf/scripts/validate_capabilities.py
@@ -49,20 +68,30 @@ jobs:
           python .adwf/scripts/docs_freshness.py
           python .adwf/scripts/generate_manifest.py --check
           python .adwf/scripts/validate_framework.py
+
+      - name: Authoritative full self-test
+        shell: bash
+        run: |
+          set -euo pipefail
+          cd "${WORK}"
           python .adwf/adwf.py self-test
 
-          ACTUAL_TREE="$(git write-tree)"
-          test "${ACTUAL_TREE}" = "${EXPECTED_TREE}"
-
+      - name: Atomic feature publication
+        shell: bash
+        run: |
+          set -euo pipefail
+          cd "${WORK}"
+          test "$(git write-tree)" = "${EXPECTED_TREE}"
           git config user.name github-actions[bot]
           git config user.email 41898282+github-actions[bot]@users.noreply.github.com
           git commit -m 'CONSUMER_INSTALL-001: durable installation provenance'
           test "$(git rev-parse HEAD^)" = "${BASE_SHA}"
           test "$(git rev-parse HEAD^{tree})" = "${EXPECTED_TREE}"
-
           if git ls-remote --exit-code --heads origin "refs/heads/${FEATURE_BRANCH}" >/tmp/existing-ref 2>/dev/null; then
             echo 'Feature branch already exists; refusing to overwrite.' >&2
+            cat /tmp/existing-ref >&2
             exit 1
           fi
+          git fetch origin main --no-tags
           test "$(git rev-parse origin/main)" = "${BASE_SHA}"
           git push origin "HEAD:refs/heads/${FEATURE_BRANCH}"
