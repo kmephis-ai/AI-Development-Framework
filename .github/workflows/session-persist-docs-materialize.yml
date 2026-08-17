@@ -1,0 +1,64 @@
+name: SESSION Persist Docs Materialize
+
+on:
+  push:
+    branches:
+      - agent/materialize-session-persist-001-docs-20260818-b1
+
+permissions:
+  contents: write
+
+env:
+  SOURCE_SHA: cc91390cc45d20641f4ad0a974352eb2a021ebe1
+
+jobs:
+  materialize:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd
+        with:
+          fetch-depth: 0
+
+      - uses: actions/setup-python@a309ff8b426b58ec0e2a45f0f869d46889d02405
+        with:
+          python-version: '3.12.10'
+
+      - name: Materialize canonical projections from exact candidate
+        shell: bash
+        run: |
+          set -euo pipefail
+          git cat-file -e "${SOURCE_SHA}^{commit}"
+          rm .github/workflows/session-persist-docs-materialize.yml
+          python - <<'PY' > /tmp/doc-dates
+          import json
+          from pathlib import Path
+          data=json.loads(Path('.adwf/docs-registry.json').read_text(encoding='utf-8'))
+          reviewed={item['reviewed_at'] for item in data['documents']}
+          valid={item['valid_until'] for item in data['documents']}
+          if len(reviewed) != 1 or len(valid) != 1:
+              raise SystemExit('DOC_REVIEW_WINDOW_AMBIGUOUS')
+          print(next(iter(reviewed)))
+          print(next(iter(valid)))
+          PY
+          REVIEWED_AT="$(sed -n '1p' /tmp/doc-dates)"
+          VALID_UNTIL="$(sed -n '2p' /tmp/doc-dates)"
+          python .adwf/scripts/docs_freshness.py --write --reviewed-at "${REVIEWED_AT}" --valid-until "${VALID_UNTIL}"
+          python .adwf/scripts/generate_manifest.py
+          python .adwf/scripts/docs_freshness.py
+          python .adwf/scripts/validate_docs.py
+          python .adwf/scripts/validate_managed_surface.py
+          python .adwf/scripts/validate_framework.py
+          git diff --check "${SOURCE_SHA}"
+          ACTUAL="$(git diff --name-only "${SOURCE_SHA}" | sort)"
+          EXPECTED="$(printf '%s\n' '.adwf/docs-registry.json' 'MANIFEST.json' 'SHA256SUMS.txt' | sort)"
+          if [ "${ACTUAL}" != "${EXPECTED}" ]; then
+            echo 'Unexpected generated path set:' >&2
+            printf '%s\n' "${ACTUAL}" >&2
+            exit 1
+          fi
+          git config user.name 'adwf-session-persist-materializer'
+          git config user.email 'adwf-session-persist-materializer@users.noreply.github.com'
+          git add -A
+          git commit -m '[SESSION_PERSIST-001] Refresh canonical docs projections'
+          git push origin "HEAD:${GITHUB_REF_NAME}"
