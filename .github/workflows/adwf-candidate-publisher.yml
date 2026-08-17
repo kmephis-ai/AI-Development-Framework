@@ -1,3 +1,4 @@
+# Retry after writer branch reset to exact BASE.
 name: ADWF Candidate Publisher CONSUMER_ROUTE-001
 
 on:
