@@ -12,52 +12,73 @@ jobs:
   publish-exact-tree:
     runs-on: ubuntu-24.04
     timeout-minutes: 10
+    env:
+      BASE_SHA: ad52ebf201e224ccb4f0f1c614da763f6965bd75
+      TARGET_BRANCH: agent/consumer-route-001-native-gate-routing
+      EXPECTED_PAYLOAD_SHA256: b4842932bd7591d24974070fae69ffda95240a9390e82f18e71c88306830db9b
+      EXPECTED_PATCH_SHA256: 6e6947f6f2183fa031290c340e1ed0102b3654aa73df489768797e603195ee2c
+      EXPECTED_TREE: 550d4eba179cffc6c80239633545eb7068bd0e78
     steps:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd
         with:
           fetch-depth: 0
           persist-credentials: true
 
-      - name: Reconstruct and verify candidate patch
+      - name: Verify transport payload
         shell: bash
-        env:
-          BASE_SHA: ad52ebf201e224ccb4f0f1c614da763f6965bd75
-          TARGET_BRANCH: agent/consumer-route-001-native-gate-routing
-          EXPECTED_PAYLOAD_SHA256: b4842932bd7591d24974070fae69ffda95240a9390e82f18e71c88306830db9b
-          EXPECTED_PATCH_SHA256: 6e6947f6f2183fa031290c340e1ed0102b3654aa73df489768797e603195ee2c
-          EXPECTED_TREE: 550d4eba179cffc6c80239633545eb7068bd0e78
         run: |
           set -euo pipefail
-
           cat \
             .candidate-transport/consumer-route-001/part-00 \
             .candidate-transport/consumer-route-001/part-01 \
             .candidate-transport/consumer-route-001/part-02 \
             > /tmp/candidate.patch.b64
-
           echo "${EXPECTED_PAYLOAD_SHA256}  /tmp/candidate.patch.b64" | sha256sum -c -
           base64 --decode /tmp/candidate.patch.b64 | gzip -dc > /tmp/candidate.patch
           echo "${EXPECTED_PATCH_SHA256}  /tmp/candidate.patch" | sha256sum -c -
 
+      - name: Verify target writer remains exact BASE
+        shell: bash
+        run: |
+          set -euo pipefail
           git fetch --no-tags origin "refs/heads/${TARGET_BRANCH}:refs/remotes/origin/${TARGET_BRANCH}"
-          test "$(git rev-parse refs/remotes/origin/${TARGET_BRANCH})" = "${BASE_SHA}"
+          ACTUAL_TARGET="$(git rev-parse refs/remotes/origin/${TARGET_BRANCH})"
+          echo "target_sha=${ACTUAL_TARGET}"
+          test "${ACTUAL_TARGET}" = "${BASE_SHA}"
 
+      - name: Prepare exact BASE checkout
+        shell: bash
+        run: |
+          set -euo pipefail
           git reset --hard "${BASE_SHA}"
-          test "$(git rev-parse HEAD)" = "${BASE_SHA}"
+          ACTUAL_HEAD="$(git rev-parse HEAD)"
+          echo "base_head=${ACTUAL_HEAD}"
+          test "${ACTUAL_HEAD}" = "${BASE_SHA}"
           git clean -fdx
 
+      - name: Apply candidate patch
+        shell: bash
+        run: |
+          set -euo pipefail
           git apply --check /tmp/candidate.patch
           git apply /tmp/candidate.patch
           git add -A
           git diff --cached --check
 
+      - name: Verify exact candidate tree
+        shell: bash
+        run: |
+          set -euo pipefail
           ACTUAL_TREE="$(git write-tree)"
           echo "candidate_tree=${ACTUAL_TREE}"
           test "${ACTUAL_TREE}" = "${EXPECTED_TREE}"
 
+      - name: Commit and publish exact candidate
+        shell: bash
+        run: |
+          set -euo pipefail
           git config user.name "adwf-candidate-publisher"
           git config user.email "adwf-candidate-publisher@users.noreply.github.com"
           git commit -m "CONSUMER_ROUTE-001: route consumer CI to native gates"
           test "$(git rev-parse HEAD^{tree})" = "${EXPECTED_TREE}"
-
           git push origin "HEAD:refs/heads/${TARGET_BRANCH}"
