@@ -1,0 +1,100 @@
+name: ADWF GOV-026 Current-Main Materializer
+
+on:
+  push:
+    branches:
+      - agent/materializer-GOV-026-20260817-b
+
+permissions:
+  contents: write
+
+env:
+  MAIN_SHA: 6ce5ed328577c7a1c64127732321cb1d634acd8a
+  EXPECTED_TREE: 7b41e4f18fa30e9184d0ebbc4c25ad7cd52bdc8c
+  PATCH_SHA256: ae717bd16f450aa94ff4c906f6a7a1a3713a65f4059f980d461475e2c8a4de77
+  TARGET_BRANCH: agent/GOV-026-bounded-recent-actions
+  PATCH_GZ_B64: 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
+
+jobs:
+  materialize:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd
+        with:
+          ref: ${{ env.MAIN_SHA }}
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Verify exact main and apply certified patch
+        shell: bash
+        run: |
+          set -euo pipefail
+          git fetch --no-tags origin "+refs/heads/main:refs/remotes/origin/main"
+          test "$(git rev-parse refs/remotes/origin/main)" = "$MAIN_SHA"
+          printf '%s' "$PATCH_GZ_B64" | base64 -d | gzip -d > "$RUNNER_TEMP/gov026.patch"
+          test "$(sha256sum "$RUNNER_TEMP/gov026.patch" | awk '{print $1}')" = "$PATCH_SHA256"
+          git apply --check "$RUNNER_TEMP/gov026.patch"
+          git apply "$RUNNER_TEMP/gov026.patch"
+          mapfile -t changed < <(git diff --name-only | LC_ALL=C sort)
+          expected=(.adwf/docs-registry.json .adwf/lib/github_provider.py .adwf/scripts/github_metrics_collector.py .adwf/scripts/github_reconcile.py .adwf/tests/test_github_provider_recent_runs.py MANIFEST.json SHA256SUMS.txt docs/architecture/CI_CD_ARCHITECTURE.md)
+          mapfile -t expected_sorted < <(printf '%s\n' "${expected[@]}" | LC_ALL=C sort)
+          test "${#changed[@]}" -eq "${#expected_sorted[@]}"
+          for i in "${!expected_sorted[@]}"; do test "${changed[$i]}" = "${expected_sorted[$i]}"; done
+          git add "${expected[@]}"
+          test "$(git write-tree)" = "$EXPECTED_TREE"
+          git diff --cached --check
+      - name: Verify canonical generated artifacts are reproducible
+        shell: bash
+        run: |
+          set -euo pipefail
+          python .adwf/scripts/docs_freshness.py --write --reviewed-at 2026-08-17T17:30:00Z --valid-until 2026-11-17T17:30:00Z
+          python .adwf/scripts/generate_manifest.py
+          test -z "$(git diff --name-only)"
+          python .adwf/scripts/docs_freshness.py
+          python .adwf/scripts/generate_manifest.py --check
+      - name: Run focused pagination and trusted-controller regressions
+        shell: bash
+        run: |
+          set -euo pipefail
+          export PYTHONPATH="$PWD/.adwf${PYTHONPATH:+:$PYTHONPATH}"
+          python .adwf/tests/test_github_provider_recent_runs.py
+          python .adwf/tests/test_provider_http_mock.py
+          python .adwf/tests/test_metrics.py
+          python .adwf/tests/test_trusted_controller.py
+          python .adwf/tests/test_standing_owner_authorization.py
+          python .adwf/tests/test_v16_remediation.py
+      - name: Run canonical validators and full self-test
+        shell: bash
+        run: |
+          set -euo pipefail
+          export PYTHONPATH="$PWD/.adwf${PYTHONPATH:+:$PYTHONPATH}"
+          python .adwf/scripts/validate_capabilities.py
+          python .adwf/scripts/docs_freshness.py
+          python .adwf/scripts/validate_managed_surface.py
+          python .adwf/scripts/validate_docs.py
+          python .adwf/scripts/validate_pipeline_ir.py
+          python .adwf/scripts/validate_ci.py
+          python .adwf/scripts/validate_framework.py
+          python .adwf/scripts/generate_manifest.py --check
+          python .adwf/adwf.py self-test
+      - name: Seal exact GOV-026 feature commit
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -z "$(git diff --name-only)"
+          git config user.name 'ADWF Autonomous Writer'
+          git config user.email 'adwf-writer@example.invalid'
+          git commit -m 'fix(GOV-026): bound recent Actions inventory for trusted reconciliation'
+          test "$(git rev-parse HEAD^)" = "$MAIN_SHA"
+          test "$(git rev-parse HEAD^{tree})" = "$EXPECTED_TREE"
+          test -z "$(git status --porcelain)"
+          echo "candidate_commit=$(git rev-parse HEAD)"
+          echo "candidate_tree=$(git rev-parse HEAD^{tree})"
+      - name: Publish canonical writer ref without force
+        shell: bash
+        env:
+          PUSH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          auth="$(printf 'x-access-token:%s' "$PUSH_TOKEN" | base64 -w0)"
+          git -c "http.https://github.com/.extraheader=AUTHORIZATION: basic $auth" push origin "HEAD:refs/heads/$TARGET_BRANCH"
