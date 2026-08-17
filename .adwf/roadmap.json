@@ -222,6 +222,14 @@
             "EDGEREF-001"
           ],
           "product_impact": false
+        },
+        {
+          "roadmap_id": "CONSUMER_INSTALL-001",
+          "title_ru": "Provider-durable Consumer Installation Record + Fresh-session Integrity v1",
+          "dependencies": [
+            "AGENTQUAL-001"
+          ],
+          "product_impact": false
         }
       ]
     }

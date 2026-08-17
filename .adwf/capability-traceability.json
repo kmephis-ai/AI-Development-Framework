@@ -542,6 +542,24 @@
       ],
       "live_boundary": "Synthetic reference-local qualification доказывает fail-closed invocation contract, exact package/result binding и zero-cost offline boundary. LIVE_VERIFIED требует реальный внешний creative adapter/agent result, привязанный к exact AIWorkPackage, плюс downstream trusted/provider exact-SHA evidence; deterministic reference adapter не является AI/provider/live proof.",
       "live_evidence": []
+    },
+    {
+      "id": "CONSUMER_INSTALLATION_PROVENANCE",
+      "status": "LIVE_NOT_VERIFIED",
+      "execution_mode": "CORE",
+      "owner_claim_ru": "ADWF может сохранить consumer-owned self-sealed installation record и в новой чистой сессии доказать exact установленную revision, managed bytes и Consumer Profile/Project Pack binding без доверия к ignored runtime state.",
+      "entrypoints": [
+        ".adwf/scripts/consumer_installation.py"
+      ],
+      "production_paths": [
+        ".adwf/lib/consumer_installation.py",
+        ".adwf/schemas/consumer-installation-record.schema.json"
+      ],
+      "verification": [
+        ".adwf/tests/test_consumer_installation.py"
+      ],
+      "live_boundary": "LIVE_VERIFIED требует реального downstream consumer/provider evidence после committed adoption и fresh provider checkout. Deterministic/adversarial fixture, CI и self-host merge доказывают implementation, но не означают, что PrihRash уже ADWF-managed.",
+      "live_evidence": []
     }
   ]
 }
