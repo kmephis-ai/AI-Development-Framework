@@ -3,7 +3,7 @@ name: ADWF GOV-027 Materializer
 on:
   push:
     branches:
-      - agent/materializer-GOV-027-20260817-a1
+      - agent/materializer-GOV-027-20260817-b1
 
 permissions:
   contents: write
@@ -11,7 +11,7 @@ permissions:
 env:
   SOURCE_SHA: afe77d7f455285d81e8e70cea0e972b0b734dc0d
   SOURCE_TREE: 36a9219f5ea596bfcdbe5e0737ecf945680ca4d9
-  TARGET_BRANCH: agent/materialized-GOV-027-20260817-a1
+  TARGET_BRANCH: agent/materialized-GOV-027-20260817-b1
   EXPECTED_TREE: 3a390623a58cf532f37bb9453e8fdfefddb0455e
   PATCH_B64_SHA256: 3539489cd14b43d7527e87f9a42350627a028ad006c3f7a7f2393f082f38db24
   PATCH_SHA256: d91153f1726212a2b396d644fafbaf3ae6d89c67522c5a1b58a7306279ce9a5f
@@ -117,11 +117,11 @@ jobs:
           SHA256SUMS.txt
           docs/governance/TRUST_AND_SELF_AUDIT.md
           EOF
-          git diff --name-only "${SOURCE_SHA}" | sort > /tmp/actual-paths
           sort /tmp/expected-paths -o /tmp/expected-paths
+          git add -A
+          git diff --cached --name-only "${SOURCE_SHA}" | sort > /tmp/actual-paths
           diff -u /tmp/expected-paths /tmp/actual-paths
           test -z "$(git status --porcelain --untracked-files=all | awk '$1 == "??" {print}')"
-          git add -A
           tree="$(git write-tree)"
           echo "candidate_tree=${tree}"
           test "${tree}" = "${EXPECTED_TREE}"
