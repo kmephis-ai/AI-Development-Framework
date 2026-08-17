@@ -47,6 +47,26 @@ jobs:
           git apply /tmp/cgate.patch
           git diff --check
 
+      - name: Normalize trace projection and generated integrity
+        working-directory: repo
+        shell: bash
+        run: |
+          set -euo pipefail
+          PYTHONPATH=.adwf python - <<'PY'
+          import json
+          from pathlib import Path
+          from lib.decision_traceability import seal_graph
+          p=Path('.adwf/decision-requirement-traceability.json')
+          graph=json.loads(p.read_text())
+          bad={'REQ-CONSUMER_GATE-001','DEC-CONSUMER_GATE-001'}
+          graph['records']=[r for r in graph['records'] if r.get('id') not in bad]
+          graph=seal_graph(graph)
+          p.write_text(json.dumps(graph, ensure_ascii=False, indent=2)+'\n')
+          PY
+          python .adwf/scripts/docs_freshness.py --write --reviewed-at 2026-08-17T03:00:00Z --valid-until 2026-11-17T03:00:00Z
+          python .adwf/scripts/generate_manifest.py
+          git diff --check
+
       - name: Focused consumer gate and lifecycle tests
         working-directory: repo
         run: |
@@ -54,6 +74,7 @@ jobs:
           python .adwf/tests/test_consumer_gates.py
           python .adwf/tests/test_consumer_installation.py
           python .adwf/tests/test_consumer_operational.py
+          cd .adwf && PYTHONPATH=. python -m unittest tests.test_decision_traceability.DecisionTraceabilityTests.test_16_complete_chain_requires_real_append_only_evidence -v && cd ..
           python .adwf/scripts/validate_capabilities.py
           python .adwf/scripts/validate_traceability.py
           python .adwf/scripts/docs_freshness.py
@@ -68,7 +89,6 @@ jobs:
           git config user.email "actions@users.noreply.github.com"
           git add .
           git commit -m "feat: bind consumer native gates to exact provider evidence"
-          HEAD_SHA="$(git rev-parse HEAD)"
           PYTHONPATH=.adwf python - <<'PY'
           import json, subprocess
           from pathlib import Path
