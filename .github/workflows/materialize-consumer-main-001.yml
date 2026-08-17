@@ -1,0 +1,150 @@
+name: Materialize CONSUMER_MAIN-001 candidate
+
+on:
+  push:
+    branches: [agent/materialize-consumer-main-001]
+
+permissions:
+  contents: read
+
+env:
+  BASE_SHA: e3bd9fb33f699ae227521f7ed5866c8f11589ed4
+
+jobs:
+  materialize:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd
+        with:
+          fetch-depth: 2
+          persist-credentials: false
+      - uses: actions/setup-python@a309ff8b426b58ec0e2a45f0f869d46889d02405
+        with:
+          python-version: "3.12.10"
+      - name: Reconstruct clean exact base
+        shell: bash
+        run: |
+          set -euo pipefail
+          git reset --hard "$BASE_SHA"
+          test "$(git rev-parse HEAD)" = "$BASE_SHA"
+          test -z "$(git status --porcelain)"
+      - name: Apply bounded source change and regression contract
+        shell: bash
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          from pathlib import Path
+          p = Path('.adwf/scripts/generate_pipeline.py')
+          text = p.read_text(encoding='utf-8')
+          marker = "    main=header('ADWF Main')+f'''"
+          release = "    release=header('ADWF Release')+f'''"
+          before, rest = text.split(marker, 1)
+          main, after = rest.split(release, 1)
+          replacements = [
+              ("on:\\n  push:\\n    branches: [main]\\n  workflow_dispatch:\\n",
+               "on:\\n  push:\\n    branches: [main]\\n  workflow_run:\\n    workflows: [\"Main Verification\"]\\n    types: [completed]\\n  workflow_dispatch:\\n"),
+              ("  group: adwf-main-${{{{ github.ref }}}}\\n",
+               "  group: adwf-main-${{{{ github.repository }}}}-${{{{ github.event.workflow_run.head_sha || github.sha }}}}\\n"),
+              ("  canonical-verification:\\n    runs-on: {runner}\\n",
+               "  canonical-verification:\\n    if: github.event_name != 'workflow_run' || github.event.workflow_run.conclusion == 'success'\\n    runs-on: {runner}\\n"),
+              ("      - uses: actions/checkout@{CHECKOUT}\\n        with:\\n          persist-credentials: false\\n          fetch-depth: 2\\n",
+               "      - uses: actions/checkout@{CHECKOUT}\\n        with:\\n          ref: ${{{{ github.event.workflow_run.head_sha || github.sha }}}}\\n          persist-credentials: false\\n          fetch-depth: 2\\n"),
+              ("          ADWF_ANCHOR_SHA: ${{{{ github.event.before || '' }}}}\\n          ADWF_SUBJECT_SHA: ${{{{ github.sha }}}}\\n",
+               "          ADWF_ANCHOR_SHA: ${{{{ github.event_name == 'push' && github.event.before || '' }}}}\\n          ADWF_SUBJECT_SHA: ${{{{ github.event.workflow_run.head_sha || github.sha }}}}\\n"),
+              ("          ADWF_SUBJECT_SHA: ${{{{ github.sha }}}}\\n        run: python .adwf/scripts/consumer_ci.py delegate --phase main",
+               "          ADWF_SUBJECT_SHA: ${{{{ github.event.workflow_run.head_sha || github.sha }}}}\\n        run: python .adwf/scripts/consumer_ci.py delegate --phase main")
+          ]
+          for old, new in replacements:
+              if old not in main:
+                  raise SystemExit('EXPECTED_MAIN_FRAGMENT_NOT_FOUND:' + old[:80])
+              main = main.replace(old, new, 1)
+          p.write_text(before + marker + main + release + after, encoding='utf-8', newline='\n')
+
+          test = Path('.adwf/tests/test_consumer_main_trigger.py')
+          test.write_text(r'''import importlib.util
+import json
+from pathlib import Path
+import unittest
+
+ROOT = Path(__file__).resolve().parents[2]
+SPEC = importlib.util.spec_from_file_location('generate_pipeline', ROOT / '.adwf/scripts/generate_pipeline.py')
+MOD = importlib.util.module_from_spec(SPEC)
+assert SPEC.loader is not None
+SPEC.loader.exec_module(MOD)
+
+class ConsumerMainTriggerTests(unittest.TestCase):
+    def render_main(self):
+        ir = json.loads((ROOT / '.adwf/pipeline-ir.json').read_text(encoding='utf-8'))
+        return MOD.render(ir)['.github/workflows/adwf-main.yml']
+
+    def test_preserves_push_and_adds_main_verification_bridge(self):
+        text = self.render_main()
+        self.assertIn('push:\n    branches: [main]', text)
+        self.assertIn('workflow_run:\n    workflows: ["Main Verification"]\n    types: [completed]', text)
+        self.assertNotIn('workflows: ["ADWF Main"]', text)
+
+    def test_workflow_run_is_success_only_and_exact_subject_bound(self):
+        text = self.render_main()
+        self.assertIn("if: github.event_name != 'workflow_run' || github.event.workflow_run.conclusion == 'success'", text)
+        self.assertIn('ref: ${{ github.event.workflow_run.head_sha || github.sha }}', text)
+        self.assertIn('ADWF_SUBJECT_SHA: ${{ github.event.workflow_run.head_sha || github.sha }}', text)
+        self.assertIn("ADWF_ANCHOR_SHA: ${{ github.event_name == 'push' && github.event.before || '' }}", text)
+        self.assertIn('delegate --phase main --subject-sha "$ADWF_SUBJECT_SHA"', text)
+
+    def test_consumer_bridge_does_not_expand_permissions(self):
+        text = self.render_main()
+        permissions = text.split('permissions:', 1)[1].split('env:', 1)[0]
+        self.assertIn('contents: read', permissions)
+        self.assertIn('checks: read', permissions)
+        self.assertNotIn('write', permissions)
+
+if __name__ == '__main__':
+    unittest.main()
+''', encoding='utf-8', newline='\n')
+          PY
+      - name: Materialize canonical projections and metadata
+        shell: bash
+        run: |
+          set -euo pipefail
+          python .adwf/scripts/generate_pipeline.py
+          python .adwf/scripts/docs_freshness.py --write
+          python .adwf/scripts/generate_manifest.py
+      - name: Verify bounded candidate
+        shell: bash
+        run: |
+          set -euo pipefail
+          python -m unittest .adwf.tests.test_consumer_main_trigger -v
+          python .adwf/scripts/generate_pipeline.py --check
+          python .adwf/scripts/validate_pipeline_ir.py
+          python .adwf/scripts/validate_ci.py
+          python .adwf/scripts/validate_framework.py
+          python .adwf/scripts/validate_docs.py
+          python .adwf/adwf.py doctor --scope package_integrity
+          python .adwf/adwf.py doctor --scope config_health
+      - name: Seal exact local candidate
+        shell: bash
+        run: |
+          set -euo pipefail
+          git add -A
+          git diff --cached --name-status "$BASE_SHA" | tee /tmp/changed.txt
+          test -s /tmp/changed.txt
+          git config user.name adwf-materializer
+          git config user.email adwf-materializer@users.noreply.github.com
+          git commit -m '[CONSUMER_MAIN-001] Bridge consumer Main Verification to ADWF Main'
+          mkdir -p /tmp/candidate
+          cp /tmp/changed.txt /tmp/candidate/changed.txt
+          git show -s --format='%H%n%T%n%P' HEAD > /tmp/candidate/commit.txt
+          while IFS=$'\t' read -r status path; do
+            case "$status" in
+              A|M) mkdir -p "/tmp/candidate/files/$(dirname "$path")"; cp "$path" "/tmp/candidate/files/$path" ;;
+              *) echo "Unsupported change status: $status $path"; exit 1 ;;
+            esac
+          done < /tmp/changed.txt
+          tar -C /tmp/candidate -czf /tmp/consumer-main-001.tgz .
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: consumer-main-001-candidate
+          path: /tmp/consumer-main-001.tgz
+          retention-days: 1
+          if-no-files-found: error
