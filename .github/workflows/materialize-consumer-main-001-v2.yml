@@ -1,0 +1,54 @@
+name: Materialize CONSUMER_MAIN-001 v2
+
+on:
+  push:
+    branches:
+      - agent/materialize-consumer-main-001-v2-20260817
+
+permissions:
+  contents: write
+
+env:
+  TARGET_BRANCH: agent/CONSUMER_MAIN-001-workflow-run-main
+  SOURCE_SHA: 570c5af23099ab92454968a614023fec4c86c1fb
+
+jobs:
+  materialize:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd
+        with:
+          ref: ${{ env.TARGET_BRANCH }}
+          fetch-depth: 0
+          persist-credentials: true
+      - uses: actions/setup-python@a309ff8b426b58ec0e2a45f0f869d46889d02405
+        with:
+          python-version: "3.12.10"
+      - name: Verify exact source and materialize canonical projections
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "${SOURCE_SHA}"
+          python .adwf/scripts/docs_freshness.py --write
+          python .adwf/scripts/generate_manifest.py
+          python .adwf/scripts/validate_managed_surface.py
+          python .adwf/scripts/generate_pipeline.py --check
+          python .adwf/tests/test_consumer_main_trigger.py
+          mapfile -t changed < <(git diff --name-only | sort)
+          printf '%s\n' "${changed[@]}"
+          expected=(.adwf/docs-registry.json MANIFEST.json SHA256SUMS.txt)
+          mapfile -t expected_sorted < <(printf '%s\n' "${expected[@]}" | sort)
+          test "${#changed[@]}" -eq "${#expected_sorted[@]}"
+          for i in "${!changed[@]}"; do test "${changed[$i]}" = "${expected_sorted[$i]}"; done
+      - name: Publish only if target still equals exact source
+        shell: bash
+        run: |
+          set -euo pipefail
+          remote_sha="$(git ls-remote origin "refs/heads/${TARGET_BRANCH}" | awk '{print $1}')"
+          test "${remote_sha}" = "${SOURCE_SHA}"
+          git config user.name 'kmephis-ai'
+          git config user.email 'kmephis@gmail.com'
+          git add .adwf/docs-registry.json MANIFEST.json SHA256SUMS.txt
+          git commit -m 'chore: rematerialize R4 trust projections'
+          git push --force-with-lease="refs/heads/${TARGET_BRANCH}:${SOURCE_SHA}" origin "HEAD:refs/heads/${TARGET_BRANCH}"
