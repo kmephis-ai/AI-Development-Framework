@@ -82,6 +82,17 @@ def load_consumer_instruction_policy(root: str | Path, inventory: dict[str, Any]
     return policy
 
 
+def validate_consumer_instruction_state(consumer_root: str | Path, policy: dict[str, Any]) -> None:
+    """Validate consumer-owned instruction object types without granting write authority."""
+    root = Path(consumer_root).resolve()
+    rel = _safe_rel(str((policy.get("consumer_invariants") or {}).get("path") or ""))
+    path = root / rel
+    if path.is_symlink():
+        raise ConsumerInstructionError("CONSUMER_INSTRUCTION_INVARIANTS_SYMLINK_FORBIDDEN")
+    if path.exists() and not path.is_file():
+        raise ConsumerInstructionError("CONSUMER_INSTRUCTION_INVARIANTS_REGULAR_FILE_REQUIRED")
+
+
 def legacy_preexisting_router_transition_allowed(
     policy: dict[str, Any], *, path: str, source_ownership: str, target_ownership: str, target_present: bool,
 ) -> bool:

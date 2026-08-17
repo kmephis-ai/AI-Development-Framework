@@ -47,7 +47,7 @@ Planner строит A↔B diff по framework package inventory и отдель
 
 Pre-existing managed entries сохраняются. Shared-guarded paths сохраняются. Новая версия ADWF не получает silent overwrite authority над такими путями даже тогда, когда target package содержит новый вариант файла.
 
-Единственное bounded semantic исключение v1 задаёт `Consumer Instruction Contract`: pre-existing `AGENTS.md` с `managed_by_adwf=false` может оставаться `PRESERVE_PREEXISTING` без `HUMAN_REQUIRED` при изменившихся package bytes, если exact target `.adwf/consumer-instruction-policy.json` валиден и подтверждает неизменную роль `AGENTS.md` как `SHARED_GUARDED / CONSUMER_PRESERVED` router. Consumer bytes при этом не записываются. Это правило не распространяется на остальные shared paths. См. `docs/governance/CONSUMER_INSTRUCTION_CONTRACT.md`.
+Единственное bounded semantic исключение v1 задаёт `Consumer Instruction Contract`: pre-existing `AGENTS.md` с `managed_by_adwf=false` может оставаться `PRESERVE_PREEXISTING` без `HUMAN_REQUIRED` при изменившихся package bytes, если exact target `.adwf/consumer-instruction-policy.json` валиден и подтверждает неизменную роль `AGENTS.md` как `SHARED_GUARDED / CONSUMER_PRESERVED` router. Source A может предшествовать самому instruction contract; это не даёт source-пакету authority, потому что исключение определяется exact target policy и sealed source snapshot. Consumer bytes при этом не записываются. Consumer-owned invariant path из target policy, если он уже существует, обязан быть regular file; symlink/directory/type ambiguity блокируется и повторно проверяется apply-preflight. Это правило не распространяется на остальные shared paths. См. `docs/governance/CONSUMER_INSTRUCTION_CONTRACT.md`.
 
 ## Compatibility contracts
 
