@@ -15,6 +15,7 @@ import hashlib,json,os,tempfile,copy,re
 from .durable_orchestrator import validate_journal
 from .github_provider import GitHubClient
 from .github_rulesets import verify_runtime_anchor_ruleset
+from .session_continuity import reconcile_checkpoint,validate_checkpoint
 
 TITLE='[ADWF] Runtime Ledger';PREFIX='<!-- ADWF-RUNTIME-EVENT v3 -->\n```json\n';SUFFIX='\n```';ANCHOR_PREFIX='adwf-runtime-anchor-'
 def _now()->str:return datetime.now(timezone.utc).isoformat().replace('+00:00','Z')
@@ -44,6 +45,33 @@ def public_memory_projection(memory:dict[str,Any]|None)->dict[str,Any]|None:
     if not isinstance(memory,dict):return None
     return {k:memory.get(k) for k in ('schema_version','brief_id','run_id','status','revision','memory_digest')}
 
+def public_session_continuity_projection(checkpoint:dict[str,Any]|None)->dict[str,Any]|None:
+    if checkpoint is None:return None
+    if not isinstance(checkpoint,dict):raise ValueError('REMOTE_RUNTIME_SESSION_CONTINUITY_INVALID:CONTINUITY_CHECKPOINT_NOT_OBJECT')
+    errors=validate_checkpoint(checkpoint)
+    if errors:raise ValueError('REMOTE_RUNTIME_SESSION_CONTINUITY_INVALID:'+','.join(errors))
+    return copy.deepcopy(checkpoint)
+
+def _checkpoint_state_binding_errors(checkpoint:dict[str,Any],state:dict[str,Any])->list[str]:
+    errors=[];work=checkpoint.get('work_identity') or {}
+    if str(work.get('roadmap_id') or '')!=str(state.get('roadmap_id') or ''):errors.append('REMOTE_SESSION_CONTINUITY_ROADMAP_BINDING')
+    checkpoint_issue=work.get('issue_id');state_issue=state.get('issue_id')
+    if (None if checkpoint_issue is None else str(checkpoint_issue))!=(None if state_issue is None else str(state_issue)):errors.append('REMOTE_SESSION_CONTINUITY_ISSUE_BINDING')
+    return errors
+
+def _session_continuity_event_errors(event:dict[str,Any],state:dict[str,Any])->list[str]:
+    checkpoint=event.get('session_continuity_projection')
+    binding_keys=('session_continuity_digest','session_continuity_id','session_continuity_revision')
+    if checkpoint is None:
+        return ['REMOTE_SESSION_CONTINUITY_ORPHAN_BINDING'] if any(key in event for key in binding_keys) else []
+    if not isinstance(checkpoint,dict):return ['REMOTE_SESSION_CONTINUITY_NOT_OBJECT']
+    errors=['REMOTE_SESSION_CONTINUITY_INVALID:'+item for item in validate_checkpoint(checkpoint)]
+    if event.get('session_continuity_digest')!=checkpoint.get('checkpoint_digest'):errors.append('REMOTE_SESSION_CONTINUITY_DIGEST_BINDING')
+    if event.get('session_continuity_id')!=checkpoint.get('checkpoint_id'):errors.append('REMOTE_SESSION_CONTINUITY_ID_BINDING')
+    if event.get('session_continuity_revision')!=checkpoint.get('checkpoint_revision'):errors.append('REMOTE_SESSION_CONTINUITY_REVISION_BINDING')
+    errors.extend(_checkpoint_state_binding_errors(checkpoint,state))
+    return errors
+
 def _parse(body:str)->dict[str,Any]|None:
     if not body.startswith(PREFIX) or not body.endswith(SUFFIX):return None
     try:return json.loads(body[len(PREFIX):-len(SUFFIX)])
@@ -62,6 +90,7 @@ def verify_remote_events(events:list[dict[str,Any]])->list[str]:
         elif event.get('state_digest')!=_hash(state):errors.append(f'REMOTE_STATE_DIGEST:{i}')
         public=event.get('work_memory_projection')
         if public is not None and set(public)-{'schema_version','brief_id','run_id','status','revision','memory_digest'}:errors.append(f'REMOTE_PRIVATE_MEMORY_LEAK:{i}')
+        for item in _session_continuity_event_errors(event,state if isinstance(state,dict) else {}):errors.append(f'{item}:{i}')
         if not event.get('provider_object_id') or not event.get('provider_created_at') or not event.get('provider_actor'):errors.append(f'REMOTE_PROVIDER_ANCHOR_MISSING:{i}')
         prev=event.get('event_hash');prev_comment=event.get('provider_object_id')
     return errors
@@ -109,15 +138,22 @@ class GitHubRuntimeStore:
         if events and rules.get('readback_verified') is not True:errors.append('REMOTE_RUNTIME_ANCHOR_RULESET_NOT_VERIFIED')
         if errors:raise ValueError('REMOTE_RUNTIME_LEDGER_INVALID:'+','.join(errors))
         return issue,events
-    def append(self,state:dict[str,Any],work_memory:dict[str,Any]|None=None)->dict[str,Any]:
+    def append(self,state:dict[str,Any],work_memory:dict[str,Any]|None=None,session_checkpoint:dict[str,Any]|None=None)->dict[str,Any]:
         if validate_journal(state):raise ValueError('REMOTE_RUNTIME_STATE_INVALID')
         safe_state=public_state_projection(state)
         if validate_journal(safe_state):raise ValueError('REMOTE_RUNTIME_PUBLIC_PROJECTION_INVALID')
+        checkpoint=public_session_continuity_projection(session_checkpoint)
+        if checkpoint:
+            binding_errors=_checkpoint_state_binding_errors(checkpoint,safe_state)
+            if binding_errors:raise ValueError('REMOTE_RUNTIME_SESSION_CONTINUITY_BINDING_INVALID:'+','.join(binding_errors))
         issue,events=self.read();prev=events[-1]['event_hash'] if events else None;prev_object=events[-1].get('provider_object_id') if events else None
-        if events and events[-1].get('state_digest')==_hash(safe_state):return {'status':'UNCHANGED','issue_number':issue['number'],'event':events[-1]}
+        checkpoint_digest=(checkpoint or {}).get('checkpoint_digest')
+        if events and events[-1].get('state_digest')==_hash(safe_state) and (checkpoint is None or events[-1].get('session_continuity_digest')==checkpoint_digest):return {'status':'UNCHANGED','issue_number':issue['number'],'event':events[-1]}
         public=public_memory_projection(work_memory)
         unsigned={'schema_version':3,'sequence':len(events)+1,'run_id':safe_state['run_id'],'revision':safe_state['revision'],'state_digest':_hash(safe_state),'state':safe_state,
                   'work_memory_projection':public,'work_memory_digest':(public or {}).get('memory_digest'),'previous_hash':prev,'previous_provider_object_id':prev_object,'created_at':_now()}
+        if checkpoint is not None:
+            unsigned.update({'session_continuity_projection':checkpoint,'session_continuity_digest':checkpoint_digest,'session_continuity_id':checkpoint['checkpoint_id'],'session_continuity_revision':checkpoint['checkpoint_revision']})
         event={**unsigned,'event_hash':_hash(unsigned)};body=PREFIX+json.dumps(event,ensure_ascii=False,sort_keys=True,separators=(',',':'))+SUFFIX
         rules=self._anchor_rules_verified()
         if rules.get('readback_verified') is not True:raise ValueError('REMOTE_RUNTIME_ANCHOR_RULESET_REQUIRED_BEFORE_PERSIST')
@@ -142,3 +178,12 @@ class GitHubRuntimeStore:
         finally:
             if os.path.exists(tmp):os.unlink(tmp)
         return state
+    def restore_latest_session_continuity(self,*,actual_main_sha:str,actual_head_sha:str|None=None)->dict[str,Any]|None:
+        _,events=self.read()
+        for event in reversed(events):
+            checkpoint=event.get('session_continuity_projection')
+            if checkpoint is None:continue
+            errors=validate_checkpoint(checkpoint)
+            if errors:raise ValueError('REMOTE_RUNTIME_SESSION_CONTINUITY_INVALID:'+','.join(errors))
+            return {'checkpoint':copy.deepcopy(checkpoint),'event_hash':event.get('event_hash'),'provider_object_id':event.get('provider_object_id'),'reconciliation':reconcile_checkpoint(checkpoint,actual_main_sha=actual_main_sha,actual_head_sha=actual_head_sha)}
+        return None
