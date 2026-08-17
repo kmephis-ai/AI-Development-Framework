@@ -35,10 +35,6 @@ Human-facing Issues, PR summaries, roadmap, dashboard, reports и explanations �
 
 Trusted controller восстанавливает exact BASE→HEAD effect из immutable provider Git commit/tree objects и проверяет ancestry, tree completeness и object identity fail-closed. Транспортный сбой отдельного PR-files endpoint не должен превращаться ни в PASS, ни в отсутствующий required gate: недоказанный diff публикуется как явный `NOT_VERIFIED`/BLOCK. Один verified changed-path set переиспользуется downstream trusted gates; candidate code по-прежнему не исполняется.
 
-## Consumer instruction layering
-
-Для connected consumers generic AI-development rules не копируются в монолитный product `AGENTS.md`. Canonical contract — `.adwf/consumer-instruction-policy.json` + `docs/governance/CONSUMER_INSTRUCTION_CONTRACT.md`: ADWF управляет `FRAMEWORK_CORE`/Project Pack, consumer владеет `.adwf-consumer/INVARIANTS.md`, а root `AGENTS.md` служит compact consumer-preserved router. Current writer/task/SHA всегда читать fresh из provider/runtime truth.
-
 ## Local Git bootstrap
 
 Если среда AI не может выполнить обычный `git clone/fetch` из-за DNS/egress, но GitHub Connector доступен, не считать это блокером разработки и не повторять бесполезные сетевые retry. Использовать канонический playbook `skills/adwf-local-git-mirror/SKILL.md`: exact provider SHA → disposable transport branch → GitHub Actions bundle artifact → connector download → fail-closed local materialization. GitHub остаётся Source of Truth; локальный PASS не заменяет provider exact-head CI/owner gate.
