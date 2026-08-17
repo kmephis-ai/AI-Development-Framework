@@ -65,7 +65,7 @@
         ".adwf/scripts/validate_capabilities.py"
       ],
       "mode": "implementation-certification",
-      "source_digest": "c5e5dd93269a7adef535ac7eaa14058333b1896d9902082bc9aee4ac1edf064",
+      "source_digest": "c5e5dd93269a7adef535ac7eaa14058333b189b8550707350ae934d80a232cc7",
       "reviewed_at": "2026-08-17T21:21:00Z",
       "valid_until": "2026-11-17T21:21:00Z"
     },
