@@ -1,0 +1,97 @@
+name: ADWF Candidate Publisher CONSUMER_WAIT-001
+
+on:
+  push:
+    branches:
+      - agent/local-publish-consumer-wait-001-20260817-a1
+
+permissions:
+  contents: write
+
+jobs:
+  publish-exact-tree:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    env:
+      BASE_SHA: f17a49a22b9608297e96977e0af7f4cb0c573fc7
+      TARGET_BRANCH: agent/consumer-wait-001-native-gate-latency
+      EXPECTED_PAYLOAD_SHA256: 94a7913601645304483e4119132f9eceae1cfac49cf8d5d847b6f661ff2afe01
+      EXPECTED_PATCH_SHA256: aead947762de20bd411f618edf2db04dc6b30c4afa62d677f5bc138c6965ce24
+      EXPECTED_TREE: a9d8bc5163f30a142b73e2acfcb3740a93df6827
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd
+        with:
+          fetch-depth: 0
+          persist-credentials: true
+
+      - name: Verify checksum-bound payload
+        shell: bash
+        run: |
+          set -euo pipefail
+          cp .candidate-transport/consumer-wait-001/part-00 /tmp/candidate.patch.b64
+          echo "${EXPECTED_PAYLOAD_SHA256}  /tmp/candidate.patch.b64" | sha256sum -c -
+          base64 --decode /tmp/candidate.patch.b64 | gzip -dc > /tmp/candidate.patch
+          echo "${EXPECTED_PATCH_SHA256}  /tmp/candidate.patch" | sha256sum -c -
+
+      - name: Verify target remains exact BASE
+        shell: bash
+        run: |
+          set -euo pipefail
+          git fetch --no-tags origin "refs/heads/${TARGET_BRANCH}:refs/remotes/origin/${TARGET_BRANCH}"
+          test "$(git rev-parse refs/remotes/origin/${TARGET_BRANCH})" = "${BASE_SHA}"
+
+      - name: Materialize exact candidate
+        shell: bash
+        run: |
+          set -euo pipefail
+          git reset --hard "${BASE_SHA}"
+          git clean -fdx
+          test "$(git rev-parse HEAD)" = "${BASE_SHA}"
+          git apply --check /tmp/candidate.patch
+          git apply /tmp/candidate.patch
+          git add -A
+          git diff --cached --check
+          test "$(git write-tree)" = "${EXPECTED_TREE}"
+
+      - name: Focused consumer wait regressions
+        shell: bash
+        run: |
+          set -euo pipefail
+          python .adwf/tests/test_consumer_ci.py -v
+          python .adwf/tests/test_consumer_gates.py -v
+
+      - name: Canonical validators
+        shell: bash
+        run: |
+          set -euo pipefail
+          python .adwf/scripts/validate_traceability.py
+          python .adwf/scripts/validate_capabilities.py
+          python .adwf/scripts/validate_ci.py
+          python .adwf/scripts/validate_pipeline_ir.py
+          python .adwf/scripts/validate_docs.py
+          python .adwf/scripts/validate_framework.py
+          python .adwf/scripts/generate_manifest.py --check
+
+      - name: Authoritative full ADWF self-test
+        shell: bash
+        run: |
+          set -euo pipefail
+          python .adwf/adwf.py self-test
+
+      - name: Re-verify exact candidate tree
+        shell: bash
+        run: |
+          set -euo pipefail
+          git add -A
+          git diff --cached --check
+          test "$(git write-tree)" = "${EXPECTED_TREE}"
+
+      - name: Commit and publish exact candidate
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name "adwf-candidate-publisher"
+          git config user.email "adwf-candidate-publisher@users.noreply.github.com"
+          git commit -m "CONSUMER_WAIT-001: bound native gate wait to real CI latency"
+          test "$(git rev-parse HEAD^{tree})" = "${EXPECTED_TREE}"
+          git push origin "HEAD:refs/heads/${TARGET_BRANCH}"
