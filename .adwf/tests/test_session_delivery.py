@@ -1,12 +1,13 @@
 from __future__ import annotations
 
 import json
+import sys
 from pathlib import Path
 
-from adwf.lib.project_packs import commands_for_pack
-
-
 ROOT = Path(__file__).resolve().parents[2]
+sys.path.insert(0, str(ROOT / '.adwf'))
+
+from lib.project_packs import commands_for_pack
 
 
 def _project(tmp_path: Path, *, package: dict | None = None, files: dict[str, str] | None = None) -> Path:
