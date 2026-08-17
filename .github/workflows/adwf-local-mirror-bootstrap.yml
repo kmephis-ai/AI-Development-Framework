@@ -1,4 +1,4 @@
-name: ADWF Local Git Mirror Bootstrap
+name: ADWF CONSUMER_OPS-001 Provider Materializer
 
 on:
   push:
@@ -6,53 +6,89 @@ on:
       - agent/local-mirror-consumer-ops-001-20260817-a1
 
 permissions:
-  contents: read
+  contents: write
 
 env:
   SOURCE_SHA: fee61e8e249b7977dbee926b410ed2f9cffaecbd
-  SOURCE_BRANCH: main
-  MIRROR_ARTIFACT_NAME: adwf-consumer-ops-001-fee61e8e
+  EXPECTED_TREE: 9451db83818f06ff23ec52008a05a5e1b87f62fc
+  PATCH_GZ_SHA256: d8964b9008b97f4abd0a3392aeef1ec22acc14519afc0d37b4476c8a8d600ae0
+  WRITER_BRANCH: agent/consumer-ops-001-roadmap-binding
 
 jobs:
-  build-bundle:
+  materialize:
     runs-on: ubuntu-24.04
-    timeout-minutes: 10
+    timeout-minutes: 20
     steps:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd
         with:
           fetch-depth: 0
-          persist-credentials: false
+          persist-credentials: true
 
-      - name: Build exact-source bundle
+      - name: Reconstruct exact candidate and verify
         shell: bash
         run: |
           set -euo pipefail
-          git cat-file -e "${SOURCE_SHA}^{commit}"
-          git branch -f adwf-source "${SOURCE_SHA}"
-          mkdir -p mirror-artifact
-          git bundle create mirror-artifact/repository.bundle refs/heads/adwf-source --tags
-          git bundle verify mirror-artifact/repository.bundle
-          BUNDLE_SHA256="$(sha256sum mirror-artifact/repository.bundle | awk '{print $1}')"
-          BUNDLE_BYTES="$(wc -c < mirror-artifact/repository.bundle | tr -d ' ')"
-          printf '%s  %s\n' "${BUNDLE_SHA256}" "repository.bundle" > mirror-artifact/SHA256SUMS.txt
-          cat > mirror-artifact/manifest.json <<JSON
-          {
-            "schema_version": 1,
-            "source_repository": "${GITHUB_REPOSITORY}",
-            "source_branch": "${SOURCE_BRANCH}",
-            "source_sha": "${SOURCE_SHA}",
-            "transport_sha": "${GITHUB_SHA}",
-            "bundle_sha256": "${BUNDLE_SHA256}",
-            "bundle_bytes": ${BUNDLE_BYTES},
-            "bundle_ref": "refs/heads/adwf-source"
-          }
-          JSON
+          cat .transport/consumer-ops.patch.b64.part* > /tmp/candidate.b64
+          base64 -d /tmp/candidate.b64 > /tmp/candidate.diff.gz
+          echo "${PATCH_GZ_SHA256}  /tmp/candidate.diff.gz" | sha256sum -c -
+          gzip -dc /tmp/candidate.diff.gz > /tmp/candidate.diff
 
-      - name: Upload bundle artifact
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
-        with:
-          name: ${{ env.MIRROR_ARTIFACT_NAME }}
-          path: mirror-artifact/
-          if-no-files-found: error
-          retention-days: 1
-          compression-level: 0
+          git cat-file -e "${SOURCE_SHA}^{commit}"
+          git checkout --detach "${SOURCE_SHA}"
+          git reset --hard "${SOURCE_SHA}"
+          git clean -fdx
+          git apply --check /tmp/candidate.diff
+          git apply /tmp/candidate.diff
+
+          python .adwf/tests/test_consumer_operational.py
+          python .adwf/tests/test_consumer_installation.py
+          python .adwf/tests/test_roadmap_truth.py
+          python .adwf/scripts/validate_capabilities.py
+          python .adwf/scripts/validate_traceability.py
+          python .adwf/scripts/docs_freshness.py
+          python .adwf/scripts/generate_manifest.py --check
+          python .adwf/scripts/validate_framework.py
+          python .adwf/adwf.py self-test
+
+          git diff --quiet "${SOURCE_SHA}" -- .adwf/lib/trust.py
+          git add -A
+          TREE="$(git write-tree)"
+          test "${TREE}" = "${EXPECTED_TREE}"
+
+          python - <<'PY'
+          import json, subprocess, sys
+          from pathlib import Path
+          sys.path.insert(0, str(Path('.adwf').resolve()))
+          from lib.trust import classify_diff, load_base_trust_policy
+          base = 'fee61e8e249b7977dbee926b410ed2f9cffaecbd'
+          policy = load_base_trust_policy(Path('.'), base)
+          raw = subprocess.check_output(['git','diff','--cached','--name-status','-z','--find-renames'], text=False)
+          tokens = raw.split(b'\0'); tokens = tokens[:-1] if tokens and tokens[-1] == b'' else tokens
+          records=[]; i=0
+          while i < len(tokens):
+              status=tokens[i].decode(); i+=1
+              path=tokens[i].decode(); i+=1
+              old = None if status.startswith('A') else subprocess.run(['git','show',f'{base}:{path}'],capture_output=True,text=True).stdout
+              new = None if status.startswith('D') else Path(path).read_text(encoding='utf-8')
+              records.append({'path':path,'status':status,'old_text':old,'new_text':new})
+          result=classify_diff(records, policy)
+          print(json.dumps(result, indent=2))
+          assert result['result']=='ALLOW'
+          assert result['authorization_mode']=='STANDING_OWNER_POLICY'
+          assert result['human_required'] is False
+          assert result['manual_required_files']==[]
+          assert result['weakening']==[]
+          assert result['reason_codes']==[]
+          PY
+
+      - name: Publish one exact writer commit
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name "ADWF Automation"
+          git config user.email "adwf-automation@users.noreply.github.com"
+          git commit -m "CONSUMER_OPS-001: bind consumer native operational state"
+          test "$(git rev-parse HEAD^{tree})" = "${EXPECTED_TREE}"
+          git fetch origin main
+          test "$(git rev-parse origin/main)" = "${SOURCE_SHA}"
+          git push origin "HEAD:refs/heads/${WRITER_BRANCH}"
