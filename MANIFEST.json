@@ -4,7 +4,7 @@
   "schema_version": 3,
   "scope": "FRAMEWORK_OWNED_TRUST_BOUNDARY",
   "file_count_excluding_manifests": 537,
-  "total_bytes_excluding_manifests": 2707261,
+  "total_bytes_excluding_manifests": 2724903,
   "files": [
     ".adwf/SETUP_CHECKLIST.md",
     ".adwf/actions-lock.json",
