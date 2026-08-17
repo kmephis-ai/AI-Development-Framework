@@ -4,9 +4,10 @@ from pathlib import Path
 ROOT=Path(__file__).resolve().parents[2]; sys.path.insert(0,str(ROOT/'.adwf'))
 from lib.http_transport import urllib_transport
 from lib.provider_contracts import ProviderContractError,request_bytes,request_json,request_pages,mutate_with_readback
+from lib.github_provider import GitHubClient
 
 class Handler(BaseHTTPRequestHandler):
-    rate_calls=0; mutations=[]
+    rate_calls=0; action_run_calls=0; mutations=[]
     def sendj(self,status,obj,headers=None):
         body=(json.dumps(obj) if not isinstance(obj,bytes) else obj).encode() if isinstance(obj,str) else (obj if isinstance(obj,bytes) else json.dumps(obj).encode())
         self.send_response(status); self.send_header('Content-Type','application/json'); self.send_header('Content-Length',str(len(body)))
@@ -32,6 +33,11 @@ class Handler(BaseHTTPRequestHandler):
                     if part.startswith('page='): page=part.split('=',1)[1]
             if page=='1': return self.sendj(200,{'items':[{'id':1}]},{'X-Next-Page':'2'})
             return self.sendj(200,{'items':[{'id':2}]},{'X-Next-Page':''})
+        if self.path.startswith('/repos/example/repo/actions/runs'):
+            Handler.action_run_calls+=1
+            if 'event=badshape' in self.path:
+                return self.sendj(200,{'workflow_runs':'not-a-list'})
+            return self.sendj(200,{'workflow_runs':[{'id':1,'event':'pull_request'},{'id':2,'event':'pull_request'}]}, {'Link':'<https://api.example.invalid/page=2>; rel="next"'})
         if self.path=='/readback': return self.sendj(200,{'value':Handler.mutations[-1] if Handler.mutations else None})
         if self.path=='/redirect-same': self.send_response(302); self.send_header('Location','/echo-auth'); self.end_headers(); return
         if self.path=='/redirect-cross': self.send_response(302); self.send_header('Location',Handler.redirect_target+'/download'); self.end_headers(); return
@@ -90,6 +96,22 @@ class ProviderHttpMockTests(unittest.TestCase):
         with self.assertRaisesRegex(ProviderContractError,'MALFORMED_JSON'): request_json(urllib_transport,'GET',self.base+'/malformed',{},timeout=1)
         with self.assertRaisesRegex(ProviderContractError,'NON_OBJECT'): request_json(urllib_transport,'GET',self.base+'/nonobject',{},timeout=1)
         with self.assertRaisesRegex(ProviderContractError,'TIMEOUT_OR_NETWORK'): request_json(urllib_transport,'GET',self.base+'/slow',{},timeout=.02,max_attempts=1)
+
+    def test_github_recent_runs_is_explicitly_bounded_single_page(self):
+        client=GitHubClient('example/repo','token',api_base=self.base)
+        Handler.action_run_calls=0
+        rows=client.recent_runs(limit=2,event='pull_request')
+        self.assertEqual([x['id'] for x in rows],[1,2])
+        self.assertEqual(Handler.action_run_calls,1)
+        for bad in (0,101,True):
+            with self.subTest(limit=bad), self.assertRaisesRegex(ProviderContractError,'PROVIDER_RECENT_RUNS_LIMIT_INVALID'):
+                client.recent_runs(limit=bad)
+        with self.assertRaisesRegex(ProviderContractError,'PROVIDER_RECENT_RUNS_EVENT_INVALID'):
+            client.recent_runs(event='bad event')
+        with self.assertRaisesRegex(ProviderContractError,'PROVIDER_RECENT_RUNS_PAYLOAD_INVALID'):
+            client.recent_runs(event='badshape')
+        self.assertEqual(Handler.action_run_calls,2)
+
     def test_pagination_and_mutation_readback(self):
         items=request_pages(urllib_transport,self.base+'/page?page=1',{},timeout=1); self.assertEqual([x['id'] for x in items],[1,2])
         mutation,readback=mutate_with_readback(urllib_transport,method='POST',url=self.base+'/mutate',readback_url=self.base+'/readback',headers={},payload={'x':7},idempotency_key='123456789012',timeout=1)

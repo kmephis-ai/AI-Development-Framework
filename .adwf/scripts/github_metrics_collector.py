@@ -39,7 +39,7 @@ def _impact_name(client:GitHubClient,number:int|None)->str:
 
 def collect(client:GitHubClient,*,limit:int=50,days:int=30)->dict:
     cutoff=datetime.now(timezone.utc)-timedelta(days=days);candidates=[]
-    for run in client.runs():
+    for run in client.recent_runs(limit=100,event='pull_request'):
         if str(run.get('event'))!='pull_request':continue
         if str(run.get('name') or '') not in {'ADWF PR','ADWF PR v1.6'}:continue
         created=run.get('created_at');started=run.get('run_started_at') or created;completed=run.get('updated_at')
