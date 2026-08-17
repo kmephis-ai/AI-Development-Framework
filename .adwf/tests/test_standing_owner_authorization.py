@@ -129,7 +129,28 @@ class FakeGateClient:
         self.base_sha = "a" * 40; self.head_sha = "b" * 40
         self.base_current = base_current; self.body = body; self.permission = permission
         self.wrapped_base64 = wrapped_base64; self.malformed_base64 = malformed_base64; self.content_failure = content_failure
+    def _tree(self, head):
+        entries = []
+        for item in self.files:
+            status = str(item.get("status") or "modified")
+            path = str(item.get("filename") or "")
+            old_path = str(item.get("previous_filename") or path)
+            if head:
+                if status == "removed": continue
+                entries.append({"path": path, "mode": "100644", "type": "blob", "sha": "2" * 40})
+            else:
+                if status == "added": continue
+                entries.append({"path": old_path, "mode": "100644", "type": "blob", "sha": "1" * 40})
+        return entries
     def get(self, path):
+        if "/git/commits/" + self.base_sha in path:
+            return {"sha": self.base_sha, "tree": {"sha": "c" * 40}, "parents": []}
+        if "/git/commits/" + self.head_sha in path:
+            return {"sha": self.head_sha, "tree": {"sha": "d" * 40}, "parents": [{"sha": self.base_sha}]}
+        if "/git/trees/" + "c" * 40 in path:
+            return {"sha": "c" * 40, "truncated": False, "tree": self._tree(False)}
+        if "/git/trees/" + "d" * 40 in path:
+            return {"sha": "d" * 40, "truncated": False, "tree": self._tree(True)}
         return {"id": 1, "head_sha": self.head_sha, "name": "ADWF PR", "event": "pull_request", "status": "completed", "conclusion": "success", "pull_requests": [{"number": 7}]}
     def check_runs(self, sha):
         return [{"name": "fast-feedback", "head_sha": sha, "status": "completed", "conclusion": "success", "app": {"slug": "github-actions"}}]

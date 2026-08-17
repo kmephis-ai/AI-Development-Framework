@@ -31,6 +31,10 @@ Human-facing Issues, PR summaries, roadmap, dashboard, reports и explanations �
 
 Один активный Writer на conflict domain. Параллельны только независимые read-only lanes или явно непересекающиеся workspaces. Перед mutation требуется текущая policy authorization; после mutation — readback/CAS там, где provider поддерживает revision.
 
+## Trusted provider readback
+
+Trusted controller восстанавливает exact BASE→HEAD effect из immutable provider Git commit/tree objects и проверяет ancestry, tree completeness и object identity fail-closed. Транспортный сбой отдельного PR-files endpoint не должен превращаться ни в PASS, ни в отсутствующий required gate: недоказанный diff публикуется как явный `NOT_VERIFIED`/BLOCK. Один verified changed-path set переиспользуется downstream trusted gates; candidate code по-прежнему не исполняется.
+
 ## Local Git bootstrap
 
 Если среда AI не может выполнить обычный `git clone/fetch` из-за DNS/egress, но GitHub Connector доступен, не считать это блокером разработки и не повторять бесполезные сетевые retry. Использовать канонический playbook `skills/adwf-local-git-mirror/SKILL.md`: exact provider SHA → disposable transport branch → GitHub Actions bundle artifact → connector download → fail-closed local materialization. GitHub остаётся Source of Truth; локальный PASS не заменяет provider exact-head CI/owner gate.

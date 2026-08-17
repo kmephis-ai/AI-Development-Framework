@@ -20,7 +20,10 @@ from lib.capability_live_evidence import validate_certification_registry, resolv
 
 OWNER_ATTESTATION=re.compile(r'(?mi)^\s*Owner-Attestation:\s*`?([0-9a-f]{40})`?\s*$')
 SHA=re.compile(r'^[0-9a-f]{40}$')
-_STATUS_MAP={'added':'A','removed':'D','modified':'M','renamed':'R','copied':'C'}
+_TREE_FILE_MODES={'blob':{'100644','100755','120000'},'commit':{'160000'}}
+_MAX_CHANGED_FILES=3000
+_MAX_ANCESTRY_COMMITS=512
+_MAX_TREE_FILES=100000
 
 
 def _pull_number(live:dict[str,Any])->int|None:
@@ -95,6 +98,85 @@ def _github_blob(client:GitHubClient,path:str,sha:str)->str:
     return raw.decode('utf-8',errors='replace')
 
 
+def _provider_commit_node(client:GitHubClient,sha:str,cache:dict[str,dict[str,Any]])->dict[str,Any]:
+    commit_sha=_exact_sha(sha,'GIT_COMMIT_SHA_INVALID')
+    if commit_sha in cache:return cache[commit_sha]
+    payload=client.get(f'/repos/{client.repo}/git/commits/{commit_sha}')
+    if _exact_sha(payload.get('sha'),'GIT_COMMIT_READBACK_SHA_INVALID')!=commit_sha:raise ValueError('GIT_COMMIT_READBACK_SHA_MISMATCH')
+    tree_sha=_exact_sha((payload.get('tree') or {}).get('sha'),'GIT_COMMIT_TREE_SHA_INVALID')
+    parents=payload.get('parents')
+    if not isinstance(parents,list):raise ValueError('GIT_COMMIT_PARENTS_INVALID')
+    parent_shas=[]
+    for parent in parents:
+        if not isinstance(parent,dict):raise ValueError('GIT_COMMIT_PARENT_INVALID')
+        parent_shas.append(_exact_sha(parent.get('sha'),'GIT_COMMIT_PARENT_SHA_INVALID'))
+    node={'sha':commit_sha,'tree_sha':tree_sha,'parents':parent_shas}
+    cache[commit_sha]=node
+    return node
+
+
+def _prove_base_ancestor(client:GitHubClient,base_sha:str,head_sha:str,cache:dict[str,dict[str,Any]])->None:
+    base=_exact_sha(base_sha,'PR_BASE_SHA_INVALID');head=_exact_sha(head_sha,'PR_HEAD_SHA_INVALID')
+    pending=[head];seen=set()
+    while pending:
+        current=pending.pop(0)
+        if current==base:
+            _provider_commit_node(client,current,cache)
+            return
+        if current in seen:continue
+        if len(seen)>=_MAX_ANCESTRY_COMMITS:raise ValueError('PR_ANCESTRY_INSPECTION_LIMIT')
+        seen.add(current)
+        node=_provider_commit_node(client,current,cache)
+        pending.extend(parent for parent in node['parents'] if parent not in seen)
+    raise ValueError('PR_BASE_NOT_ANCESTOR_OF_HEAD')
+
+
+def _provider_tree_files(client:GitHubClient,tree_sha:str)->dict[str,dict[str,Any]]:
+    exact_tree=_exact_sha(tree_sha,'GIT_TREE_SHA_INVALID')
+    payload=client.get(f'/repos/{client.repo}/git/trees/{exact_tree}?recursive=1')
+    if _exact_sha(payload.get('sha'),'GIT_TREE_READBACK_SHA_INVALID')!=exact_tree:raise ValueError('GIT_TREE_READBACK_SHA_MISMATCH')
+    if payload.get('truncated') is not False:raise ValueError('GIT_TREE_READBACK_TRUNCATED_OR_UNKNOWN')
+    raw=payload.get('tree')
+    if not isinstance(raw,list):raise ValueError('GIT_TREE_ENTRIES_INVALID')
+    files={}
+    for item in raw:
+        if not isinstance(item,dict):raise ValueError('GIT_TREE_ENTRY_INVALID')
+        kind=str(item.get('type') or '')
+        if kind=='tree':continue
+        if kind not in _TREE_FILE_MODES:raise ValueError('GIT_TREE_ENTRY_TYPE_UNSUPPORTED')
+        path=normalize_repo_path(str(item.get('path') or ''))
+        mode=str(item.get('mode') or '')
+        if mode not in _TREE_FILE_MODES[kind]:raise ValueError('GIT_TREE_ENTRY_MODE_INVALID')
+        object_sha=_exact_sha(item.get('sha'),'GIT_TREE_ENTRY_SHA_INVALID')
+        if path in files:raise ValueError('GIT_TREE_DUPLICATE_PATH')
+        files[path]={'type':kind,'mode':mode,'sha':object_sha}
+        if len(files)>_MAX_TREE_FILES:raise ValueError('GIT_TREE_FILE_INSPECTION_LIMIT')
+    return files
+
+
+def _provider_diff_records(client:GitHubClient,pr:dict[str,Any],patterns:list[Any])->list[dict[str,Any]]:
+    base_sha=_exact_sha((pr.get('base') or {}).get('sha'),'PR_BASE_SHA_INVALID')
+    head_sha=_exact_sha((pr.get('head') or {}).get('sha'),'PR_HEAD_SHA_INVALID')
+    cache={}
+    _prove_base_ancestor(client,base_sha,head_sha,cache)
+    base_files=_provider_tree_files(client,_provider_commit_node(client,base_sha,cache)['tree_sha'])
+    head_files=_provider_tree_files(client,_provider_commit_node(client,head_sha,cache)['tree_sha'])
+    records=[]
+    for path in sorted(set(base_files)|set(head_files)):
+        old=base_files.get(path);new=head_files.get(path)
+        if old==new:continue
+        status='A' if old is None else 'D' if new is None else 'M'
+        inspect=is_trust_sensitive_path(path,patterns)
+        old_text=new_text=None
+        if inspect:
+            if status!='A':old_text=_github_blob(client,path,base_sha)
+            if status!='D':new_text=_github_blob(client,path,head_sha)
+        records.append({'path':path,'old_path':None,'status':status,'old_text':old_text,'new_text':new_text})
+        if len(records)>_MAX_CHANGED_FILES:raise ValueError('PR_DIFF_INSPECTION_INVALID')
+    if not records:raise ValueError('PR_DIFF_INSPECTION_INVALID')
+    return records
+
+
 def _provider_trust_classification(client:GitHubClient,pr:dict[str,Any])->dict[str,Any]:
     number=int(pr.get('number') or 0)
     if number<1:raise ValueError('PR_NUMBER_INVALID')
@@ -105,42 +187,31 @@ def _provider_trust_classification(client:GitHubClient,pr:dict[str,Any])->dict[s
     policy=strict_loads(_github_blob(client,'.adwf/policies/trust-boundary.json',base_sha))
     patterns=policy.get('paths') if isinstance(policy,dict) else None
     if not isinstance(patterns,list) or not patterns:raise ValueError('BASE_TRUST_POLICY_INVALID')
-    files=client.pull_files(number)
-    if not files or len(files)>3000:raise ValueError('PR_DIFF_INSPECTION_INVALID')
-    records=[]
-    for item in files:
-        path=normalize_repo_path(str(item.get('filename') or ''))
-        old_path=normalize_repo_path(str(item.get('previous_filename'))) if item.get('previous_filename') else None
-        status=_STATUS_MAP.get(str(item.get('status') or ''))
-        if status is None:raise ValueError('PR_FILE_STATUS_UNKNOWN')
-        inspect=any(is_trust_sensitive_path(candidate,patterns) for candidate in (path,old_path) if candidate)
-        old_text=new_text=None
-        if inspect:
-            if status!='A':old_text=_github_blob(client,old_path or path,base_sha)
-            if status!='D':new_text=_github_blob(client,path,head_sha)
-        records.append({'path':path,'old_path':old_path,'status':status,'old_text':old_text,'new_text':new_text})
+    records=_provider_diff_records(client,pr,patterns)
     result=classify_diff(records,policy)
     ref=client.git_ref(base_ref)
     current_sha=_exact_sha((ref.get('object') or {}).get('sha'),'CURRENT_BASE_SHA_INVALID')
     result.update({
         'base_sha':base_sha,'head_sha':head_sha,'base_ref':base_ref,
         'current_base_sha':current_sha,'base_current':current_sha==base_sha,
-        'classification_verified':True,'source':'GITHUB_PROVIDER_API',
+        'classification_verified':True,'source':'GITHUB_PROVIDER_API','diff_source':'EXACT_GIT_TREES',
     })
     return result
 
 
-def _capability_live_evidence_provider_gate(client:GitHubClient,pr:dict[str,Any],sha:str)->dict[str,Any]:
+def _capability_live_evidence_provider_gate(client:GitHubClient,pr:dict[str,Any],sha:str,changed_paths:list[str]|None)->dict[str,Any]:
     """Provider-verify candidate live certifications using trusted BASE code.
 
-    This runs only when Capability Truth/certification surfaces change.  Schemas
-    are loaded from the exact PR BASE, so a candidate cannot relax its own
-    certification contract and use that relaxation for self-authorization.
+    Applicability is derived from the already provider-verified exact BASE/HEAD
+    tree effect. Schemas are loaded from the exact PR BASE, so a candidate
+    cannot relax its own certification contract and use that relaxation for
+    self-authorization.
     """
     number=int(pr.get('number') or 0)
     if number<1:return {'applicable':True,'verified':False,'reason_codes':['LIVE_CERT_PR_NUMBER_INVALID']}
-    files=client.pull_files(number)
-    names={normalize_repo_path(str(item.get('filename') or '')) for item in files}
+    if changed_paths is None:return {'applicable':True,'verified':False,'reason_codes':['LIVE_CERT_DIFF_NOT_VERIFIED']}
+    try:names={normalize_repo_path(str(path)) for path in changed_paths}
+    except ValueError:return {'applicable':True,'verified':False,'reason_codes':['LIVE_CERT_DIFF_PATH_INVALID']}
     guarded={'.adwf/capability-live-evidence.json','.adwf/capability-traceability.json','.adwf/schemas/capability-live-evidence-certification.schema.json','.adwf/lib/capability_live_evidence.py'}
     if not (names & guarded):return {'applicable':False,'verified':True,'reason_codes':[]}
     base_sha=_exact_sha((pr.get('base') or {}).get('sha'),'LIVE_CERT_BASE_SHA_INVALID')
@@ -156,11 +227,10 @@ def _capability_live_evidence_provider_gate(client:GitHubClient,pr:dict[str,Any]
     provider=[]
     if not reasons:
         for cert in registry.get('certifications') or []:
-            result=verify_provider_certification(client,cert); provider.append({'id':cert.get('id'),**result})
+            result=verify_provider_certification(client,cert);provider.append({'id':cert.get('id'),**result})
             if result.get('verified') is not True:
                 reasons.extend(result.get('reason_codes') or ['LIVE_CERT_PROVIDER_NOT_VERIFIED'])
     return {'applicable':True,'verified':not reasons,'reason_codes':list(dict.fromkeys(reasons)),'provider':provider}
-
 
 def evaluate_trusted_gate(client:GitHubClient,repo:str,workflow_run:dict[str,Any])->dict[str,Any]:
     run_id=workflow_run.get('id');sha=str(workflow_run.get('head_sha') or '')
@@ -193,7 +263,7 @@ def evaluate_trusted_gate(client:GitHubClient,repo:str,workflow_run:dict[str,Any
             key:classification.get(key) for key in (
                 'result','authorization_mode','reason_codes','manual_required_files','inspection_unverified_files',
                 'standing_policy','base_sha','head_sha','base_ref','current_base_sha','base_current',
-                'classification_verified','source','error_type'
+                'classification_verified','source','diff_source','error_type'
             )
         }
         governance['files']=classification.get('protected_files') or []
@@ -226,7 +296,8 @@ def evaluate_trusted_gate(client:GitHubClient,repo:str,workflow_run:dict[str,Any
                     reasons.append('TRUST_BOUNDARY_CHANGE_NOT_AUTHORIZED')
             else:
                 governance['verified']=True
-        live_evidence=_capability_live_evidence_provider_gate(client,pr,sha)
+        changed_paths=classification.get('changed_files') if classification.get('classification_verified') is True else None
+        live_evidence=_capability_live_evidence_provider_gate(client,pr,sha,changed_paths)
         if live_evidence.get('verified') is not True:
             reasons.append('CAPABILITY_LIVE_EVIDENCE_PROVIDER_NOT_VERIFIED')
             reasons.extend(str(code) for code in (live_evidence.get('reason_codes') or []))
