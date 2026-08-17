@@ -17,10 +17,10 @@ jobs:
         with:
           fetch-depth: 0
 
-      - name: Reconstruct and publish exact candidate tree
+      - name: Publish remaining non-workflow candidate bytes
         shell: bash
         env:
-          BASE_SHA: ad52ebf201e224ccb4f0f1c614da763f6965bd75
+          TARGET_HEAD: ff6b4c261424010d66c74b846514a67d6862e1d8
           EXPECTED_TREE: 73d5da894028de92103a6a4893352ebe016bb1e5
           TARGET_BRANCH: agent/consumer-route-001-native-gate-routing
         run: |
@@ -29,12 +29,12 @@ jobs:
           test "$(sha256sum /tmp/candidate.patch.gz.b64 | awk '{print $1}')" = "fc08be1c42bd206527a5ae29ff31af7325045a285489c5b8744059bf47ac2995"
           base64 -d /tmp/candidate.patch.gz.b64 | gzip -d > /tmp/candidate.patch
           test "$(sha256sum /tmp/candidate.patch | awk '{print $1}')" = "287c700fe340ccf9b8b3abd3d237613b5d8e17bd97231f46de60c2204fb1b95c"
-          git cat-file -e "${BASE_SHA}^{commit}"
-          git checkout --detach "${BASE_SHA}"
-          git apply --index --binary /tmp/candidate.patch
+          git cat-file -e "${TARGET_HEAD}^{commit}"
+          git checkout -B "${TARGET_BRANCH}" "${TARGET_HEAD}"
+          git apply --index --binary --exclude=.github/workflows/adwf-main.yml --exclude=.github/workflows/adwf-pr.yml /tmp/candidate.patch
           test "$(git write-tree)" = "${EXPECTED_TREE}"
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git commit -m "CONSUMER_ROUTE-001: route consumer CI to native gates"
+          git commit -m "CONSUMER_ROUTE-001: materialize exact candidate tree"
           test "$(git rev-parse HEAD^{tree})" = "${EXPECTED_TREE}"
-          git push --force-with-lease="refs/heads/${TARGET_BRANCH}:${BASE_SHA}" origin "HEAD:refs/heads/${TARGET_BRANCH}"
+          git push --force-with-lease="refs/heads/${TARGET_BRANCH}:${TARGET_HEAD}" origin "HEAD:refs/heads/${TARGET_BRANCH}"
