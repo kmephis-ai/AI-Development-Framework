@@ -25,7 +25,14 @@ class GateClient:
     def __init__(self,files,approved=False):
         self.files=files;self.approved=approved;self.repo='o/r'
         self.policy=json.loads((ROOT/'.adwf/policies/trust-boundary.json').read_text(encoding='utf-8'))
-    def get(self,path):return {'id':1,'head_sha':'a'*40,'name':'ADWF PR','event':'pull_request','status':'completed','conclusion':'success','pull_requests':[{'number':7}]}
+    def _tree(self,head):
+        return [{'path':x,'mode':'100644','type':'blob','sha':('2' if head else '1')*40} for x in self.files]
+    def get(self,path):
+        if '/git/commits/'+('b'*40) in path:return {'sha':'b'*40,'tree':{'sha':'c'*40},'parents':[]}
+        if '/git/commits/'+('a'*40) in path:return {'sha':'a'*40,'tree':{'sha':'d'*40},'parents':[{'sha':'b'*40}]}
+        if '/git/trees/'+('c'*40) in path:return {'sha':'c'*40,'truncated':False,'tree':self._tree(False)}
+        if '/git/trees/'+('d'*40) in path:return {'sha':'d'*40,'truncated':False,'tree':self._tree(True)}
+        return {'id':1,'head_sha':'a'*40,'name':'ADWF PR','event':'pull_request','status':'completed','conclusion':'success','pull_requests':[{'number':7}]}
     def check_runs(self,sha):return [{'name':'fast-feedback','head_sha':sha,'status':'completed','conclusion':'success','app':{'slug':'github-actions','id':123}}]
     def pull(self,n):return {'number':n,'base':{'sha':'b'*40,'ref':'main'},'head':{'sha':'a'*40},'user':{'login':'author'}}
     def pull_files(self,n):return [{'filename':x,'status':'modified'} for x in self.files]

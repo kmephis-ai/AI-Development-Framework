@@ -25,9 +25,9 @@ GOV-021 вводит долговечную certification projection повер�
 
 ### Trusted provider readback
 
-Когда PR меняет Capability Truth или live-certification surface, controller выполняется из trusted BASE и перечитывает provider facts заново. Для real external consumer upgrade proof он проверяет exact GitHub workflow run, exact check-run/app, exact check output/report digest, exact ADWF source/target commit trees и exact external consumer commit tree.
+Когда PR меняет Capability Truth или live-certification surface, controller выполняется из trusted BASE и перечитывает provider facts заново. Применимость gate определяется из уже provider-verified exact BASE→HEAD changed-path set, восстановленного по immutable Git commit/tree objects; отдельный повторный PR-files readback не является authority. Для real external consumer upgrade proof controller проверяет exact GitHub workflow run, exact check-run/app, exact check output/report digest, exact ADWF source/target commit trees и exact external consumer commit tree.
 
-Candidate не может ослабить этот gate собственной версией verifier: controller использует код и schema из exact PR BASE. Изменение самого controller остаётся owner-reserved trust-boundary change.
+Если exact diff/ancestry/tree completeness не доказаны, live-evidence gate остаётся `NOT_VERIFIED` и trusted controller должен дойти до публикации явного failing required context, а не завершиться до `_publish()`. Candidate не может ослабить этот gate собственной версией verifier: controller использует код и schema из exact PR BASE. Изменение самого controller остаётся owner-reserved trust-boundary change.
 
 ## Сертифицированный UPGRADE-003 proof
 
