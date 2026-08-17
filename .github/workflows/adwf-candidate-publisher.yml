@@ -178,6 +178,10 @@ jobs:
           printf 'writer_before=%s\n' "$CURRENT"
           test "$CURRENT" = "$BASE_SHA"
 
+          export GIT_AUTHOR_NAME='github-actions[bot]'
+          export GIT_AUTHOR_EMAIL='41898282+github-actions[bot]@users.noreply.github.com'
+          export GIT_COMMITTER_NAME="$GIT_AUTHOR_NAME"
+          export GIT_COMMITTER_EMAIL="$GIT_AUTHOR_EMAIL"
           COMMIT="$(printf '%s\n' 'CONSUMER_INSTR-001: add layered consumer instruction contract' | git commit-tree "$TREE" -p "$BASE_SHA")"
           printf 'candidate_commit=%s\n' "$COMMIT"
           git push origin "$COMMIT:refs/heads/$WRITER_BRANCH"
