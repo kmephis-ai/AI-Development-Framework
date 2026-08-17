@@ -1,0 +1,52 @@
+name: ADWF Materialize CONSUMER_MAIN-001
+
+on:
+  push:
+    branches:
+      - agent/materialize-consumer-main-001-20260817-a
+
+permissions:
+  contents: write
+
+env:
+  TARGET_BRANCH: agent/CONSUMER_MAIN-001-workflow-run-main
+  EXPECTED_HEAD: d128ed9b5cfc93d029b98f2ec37f4b372b853a64
+
+jobs:
+  materialize:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd
+        with:
+          ref: ${{ env.TARGET_BRANCH }}
+          persist-credentials: true
+          fetch-depth: 2
+      - uses: actions/setup-python@a309ff8b426b58ec0e2a45f0f869d46889d02405
+        with:
+          python-version: "3.12.10"
+      - name: Verify exact writer head
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "${EXPECTED_HEAD}"
+      - name: Verify canonical generated projections
+        run: |
+          python .adwf/scripts/generate_pipeline.py --check
+          python .adwf/scripts/docs_freshness.py
+      - name: Materialize package integrity projections
+        run: |
+          python .adwf/scripts/generate_manifest.py
+          python .adwf/scripts/generate_manifest.py --check
+      - name: Commit only canonical materialized files
+        shell: bash
+        run: |
+          set -euo pipefail
+          git status --short
+          CHANGED="$(git diff --name-only)"
+          test "${CHANGED}" = $'MANIFEST.json\nSHA256SUMS.txt' || test "${CHANGED}" = $'SHA256SUMS.txt\nMANIFEST.json'
+          git config user.name "adwf-materializer"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add MANIFEST.json SHA256SUMS.txt
+          git commit -m "chore: материализовать package integrity"
+          git push origin "HEAD:${TARGET_BRANCH}"
