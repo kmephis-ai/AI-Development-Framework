@@ -84,11 +84,11 @@ Migration registry остаётся metadata contract. UPGRADE-002 не испо
 
 `.adwf/scripts/apply_consumer_upgrade.py` предоставляет только явные subcommands:
 
-- `apply` — exact compatibility/plan/snapshot → transaction apply;
+- `apply` — exact compatibility/plan + source snapshot → transaction apply; source snapshot может быть передан явно либо, только при отсутствии runtime adoption provenance после fresh provider checkout, восстановлен из полностью revalidated provider-durable Installation Record;
 - `recover` — восстановление interrupted transaction по transaction id;
 - `rollback` — явный rollback committed transaction.
 
-Planning CLI UPGRADE-001 остаётся read-only; mutating operation никогда не запускается неявно из planning.
+Planning CLI UPGRADE-001 остаётся read-only; mutating operation никогда не запускается неявно из planning. Installation Record остаётся proof-only: rebind лишь восстанавливает exact snapshot input, а `apply` отдельно повторяет trusted-source provenance и current-state checks до любой записи. Существующий runtime adoption/upgrade journal всегда имеет приоритет и не может быть обойдён durable record.
 
 ## Adversarial evidence
 

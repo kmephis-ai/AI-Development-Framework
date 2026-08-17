@@ -1,12 +1,13 @@
 from __future__ import annotations
 from pathlib import Path
-import copy, json, sys, unittest
+import copy, hashlib, json, shutil, sys, unittest
 from unittest.mock import patch
 
 ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT / ".adwf")); sys.path.insert(0, str(ROOT / ".adwf/tests"))
 from consumer_upgrade_transaction_fixture import prepared_transaction  # noqa: E402
 from lib.consumer_profile import PROFILE_REL, load_consumer_profile  # noqa: E402
+from lib.consumer_installation import RECORD_REL, build_record, seal_record, write_record  # noqa: E402
 from lib.consumer_upgrade import ConsumerUpgradeError  # noqa: E402
 from lib.consumer_upgrade_transaction import (  # noqa: E402
     SimulatedUpgradeCrash, UpgradeTransactionStore, apply_upgrade, recover_upgrade, rollback_upgrade,
@@ -24,6 +25,27 @@ class UpgradeTransactionTests(unittest.TestCase):
 
     def rollback(self, s, t, c, txid):
         with self.patched(): return rollback_upgrade(s, t, c, txid)
+
+
+    def publish_installation_record(self, source, consumer, snapshot, *, repository="example/consumer"):
+        adoption = {
+            "status": "COMMITTED",
+            "transaction_id": snapshot["transaction_id"],
+            "snapshot": snapshot,
+            "snapshot_sha256": hashlib.sha256(
+                (json.dumps(snapshot, ensure_ascii=False, indent=2) + "\n").encode("utf-8")
+            ).hexdigest(),
+        }
+        with patch("lib.consumer_installation._git") as git:
+            git.side_effect = lambda _root, *args: (
+                snapshot["source_revision"] if args == ("rev-parse", "HEAD") else "c" * 40
+            )
+            record = build_record(
+                source, consumer, adoption, consumer_repository=repository,
+                consumer_base_sha=None, consumer_base_tree=None,
+            )
+            write_record(record, consumer, source)
+        return record
 
     def assert_a(self, source, consumer):
         self.assertEqual((consumer / ".adwf/private.txt").read_bytes(), (source / ".adwf/private.txt").read_bytes())
@@ -226,5 +248,92 @@ class UpgradeTransactionTests(unittest.TestCase):
                 self.apply(s,t,c,comp,plan,snap)
             self.assertFalse((c / ".adwf-runtime/consumer-upgrade").exists())
         finally: temp.cleanup()
+
+
+    def test_21_fresh_session_installation_proof_rebinds_first_upgrade_only_after_full_validation(self):
+        temp, source, target, consumer, snapshot, compatibility, plan = prepared_transaction(ROOT)
+        try:
+            self.publish_installation_record(source, consumer, snapshot)
+            shutil.rmtree(consumer / ".adwf-runtime")
+            with patch("lib.consumer_upgrade_transaction.detect_repository", return_value="example/consumer"), \
+                 patch("lib.consumer_installation._git") as git:
+                git.side_effect = lambda _root, *args: (
+                    snapshot["source_revision"] if args == ("rev-parse", "HEAD") else "c" * 40
+                )
+                result = self.apply(source, target, consumer, compatibility, plan, snapshot)
+            self.assertEqual(result["status"], "COMMITTED")
+            self.assert_b(target, consumer)
+        finally:
+            temp.cleanup()
+
+    def test_22_fresh_session_installation_record_tamper_blocks_before_upgrade_runtime_write(self):
+        temp, source, target, consumer, snapshot, compatibility, plan = prepared_transaction(ROOT)
+        try:
+            record = self.publish_installation_record(source, consumer, snapshot)
+            shutil.rmtree(consumer / ".adwf-runtime")
+            forged = copy.deepcopy(record)
+            forged["framework"]["source_sha"] = "0" * 40
+            forged = seal_record(forged)
+            (consumer / RECORD_REL).write_text(json.dumps(forged, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+            with patch("lib.consumer_upgrade_transaction.detect_repository", return_value="example/consumer"), \
+                 patch("lib.consumer_installation._git") as git:
+                git.side_effect = lambda _root, *args: (
+                    snapshot["source_revision"] if args == ("rev-parse", "HEAD") else "c" * 40
+                )
+                with self.assertRaisesRegex(ConsumerUpgradeError, "UPGRADE_APPLY_SOURCE_INSTALLATION_PROVENANCE_INVALID"):
+                    self.apply(source, target, consumer, compatibility, plan, snapshot)
+            self.assertFalse((consumer / ".adwf-runtime/consumer-upgrade").exists())
+            self.assert_a(source, consumer)
+        finally:
+            temp.cleanup()
+
+    def test_23_fresh_session_repository_or_snapshot_substitution_blocks_before_write(self):
+        temp, source, target, consumer, snapshot, compatibility, plan = prepared_transaction(ROOT)
+        try:
+            self.publish_installation_record(source, consumer, snapshot)
+            shutil.rmtree(consumer / ".adwf-runtime")
+            with patch("lib.consumer_upgrade_transaction.detect_repository", return_value="foreign/consumer"), \
+                 patch("lib.consumer_installation._git") as git:
+                git.side_effect = lambda _root, *args: (
+                    snapshot["source_revision"] if args == ("rev-parse", "HEAD") else "c" * 40
+                )
+                with self.assertRaisesRegex(ConsumerUpgradeError, "UPGRADE_APPLY_SOURCE_INSTALLATION_PROVENANCE_INVALID:INSTALLATION_CONSUMER_REPOSITORY_MISMATCH"):
+                    self.apply(source, target, consumer, compatibility, plan, snapshot)
+            self.assertFalse((consumer / ".adwf-runtime/consumer-upgrade").exists())
+
+            substituted = copy.deepcopy(snapshot)
+            substituted["transaction_id"] = "d" * 64
+            with patch("lib.consumer_upgrade_transaction.detect_repository", return_value="example/consumer"), \
+                 patch("lib.consumer_installation._git") as git:
+                git.side_effect = lambda _root, *args: (
+                    snapshot["source_revision"] if args == ("rev-parse", "HEAD") else "c" * 40
+                )
+                with self.assertRaisesRegex(ConsumerUpgradeError, "UPGRADE_APPLY_SOURCE_INSTALLATION_SNAPSHOT_PROVENANCE_MISMATCH"):
+                    self.apply(source, target, consumer, compatibility, plan, substituted)
+            self.assertFalse((consumer / ".adwf-runtime/consumer-upgrade").exists())
+        finally:
+            temp.cleanup()
+
+    def test_24_existing_invalid_runtime_adoption_provenance_is_never_bypassed_by_installation_record(self):
+        temp, source, target, consumer, snapshot, compatibility, plan = prepared_transaction(ROOT)
+        try:
+            self.publish_installation_record(source, consumer, snapshot)
+            txpath = consumer / ".adwf-runtime/managed-surface/transactions" / (snapshot["transaction_id"] + ".json")
+            value = json.loads(txpath.read_text(encoding="utf-8"))
+            value["status"] = "ROLLED_BACK"
+            value["journal_sha256"] = hashlib.sha256(
+                json.dumps({k: v for k, v in value.items() if k != "journal_sha256"}, ensure_ascii=False, sort_keys=True, separators=(",", ":")).encode("utf-8")
+            ).hexdigest()
+            txpath.write_text(json.dumps(value, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+            with patch("lib.consumer_upgrade_transaction.detect_repository", return_value="example/consumer"), \
+                 patch("lib.consumer_installation._git") as git:
+                git.side_effect = lambda _root, *args: (
+                    snapshot["source_revision"] if args == ("rev-parse", "HEAD") else "c" * 40
+                )
+                with self.assertRaisesRegex(ConsumerUpgradeError, "UPGRADE_APPLY_SOURCE_ADOPTION_NOT_COMMITTED"):
+                    self.apply(source, target, consumer, compatibility, plan, snapshot)
+            self.assertFalse((consumer / ".adwf-runtime/consumer-upgrade").exists())
+        finally:
+            temp.cleanup()
 
 if __name__ == "__main__": unittest.main()
