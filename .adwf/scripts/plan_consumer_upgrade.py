@@ -10,6 +10,7 @@ import sys
 ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT / ".adwf"))
 
+from lib.consumer_installation import ConsumerInstallationError, rebind_snapshot_for_fresh_session  # noqa: E402
 from lib.consumer_upgrade import ConsumerUpgradeError, build_upgrade_compatibility, plan_consumer_upgrade  # noqa: E402
 from lib.strict_json import load as strict_load  # noqa: E402
 
@@ -28,13 +29,13 @@ def main() -> int:
     parser.add_argument("--consumer-root", required=True)
     parser.add_argument("--source-revision", required=True)
     parser.add_argument("--target-revision", required=True)
-    parser.add_argument("--snapshot", required=True)
+    parser.add_argument("--snapshot")
     parser.add_argument("--skill-bindings")
     args = parser.parse_args()
 
-    snapshot = _object(args.snapshot, "SNAPSHOT")
-    bindings = _object(args.skill_bindings, "SKILL_BINDINGS") if args.skill_bindings else None
     try:
+        snapshot = _object(args.snapshot, "SNAPSHOT") if args.snapshot else rebind_snapshot_for_fresh_session(args.consumer_root, args.source_root)
+        bindings = _object(args.skill_bindings, "SKILL_BINDINGS") if args.skill_bindings else None
         compatibility = build_upgrade_compatibility(
             args.source_root,
             args.target_root,
@@ -53,7 +54,7 @@ def main() -> int:
             snapshot=snapshot,
             skill_bindings=bindings,
         )
-    except (ConsumerUpgradeError, OSError, ValueError, json.JSONDecodeError) as exc:
+    except (ConsumerInstallationError, ConsumerUpgradeError, OSError, ValueError, json.JSONDecodeError) as exc:
         print(json.dumps({
             "status": "BLOCK",
             "reason": str(exc).split("\n", 1)[0],
