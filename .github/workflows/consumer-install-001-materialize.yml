@@ -1,0 +1,68 @@
+name: CONSUMER_INSTALL-001 Materialize
+
+on:
+  push:
+    branches:
+      - agent/materialize-consumer-install-001-20260817-a1
+
+permissions:
+  contents: write
+
+env:
+  BASE_SHA: e1c39313ea3d8222aa825fd759d0ae8953c79737
+  EXPECTED_TREE: ce7ccc7bffb1b6f82edff6ae5de89c622ededbc9
+  PATCH_SHA256: 24fb148c11a6cc525e0d97d792eb93778e823933a83c8ce7fc18ff8fb9f582a3
+  FEATURE_BRANCH: agent/consumer-install-001-durable-install-record
+
+jobs:
+  materialize:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd
+        with:
+          fetch-depth: 0
+          persist-credentials: true
+
+      - name: Reconstruct exact candidate and verify
+        shell: bash
+        run: |
+          set -euo pipefail
+          git fetch origin main --no-tags
+          test "$(git rev-parse origin/main)" = "${BASE_SHA}"
+          test "$(git cat-file -t ${BASE_SHA})" = commit
+
+          cat .transport/consumer-install-001/part-* | base64 -d | gzip -d > /tmp/consumer-install-001.patch
+          echo "${PATCH_SHA256}  /tmp/consumer-install-001.patch" | sha256sum -c -
+
+          rm -rf /tmp/consumer-install-001-work
+          git worktree add --detach /tmp/consumer-install-001-work "${BASE_SHA}"
+          cd /tmp/consumer-install-001-work
+
+          git apply --check /tmp/consumer-install-001.patch
+          git apply --index /tmp/consumer-install-001.patch
+
+          python -m unittest .adwf.tests.test_consumer_installation
+          python -m unittest discover -s .adwf/tests -p 'test_consumer*.py'
+          python .adwf/scripts/validate_capabilities.py
+          python .adwf/scripts/validate_traceability.py
+          python .adwf/scripts/docs_freshness.py
+          python .adwf/scripts/generate_manifest.py --check
+          python .adwf/scripts/validate_framework.py
+          python .adwf/adwf.py self-test
+
+          ACTUAL_TREE="$(git write-tree)"
+          test "${ACTUAL_TREE}" = "${EXPECTED_TREE}"
+
+          git config user.name github-actions[bot]
+          git config user.email 41898282+github-actions[bot]@users.noreply.github.com
+          git commit -m 'CONSUMER_INSTALL-001: durable installation provenance'
+          test "$(git rev-parse HEAD^)" = "${BASE_SHA}"
+          test "$(git rev-parse HEAD^{tree})" = "${EXPECTED_TREE}"
+
+          if git ls-remote --exit-code --heads origin "refs/heads/${FEATURE_BRANCH}" >/tmp/existing-ref 2>/dev/null; then
+            echo 'Feature branch already exists; refusing to overwrite.' >&2
+            exit 1
+          fi
+          test "$(git rev-parse origin/main)" = "${BASE_SHA}"
+          git push origin "HEAD:refs/heads/${FEATURE_BRANCH}"
