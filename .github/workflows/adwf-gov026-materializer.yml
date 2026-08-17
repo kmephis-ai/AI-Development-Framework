@@ -1,0 +1,106 @@
+name: ADWF GOV-026 Bounded Recent Runs Materializer
+
+on:
+  push:
+    branches:
+      - agent/materializer-GOV-026-20260817-a
+
+permissions:
+  contents: write
+
+env:
+  MAIN_SHA: ea0491fdd1399a804728167c7ef44a498b3635e1
+  EXPECTED_TREE: b71832c641914bdbee2479e14af782861856fccb
+  PATCH_SHA256: b3d9f8ab83aefe514b6daceae90a71ca00ea464d6832df28af9c3ba670e93eef
+  TARGET_BRANCH: agent/GOV-026-bounded-recent-actions
+  PATCH_GZ_B64: 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
+
+jobs:
+  materialize:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd
+        with:
+          ref: ${{ env.MAIN_SHA }}
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Verify exact base and apply certified patch
+        shell: bash
+        run: |
+          set -euo pipefail
+          git fetch --no-tags origin "+refs/heads/main:refs/remotes/origin/main"
+          test "$(git rev-parse refs/remotes/origin/main)" = "$MAIN_SHA"
+          printf '%s' "$PATCH_GZ_B64" | base64 -d | gzip -d > "$RUNNER_TEMP/gov026.patch"
+          test "$(sha256sum "$RUNNER_TEMP/gov026.patch" | awk '{print $1}')" = "$PATCH_SHA256"
+          git apply --check "$RUNNER_TEMP/gov026.patch"
+          git apply "$RUNNER_TEMP/gov026.patch"
+          mapfile -t changed < <(git diff --name-only | LC_ALL=C sort)
+          expected=(.adwf/docs-registry.json .adwf/lib/github_provider.py .adwf/scripts/github_metrics_collector.py .adwf/scripts/github_reconcile.py .adwf/tests/test_github_provider_recent_runs.py MANIFEST.json SHA256SUMS.txt docs/architecture/CI_CD_ARCHITECTURE.md)
+          mapfile -t expected_sorted < <(printf '%s\n' "${expected[@]}" | LC_ALL=C sort)
+          test "${#changed[@]}" -eq "${#expected_sorted[@]}"
+          for i in "${!expected_sorted[@]}"; do test "${changed[$i]}" = "${expected_sorted[$i]}"; done
+          git add "${expected[@]}"
+          test "$(git write-tree)" = "$EXPECTED_TREE"
+          git diff --cached --check
+
+      - name: Verify canonical generated artifacts are reproducible
+        shell: bash
+        run: |
+          set -euo pipefail
+          python .adwf/scripts/docs_freshness.py --write --reviewed-at 2026-08-17T17:00:00Z --valid-until 2026-11-17T17:00:00Z
+          python .adwf/scripts/generate_manifest.py
+          test -z "$(git diff --name-only)"
+          python .adwf/scripts/docs_freshness.py
+          python .adwf/scripts/generate_manifest.py --check
+
+      - name: Run focused pagination and trusted-controller regressions
+        shell: bash
+        run: |
+          set -euo pipefail
+          export PYTHONPATH="$PWD/.adwf${PYTHONPATH:+:$PYTHONPATH}"
+          python .adwf/tests/test_github_provider_recent_runs.py
+          python .adwf/tests/test_provider_http_mock.py
+          python .adwf/tests/test_metrics.py
+          python .adwf/tests/test_trusted_controller.py
+          python .adwf/tests/test_standing_owner_authorization.py
+          python .adwf/tests/test_v16_remediation.py
+
+      - name: Run canonical validators and full self-test
+        shell: bash
+        run: |
+          set -euo pipefail
+          export PYTHONPATH="$PWD/.adwf${PYTHONPATH:+:$PYTHONPATH}"
+          python .adwf/scripts/docs_freshness.py
+          python .adwf/scripts/validate_capabilities.py
+          python .adwf/scripts/validate_managed_surface.py
+          python .adwf/scripts/validate_docs.py
+          python .adwf/scripts/validate_pipeline_ir.py
+          python .adwf/scripts/validate_ci.py
+          python .adwf/scripts/validate_framework.py
+          python .adwf/scripts/generate_manifest.py --check
+          python .adwf/adwf.py self-test
+
+      - name: Seal exact GOV-026 feature commit
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -z "$(git diff --name-only)"
+          git config user.name 'ADWF Autonomous Writer'
+          git config user.email 'adwf-writer@example.invalid'
+          git commit -m 'fix(GOV-026): bound recent Actions inventory for trusted reconciliation'
+          test "$(git rev-parse HEAD^)" = "$MAIN_SHA"
+          test "$(git rev-parse HEAD^{tree})" = "$EXPECTED_TREE"
+          test -z "$(git status --porcelain)"
+          echo "candidate_commit=$(git rev-parse HEAD)"
+          echo "candidate_tree=$(git rev-parse HEAD^{tree})"
+
+      - name: Publish feature ref without force
+        shell: bash
+        env:
+          PUSH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          auth="$(printf 'x-access-token:%s' "$PUSH_TOKEN" | base64 -w0)"
+          git -c "http.https://github.com/.extraheader=AUTHORIZATION: basic $auth" push origin "HEAD:refs/heads/$TARGET_BRANCH"
