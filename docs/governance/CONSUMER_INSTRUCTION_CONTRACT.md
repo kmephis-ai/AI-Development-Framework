@@ -23,13 +23,13 @@ Template `.adwf/instructions/AGENTS_ROUTER.template.md` использует con
 
 ## Consumer invariants
 
-`.adwf-consumer/INVARIANTS.md` намеренно **не входит** в framework package inventory. ADWF package/upgrade/detach не получает write/delete authority над этим path. Попытка включить его в target framework package считается invalid instruction ownership и блокирует upgrade до write.
+`.adwf-consumer/INVARIANTS.md` намеренно **не входит** в framework package inventory. ADWF package/upgrade/detach не получает write/delete authority над этим path. Попытка включить его в target framework package считается invalid instruction ownership и блокирует upgrade до write. Если consumer уже материализовал этот path, planning/apply принимают только обычный regular file через реальную directory parent-chain; symlink/non-directory в любом parent component, symlink на конечном path, directory или другой неоднозначный object type блокируется до upgrade write.
 
 Consumer invariants должны содержать только долгоживущие product-specific ограничения. Общие правила Git/CI/writer lifecycle, generic fail-closed semantics и текущий operational state туда не дублируются.
 
 ## Legacy root `AGENTS.md` transition
 
-Ранее подключённые consumer repositories могут иметь pre-existing root `AGENTS.md`, который ADWF уже пометил `managed_by_adwf=false` и сохранил отдельным `preserved_sha256`. В таком случае изменение **self-host/package bytes** `AGENTS.md` между source A и target B не должно само по себе требовать новой overwrite authority, потому что consumer bytes всё равно не записываются.
+Ранее подключённые consumer repositories могут иметь pre-existing root `AGENTS.md`, который ADWF уже пометил `managed_by_adwf=false` и сохранил отдельным `preserved_sha256`. Source A при этом может быть legacy revision, в котором Consumer Instruction Contract ещё отсутствует; authority для bounded transition берётся только из exact target B policy. В таком случае изменение **self-host/package bytes** `AGENTS.md` между source A и target B не должно само по себе требовать новой overwrite authority, потому что consumer bytes всё равно не записываются.
 
 Это исключение узкое и разрешено только если target instruction policy валиден и одновременно выполняется всё:
 

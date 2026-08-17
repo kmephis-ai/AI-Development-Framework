@@ -1,6 +1,6 @@
 from __future__ import annotations
 from pathlib import Path
-import copy, hashlib, json, sys, unittest
+import copy, hashlib, json, shutil, sys, unittest
 from unittest.mock import patch
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -110,6 +110,25 @@ class ConsumerUpgradeCoreTests(unittest.TestCase):
             (target / ".adwf/consumer-instruction-policy.json").unlink()
             seal_inventory(target)
             with self.assertRaisesRegex(ConsumerUpgradeError, "UPGRADE_TARGET_INSTRUCTION_POLICY_INVALID"):
+                self.compat(source, target, consumer, snapshot)
+        finally: temp.cleanup()
+
+    def test_09_consumer_invariant_type_ambiguity_blocks_planning(self):
+        temp, source, target, consumer, snapshot = prepared(ROOT)
+        try:
+            invariant = consumer / ".adwf-consumer/INVARIANTS.md"
+            invariant.mkdir(parents=True)
+            with self.assertRaisesRegex(ConsumerUpgradeError, "UPGRADE_TARGET_INSTRUCTION_POLICY_INVALID"):
+                self.compat(source, target, consumer, snapshot)
+        finally: temp.cleanup()
+
+    def test_10_consumer_invariant_parent_ambiguity_blocks_planning(self):
+        temp, source, target, consumer, snapshot = prepared(ROOT)
+        try:
+            parent = consumer / ".adwf-consumer"
+            shutil.rmtree(parent)
+            parent.write_text("not-a-directory\n", encoding="utf-8")
+            with self.assertRaisesRegex(ConsumerUpgradeError, "INVARIANTS_PARENT_DIRECTORY_REQUIRED"):
                 self.compat(source, target, consumer, snapshot)
         finally: temp.cleanup()
 

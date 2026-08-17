@@ -6,7 +6,7 @@ ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT / ".adwf")); sys.path.insert(0, str(ROOT / ".adwf/tests"))
 from consumer_upgrade_fixture import build_framework  # noqa: E402
 from lib.consumer_instructions import (  # noqa: E402
-    ConsumerInstructionError, load_consumer_instruction_policy, validate_consumer_router,
+    ConsumerInstructionError, load_consumer_instruction_policy, validate_consumer_instruction_state, validate_consumer_router,
 )
 from lib.managed_surface import load_source_inventory  # noqa: E402
 
@@ -57,6 +57,52 @@ class ConsumerInstructionContractTests(unittest.TestCase):
             seal_inventory(framework)
             with self.assertRaisesRegex(ConsumerInstructionError, "ROUTER_OWNERSHIP_INVALID"):
                 load_consumer_instruction_policy(framework, load_source_inventory(framework))
+
+    def test_05_consumer_invariant_object_must_be_regular_file_when_present(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp); framework = root / "framework"; consumer = root / "consumer"
+            framework.mkdir(); consumer.mkdir(); build_framework(framework, ROOT)
+            policy = load_consumer_instruction_policy(framework, load_source_inventory(framework))
+            invariant = consumer / ".adwf-consumer/INVARIANTS.md"
+            invariant.mkdir(parents=True)
+            with self.assertRaisesRegex(ConsumerInstructionError, "INVARIANTS_REGULAR_FILE_REQUIRED"):
+                validate_consumer_instruction_state(consumer, policy)
+
+    def test_06_consumer_invariant_final_symlink_is_forbidden(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp); framework = root / "framework"; consumer = root / "consumer"
+            framework.mkdir(); consumer.mkdir(); build_framework(framework, ROOT)
+            policy = load_consumer_instruction_policy(framework, load_source_inventory(framework))
+            parent = consumer / ".adwf-consumer"; parent.mkdir()
+            target = consumer / "real-invariants.md"; target.write_text("safe\n", encoding="utf-8")
+            try:
+                (parent / "INVARIANTS.md").symlink_to(target)
+            except OSError as exc:
+                self.skipTest(f"symlink unsupported: {exc}")
+            with self.assertRaisesRegex(ConsumerInstructionError, "INVARIANTS_SYMLINK_FORBIDDEN"):
+                validate_consumer_instruction_state(consumer, policy)
+
+    def test_07_consumer_invariant_parent_symlink_is_forbidden(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp); framework = root / "framework"; consumer = root / "consumer"; outside = root / "outside"
+            framework.mkdir(); consumer.mkdir(); outside.mkdir(); build_framework(framework, ROOT)
+            policy = load_consumer_instruction_policy(framework, load_source_inventory(framework))
+            (outside / "INVARIANTS.md").write_text("safe\n", encoding="utf-8")
+            try:
+                (consumer / ".adwf-consumer").symlink_to(outside, target_is_directory=True)
+            except OSError as exc:
+                self.skipTest(f"symlink unsupported: {exc}")
+            with self.assertRaisesRegex(ConsumerInstructionError, "INVARIANTS_PARENT_SYMLINK_FORBIDDEN"):
+                validate_consumer_instruction_state(consumer, policy)
+
+    def test_08_consumer_invariant_parent_must_be_directory(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp); framework = root / "framework"; consumer = root / "consumer"
+            framework.mkdir(); consumer.mkdir(); build_framework(framework, ROOT)
+            policy = load_consumer_instruction_policy(framework, load_source_inventory(framework))
+            (consumer / ".adwf-consumer").write_text("not-a-directory\n", encoding="utf-8")
+            with self.assertRaisesRegex(ConsumerInstructionError, "INVARIANTS_PARENT_DIRECTORY_REQUIRED"):
+                validate_consumer_instruction_state(consumer, policy)
 
 
 if __name__ == "__main__": unittest.main()

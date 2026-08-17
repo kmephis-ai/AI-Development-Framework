@@ -47,6 +47,35 @@ class ConsumerInstructionUpgradeTransactionTests(unittest.TestCase):
         finally:
             temp.cleanup()
 
+    def test_legacy_source_without_instruction_contract_reaches_layered_b_without_router_write(self):
+        temp, source, target, consumer, snapshot, compatibility, plan = prepared_transaction(
+            ROOT, preserve_agents_router=True, legacy_source_without_instruction_policy=True
+        )
+        try:
+            self.assertFalse((source / ".adwf/consumer-instruction-policy.json").exists())
+            self.assertTrue((target / ".adwf/consumer-instruction-policy.json").is_file())
+            baseline = (consumer / "AGENTS.md").read_bytes()
+            result = self.apply(source, target, consumer, compatibility, plan, snapshot)
+            self.assertEqual(result["status"], "COMMITTED")
+            self.assertEqual((consumer / "AGENTS.md").read_bytes(), baseline)
+            self.assertTrue((consumer / ".adwf/consumer-instruction-policy.json").is_file())
+            self.assertTrue((consumer / ".adwf/instructions/CORE.md").is_file())
+        finally:
+            temp.cleanup()
+
+    def test_consumer_invariant_type_ambiguity_blocks_before_upgrade_write(self):
+        temp, source, target, consumer, snapshot, compatibility, plan = prepared_transaction(
+            ROOT, preserve_agents_router=True
+        )
+        try:
+            invariant = consumer / ".adwf-consumer/INVARIANTS.md"
+            invariant.mkdir(parents=True)
+            with self.assertRaisesRegex(Exception, "UPGRADE_APPLY_TARGET_INSTRUCTION_POLICY_INVALID"):
+                self.apply(source, target, consumer, compatibility, plan, snapshot)
+            self.assertFalse((consumer / ".adwf-runtime/consumer-upgrade").exists())
+        finally:
+            temp.cleanup()
+
 
 if __name__ == "__main__":
     unittest.main()
