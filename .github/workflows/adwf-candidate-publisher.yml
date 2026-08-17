@@ -1,0 +1,186 @@
+name: ADWF Exact Candidate Publisher
+
+on:
+  push:
+    branches:
+      - agent/publish-CONSUMER_INSTR-001-20260817-d1
+
+permissions:
+  contents: write
+
+env:
+  BASE_SHA: 4285ab53714841a2646e6d658e0b8d8a25b4d264
+  EXPECTED_TREE: 17e75816998c9f8d540fd7b80f80d1de5d5e8bac
+  WRITER_BRANCH: agent/CONSUMER_INSTR-001-layered-instructions
+
+jobs:
+  publish:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - uses: actions/setup-python@a309ff8b426b58ec0e2a45f0f869d46889d02405
+        with:
+          python-version: "3.12.10"
+
+      - name: Materialize exact candidate and publish fast-forward only
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          # The transport workflow is never part of the candidate tree.
+          git rm -f .github/workflows/adwf-candidate-publisher.yml
+
+          git apply <<'PATCH'
+          diff --git a/.adwf/lib/consumer_upgrade.py b/.adwf/lib/consumer_upgrade.py
+          index 0e9da18..e3c85ed 100644
+          --- a/.adwf/lib/consumer_upgrade.py
+          +++ b/.adwf/lib/consumer_upgrade.py
+          @@ -17,6 +17,10 @@ import subprocess
+           from .consumer_profile import (
+               PROFILE_REL, ConsumerProfileError, build_consumer_profile, load_consumer_profile,
+           )
+          +from .consumer_instructions import (
+          +    ConsumerInstructionError, legacy_preexisting_router_transition_allowed,
+          +    load_consumer_instruction_policy,
+          +)
+           from .contracts import validate
+           from .managed_surface import _validate_snapshot, load_source_inventory
+           from .strict_json import load as strict_load
+          @@ -298,7 +302,7 @@ def _severity_status(findings: list[dict[str, str]]) -> str:
+           
+           def _package_diff(
+               source_inventory: dict[str, Any], target_inventory: dict[str, Any], consumer_root: Path,
+          -    snapshot: dict[str, Any],
+          +    snapshot: dict[str, Any], target_instruction_policy: dict[str, Any],
+           ) -> tuple[list[dict[str, Any]], list[dict[str, str]], dict[str, Any]]:
+               source_files = set(source_inventory["files"])
+               target_files = set(target_inventory["files"])
+          @@ -350,7 +354,12 @@ def _package_diff(
+                           findings.append({"severity": "BLOCK", "code": "UPGRADE_CONSUMER_DRIFT", "subject": rel})
+                       elif snap["managed_by_adwf"] is not True:
+                           action = "PRESERVE_PREEXISTING"
+          -                if source_sha != target_sha or rel not in target_files:
+          +                changed = source_sha != target_sha or rel not in target_files
+          +                router_transition = legacy_preexisting_router_transition_allowed(
+          +                    target_instruction_policy, path=rel, source_ownership=source_ownership,
+          +                    target_ownership=target_ownership, target_present=rel in target_files,
+          +                )
+          +                if changed and not router_transition:
+                               findings.append({"severity": "HUMAN_REQUIRED", "code": "UPGRADE_PREEXISTING_PATH_CHANGE", "subject": rel})
+                       elif source_ownership == "SHARED_GUARDED" or target_ownership == "SHARED_GUARDED":
+                           action = "PRESERVE_SHARED"
+          @@ -413,6 +422,10 @@ def build_upgrade_compatibility(
+           
+               source_inventory = load_source_inventory(source_root)
+               target_inventory = load_source_inventory(target_root)
+          +    try:
+          +        target_instruction_policy = load_consumer_instruction_policy(target_root, target_inventory)
+          +    except ConsumerInstructionError as exc:
+          +        raise ConsumerUpgradeError("UPGRADE_TARGET_INSTRUCTION_POLICY_INVALID:" + str(exc)) from exc
+               _validate_snapshot(snapshot, source_root)
+               if snapshot.get("source_revision") != source_revision:
+                   raise ConsumerUpgradeError("UPGRADE_SNAPSHOT_SOURCE_REVISION_STALE")
+          @@ -472,7 +485,9 @@ def build_upgrade_compatibility(
+           
+               skills, skill_findings = _skill_compatibility(source_root, target_root, migrations, skill_bindings)
+               findings.extend(skill_findings)
+          -    entries, path_findings, rollback = _package_diff(source_inventory, target_inventory, consumer, snapshot)
+          +    entries, path_findings, rollback = _package_diff(
+          +        source_inventory, target_inventory, consumer, snapshot, target_instruction_policy
+          +    )
+               findings.extend(path_findings)
+           
+               compatibility = {
+          diff --git a/.adwf/lib/consumer_upgrade_transaction.py b/.adwf/lib/consumer_upgrade_transaction.py
+          index 1e4f004..34794c5 100644
+          --- a/.adwf/lib/consumer_upgrade_transaction.py
+          +++ b/.adwf/lib/consumer_upgrade_transaction.py
+          @@ -17,6 +17,10 @@ import stat
+           import tempfile
+           
+           from .consumer_profile import PROFILE_REL, ConsumerProfileError, build_consumer_profile, load_consumer_profile
+          +from .consumer_instructions import (
+          +    ConsumerInstructionError, legacy_preexisting_router_transition_allowed,
+          +    load_consumer_instruction_policy,
+          +)
+           from .consumer_installation import (
+               ConsumerInstallationError, _snapshot_from_record, load_record as load_installation_record,
+               validate_fresh_session as validate_installation_fresh_session,
+          @@ -362,6 +366,10 @@ def _preflight(
+               _validate_static_apply_bindings(source_root, target_root, consumer, compatibility, plan, snapshot)
+               source_inventory = load_source_inventory(source_root)
+               target_inventory = load_source_inventory(target_root)
+          +    try:
+          +        target_instruction_policy = load_consumer_instruction_policy(target_root, target_inventory)
+          +    except ConsumerInstructionError as exc:
+          +        raise ConsumerUpgradeError("UPGRADE_APPLY_TARGET_INSTRUCTION_POLICY_INVALID:" + str(exc)) from exc
+           
+               snap = _source_snapshot_map(snapshot)
+               by_path = {str(item["path"]): item for item in plan["entries"]}
+          @@ -404,7 +412,16 @@ def _preflight(
+                           raise ConsumerUpgradeError("UPGRADE_APPLY_SHARED_PRESERVE_INVALID:" + rel)
+                   elif action == "PRESERVE_PREEXISTING":
+                       preserved = (source_snap or {}).get("preserved_sha256") or source_sha
+          -            if not (source_sha and target_sha == source_sha and source_snap and source_snap.get("managed_by_adwf") is False and current_state == "FILE" and current_sha == preserved):
+          +            exact_unchanged = target_sha == source_sha
+          +            router_transition = legacy_preexisting_router_transition_allowed(
+          +                target_instruction_policy, path=rel, source_ownership=str(item.get("source_ownership")),
+          +                target_ownership=str(item.get("target_ownership")), target_present=target_sha is not None,
+          +            )
+          +            if not (
+          +                source_sha and target_sha and source_snap and source_snap.get("managed_by_adwf") is False
+          +                and current_state == "FILE" and current_sha == preserved
+          +                and (exact_unchanged or router_transition)
+          +            ):
+                           raise ConsumerUpgradeError("UPGRADE_APPLY_PREEXISTING_PRESERVE_INVALID:" + rel)
+           
+               rollback = plan["rollback_prerequisites"]
+          @@ -698,7 +715,9 @@ def _apply_entry(source_root: Path, target_root: Path, consumer: Path, journal:
+                   expected = entry.get("preserved_sha256") if action == "PRESERVE_PREEXISTING" else source_sha
+                   _assert_existing_parent_chain(consumer, rel)
+                   state, digest = _path_state(consumer, rel)
+          -        if state != "FILE" or digest != expected or target_sha != source_sha:
+          +        if state != "FILE" or digest != expected:
+          +            raise ConsumerUpgradeError("UPGRADE_PRESERVED_PATH_DRIFT:" + rel)
+          +        if action != "PRESERVE_PREEXISTING" and target_sha != source_sha:
+                       raise ConsumerUpgradeError("UPGRADE_PRESERVED_PATH_DRIFT:" + rel)
+                   entry["state"] = "PRESERVED"; store.save(journal); return
+               if entry["state"] == "VERIFIED":
+          PATCH
+
+          python .adwf/scripts/docs_freshness.py --write
+          python .adwf/scripts/generate_manifest.py
+          python .adwf/tests/test_consumer_instructions.py
+          python .adwf/tests/test_consumer_upgrade_core.py
+          python .adwf/tests/test_consumer_instruction_upgrade_transaction.py
+          python .adwf/tests/test_consumer_upgrade_adversarial.py
+          python .adwf/tests/test_consumer_upgrade_transaction_adversarial.py
+          python .adwf/tests/test_consumer_upgrade_connected.py
+          python .adwf/scripts/validate_framework.py
+          python .adwf/scripts/validate_managed_surface.py
+          git diff --check
+
+          git add -A
+          TREE="$(git write-tree)"
+          printf 'candidate_tree=%s\n' "$TREE"
+          test "$TREE" = "$EXPECTED_TREE"
+
+          AUTH="$(printf 'x-access-token:%s' "$GITHUB_TOKEN" | base64 -w0)"
+          git config --local http.https://github.com/.extraheader "AUTHORIZATION: basic $AUTH"
+          CURRENT="$(git ls-remote origin "refs/heads/${WRITER_BRANCH}" | awk '{print $1}')"
+          printf 'writer_before=%s\n' "$CURRENT"
+          test "$CURRENT" = "$BASE_SHA"
+
+          COMMIT="$(printf '%s\n' 'CONSUMER_INSTR-001: add layered consumer instruction contract' | git commit-tree "$TREE" -p "$BASE_SHA")"
+          printf 'candidate_commit=%s\n' "$COMMIT"
+          git push origin "$COMMIT:refs/heads/$WRITER_BRANCH"
+          AFTER="$(git ls-remote origin "refs/heads/${WRITER_BRANCH}" | awk '{print $1}')"
+          test "$AFTER" = "$COMMIT"
+          printf 'writer_after=%s\n' "$AFTER"
