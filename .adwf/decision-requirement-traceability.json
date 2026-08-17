@@ -2,7 +2,7 @@
   "$schema": ".adwf/schemas/decision-requirement-traceability.schema.json",
   "schema_version": 1,
   "role": "CANONICAL_DECISION_REQUIREMENT_TRACEABILITY",
-  "revision": 22,
+  "revision": 23,
   "records": [
     {
       "id": "INTENT-FOUNDATION-20260815",
@@ -388,6 +388,28 @@
       "source_path": null,
       "source_sha256": null,
       "record_sha256": "7e2c6ad2d98e0aadc1f0607d6824455b835d31fa1bc5f6326d9f89e45f4b6141"
+    },
+    {
+      "id": "REQ-CONSUMER-ROUTE-001",
+      "kind": "REQUIREMENT",
+      "version": 1,
+      "status": "ACTIVE",
+      "title_ru": "Installed consumer CI должен использовать native provider gates без self-host false failures",
+      "statement_ru": "ADWF обязан различать self-host и installed consumer по fail-closed predecessor/current binding contract; в consumer mode не запускать framework-centric global validators/project-command fallback, а принимать PR/Main только по exact-SHA Native Gate Binding provider evidence.",
+      "source_path": null,
+      "source_sha256": null,
+      "record_sha256": "a35cc11af8e3fcd4936652ee39051d86388a518fdeeea65373b6c7cbc587e790"
+    },
+    {
+      "id": "DEC-CONSUMER-ROUTE-001",
+      "kind": "DECISION",
+      "version": 1,
+      "status": "ACCEPTED",
+      "title_ru": "CI route привязывается к predecessor mode и proof-only consumer chain",
+      "statement_ru": "Использовать exact predecessor commit для запрета candidate-controlled SELF_HOST→CONSUMER switch; разрешать UNMANAGED_PREINSTALL→CONSUMER_NATIVE только как initial adoption, валидировать current Profile/Installation/Operations/Gates и ADWF-managed bytes, затем читать native checks с contents/checks read-only authority.",
+      "source_path": null,
+      "source_sha256": null,
+      "record_sha256": "019dc1ce664b058aec290b03b3043de237772b5fe69382a8794db5bc33c5c495"
     }
   ],
   "capability_refs": [
@@ -460,6 +482,11 @@
       "id": "CAPREF-CONSUMER-NATIVE-GATE-BINDING",
       "capability_id": "CONSUMER_NATIVE_GATE_BINDING",
       "ref_sha256": "418f9e36d59119e57d70a635b29e86f34419c676832cf128fcc0c99ac33ab35e"
+    },
+    {
+      "id": "CAPREF-CONSUMER-CI-ROUTING",
+      "capability_id": "CONSUMER_CI_ROUTING",
+      "ref_sha256": "725e58273b59894b3e8410130ab5e367cebb9e0332d63d504f748efd91287ef0"
     }
   ],
   "work_unit_refs": [
@@ -616,6 +643,13 @@
       "issue_number": 106,
       "ai_work_package_id": null,
       "ref_sha256": "3656113568b168b9cdcd23b7e592b070b729f191341b8a583812f2dcb1a96cc8"
+    },
+    {
+      "id": "WORKREF-CONSUMER-ROUTE-001",
+      "roadmap_id": "CONSUMER_ROUTE-001",
+      "issue_number": 108,
+      "ai_work_package_id": null,
+      "ref_sha256": "ae3686e3561d10fabb1236cca2540ea156fd2afb63a3aca334ff7c73a93b1086"
     }
   ],
   "evidence_refs": [],
@@ -1214,7 +1248,35 @@
       "from": "CAPREF-CONSUMER-NATIVE-GATE-BINDING",
       "to": "WORKREF-CONSUMER-GATE-001",
       "edge_sha256": "4e5f4e099fc5673053a95f5275679a3c970b77af4e232618b9143283511695da"
+    },
+    {
+      "id": "EDGE-INTENT-REQ-CONSUMER-ROUTE-001",
+      "type": "INTENT_TO_REQUIREMENT",
+      "from": "INTENT-FOUNDATION-20260815",
+      "to": "REQ-CONSUMER-ROUTE-001",
+      "edge_sha256": "ada61e06c96f88526bdb8e3a14ff476fd2672013ab21ebee4a4e28a29eedf4bb"
+    },
+    {
+      "id": "EDGE-REQ-DEC-CONSUMER-ROUTE-001",
+      "type": "REQUIREMENT_TO_DECISION",
+      "from": "REQ-CONSUMER-ROUTE-001",
+      "to": "DEC-CONSUMER-ROUTE-001",
+      "edge_sha256": "1d852a636f37a054f425ead5fc24efdad19e7213dc52cf0225472d2d64dfae9f"
+    },
+    {
+      "id": "EDGE-DEC-CAP-CONSUMER-ROUTE-001",
+      "type": "DECISION_TO_CAPABILITY",
+      "from": "DEC-CONSUMER-ROUTE-001",
+      "to": "CAPREF-CONSUMER-CI-ROUTING",
+      "edge_sha256": "bd85823b274a566c6c186e4030470b522788a9dbb8e53a062a7102cc3caa2f41"
+    },
+    {
+      "id": "EDGE-CAP-WORK-CONSUMER-ROUTE-001",
+      "type": "CAPABILITY_TO_WORK",
+      "from": "CAPREF-CONSUMER-CI-ROUTING",
+      "to": "WORKREF-CONSUMER-ROUTE-001",
+      "edge_sha256": "21ffce537ed9c382d2ce950260ca7216ec67433feebf8fe8b2fbef73166f4cf8"
     }
   ],
-  "graph_sha256": "acc1e7729397f07927734d5f221c7d1cbaaa5500fc079a2d81f208be69fc115e"
+  "graph_sha256": "d669d6087cc00d5713a1f33b465b28609c9f2ea428cc6f1979c6a9ea5d31b822"
 }

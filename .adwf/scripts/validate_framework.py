@@ -49,6 +49,7 @@ def main() -> int:
         ".adwf/lib/skill_layer.py", ".adwf/scripts/validate_skills.py", ".adwf/scripts/generate_skill_registry.py", ".adwf/scripts/eval_skills.py", ".adwf/scripts/vendor_skill.py",
         ".adwf/lib/ai_work_contracts.py", ".adwf/schemas/ai-work-package.schema.json", ".adwf/schemas/ai-work-result.schema.json",
         ".adwf/lib/decision_traceability.py", ".adwf/schemas/decision-requirement-traceability.schema.json", ".adwf/decision-requirement-traceability.json", ".adwf/scripts/validate_traceability.py",
+        ".adwf/lib/consumer_ci.py", ".adwf/scripts/consumer_ci.py", ".adwf/tests/test_consumer_ci.py",
         ".adwf/lib/managed_surface.py", ".adwf/managed-surface-policy.json", ".adwf/schemas/managed-surface-policy.schema.json", ".adwf/schemas/managed-surface-snapshot.schema.json", ".adwf/schemas/managed-surface-plan.schema.json", ".adwf/scripts/validate_managed_surface.py",
         ".adwf/schemas/skill.schema.json", ".adwf/schemas/skill-eval.schema.json", ".adwf/schemas/skill-registry.schema.json", ".adwf/schemas/skill-legacy-allowlist.schema.json", ".adwf/skill-legacy-allowlist.json",
         ".github/workflows/adwf-pr.yml", ".github/workflows/adwf-main.yml",

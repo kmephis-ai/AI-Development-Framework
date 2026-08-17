@@ -23,7 +23,8 @@
       "trusted": false,
       "cancel_superseded": true,
       "permissions": [
-        "contents:read"
+        "contents:read",
+        "checks:read"
       ]
     },
     "trusted": {
@@ -36,7 +37,11 @@
     "main": {
       "job": "canonical-verification",
       "trusted": true,
-      "cancel_superseded": true
+      "cancel_superseded": true,
+      "permissions": [
+        "contents:read",
+        "checks:read"
+      ]
     },
     "release": {
       "job": "release",

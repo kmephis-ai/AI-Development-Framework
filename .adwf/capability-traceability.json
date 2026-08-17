@@ -597,6 +597,26 @@
       ],
       "live_boundary": "LIVE_VERIFIED требует реального downstream consumer/provider evidence с exact subject SHA и native checks. Fixture/fake provider и self-host CI доказывают implementation, но не означают, что PrihRash gates уже bound.",
       "live_evidence": []
+    },
+    {
+      "id": "CONSUMER_CI_ROUTING",
+      "status": "LIVE_NOT_VERIFIED",
+      "execution_mode": "CORE",
+      "owner_claim_ru": "ADWF может fail-closed различать self-host и installed-consumer CI, сохранять полный self-host validation path и для consumer делегировать PR/Main acceptance только exact-SHA native provider checks без проверки чужих consumer-owned workflows/docs как framework internals.",
+      "entrypoints": [
+        ".adwf/scripts/consumer_ci.py"
+      ],
+      "production_paths": [
+        ".adwf/lib/consumer_ci.py",
+        ".adwf/scripts/generate_pipeline.py",
+        ".github/workflows/adwf-pr.yml",
+        ".github/workflows/adwf-main.yml"
+      ],
+      "verification": [
+        ".adwf/tests/test_consumer_ci.py"
+      ],
+      "live_boundary": "LIVE_VERIFIED требует реального downstream consumer provider proof после adoption: native PR/Main checks должны быть разрешены на exact consumer SHA из clean provider checkout. Self-host CI и synthetic fixtures доказывают implementation, но не означают, что PrihRash уже подключён.",
+      "live_evidence": []
     }
   ]
 }
