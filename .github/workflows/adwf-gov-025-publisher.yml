@@ -1,0 +1,91 @@
+name: ADWF GOV-025 Publisher
+
+on:
+  push:
+    branches:
+      - agent/local-mirror-GOV-025-20260817-a
+
+permissions:
+  contents: write
+
+env:
+  WRITER_BRANCH: agent/gov-025-trusted-tree-readback-recovery
+  EXPECTED_WRITER_SHA: a41a366fc940ebc96f8d58cf8a83ea7fdaaf2416
+  EXPECTED_TREE_SHA: ce73a3fba88bd3e5a4efbbf54bdfdd8e0617ffd5
+  EXPECTED_PATCH_GZ_SHA256: c92dbbe5ea24fd058e2946468d78fcc6ef5349631617e5b3abd500c0ea0bc732
+  TRANSPORT_BRANCH: agent/local-mirror-GOV-025-20260817-a
+
+jobs:
+  publish:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd
+        with:
+          ref: ${{ env.WRITER_BRANCH }}
+          fetch-depth: 0
+      - name: Verify writer lease and reconstruct exact patch
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "${EXPECTED_WRITER_SHA}"
+          git fetch origin "${TRANSPORT_BRANCH}:refs/remotes/origin/gov-025-transport"
+          : > /tmp/patch.b64
+          for n in 00 01 02 03; do
+            git show "origin/gov-025-transport:.adwf-transport/gov-025/chunk-${n}.b64" >> /tmp/patch.b64
+          done
+          base64 -d /tmp/patch.b64 > /tmp/gov-025.patch.gz
+          echo "${EXPECTED_PATCH_GZ_SHA256}  /tmp/gov-025.patch.gz" | sha256sum -c -
+          gzip -t /tmp/gov-025.patch.gz
+          gzip -dc /tmp/gov-025.patch.gz > /tmp/gov-025.patch
+      - name: Apply exact candidate
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name 'ADWF Provider Materializer'
+          git config user.email 'adwf-materializer@example.invalid'
+          git am /tmp/gov-025.patch
+          test "$(git rev-parse HEAD^{tree})" = "${EXPECTED_TREE_SHA}"
+          cat > /tmp/expected-files <<'EOF'
+          .adwf/docs-registry.json
+          .adwf/scripts/publish_trusted_gate.py
+          .adwf/tests/test_standing_owner_authorization.py
+          .adwf/tests/test_trusted_controller.py
+          .adwf/tests/test_v16_remediation.py
+          AGENTS.md
+          MANIFEST.json
+          SHA256SUMS.txt
+          docs/governance/CAPABILITY_LIVE_EVIDENCE.md
+          EOF
+          git diff --name-only "${EXPECTED_WRITER_SHA}" HEAD | sort > /tmp/actual-files
+          sort -o /tmp/expected-files /tmp/expected-files
+          diff -u /tmp/expected-files /tmp/actual-files
+      - name: Focused regression and canonical checks
+        shell: bash
+        run: |
+          set -euo pipefail
+          export PYTHONPATH="$PWD/.adwf:$PWD/.adwf/tests"
+          for p in test_trusted_controller.py test_standing_owner_authorization.py test_v16_remediation.py test_capability_live_evidence.py; do
+            python -m unittest discover -s .adwf/tests -p "$p"
+          done
+          python .adwf/scripts/validate_capabilities.py
+          python .adwf/scripts/docs_freshness.py
+          python .adwf/scripts/generate_manifest.py --check
+          python .adwf/scripts/validate_managed_surface.py
+          python .adwf/scripts/validate_docs.py
+          python .adwf/scripts/validate_pipeline_ir.py
+          python .adwf/scripts/validate_ci.py
+          python .adwf/adwf.py doctor --scope package_integrity --json > /tmp/package.json
+          python - <<'PY'
+          import json
+          value=json.load(open('/tmp/package.json'))
+          assert value['categories']['package_integrity']['status']=='VERIFIED', value
+          assert value['categories']['config_health']['status']=='VERIFIED', value
+          PY
+      - name: CAS-like fast-forward publication
+        shell: bash
+        run: |
+          set -euo pipefail
+          remote_sha="$(git ls-remote origin "refs/heads/${WRITER_BRANCH}" | awk '{print $1}')"
+          test "${remote_sha}" = "${EXPECTED_WRITER_SHA}"
+          git push origin "HEAD:refs/heads/${WRITER_BRANCH}"
