@@ -129,10 +129,10 @@ jobs:
         run: |
           set -euo pipefail
           rm "$MARKER_PATH"
-          test "$(git diff --name-only "$TARGET_SHA")" = "$EVIDENCE_PATH"
+          git add -A
+          test "$(git diff --cached --name-only "$TARGET_SHA")" = "$EVIDENCE_PATH"
           git config user.name github-actions[bot]
           git config user.email 41898282+github-actions[bot]@users.noreply.github.com
-          git add -A
           git commit -m 'evidence: SESSION_TRUTH-001 postmerge provider readback'
           git push origin HEAD:"$EXEC_BRANCH"
       - name: Validate already-published evidence
