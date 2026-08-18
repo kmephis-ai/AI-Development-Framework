@@ -638,6 +638,72 @@
       ],
       "live_boundary": "LIVE_VERIFIED требует реального downstream consumer provider proof после adoption: native PR/Main checks должны быть разрешены на exact consumer SHA из clean provider checkout, включая реальную CI latency внутри bounded wait window. Истечение окна остаётся BLOCK. Self-host CI и synthetic fixtures доказывают implementation, но не означают, что PrihRash уже подключён.",
       "live_evidence": []
+    },
+    {
+      "id": "CONSUMER_TRUSTED_CONTROL_ROUTING",
+      "status": "LIVE_NOT_VERIFIED",
+      "execution_mode": "CORE",
+      "owner_claim_ru": "ADWF trusted controller различает self-host и connected-consumer control path: consumer получает только read-only observer/control routing, а privileged self-host mutation stages не наследуются автоматически.",
+      "entrypoints": [
+        ".github/workflows/adwf-control.yml"
+      ],
+      "production_paths": [
+        ".adwf/lib/consumer_ci.py",
+        ".adwf/scripts/consumer_ci.py",
+        ".adwf/scripts/generate_pipeline.py",
+        ".github/workflows/adwf-control.yml"
+      ],
+      "verification": [
+        ".adwf/tests/test_consumer_ci.py"
+      ],
+      "live_boundary": "LIVE_VERIFIED требует downstream installed-consumer provider proof на exact consumer SHA: control route должен разрешиться в read-only consumer observer, privileged self-host stages должны быть skipped, а provider readback обязан подтвердить отсутствие mutation authority. Self-host CI и deterministic fixtures доказывают implementation, но не live consumer truth.",
+      "live_evidence": []
+    },
+    {
+      "id": "CONSUMER_INSTRUCTION_CONTRACT",
+      "status": "LIVE_NOT_VERIFIED",
+      "execution_mode": "CORE",
+      "owner_claim_ru": "ADWF доставляет connected consumer layered instruction contract как FRAMEWORK_CORE + consumer-owned invariants + fresh provider/runtime state, не записывая volatile writer/task/SHA в root router и не создавая второй Roadmap authority.",
+      "entrypoints": [
+        ".adwf/lib/consumer_instructions.py"
+      ],
+      "production_paths": [
+        ".adwf/lib/consumer_instructions.py",
+        ".adwf/consumer-instruction-policy.json",
+        ".adwf/schemas/consumer-instruction-policy.schema.json",
+        ".adwf/instructions/CORE.md"
+      ],
+      "verification": [
+        ".adwf/tests/test_consumer_instructions.py",
+        ".adwf/tests/test_consumer_instruction_upgrade_transaction.py"
+      ],
+      "live_boundary": "LIVE_VERIFIED требует real connected-consumer upgrade/fresh-session proof: framework instruction layer должен обновиться автоматически, consumer-owned invariants/router сохраниться, а fresh executor обязан восстановить effective contract из provider truth без chat-memory authority. Unit/CI и self-host merge подтверждают implementation, но не downstream live delivery.",
+      "live_evidence": []
+    },
+    {
+      "id": "SESSION_CONTINUITY",
+      "status": "LIVE_NOT_VERIFIED",
+      "execution_mode": "CORE",
+      "owner_claim_ru": "ADWF предоставляет provider-neutral WORK_UNTIL_NATURAL_BOUNDARY, public-safe durable SessionContinuityCheckpoint, provider-durable Runtime Ledger readback/reconciliation и Project Pack continuity binding без превращения checkpoint или chat/session memory в work authority.",
+      "entrypoints": [
+        ".adwf/scripts/github_runtime_sync.py"
+      ],
+      "production_paths": [
+        ".adwf/lib/session_continuity.py",
+        ".adwf/lib/github_runtime_store.py",
+        ".adwf/lib/session_consumer_proof.py",
+        ".adwf/schemas/session-continuity-checkpoint.schema.json",
+        ".adwf/instructions/CORE.md",
+        ".adwf/lib/project_packs.py"
+      ],
+      "verification": [
+        ".adwf/tests/test_session_continuity.py",
+        ".adwf/tests/test_session_continuity_persistence.py",
+        ".adwf/tests/test_session_delivery.py",
+        ".adwf/tests/test_session_consumer_proof.py"
+      ],
+      "live_boundary": "LIVE_NOT_VERIFIED: SESSION_CORE/PERSIST/DELIVERY/CONSUMER_PROOF implementation, exact-head gates and self-host provider resume evidence существуют, но #139 дополнительно требует independently evidenced handover между двумя executor sessions и real connected-consumer proof без duplicate writer или stale mutation. До этих downstream proofs LIVE_VERIFIED запрещён.",
+      "live_evidence": []
     }
   ]
 }
