@@ -1,0 +1,73 @@
+name: ADWF Session Delivery Projection Repair
+
+on:
+  push:
+    branches:
+      - agent/repair-session-delivery-projections-20260818-a1
+
+permissions:
+  contents: write
+
+jobs:
+  repair:
+    runs-on: ubuntu-24.04
+    env:
+      EXPECTED_HEAD: cb9399d0072f6f4ba400dfb90619c21877b20242
+      WRITER_BRANCH: agent/SESSION-DELIVERY-001-consumer-continuity-binding
+      PYTHONDONTWRITEBYTECODE: "1"
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-python@a309ff8b426b58ec0e2a45f0f869d46889d02405
+        with:
+          python-version: '3.12.10'
+          check-latest: false
+      - name: Verify exact writer baseline
+        shell: bash
+        run: |
+          set -euo pipefail
+          git fetch origin "refs/heads/${WRITER_BRANCH}:refs/remotes/origin/${WRITER_BRANCH}"
+          test "$(git rev-parse "refs/remotes/origin/${WRITER_BRANCH}")" = "${EXPECTED_HEAD}"
+          git checkout --detach "${EXPECTED_HEAD}"
+          test "$(git rev-parse HEAD)" = "${EXPECTED_HEAD}"
+      - name: Refresh canonical projections
+        shell: bash
+        run: |
+          set -euo pipefail
+          python .adwf/scripts/docs_freshness.py --write
+          python .adwf/scripts/generate_manifest.py
+          mapfile -t changed < <(git diff --name-only)
+          test "${#changed[@]}" -gt 0
+          for path in "${changed[@]}"; do
+            case "${path}" in
+              .adwf/docs-registry.json|MANIFEST.json|SHA256SUMS.txt) ;;
+              *) echo "UNEXPECTED_GENERATED_PATH:${path}" >&2; exit 1 ;;
+            esac
+          done
+          printf 'generated path: %s\n' "${changed[@]}"
+      - name: Verify canonical framework state
+        shell: bash
+        run: |
+          set -euo pipefail
+          python .adwf/scripts/docs_freshness.py
+          python .adwf/scripts/validate_docs.py
+          python .adwf/scripts/validate_managed_surface.py
+          python .adwf/scripts/validate_project_packs.py
+          python .adwf/scripts/validate_framework.py
+          python .adwf/scripts/validate_pipeline_ir.py
+          python .adwf/adwf.py doctor --scope package_integrity
+          python .adwf/adwf.py doctor --scope config_health
+          python .adwf/adwf.py self-test
+          git diff --check
+      - name: Fast-forward repair to writer branch
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name "adwf-session-delivery-repair"
+          git config user.email "adwf-session-delivery-repair@users.noreply.github.com"
+          git add .adwf/docs-registry.json MANIFEST.json SHA256SUMS.txt
+          git commit -m "[SESSION_DELIVERY-001] Refresh generated projections"
+          remote_head="$(git ls-remote origin "refs/heads/${WRITER_BRANCH}" | awk '{print $1}')"
+          test "${remote_head}" = "${EXPECTED_HEAD}"
+          git push origin "HEAD:refs/heads/${WRITER_BRANCH}"
