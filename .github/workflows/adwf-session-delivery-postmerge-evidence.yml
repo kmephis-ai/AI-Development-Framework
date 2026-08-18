@@ -1,0 +1,66 @@
+name: ADWF Session Delivery Post-Merge Evidence
+
+on:
+  push:
+    branches:
+      - agent/evidence-session-delivery-postmerge-20260818-a1
+    paths:
+      - .github/workflows/adwf-session-delivery-postmerge-evidence.yml
+
+permissions:
+  actions: read
+  contents: write
+
+jobs:
+  collect:
+    runs-on: ubuntu-24.04
+    env:
+      SUBJECT_SHA: 017042c1f2bcde8d89d4b344201e848d873ec5a9
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd
+        with:
+          fetch-depth: 0
+      - name: Collect exact-SHA post-merge workflow evidence
+        shell: bash
+        run: |
+          set -uo pipefail
+          main='null'
+          smoke='null'
+          for _ in $(seq 1 60); do
+            runs="$(gh api --method GET "repos/${GITHUB_REPOSITORY}/actions/runs" -f head_sha="${SUBJECT_SHA}" -f per_page=100)" || exit 2
+            main="$(printf '%s' "${runs}" | jq -c --arg sha "${SUBJECT_SHA}" '[.workflow_runs[] | select(.name == "ADWF Main" and .head_sha == $sha)] | sort_by(.created_at, .run_attempt, .id) | last // null')"
+            smoke="$(printf '%s' "${runs}" | jq -c --arg sha "${SUBJECT_SHA}" '[.workflow_runs[] | select(.name == "ADWF Platform Smoke" and .head_sha == $sha)] | sort_by(.created_at, .run_attempt, .id) | last // null')"
+            main_status="$(printf '%s' "${main}" | jq -r '.status // "missing"')"
+            smoke_status="$(printf '%s' "${smoke}" | jq -r '.status // "missing"')"
+            if [[ "${main_status}" == "completed" && "${smoke_status}" == "completed" ]]; then
+              break
+            fi
+            sleep 5
+          done
+          main_status="$(printf '%s' "${main}" | jq -r '.status // "missing"')"
+          smoke_status="$(printf '%s' "${smoke}" | jq -r '.status // "missing"')"
+          main_conclusion="$(printf '%s' "${main}" | jq -r '.conclusion // "missing"')"
+          smoke_conclusion="$(printf '%s' "${smoke}" | jq -r '.conclusion // "missing"')"
+          jq -n \
+            --arg subject_sha "${SUBJECT_SHA}" \
+            --arg main_status "${main_status}" \
+            --arg main_conclusion "${main_conclusion}" \
+            --arg smoke_status "${smoke_status}" \
+            --arg smoke_conclusion "${smoke_conclusion}" \
+            --argjson main "${main}" \
+            --argjson smoke "${smoke}" \
+            '{schema_version:1,subject_sha:$subject_sha,adwf_main:{status:$main_status,conclusion:$main_conclusion,run:$main},adwf_platform_smoke:{status:$smoke_status,conclusion:$smoke_conclusion,run:$smoke}}' \
+            > postmerge-evidence.json
+          cat postmerge-evidence.json
+          git config user.name "adwf-postmerge-evidence"
+          git config user.email "adwf-postmerge-evidence@users.noreply.github.com"
+          git add postmerge-evidence.json
+          git commit -m "[EVIDENCE] SESSION_DELIVERY-001 post-merge workflows"
+          git push origin HEAD
+          if [[ "${main_status}" != "completed" || "${smoke_status}" != "completed" ]]; then
+            exit 3
+          fi
+          if [[ "${main_conclusion}" != "success" || "${smoke_conclusion}" != "success" ]]; then
+            exit 4
+          fi
