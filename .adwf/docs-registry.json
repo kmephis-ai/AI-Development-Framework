@@ -11,7 +11,7 @@
         ".github/workflows/**"
       ],
       "mode": "generated-status-block+manual",
-      "source_digest": "74fe0f30a584cf829f44d5a5d3b0cca27cffe5a14a6cec109c02965f774f8abf",
+      "source_digest": "34c13d8befd33a3d959ee707c3c3b0a0bc81d6291e5cde2ec697a8594ae4e32c",
       "reviewed_at": "2026-08-17T21:21:00Z",
       "valid_until": "2026-11-17T21:21:00Z"
     },
@@ -24,7 +24,7 @@
         "skills/**"
       ],
       "mode": "manual-governance",
-      "source_digest": "424d0c7cb9f8012d2797c6dcaf9478b814fe6b9a053ea458cdd0f50dbafee7c8",
+      "source_digest": "e488c8554305719d01c732a8da0edf3000a91d3bd6a0243a2a166e0a17cc476e",
       "reviewed_at": "2026-08-17T21:21:00Z",
       "valid_until": "2026-11-17T21:21:00Z"
     },
@@ -65,7 +65,7 @@
         ".adwf/scripts/validate_capabilities.py"
       ],
       "mode": "implementation-certification",
-      "source_digest": "fa2198e69f181adf7c24a7a8c08ea0ef63b7b9bc67a7eeda753e9ac595d564ca",
+      "source_digest": "48d9312379e5d3421b572e417d74290c82285bf4ca4fc8632769cfcf72c1989e",
       "reviewed_at": "2026-08-17T21:21:00Z",
       "valid_until": "2026-11-17T21:21:00Z"
     },
@@ -153,7 +153,7 @@
         ".adwf/roadmap.json"
       ],
       "mode": "governance",
-      "source_digest": "707209a561483bd77141dd3c73bf44917b5d35397ca08b33a3a2486a422b696d",
+      "source_digest": "95ce9d711030f6f3eb08049a226ca2d3f0bcf8e97f8044afef59158650021306",
       "reviewed_at": "2026-08-17T21:21:00Z",
       "valid_until": "2026-11-17T21:21:00Z"
     },
@@ -210,7 +210,7 @@
         ".adwf/decision-requirement-traceability.json"
       ],
       "mode": "governance-contract",
-      "source_digest": "72a45844e982238467dc33674e73c8892aa39b5ea8d94727cb9ecddb9cddef00",
+      "source_digest": "cad946eab676ee1c66a22867ec5db81a0ebed5b88caa28077579e1f4e37a59d2",
       "reviewed_at": "2026-08-17T21:21:00Z",
       "valid_until": "2026-11-17T21:21:00Z"
     },
@@ -230,7 +230,7 @@
         ".adwf/decision-requirement-traceability.json"
       ],
       "mode": "governance-contract",
-      "source_digest": "d20b720433cefc8e8395b6d4c198aa828eaa09ed4039140d4ce3ccf6d7ce77f7",
+      "source_digest": "08d01ec4aba8c5c8dc318858af75b04f43426b76c5a66d375a185dcb93c85efc",
       "reviewed_at": "2026-08-17T21:21:00Z",
       "valid_until": "2026-11-17T21:21:00Z"
     },
@@ -253,7 +253,7 @@
         ".adwf/decision-requirement-traceability.json"
       ],
       "mode": "governance-contract",
-      "source_digest": "a1c051280f192afd22de1988dfa92d49104449655c8a4dcc01f6c77745de2dfb",
+      "source_digest": "c91d2bf3c98fe7596c8282302abd664b51543acea73b6542bc53e9f958fbc7ad",
       "reviewed_at": "2026-08-17T21:21:00Z",
       "valid_until": "2026-11-17T21:21:00Z"
     },
@@ -276,7 +276,7 @@
         ".adwf/decision-requirement-traceability.json"
       ],
       "mode": "governance-contract",
-      "source_digest": "1619a1681e5be0c3814e6f98ae3ddcfbd10a448ecdee8b9056ce10cab2754a34",
+      "source_digest": "d73bb6fdcd1485259215415b548f9e80891348a76e4e848d609851cf69c689eb",
       "reviewed_at": "2026-08-17T21:21:00Z",
       "valid_until": "2026-11-17T21:21:00Z"
     },
@@ -296,7 +296,7 @@
         ".adwf/decision-requirement-traceability.json"
       ],
       "mode": "governance-contract",
-      "source_digest": "295ecb567b09058008eba8d5f9f9c01340106a4befe2042ab08616d585dc6504",
+      "source_digest": "ba8f77fd7c73a46103b6a85b030e961c2c93a07fd4e0083b1eca04253b94e4b9",
       "reviewed_at": "2026-08-17T21:21:00Z",
       "valid_until": "2026-11-17T21:21:00Z"
     },
@@ -314,7 +314,7 @@
         ".adwf/decision-requirement-traceability.json"
       ],
       "mode": "governance-contract",
-      "source_digest": "aeb4ed4d543fcb31925fe31371e5830754246ff8c638bd86d0d0b3ee65db3abf",
+      "source_digest": "d0831cb1098af95aeef24e3b4eedd9d8428bbb62d46eeae04b628c0bfba9131a",
       "reviewed_at": "2026-08-17T21:21:00Z",
       "valid_until": "2026-11-17T21:21:00Z"
     },
@@ -330,7 +330,7 @@
         ".adwf/tests/test_capability_live_evidence.py"
       ],
       "mode": "governance-contract",
-      "source_digest": "77ae01c46e999641b3e5932ee7d07ccc72e97f3c8fbffef9647fc1807cdb84c8",
+      "source_digest": "de0b763debec8753338a059c2f437fdb39eb2b20c526c8b7f7e4b927fb8c7100",
       "reviewed_at": "2026-08-17T21:21:00Z",
       "valid_until": "2026-11-17T21:21:00Z"
     },
@@ -351,7 +351,7 @@
         ".adwf/decision-requirement-traceability.json"
       ],
       "mode": "governance-contract",
-      "source_digest": "7089a3328073480548b95169b4ea8697eb7ba1993307e2f8e709c71a693519f2",
+      "source_digest": "4b268c9b4f5edc2d1f1c98ee45e7b39ade03da9718627993f1a5c0df403c0f49",
       "reviewed_at": "2026-08-17T21:21:00Z",
       "valid_until": "2026-11-17T21:21:00Z"
     },
@@ -370,7 +370,7 @@
         ".adwf/tests/test_consumer_upgrade_transaction.py"
       ],
       "mode": "governance-contract",
-      "source_digest": "63a631e930b693b73e031473d71a3e41e12d8feacd7ea509525ac85bf35031cc",
+      "source_digest": "ca9b1fd5e4809e830e94e8a86fa3fb16ac8aac6ca1ff579ae81dc3612585e92a",
       "reviewed_at": "2026-08-17T21:21:00Z",
       "valid_until": "2026-11-17T21:21:00Z"
     },
@@ -387,7 +387,7 @@
         ".adwf/decision-requirement-traceability.json"
       ],
       "mode": "governance-contract",
-      "source_digest": "20aa696c1d7c1af45226a3d589ce2be56c62bb979b58748fa1d6dbf8ccb6cf60",
+      "source_digest": "89ffe391bb626724e16c7646e43eea6abcab3eeb16b4491ba9a6afa79df6e3c3",
       "reviewed_at": "2026-08-17T21:21:00Z",
       "valid_until": "2026-11-17T21:21:00Z"
     },
@@ -402,7 +402,7 @@
         ".adwf/decision-requirement-traceability.json"
       ],
       "mode": "governance-contract",
-      "source_digest": "c3419601fa4ce5e566e9beede8ff8bd31e9d7635a04d882a93f8b2234be78332",
+      "source_digest": "2588c98a9e203269f2e925daed4d254d2eeecc4e82fd97c50f146144d8bc76d2",
       "reviewed_at": "2026-08-17T21:21:00Z",
       "valid_until": "2026-11-17T21:21:00Z"
     }
