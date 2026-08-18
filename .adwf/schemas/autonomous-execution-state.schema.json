@@ -1,0 +1,77 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "ADWF autonomous execution state v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "$schema",
+    "schema_version",
+    "project_identity",
+    "work_identity",
+    "writer",
+    "conflict_domains",
+    "provider_observation",
+    "execution_state",
+    "boundary_type",
+    "blockers",
+    "last_verified_transition",
+    "evidence_refs",
+    "next_permitted_action",
+    "revision",
+    "integrity_digest"
+  ],
+  "properties": {
+    "$schema": {"const": ".adwf/schemas/autonomous-execution-state.schema.json"},
+    "schema_version": {"const": 1},
+    "project_identity": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["repository"],
+      "properties": {"repository": {"type": "string", "pattern": "^[^/\\s]+/[^/\\s]+$"}}
+    },
+    "work_identity": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["roadmap_id", "issue_id"],
+      "properties": {
+        "roadmap_id": {"type": "string", "minLength": 1},
+        "issue_id": {"type": "string", "minLength": 1}
+      }
+    },
+    "writer": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["lease_id", "lease_state"],
+      "properties": {
+        "lease_id": {"type": ["string", "null"]},
+        "lease_state": {"enum": ["ACTIVE", "SUSPENDED", "RELEASED", "EXPIRED", "NONE"]}
+      }
+    },
+    "conflict_domains": {
+      "type": "array",
+      "minItems": 1,
+      "uniqueItems": true,
+      "items": {"type": "string", "minLength": 1, "maxLength": 240}
+    },
+    "provider_observation": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["main_sha", "head_sha", "pr_number", "branch"],
+      "properties": {
+        "main_sha": {"type": "string", "pattern": "^[0-9a-f]{40}$"},
+        "head_sha": {"type": ["string", "null"], "pattern": "^[0-9a-f]{40}$"},
+        "pr_number": {"type": ["integer", "null"], "minimum": 1},
+        "branch": {"type": ["string", "null"]}
+      }
+    },
+    "execution_state": {"enum": ["RUNNING", "WAITING_CI", "SUSPENDED", "HUMAN_REQUIRED", "RECOVERY", "COMPLETE"]},
+    "boundary_type": {"enum": ["NONE", "WAITING_EXTERNAL", "HUMAN_REQUIRED", "UNAVAILABLE_CAPABILITY", "AUTHORITY_EXHAUSTED", "ROADMAP_END", "EXECUTOR_LIMIT"]},
+    "blockers": {"type": "array", "items": {"type": "string", "maxLength": 240}},
+    "last_verified_transition": {"type": "string", "minLength": 1},
+    "evidence_refs": {"type": "array", "items": {"type": "string", "maxLength": 500}},
+    "next_permitted_action": {"type": "string", "minLength": 1},
+    "revision": {"type": "integer", "minimum": 0},
+    "integrity_digest": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+    "executor_audit": {"type": "object"}
+  }
+}
