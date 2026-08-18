@@ -12,7 +12,8 @@ jobs:
   repair:
     runs-on: ubuntu-24.04
     env:
-      EXPECTED_HEAD: cb9399d0072f6f4ba400dfb90619c21877b20242
+      EXPECTED_HEAD: bb85c9c8060748cda1f987c9ea78f560d756b6b6
+      METADATA_PARENT: cb9399d0072f6f4ba400dfb90619c21877b20242
       WRITER_BRANCH: agent/SESSION-DELIVERY-001-consumer-continuity-binding
       PYTHONDONTWRITEBYTECODE: "1"
     steps:
@@ -31,11 +32,44 @@ jobs:
           test "$(git rev-parse "refs/remotes/origin/${WRITER_BRANCH}")" = "${EXPECTED_HEAD}"
           git checkout --detach "${EXPECTED_HEAD}"
           test "$(git rev-parse HEAD)" = "${EXPECTED_HEAD}"
-      - name: Refresh canonical projections
+          test "$(git rev-parse "${EXPECTED_HEAD}^")" = "${METADATA_PARENT}"
+      - name: Restore review metadata and refresh digests
         shell: bash
         run: |
           set -euo pipefail
-          python .adwf/scripts/docs_freshness.py --write
+          python - <<'PY'
+          from pathlib import Path
+          import json
+          import os
+          import subprocess
+          import sys
+
+          root = Path('.').resolve()
+          sys.path.insert(0, str(root / '.adwf'))
+          from lib.docs_freshness import updated_registry
+
+          parent_sha = os.environ['METADATA_PARENT']
+          parent = json.loads(subprocess.check_output(
+              ['git', 'show', f'{parent_sha}:.adwf/docs-registry.json'], text=True
+          ))
+          fresh = updated_registry(root, '1970-01-01T00:00:00Z', '1970-01-02T00:00:00Z')
+          parent_docs = parent.get('documents') or []
+          fresh_docs = fresh.get('documents') or []
+          parent_by = {item['path']: item for item in parent_docs}
+          fresh_by = {item['path']: item for item in fresh_docs}
+          if set(parent_by) != set(fresh_by):
+              raise SystemExit('DOC_REGISTRY_PATH_SET_CHANGED')
+          for item in parent_docs:
+              path = item['path']
+              item['source_digest'] = fresh_by[path]['source_digest']
+              if item['reviewed_at'] != parent_by[path]['reviewed_at']:
+                  raise SystemExit('REVIEWED_AT_MUTATED:' + path)
+              if item['valid_until'] != parent_by[path]['valid_until']:
+                  raise SystemExit('VALID_UNTIL_MUTATED:' + path)
+          (root / '.adwf/docs-registry.json').write_text(
+              json.dumps(parent, ensure_ascii=False, indent=2) + '\n', encoding='utf-8'
+          )
+          PY
           python .adwf/scripts/generate_manifest.py
           mapfile -t changed < <(git diff --name-only)
           test "${#changed[@]}" -gt 0
@@ -67,7 +101,7 @@ jobs:
           git config user.name "adwf-session-delivery-repair"
           git config user.email "adwf-session-delivery-repair@users.noreply.github.com"
           git add .adwf/docs-registry.json MANIFEST.json SHA256SUMS.txt
-          git commit -m "[SESSION_DELIVERY-001] Refresh generated projections"
+          git commit -m "[SESSION_DELIVERY-001] Preserve docs review metadata"
           remote_head="$(git ls-remote origin "refs/heads/${WRITER_BRANCH}" | awk '{print $1}')"
           test "${remote_head}" = "${EXPECTED_HEAD}"
           git push origin "HEAD:refs/heads/${WRITER_BRANCH}"
