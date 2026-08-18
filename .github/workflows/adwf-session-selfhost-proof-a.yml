@@ -1,0 +1,169 @@
+name: ADWF Session Selfhost Proof A
+
+on:
+  push:
+    branches:
+      - agent/proof-session-selfhost-a-20260818-a1
+    paths:
+      - .github/workflows/adwf-session-selfhost-proof-a.yml
+
+permissions:
+  contents: write
+  issues: write
+
+jobs:
+  persist-checkpoint:
+    runs-on: ubuntu-24.04
+    env:
+      SUBJECT_SHA: 017042c1f2bcde8d89d4b344201e848d873ec5a9
+      PROOF_ISSUE: '149'
+      ROADMAP_ID: SESSION_SELFHOST_PROOF-001
+      RUN_ID: session-selfhost-proof-001-a
+      CHECKPOINT_ID: session-selfhost-proof-001-checkpoint
+      WRITER_LEASE: b5bc44ab-3923-41eb-89c7-c1a91c893357
+      GITHUB_TOKEN: ${{ github.token }}
+      PYTHONDONTWRITEBYTECODE: '1'
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-python@a309ff8b426b58ec0e2a45f0f869d46889d02405
+        with:
+          python-version: '3.12.10'
+          check-latest: false
+      - name: Materialize exact canonical main in isolated worktree
+        shell: bash
+        run: |
+          set -euo pipefail
+          actual_main="$(gh api "repos/${GITHUB_REPOSITORY}/branches/main" --jq '.commit.sha')"
+          test "${actual_main}" = "${SUBJECT_SHA}"
+          subject_dir="${RUNNER_TEMP}/adwf-subject"
+          git worktree add --detach "${subject_dir}" "${SUBJECT_SHA}"
+          test "$(git -C "${subject_dir}" rev-parse HEAD)" = "${SUBJECT_SHA}"
+          echo "SUBJECT_DIR=${subject_dir}" >> "${GITHUB_ENV}"
+      - name: Build verification journal and public-safe natural-boundary checkpoint
+        shell: bash
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          from pathlib import Path
+          import hashlib, json, os, sys
+
+          root = Path(os.environ['SUBJECT_DIR']).resolve()
+          sys.path.insert(0, str(root / '.adwf'))
+          from lib.durable_orchestrator import new_run
+          from lib.session_continuity import build_checkpoint, validate_checkpoint
+
+          request_digest = hashlib.sha256(b'SESSION_SELFHOST_PROOF-001 live provider-durable handover').hexdigest()
+          state = new_run(
+              root,
+              roadmap_id=os.environ['ROADMAP_ID'],
+              issue_id=os.environ['PROOF_ISSUE'],
+              risk='R1',
+              work_type='verification',
+              product_impact=False,
+              owner_request_digest=request_digest,
+              run_id=os.environ['RUN_ID'],
+              max_attempts=1,
+              max_cycles=2,
+              max_elapsed_minutes=30,
+          )
+          if state['roadmap_id'] != os.environ['ROADMAP_ID'] or state['issue_id'] != os.environ['PROOF_ISSUE']:
+              raise SystemExit('PROOF_JOURNAL_WORK_BINDING_MISMATCH')
+          checkpoint = build_checkpoint(
+              checkpoint_id=os.environ['CHECKPOINT_ID'],
+              checkpoint_revision=0,
+              project_identity='kmephis-ai/AI-Development-Framework',
+              roadmap_id=os.environ['ROADMAP_ID'],
+              issue_id=os.environ['PROOF_ISSUE'],
+              main_sha=os.environ['SUBJECT_SHA'],
+              boundary_type='EXECUTOR_LIMIT',
+              next_permitted_action='FRESH_PROVIDER_RECONCILE_THEN_RESTORE_SESSION_CONTEXT',
+              safe_handover_summary='Session A reached a bounded executor boundary after fresh provider reconciliation. Session B must reconstruct from GitHub provider truth plus this checkpoint; the checkpoint grants no authority.',
+              lease_identity=os.environ['WRITER_LEASE'],
+              conflict_domains=['runtime-ledger', 'runtime-anchor-tags'],
+              last_verified_transition='FRESH_PROVIDER_MAIN_RECONCILIATION',
+              evidence_refs=[f"github:issue:{os.environ['PROOF_ISSUE']}", f"git:{os.environ['SUBJECT_SHA']}"],
+              continuation_capability='GENERIC_PROVIDER_RECONCILE',
+          )
+          errors = validate_checkpoint(checkpoint)
+          if errors:
+              raise SystemExit('PROOF_CHECKPOINT_INVALID:' + ','.join(errors))
+          (root / 'session-checkpoint.json').write_text(json.dumps(checkpoint, ensure_ascii=False, indent=2) + '\n', encoding='utf-8')
+          PY
+      - name: Persist through canonical Runtime Ledger and verify same-session provider readback
+        shell: bash
+        run: |
+          set -euo pipefail
+          cd "${SUBJECT_DIR}"
+          python .adwf/scripts/github_runtime_sync.py \
+            --persist \
+            --run-id "${RUN_ID}" \
+            --session-checkpoint session-checkpoint.json \
+            > "${GITHUB_WORKSPACE}/session-a-persist.raw.json"
+          jq -e '
+            .persisted.status == "APPENDED" and
+            .persisted.public_projection_only == true and
+            .persisted.external_anchor.ruleset_verified == true and
+            (.persisted.comment_id != null) and
+            (.persisted.event.event_hash | type == "string") and
+            (.persisted.event.session_continuity_id == env.CHECKPOINT_ID)
+          ' "${GITHUB_WORKSPACE}/session-a-persist.raw.json" >/dev/null
+
+          actual_main="$(gh api "repos/${GITHUB_REPOSITORY}/branches/main" --jq '.commit.sha')"
+          test "${actual_main}" = "${SUBJECT_SHA}"
+          python .adwf/scripts/github_runtime_sync.py \
+            --restore-session \
+            --actual-main-sha "${actual_main}" \
+            > "${GITHUB_WORKSPACE}/session-a-readback.raw.json"
+          jq -e '
+            .session_continuity.checkpoint.checkpoint_id == env.CHECKPOINT_ID and
+            .session_continuity.checkpoint.work_identity.roadmap_id == env.ROADMAP_ID and
+            .session_continuity.checkpoint.work_identity.issue_id == env.PROOF_ISSUE and
+            .session_continuity.reconciliation.provider_authority == false and
+            .session_continuity.reconciliation.stale == false and
+            .session_continuity.reconciliation.next_step == "RESUME_CONTEXT_ONLY" and
+            (.session_continuity.event_hash | type == "string") and
+            (.session_continuity.provider_object_id | type == "string")
+          ' "${GITHUB_WORKSPACE}/session-a-readback.raw.json" >/dev/null
+      - name: Publish bounded Session A evidence on disposable branch
+        shell: bash
+        run: |
+          set -euo pipefail
+          jq -n \
+            --arg schema_version '1' \
+            --arg subject_sha "${SUBJECT_SHA}" \
+            --arg roadmap_id "${ROADMAP_ID}" \
+            --arg issue_id "${PROOF_ISSUE}" \
+            --slurpfile persist session-a-persist.raw.json \
+            --slurpfile restore session-a-readback.raw.json \
+            '{
+              schema_version: ($schema_version|tonumber),
+              proof_phase: "SESSION_A_PERSIST_AND_READBACK",
+              subject_sha: $subject_sha,
+              roadmap_id: $roadmap_id,
+              issue_id: $issue_id,
+              runtime_ledger: {
+                status: $persist[0].persisted.status,
+                issue_number: $persist[0].persisted.issue_number,
+                comment_id: $persist[0].persisted.comment_id,
+                event_hash: $persist[0].persisted.event.event_hash,
+                checkpoint_id: $persist[0].persisted.event.session_continuity_id,
+                checkpoint_revision: $persist[0].persisted.event.session_continuity_revision,
+                checkpoint_digest: $persist[0].persisted.event.session_continuity_digest,
+                external_anchor: $persist[0].persisted.external_anchor,
+                public_projection_only: $persist[0].persisted.public_projection_only
+              },
+              same_session_readback: {
+                provider_object_id: $restore[0].session_continuity.provider_object_id,
+                event_hash: $restore[0].session_continuity.event_hash,
+                reconciliation: $restore[0].session_continuity.reconciliation
+              }
+            }' > session-a-evidence.json
+          cat session-a-evidence.json
+          rm -f session-a-persist.raw.json session-a-readback.raw.json
+          git config user.name 'adwf-session-selfhost-proof'
+          git config user.email 'adwf-session-selfhost-proof@users.noreply.github.com'
+          git add session-a-evidence.json
+          git commit -m '[EVIDENCE] SESSION_SELFHOST_PROOF-001 Session A'
+          git push origin HEAD
