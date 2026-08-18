@@ -29,7 +29,7 @@ def checkpoint(*, main_sha: str = MAIN_A, head_sha: str = HEAD_A, lease: str | N
         checkpoint_id="cp-1",
         checkpoint_revision=1,
         project_identity="consumer/example",
-        roadmap_id="SESSION-CONSUMER-PROOF-001",
+        roadmap_id="SESSION_CONSUMER_PROOF-001",
         issue_id="150",
         main_sha=main_sha,
         head_sha=head_sha,
@@ -56,7 +56,8 @@ def test_independent_executor_resumes_same_writer_without_duplicate() -> None:
     assert proof["proof_state"] == "RESUME_CONTEXT_VERIFIED"
     assert proof["resume_context_allowed"] is True
     assert proof["provider_authority"] is False
-    assert proof["duplicate_writer_required"] is False
+    assert proof["duplicate_writer_allowed"] is False
+    assert proof["same_writer_compatible"] is True
 
 
 def test_stale_checkpoint_is_reconciled_from_fresh_provider_truth() -> None:
@@ -72,6 +73,7 @@ def test_stale_checkpoint_is_reconciled_from_fresh_provider_truth() -> None:
     assert proof["proof_state"] == "STALE_CHECKPOINT_RECONCILED"
     assert proof["checkpoint_stale"] is True
     assert proof["resume_context_allowed"] is True
+    assert proof["duplicate_writer_allowed"] is False
     assert proof["next_step"] == "RESUME_SAME_WRITER_AFTER_POLICY_RECHECK"
 
 
@@ -88,10 +90,10 @@ def test_crash_after_mutation_does_not_require_duplicate_writer() -> None:
     )
     assert proof["proof_state"] == "STALE_CHECKPOINT_RECONCILED"
     assert proof["provider_mutation_discovered_after_checkpoint"] is True
-    assert proof["duplicate_writer_required"] is False
+    assert proof["duplicate_writer_allowed"] is False
 
 
-def test_changed_lease_fails_closed_and_requires_authority_resolution() -> None:
+def test_changed_lease_fails_closed_and_never_authorizes_duplicate_writer() -> None:
     proof = evaluate_handover_proof(
         checkpoint=checkpoint(),
         actual_main_sha=MAIN_A,
@@ -103,11 +105,12 @@ def test_changed_lease_fails_closed_and_requires_authority_resolution() -> None:
     )
     assert proof["proof_state"] == "LEASE_RECONCILIATION_REQUIRED"
     assert proof["resume_context_allowed"] is False
-    assert proof["duplicate_writer_required"] is True
+    assert proof["duplicate_writer_allowed"] is False
+    assert proof["same_writer_compatible"] is False
     assert proof["next_step"] == "FRESH_AUTHORITY_RESOLUTION_REQUIRED"
 
 
-def test_changed_conflict_domains_fail_closed() -> None:
+def test_changed_conflict_domains_fail_closed_without_duplicate_writer() -> None:
     proof = evaluate_handover_proof(
         checkpoint=checkpoint(),
         actual_main_sha=MAIN_A,
@@ -119,6 +122,8 @@ def test_changed_conflict_domains_fail_closed() -> None:
     )
     assert proof["proof_state"] == "CONFLICT_DOMAIN_RECONCILIATION_REQUIRED"
     assert proof["resume_context_allowed"] is False
+    assert proof["duplicate_writer_allowed"] is False
+    assert proof["same_writer_compatible"] is False
 
 
 def test_consumer_binding_cannot_claim_provider_authority() -> None:
@@ -135,6 +140,7 @@ def test_consumer_binding_cannot_claim_provider_authority() -> None:
     )
     assert proof["proof_state"] == "INVALID_CONSUMER_BINDING"
     assert proof["resume_context_allowed"] is False
+    assert proof["duplicate_writer_allowed"] is False
 
 
 def test_same_executor_does_not_satisfy_cross_session_proof() -> None:
@@ -149,3 +155,4 @@ def test_same_executor_does_not_satisfy_cross_session_proof() -> None:
     )
     assert proof["proof_state"] == "NOT_INDEPENDENT_EXECUTOR"
     assert proof["resume_context_allowed"] is False
+    assert proof["duplicate_writer_allowed"] is False
