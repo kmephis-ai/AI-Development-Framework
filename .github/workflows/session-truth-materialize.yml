@@ -19,7 +19,7 @@ jobs:
     steps:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd
         with:
-          fetch-depth: 2
+          fetch-depth: 3
           ref: helper/session-truth-001-materialize
       - uses: actions/setup-python@a309ff8b426b58ec0e2a45f0f869d46889d02405
         with:
@@ -28,7 +28,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          test "$(git rev-parse HEAD^)" = "$ADWF_EXACT_BASE"
+          test "$(git merge-base HEAD "$ADWF_EXACT_BASE")" = "$ADWF_EXACT_BASE"
           test "$(git diff --name-only "$ADWF_EXACT_BASE" HEAD)" = ".github/workflows/session-truth-materialize.yml"
           rm .github/workflows/session-truth-materialize.yml
       - name: Reconcile canonical Roadmap and Capability Truth
@@ -63,11 +63,7 @@ jobs:
 
           truth = json.loads(capability_path.read_text(encoding='utf-8'))
           existing = {item['id'] for item in truth['capabilities']}
-          wanted = {
-              'CONSUMER_TRUSTED_CONTROL_ROUTING',
-              'CONSUMER_INSTRUCTION_CONTRACT',
-              'SESSION_CONTINUITY',
-          }
+          wanted = {'CONSUMER_TRUSTED_CONTROL_ROUTING', 'CONSUMER_INSTRUCTION_CONTRACT', 'SESSION_CONTINUITY'}
           collision = sorted(existing & wanted)
           if collision:
               raise SystemExit('CAPABILITY_ALREADY_PRESENT:' + ','.join(collision))
@@ -79,12 +75,7 @@ jobs:
                   'execution_mode': 'CORE',
                   'owner_claim_ru': 'ADWF trusted controller различает self-host и connected-consumer control path: consumer получает только read-only observer/control routing, а privileged self-host mutation stages не наследуются автоматически.',
                   'entrypoints': ['.github/workflows/adwf-control.yml'],
-                  'production_paths': [
-                      '.adwf/lib/consumer_ci.py',
-                      '.adwf/scripts/consumer_ci.py',
-                      '.adwf/scripts/generate_pipeline.py',
-                      '.github/workflows/adwf-control.yml',
-                  ],
+                  'production_paths': ['.adwf/lib/consumer_ci.py', '.adwf/scripts/consumer_ci.py', '.adwf/scripts/generate_pipeline.py', '.github/workflows/adwf-control.yml'],
                   'verification': ['.adwf/tests/test_consumer_ci.py'],
                   'live_boundary': 'LIVE_VERIFIED требует downstream installed-consumer provider proof на exact consumer SHA: control route должен разрешиться в read-only consumer observer, privileged self-host stages должны быть skipped, а provider readback обязан подтвердить отсутствие mutation authority. Self-host CI и deterministic fixtures доказывают implementation, но не live consumer truth.',
                   'live_evidence': [],
@@ -95,16 +86,8 @@ jobs:
                   'execution_mode': 'CORE',
                   'owner_claim_ru': 'ADWF доставляет connected consumer layered instruction contract как FRAMEWORK_CORE + consumer-owned invariants + fresh provider/runtime state, не записывая volatile writer/task/SHA в root router и не создавая второй Roadmap authority.',
                   'entrypoints': ['.adwf/lib/consumer_instructions.py'],
-                  'production_paths': [
-                      '.adwf/lib/consumer_instructions.py',
-                      '.adwf/consumer-instruction-policy.json',
-                      '.adwf/schemas/consumer-instruction-policy.schema.json',
-                      '.adwf/instructions/CORE.md',
-                  ],
-                  'verification': [
-                      '.adwf/tests/test_consumer_instructions.py',
-                      '.adwf/tests/test_consumer_instruction_upgrade_transaction.py',
-                  ],
+                  'production_paths': ['.adwf/lib/consumer_instructions.py', '.adwf/consumer-instruction-policy.json', '.adwf/schemas/consumer-instruction-policy.schema.json', '.adwf/instructions/CORE.md'],
+                  'verification': ['.adwf/tests/test_consumer_instructions.py', '.adwf/tests/test_consumer_instruction_upgrade_transaction.py'],
                   'live_boundary': 'LIVE_VERIFIED требует real connected-consumer upgrade/fresh-session proof: framework instruction layer должен обновиться автоматически, consumer-owned invariants/router сохраниться, а fresh executor обязан восстановить effective contract из provider truth без chat-memory authority. Unit/CI и self-host merge подтверждают implementation, но не downstream live delivery.',
                   'live_evidence': [],
               },
@@ -114,20 +97,8 @@ jobs:
                   'execution_mode': 'CORE',
                   'owner_claim_ru': 'ADWF предоставляет provider-neutral WORK_UNTIL_NATURAL_BOUNDARY, public-safe durable SessionContinuityCheckpoint, provider-durable Runtime Ledger readback/reconciliation и Project Pack continuity binding без превращения checkpoint или chat/session memory в work authority.',
                   'entrypoints': ['.adwf/scripts/github_runtime_sync.py'],
-                  'production_paths': [
-                      '.adwf/lib/session_continuity.py',
-                      '.adwf/lib/github_runtime_store.py',
-                      '.adwf/lib/session_consumer_proof.py',
-                      '.adwf/schemas/session-continuity-checkpoint.schema.json',
-                      '.adwf/instructions/CORE.md',
-                      '.adwf/lib/project_packs.py',
-                  ],
-                  'verification': [
-                      '.adwf/tests/test_session_continuity.py',
-                      '.adwf/tests/test_session_continuity_persistence.py',
-                      '.adwf/tests/test_session_delivery.py',
-                      '.adwf/tests/test_session_consumer_proof.py',
-                  ],
+                  'production_paths': ['.adwf/lib/session_continuity.py', '.adwf/lib/github_runtime_store.py', '.adwf/lib/session_consumer_proof.py', '.adwf/schemas/session-continuity-checkpoint.schema.json', '.adwf/instructions/CORE.md', '.adwf/lib/project_packs.py'],
+                  'verification': ['.adwf/tests/test_session_continuity.py', '.adwf/tests/test_session_continuity_persistence.py', '.adwf/tests/test_session_delivery.py', '.adwf/tests/test_session_consumer_proof.py'],
                   'live_boundary': 'LIVE_NOT_VERIFIED: SESSION_CORE/PERSIST/DELIVERY/CONSUMER_PROOF implementation, exact-head gates and self-host provider resume evidence существуют, но #139 дополнительно требует independently evidenced handover между двумя executor sessions и real connected-consumer proof без duplicate writer или stale mutation. До этих downstream proofs LIVE_VERIFIED запрещён.',
                   'live_evidence': [],
               },
@@ -165,13 +136,7 @@ jobs:
           set -euo pipefail
           python - <<'PY'
           import subprocess
-          expected = {
-              '.adwf/capability-traceability.json',
-              '.adwf/docs-registry.json',
-              '.adwf/roadmap.json',
-              'MANIFEST.json',
-              'SHA256SUMS.txt',
-          }
+          expected = {'.adwf/capability-traceability.json', '.adwf/docs-registry.json', '.adwf/roadmap.json', 'MANIFEST.json', 'SHA256SUMS.txt'}
           actual = set(subprocess.check_output(['git','diff','--name-only', '43d0774325d4f2f37ec5e71add1d1acacd82a23f'], text=True).splitlines())
           if actual != expected:
               raise SystemExit('UNEXPECTED_FINAL_DIFF:' + ','.join(sorted(actual)))
