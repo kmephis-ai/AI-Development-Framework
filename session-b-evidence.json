@@ -1,0 +1,34 @@
+{
+  "schema_version": 1,
+  "proof_phase": "SESSION_B_FRESH_PROVIDER_RESTORE",
+  "github_run_id": "32099048963",
+  "subject_sha": "017042c1f2bcde8d89d4b344201e848d873ec5a9",
+  "roadmap_id": "SESSION_SELFHOST_PROOF-001",
+  "issue_id": "149",
+  "independent_checkout": true,
+  "session_a_local_runtime_present": false,
+  "restored": {
+    "checkpoint_id": "session-selfhost-proof-001-checkpoint",
+    "checkpoint_revision": 0,
+    "checkpoint_digest": "8e8d0bebbbb5ac3f542c5b141d5cb58c6b27993f5c1c40ed77ed9df397bda523",
+    "work_identity": {
+      "ai_work_package_digest": null,
+      "issue_id": "149",
+      "roadmap_id": "SESSION_SELFHOST_PROOF-001"
+    },
+    "boundary_type": "EXECUTOR_LIMIT",
+    "event_hash": "611cbcec83b883b764308ed5bc3c5e9d3a662d2696a199490df9ea60ea0ecf95",
+    "provider_object_id": "5323578406",
+    "reconciliation": {
+      "checkpoint_id": "session-selfhost-proof-001-checkpoint",
+      "checkpoint_revision": 0,
+      "provider_authority": false,
+      "stale": false,
+      "stale_main": false,
+      "stale_head": false,
+      "actual_main_sha": "017042c1f2bcde8d89d4b344201e848d873ec5a9",
+      "actual_head_sha": null,
+      "next_step": "RESUME_CONTEXT_ONLY"
+    }
+  }
+}
