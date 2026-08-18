@@ -1,7 +1,8 @@
 name: SESSION_TRUTH Postmerge Evidence
 
 on:
-  push:
+  pull_request:
+    types: [opened, synchronize, reopened]
     branches:
       - helper/session-truth-001-postmerge-evidence
 
@@ -12,24 +13,37 @@ permissions:
 env:
   TARGET_SHA: "aea2327c9bea12a4c2eb455187ae81ea02804636"
   TARGET_BRANCH: "main"
+  EXEC_BRANCH: "helper/session-truth-001-postmerge-exec"
+  MARKER_PATH: ".adwf-evidence/session-truth-001-trigger.txt"
   EVIDENCE_PATH: ".adwf-evidence/session-truth-001-postmerge.json"
 
 jobs:
   readback:
+    if: github.event.pull_request.head.ref == 'helper/session-truth-001-postmerge-exec'
     runs-on: ubuntu-24.04
     timeout-minutes: 10
     steps:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd
         with:
-          fetch-depth: 3
-          ref: helper/session-truth-001-postmerge-evidence
-      - name: Fail closed on helper provenance
+          fetch-depth: 0
+          ref: ${{ github.event.pull_request.head.sha }}
+      - name: Detect bounded helper phase
+        id: phase
         shell: bash
         run: |
           set -euo pipefail
           test "$(git merge-base HEAD "$TARGET_SHA")" = "$TARGET_SHA"
-          test "$(git diff --name-only "$TARGET_SHA" HEAD)" = ".github/workflows/session-truth-postmerge-evidence.yml"
+          mapfile -t paths < <(git diff --name-only "$TARGET_SHA" HEAD)
+          if [ "${#paths[@]}" -eq 1 ] && [ "${paths[0]}" = "$MARKER_PATH" ]; then
+            echo "materialize=true" >> "$GITHUB_OUTPUT"
+          elif [ "${#paths[@]}" -eq 1 ] && [ "${paths[0]}" = "$EVIDENCE_PATH" ]; then
+            echo "materialize=false" >> "$GITHUB_OUTPUT"
+          else
+            printf 'UNEXPECTED_HELPER_DIFF:%s\n' "${paths[*]}"
+            exit 1
+          fi
       - name: Read exact postmerge workflow evidence
+        if: steps.phase.outputs.materialize == 'true'
         env:
           GITHUB_TOKEN: ${{ github.token }}
         shell: bash
@@ -92,12 +106,7 @@ jobs:
               run = selected[name]
               jobs_payload = get(f"/repos/{repo}/actions/runs/{run['id']}/jobs?per_page=100")
               jobs = [
-                  {
-                      'id': int(job['id']),
-                      'name': job['name'],
-                      'status': job['status'],
-                      'conclusion': job['conclusion'],
-                  }
+                  {'id': int(job['id']), 'name': job['name'], 'status': job['status'], 'conclusion': job['conclusion']}
                   for job in jobs_payload.get('jobs', [])
               ]
               if run.get('conclusion') != 'success':
@@ -107,26 +116,36 @@ jobs:
               if name == 'ADWF Platform Smoke' and len(jobs) < 2:
                   raise SystemExit('POSTMERGE_PLATFORM_MATRIX_INCOMPLETE')
               evidence['runs'][name] = {
-                  'id': int(run['id']),
-                  'status': run['status'],
-                  'conclusion': run['conclusion'],
-                  'head_sha': run['head_sha'],
-                  'head_branch': run['head_branch'],
-                  'event': run['event'],
-                  'jobs': jobs,
+                  'id': int(run['id']), 'status': run['status'], 'conclusion': run['conclusion'],
+                  'head_sha': run['head_sha'], 'head_branch': run['head_branch'], 'event': run['event'], 'jobs': jobs,
               }
 
           evidence_path.parent.mkdir(parents=True, exist_ok=True)
           evidence_path.write_text(json.dumps(evidence, ensure_ascii=False, indent=2, sort_keys=True) + '\n', encoding='utf-8')
           PY
-      - name: Self-clean and publish bounded evidence
+      - name: Publish bounded evidence to helper head
+        if: steps.phase.outputs.materialize == 'true'
         shell: bash
         run: |
           set -euo pipefail
-          rm .github/workflows/session-truth-postmerge-evidence.yml
+          rm "$MARKER_PATH"
           test "$(git diff --name-only "$TARGET_SHA")" = "$EVIDENCE_PATH"
           git config user.name github-actions[bot]
           git config user.email 41898282+github-actions[bot]@users.noreply.github.com
           git add -A
           git commit -m 'evidence: SESSION_TRUTH-001 postmerge provider readback'
-          git push origin HEAD:helper/session-truth-001-postmerge-evidence
+          git push origin HEAD:"$EXEC_BRANCH"
+      - name: Validate already-published evidence
+        if: steps.phase.outputs.materialize == 'false'
+        shell: bash
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          import json, os
+          from pathlib import Path
+          p = Path(os.environ['EVIDENCE_PATH'])
+          data = json.loads(p.read_text(encoding='utf-8'))
+          assert data['target_sha'] == os.environ['TARGET_SHA']
+          assert set(data['runs']) == {'ADWF Main', 'ADWF Platform Smoke'}
+          assert all(v['conclusion'] == 'success' for v in data['runs'].values())
+          PY
