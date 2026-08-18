@@ -1,4 +1,4 @@
-name: ADWF Local Git Mirror Bootstrap
+name: ADWF Projection Regenerator
 
 on:
   push:
@@ -6,53 +6,31 @@ on:
       - agent/local-mirror-session-consumer-proof-001-20260818-b1
 
 permissions:
-  contents: read
-
-env:
-  SOURCE_SHA: 8ca93ada1915aca4eca18d55fc5e20ec29ef5e63
-  SOURCE_BRANCH: agent/session-consumer-proof-001
-  MIRROR_ARTIFACT_NAME: adwf-local-mirror-session-consumer-proof-001-20260818-b1
+  contents: write
 
 jobs:
-  build-bundle:
+  regenerate:
     runs-on: ubuntu-24.04
     timeout-minutes: 10
     steps:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd
         with:
           fetch-depth: 0
-          persist-credentials: false
 
-      - name: Build exact-source bundle
+      - name: Regenerate exact-source integrity projections and self-clean
         shell: bash
         run: |
           set -euo pipefail
-          git cat-file -e "${SOURCE_SHA}^{commit}"
-          git branch -f adwf-source "${SOURCE_SHA}"
-          mkdir -p mirror-artifact
-          git bundle create mirror-artifact/repository.bundle refs/heads/adwf-source --tags
-          git bundle verify mirror-artifact/repository.bundle
-          BUNDLE_SHA256="$(sha256sum mirror-artifact/repository.bundle | awk '{print $1}')"
-          BUNDLE_BYTES="$(wc -c < mirror-artifact/repository.bundle | tr -d ' ')"
-          printf '%s  %s\n' "${BUNDLE_SHA256}" "repository.bundle" > mirror-artifact/SHA256SUMS.txt
-          cat > mirror-artifact/manifest.json <<JSON
-          {
-            "schema_version": 1,
-            "source_repository": "${GITHUB_REPOSITORY}",
-            "source_branch": "${SOURCE_BRANCH}",
-            "source_sha": "${SOURCE_SHA}",
-            "transport_sha": "${GITHUB_SHA}",
-            "bundle_sha256": "${BUNDLE_SHA256}",
-            "bundle_bytes": ${BUNDLE_BYTES},
-            "bundle_ref": "refs/heads/adwf-source"
+          test "$(git rev-parse HEAD^)" = "8ca93ada1915aca4eca18d55fc5e20ec29ef5e63" || {
+            echo "unexpected helper base" >&2
+            exit 1
           }
-          JSON
-
-      - name: Upload bundle artifact
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
-        with:
-          name: ${{ env.MIRROR_ARTIFACT_NAME }}
-          path: mirror-artifact/
-          if-no-files-found: error
-          retention-days: 1
-          compression-level: 0
+          rm .github/workflows/adwf-local-mirror-bootstrap.yml
+          python .adwf/scripts/generate_manifest.py
+          python .adwf/scripts/generate_manifest.py --check
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add MANIFEST.json SHA256SUMS.txt .github/workflows/adwf-local-mirror-bootstrap.yml
+          git diff --cached --check
+          git commit -m "[SESSION_CONSUMER_PROOF-001] Regenerate integrity projections"
+          git push origin HEAD:agent/local-mirror-session-consumer-proof-001-20260818-b1
