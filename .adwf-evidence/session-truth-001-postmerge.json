@@ -1,0 +1,47 @@
+{
+  "repository": "kmephis-ai/AI-Development-Framework",
+  "role": "SESSION_TRUTH_POSTMERGE_PROVIDER_EVIDENCE",
+  "runs": {
+    "ADWF Main": {
+      "conclusion": "success",
+      "event": "push",
+      "head_branch": "main",
+      "head_sha": "aea2327c9bea12a4c2eb455187ae81ea02804636",
+      "id": 32152795996,
+      "jobs": [
+        {
+          "conclusion": "success",
+          "id": 95762601037,
+          "name": "canonical-verification",
+          "status": "completed"
+        }
+      ],
+      "status": "completed"
+    },
+    "ADWF Platform Smoke": {
+      "conclusion": "success",
+      "event": "push",
+      "head_branch": "main",
+      "head_sha": "aea2327c9bea12a4c2eb455187ae81ea02804636",
+      "id": 32152796040,
+      "jobs": [
+        {
+          "conclusion": "success",
+          "id": 95762600553,
+          "name": "smoke (ubuntu-24.04)",
+          "status": "completed"
+        },
+        {
+          "conclusion": "success",
+          "id": 95762600819,
+          "name": "smoke (windows-2022)",
+          "status": "completed"
+        }
+      ],
+      "status": "completed"
+    }
+  },
+  "schema_version": 1,
+  "target_branch": "main",
+  "target_sha": "aea2327c9bea12a4c2eb455187ae81ea02804636"
+}
