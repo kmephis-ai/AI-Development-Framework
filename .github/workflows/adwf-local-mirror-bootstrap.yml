@@ -8,6 +8,9 @@ on:
 permissions:
   contents: write
 
+env:
+  SOURCE_SHA: 8ca93ada1915aca4eca18d55fc5e20ec29ef5e63
+
 jobs:
   regenerate:
     runs-on: ubuntu-24.04
@@ -21,8 +24,10 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          test "$(git rev-parse HEAD^)" = "8ca93ada1915aca4eca18d55fc5e20ec29ef5e63" || {
-            echo "unexpected helper base" >&2
+          git merge-base --is-ancestor "${SOURCE_SHA}" HEAD
+          CHANGED="$(git diff --name-only "${SOURCE_SHA}" HEAD)"
+          test "${CHANGED}" = ".github/workflows/adwf-local-mirror-bootstrap.yml" || {
+            echo "unexpected helper diff from exact source: ${CHANGED}" >&2
             exit 1
           }
           rm .github/workflows/adwf-local-mirror-bootstrap.yml
