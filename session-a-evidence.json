@@ -1,0 +1,37 @@
+{
+  "schema_version": 1,
+  "proof_phase": "SESSION_A_PERSIST_AND_READBACK",
+  "subject_sha": "017042c1f2bcde8d89d4b344201e848d873ec5a9",
+  "roadmap_id": "SESSION_SELFHOST_PROOF-001",
+  "issue_id": "149",
+  "runtime_ledger": {
+    "status": "APPENDED",
+    "issue_number": 3,
+    "comment_id": 5323578406,
+    "event_hash": "611cbcec83b883b764308ed5bc3c5e9d3a662d2696a199490df9ea60ea0ecf95",
+    "checkpoint_id": "session-selfhost-proof-001-checkpoint",
+    "checkpoint_revision": 0,
+    "checkpoint_digest": "8e8d0bebbbb5ac3f542c5b141d5cb58c6b27993f5c1c40ed77ed9df397bda523",
+    "external_anchor": {
+      "tag": "adwf-runtime-anchor-000001-611cbcec83b883b7",
+      "tag_object_sha": "ca7bd9f5bc3613c9659e5359518f811aa73f1929",
+      "ruleset_verified": true
+    },
+    "public_projection_only": true
+  },
+  "same_session_readback": {
+    "provider_object_id": "5323578406",
+    "event_hash": "611cbcec83b883b764308ed5bc3c5e9d3a662d2696a199490df9ea60ea0ecf95",
+    "reconciliation": {
+      "checkpoint_id": "session-selfhost-proof-001-checkpoint",
+      "checkpoint_revision": 0,
+      "provider_authority": false,
+      "stale": false,
+      "stale_main": false,
+      "stale_head": false,
+      "actual_main_sha": "017042c1f2bcde8d89d4b344201e848d873ec5a9",
+      "actual_head_sha": null,
+      "next_step": "RESUME_CONTEXT_ONLY"
+    }
+  }
+}
