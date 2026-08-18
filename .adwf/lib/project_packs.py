@@ -13,6 +13,7 @@ from .strict_json import loads as strict_loads
 
 PACK_ORDER = ("apps-script", "edge-controller", "react", "vue", "angular", "fastapi", "node", "python", "go")
 COMMAND_NAMES = {"lint", "unit", "integration", "build", "smoke", "golden_paths", "e2e", "install", "start"}
+RESUMABLE_COMMAND_NAMES = {"lint", "unit", "integration", "build", "smoke", "golden_paths", "e2e"}
 SHELL_CONTROL = re.compile(r"(?:\r|\n|\x00|`|\$\(|&&|\|\||[;|<>])")
 EXECUTABLE = re.compile(r"^[A-Za-z0-9_.+-]+$")
 
@@ -200,6 +201,50 @@ def detect_pack(project_root: str | Path, framework_root: str | Path) -> dict[st
     }
 
 
+def _session_continuity_binding(pack_id: str | None, commands: dict[str, Any], preview: dict[str, Any], safety: dict[str, Any]) -> dict[str, Any]:
+    """Return environment facts for SESSION_CONTINUITY without duplicating core WUNB policy."""
+    available = sorted(
+        name for name, entry in commands.items()
+        if name in RESUMABLE_COMMAND_NAMES and bool(entry.get("available"))
+    )
+    binding: dict[str, Any] = {
+        "schema_version": 1,
+        "role": "SESSION_CONTINUITY_PROJECT_PACK_BINDING",
+        "inherits_framework_core": True,
+        "provider_authority": False,
+        "pack_id": pack_id,
+        "workspace_reconstruction": "FRESH_PROVIDER_CHECKOUT",
+        "runtime_evidence_mode": "PROVIDER_FACTS_ONLY",
+        "resumable_commands": available,
+        "safety_boundaries": ["NO_AUTHORITY_EXPANSION", "FRESH_RECONCILE_BEFORE_WRITE"],
+    }
+    if pack_id == "apps-script":
+        binding.update({
+            "runtime_evidence_mode": "CONSUMER_NATIVE_EXTERNAL_RUNTIME_READBACK",
+            "resumable_commands": [],
+            "safety_boundaries": binding["safety_boundaries"] + ["NO_LOCAL_RUNTIME_INFERENCE", "NO_SECRET_SESSION_HANDLE"],
+        })
+    elif pack_id == "edge-controller":
+        binding.update({
+            "runtime_evidence_mode": "REPOSITORY_TEST_EVIDENCE_ONLY",
+            "safety_boundaries": binding["safety_boundaries"] + ["NO_EXTERNAL_RUNTIME", "NO_PHYSICAL_ACTIONS"],
+        })
+    elif preview.get("default_url"):
+        binding.update({
+            "workspace_reconstruction": "FRESH_PROVIDER_CHECKOUT_AND_LOCAL_REBUILD",
+            "runtime_evidence_mode": "LOOPBACK_PREVIEW_PLUS_PROVIDER_FACTS",
+            "safety_boundaries": binding["safety_boundaries"] + ["LOOPBACK_ONLY"],
+        })
+    elif pack_id:
+        binding.update({
+            "workspace_reconstruction": "FRESH_PROVIDER_CHECKOUT_AND_LOCAL_REBUILD",
+            "runtime_evidence_mode": "REPOSITORY_TEST_EVIDENCE_ONLY",
+        })
+    if safety.get("network") == "NONE" and "NO_NETWORK" not in binding["safety_boundaries"]:
+        binding["safety_boundaries"].append("NO_NETWORK")
+    return binding
+
+
 def commands_for_pack(project_root: str | Path, framework_root: str | Path) -> dict[str, Any]:
     detected = detect_pack(project_root, framework_root)
     definition = detected.get("definition") or {}
@@ -216,9 +261,12 @@ def commands_for_pack(project_root: str | Path, framework_root: str | Path) -> d
             entry["available"] = False
         else:
             entry["available"] = True
+    preview = definition.get("preview") or {}
+    safety = definition.get("safety") or {}
     return {
         **detected,
         "commands": commands,
-        "preview": definition.get("preview") or {},
-        "safety": definition.get("safety") or {},
+        "preview": preview,
+        "safety": safety,
+        "session_continuity": _session_continuity_binding(detected.get("pack"), commands, preview, safety),
     }
