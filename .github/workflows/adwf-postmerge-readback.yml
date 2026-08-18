@@ -1,0 +1,164 @@
+name: ADWF Postmerge Readback
+
+on:
+  push:
+    branches:
+      - agent/evidence-session-consumer-proof-postmerge-20260818-a1
+
+permissions:
+  actions: read
+  contents: write
+
+env:
+  MERGE_SHA: 43d0774325d4f2f37ec5e71add1d1acacd82a23f
+  EVIDENCE_FILE: postmerge-readback.json
+
+jobs:
+  readback:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd
+        with:
+          fetch-depth: 0
+
+      - name: Guard exact evidence base
+        shell: bash
+        run: |
+          set -euo pipefail
+          git merge-base --is-ancestor "${MERGE_SHA}" HEAD
+          CHANGED="$(git diff --name-only "${MERGE_SHA}" HEAD)"
+          test "${CHANGED}" = ".github/workflows/adwf-postmerge-readback.yml" || {
+            echo "unexpected evidence-helper diff from exact merge: ${CHANGED}" >&2
+            exit 1
+          }
+
+      - name: Read exact-SHA postmerge provider evidence
+        id: evidence
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          import json
+          import os
+          import time
+          import urllib.request
+
+          repo = os.environ["GITHUB_REPOSITORY"]
+          merge_sha = os.environ["MERGE_SHA"]
+          token = os.environ["GH_TOKEN"]
+          evidence_file = os.environ["EVIDENCE_FILE"]
+          required = ("ADWF Main", "ADWF Platform Smoke")
+          api = "https://api.github.com"
+          headers = {
+              "Accept": "application/vnd.github+json",
+              "Authorization": f"Bearer {token}",
+              "User-Agent": "adwf-postmerge-readback",
+              "X-GitHub-Api-Version": "2022-11-28",
+          }
+
+          def get(path):
+              req = urllib.request.Request(api + path, headers=headers)
+              with urllib.request.urlopen(req, timeout=20) as response:
+                  return json.load(response)
+
+          latest = {}
+          for _ in range(60):
+              payload = get(f"/repos/{repo}/actions/runs?head_sha={merge_sha}&per_page=100")
+              candidates = [
+                  run for run in payload.get("workflow_runs", [])
+                  if run.get("head_sha") == merge_sha and run.get("event") == "push" and run.get("name") in required
+              ]
+              latest = {}
+              for name in required:
+                  matches = sorted(
+                      (run for run in candidates if run.get("name") == name),
+                      key=lambda run: (run.get("created_at") or "", run.get("id") or 0),
+                      reverse=True,
+                  )
+                  if matches:
+                      latest[name] = matches[0]
+              if len(latest) == len(required) and all(run.get("status") == "completed" for run in latest.values()):
+                  break
+              time.sleep(10)
+
+          main = get(f"/repos/{repo}/branches/main")
+          normalized = {}
+          for name in required:
+              run = latest.get(name)
+              if not run:
+                  normalized[name] = None
+                  continue
+              jobs_payload = get(f"/repos/{repo}/actions/runs/{run['id']}/jobs?per_page=100")
+              normalized[name] = {
+                  "id": run.get("id"),
+                  "run_number": run.get("run_number"),
+                  "run_attempt": run.get("run_attempt"),
+                  "event": run.get("event"),
+                  "status": run.get("status"),
+                  "conclusion": run.get("conclusion"),
+                  "head_sha": run.get("head_sha"),
+                  "head_branch": run.get("head_branch"),
+                  "created_at": run.get("created_at"),
+                  "updated_at": run.get("updated_at"),
+                  "html_url": run.get("html_url"),
+                  "jobs": [
+                      {
+                          "id": job.get("id"),
+                          "name": job.get("name"),
+                          "status": job.get("status"),
+                          "conclusion": job.get("conclusion"),
+                          "started_at": job.get("started_at"),
+                          "completed_at": job.get("completed_at"),
+                      }
+                      for job in jobs_payload.get("jobs", [])
+                  ],
+              }
+
+          success = (
+              main.get("commit", {}).get("sha") == merge_sha
+              and all(
+                  normalized.get(name)
+                  and normalized[name].get("head_sha") == merge_sha
+                  and normalized[name].get("event") == "push"
+                  and normalized[name].get("status") == "completed"
+                  and normalized[name].get("conclusion") == "success"
+                  for name in required
+              )
+          )
+          evidence = {
+              "schema_version": 1,
+              "repository": repo,
+              "merge_sha": merge_sha,
+              "main_sha": main.get("commit", {}).get("sha"),
+              "required_workflows": normalized,
+              "verified": success,
+          }
+          with open(evidence_file, "w", encoding="utf-8") as fh:
+              json.dump(evidence, fh, indent=2, sort_keys=True)
+              fh.write("\n")
+          print(json.dumps(evidence, sort_keys=True))
+          with open(os.environ["GITHUB_OUTPUT"], "a", encoding="utf-8") as fh:
+              fh.write(f"verified={'true' if success else 'false'}\n")
+          PY
+
+      - name: Persist self-cleaning readback
+        shell: bash
+        run: |
+          set -euo pipefail
+          rm .github/workflows/adwf-postmerge-readback.yml
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add "${EVIDENCE_FILE}" .github/workflows/adwf-postmerge-readback.yml
+          git diff --cached --check
+          git commit -m "[SESSION_CONSUMER_PROOF-001] Record exact postmerge readback"
+          git push origin HEAD:agent/evidence-session-consumer-proof-postmerge-20260818-a1
+
+      - name: Enforce readback verdict
+        if: steps.evidence.outputs.verified != 'true'
+        shell: bash
+        run: |
+          echo "postmerge evidence is not fully verified" >&2
+          exit 1
