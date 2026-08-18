@@ -26,6 +26,8 @@ def evaluate_handover_proof(
 
     The result is an evidence projection, never mutation authority. A caller must
     still enforce the repository's current policy and work package before writing.
+    A mismatch never authorizes creation of a duplicate writer; it requires fresh
+    authority resolution by the existing orchestration/lease layer.
     """
     errors = validate_checkpoint(checkpoint)
     if errors:
@@ -33,6 +35,7 @@ def evaluate_handover_proof(
             "proof_state": "INVALID_CHECKPOINT",
             "resume_context_allowed": False,
             "provider_authority": False,
+            "duplicate_writer_allowed": False,
             "errors": errors,
         }
 
@@ -50,7 +53,7 @@ def evaluate_handover_proof(
 
     lease_matches = bool(checkpoint_lease) and checkpoint_lease == active_lease_identity
     domains_match = checkpoint_domains == actual_domains
-    duplicate_writer_required = not (lease_matches and domains_match)
+    same_writer_compatible = lease_matches and domains_match
 
     if not independent_executor:
         state = "NOT_INDEPENDENT_EXECUTOR"
@@ -76,7 +79,8 @@ def evaluate_handover_proof(
         "proof_state": state,
         "resume_context_allowed": resume_context_allowed,
         "provider_authority": False,
-        "duplicate_writer_required": duplicate_writer_required,
+        "duplicate_writer_allowed": False,
+        "same_writer_compatible": same_writer_compatible,
         "lease_matches": lease_matches,
         "conflict_domains_match": domains_match,
         "checkpoint_stale": bool(reconciliation["stale"]),
