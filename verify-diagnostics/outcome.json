@@ -1,0 +1,14 @@
+{
+  "source_sha": "86d943b03a1fc591b5b533d1ac211da93dc70694",
+  "prep": "success",
+  "manifest": "success",
+  "ci": "success",
+  "pipeline": "success",
+  "capabilities": "success",
+  "traceability": "success",
+  "docs": "success",
+  "framework": "failure",
+  "package": "skipped",
+  "config": "skipped",
+  "selftest": "skipped"
+}
