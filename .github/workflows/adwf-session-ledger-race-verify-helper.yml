@@ -12,12 +12,12 @@ permissions:
 
 env:
   TARGET_BRANCH: agent/SESSION_LEDGER_RACE_001-runtime-ledger-singleton
-  EXPECTED_HEAD: 8030a950641a1915835dc323421839e042bc80a3
+  EXPECTED_HEAD: 009e887be27630bd637753918ea936a3ec52099f
   PYTHONDONTWRITEBYTECODE: '1'
 
 jobs:
   verify-materialize:
-    if: github.event.action == 'opened'
+    if: github.event.action == 'synchronize'
     runs-on: ubuntu-24.04
     timeout-minutes: 20
     steps:
