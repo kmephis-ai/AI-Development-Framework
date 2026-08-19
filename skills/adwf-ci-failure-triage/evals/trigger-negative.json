@@ -1,0 +1,27 @@
+{
+  "schema_version": 1,
+  "skill_id": "adwf-ci-failure-triage",
+  "kind": "trigger-negative",
+  "cases": [
+    {
+      "id": "release-notes",
+      "input": "release notes only: подготовь changelog",
+      "expected_trigger": false
+    },
+    {
+      "id": "weather",
+      "input": "погода на завтра в Амстердаме",
+      "expected_trigger": false
+    },
+    {
+      "id": "architecture",
+      "input": "объясни event-driven architecture",
+      "expected_trigger": false
+    },
+    {
+      "id": "email",
+      "input": "напиши письмо поставщику",
+      "expected_trigger": false
+    }
+  ]
+}
