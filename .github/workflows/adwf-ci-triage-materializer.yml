@@ -1,0 +1,70 @@
+name: ADWF CI Triage Disposable Materializer
+
+on:
+  push:
+    branches:
+      - agent/local-materialize-CI_TRIAGE-001-20260819-a1
+
+permissions:
+  contents: write
+
+env:
+  TRUST_ANCHOR_MAIN: 1f38866eeb242f8d1e56c54632b059cf8adde77d
+
+jobs:
+  materialize:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd
+        with:
+          fetch-depth: 0
+
+      - name: Materialize final intended tree
+        shell: bash
+        run: |
+          set -euo pipefail
+          git cat-file -e "${TRUST_ANCHOR_MAIN}^{commit}"
+
+          # Both helper workflows are transport-only and MUST NOT survive in the final tree.
+          git rm -f \
+            .github/workflows/adwf-local-mirror-bootstrap.yml \
+            .github/workflows/adwf-ci-triage-materializer.yml
+
+          python3 .adwf/scripts/generate_skill_registry.py
+          python3 .adwf/scripts/docs_freshness.py --write
+          python3 .adwf/scripts/generate_manifest.py
+
+          python3 .adwf/scripts/validate_skills.py
+          python3 .adwf/scripts/eval_skills.py
+          python3 .adwf/scripts/generate_skill_registry.py --check
+          python3 .adwf/scripts/docs_freshness.py
+          python3 .adwf/scripts/generate_manifest.py --check
+          python3 .adwf/scripts/validate_docs.py
+          python3 .adwf/scripts/validate_pipeline_ir.py
+          python3 .adwf/scripts/validate_framework_structure.py
+          python3 .adwf/scripts/ci_static_security.py
+          python3 .adwf/adwf.py doctor --scope package_integrity
+          python3 .adwf/adwf.py doctor --scope config_health
+          python3 -m unittest discover -s .adwf/tests -p 'test_*skill*.py' -v
+          git diff --check "${TRUST_ANCHOR_MAIN}"
+
+          mapfile -t changed < <(git diff --name-only "${TRUST_ANCHOR_MAIN}" | sort)
+          allowed='^(\.adwf/docs-registry\.json|MANIFEST\.json|SHA256SUMS\.txt|skills/registry\.json|skills/adwf-ci-failure-triage/(SKILL\.md|SPEC\.md|skill\.json|evals/(adversarial|success-cases|trigger-negative|trigger-positive)\.json)|skills/adwf-develop/(SKILL\.md|skill\.json|evals/trigger-positive\.json)|skills/adwf-operate/(SKILL\.md|skill\.json|evals/trigger-positive\.json))$'
+          for path in "${changed[@]}"; do
+            if [[ ! "$path" =~ $allowed ]]; then
+              echo "UNEXPECTED_FINAL_PATH=$path" >&2
+              exit 1
+            fi
+          done
+          [[ "${#changed[@]}" -eq 17 ]]
+          if printf '%s\n' "${changed[@]}" | grep -q '^\.github/workflows/'; then
+            echo 'TEMP_WORKFLOW_SURVIVED_FINAL_DIFF' >&2
+            exit 1
+          fi
+
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          git commit -m "[CI_TRIAGE-001] Materialize canonical generated projections"
+          git push origin HEAD:${GITHUB_REF_NAME}
