@@ -1,0 +1,64 @@
+name: ADWF ORCH_STATE Generated Sync PR Helper
+
+on:
+  pull_request:
+    branches:
+      - helper/orch-state-gen-base-20260819-a1
+    paths:
+      - .adwf-evidence/orch-state-generated-sync.trigger
+
+permissions:
+  contents: write
+
+env:
+  TARGET_BRANCH: agent/ORCH-STATE-001-provider-durable-state
+  EXPECTED_HEAD: 7c8fd1d1bc080693780ffd808478d32c36d50627
+  PYTHONDONTWRITEBYTECODE: '1'
+
+jobs:
+  sync:
+    if: github.event.action == 'opened'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd
+        with:
+          ref: ${{ env.TARGET_BRANCH }}
+          fetch-depth: 0
+          persist-credentials: true
+      - uses: actions/setup-python@a309ff8b426b58ec0e2a45f0f869d46889d02405
+        with:
+          python-version: '3.12.10'
+          check-latest: false
+      - name: Exact-head CAS and canonical generation
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "$EXPECTED_HEAD"
+          remote_head="$(git ls-remote origin "refs/heads/${TARGET_BRANCH}" | awk '{print $1}')"
+          test "$remote_head" = "$EXPECTED_HEAD"
+          python .adwf/scripts/docs_freshness.py --write
+          python .adwf/scripts/generate_manifest.py
+          python .adwf/scripts/docs_freshness.py
+          python .adwf/scripts/generate_manifest.py --check
+          python .adwf/scripts/validate_framework.py
+      - name: Enforce bounded generated-only delta and publish same writer branch
+        shell: bash
+        run: |
+          set -euo pipefail
+          changed="$(git status --porcelain=v1 | awk '{print $2}' | sort)"
+          printf '%s\n' "$changed"
+          test -n "$changed"
+          while IFS= read -r path; do
+            case "$path" in
+              .adwf/docs-registry.json|MANIFEST.json|SHA256SUMS.txt) ;;
+              *) echo "UNAUTHORIZED_GENERATED_SYNC_PATH:$path"; exit 1;;
+            esac
+          done <<< "$changed"
+          remote_head="$(git ls-remote origin "refs/heads/${TARGET_BRANCH}" | awk '{print $1}')"
+          test "$remote_head" = "$EXPECTED_HEAD"
+          git config user.name 'adwf-orch-state-recovery'
+          git config user.email 'adwf-orch-state-recovery@users.noreply.github.com'
+          git add .adwf/docs-registry.json MANIFEST.json SHA256SUMS.txt
+          git commit -m '[ORCH_STATE-001] Sync generated projections after recovery'
+          git push origin "HEAD:${TARGET_BRANCH}"
