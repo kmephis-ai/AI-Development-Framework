@@ -1,0 +1,48 @@
+{
+  "schema_version": 1,
+  "skill_id": "adwf-ci-failure-triage",
+  "kind": "success-cases",
+  "cases": [
+    {
+      "id": "evidence-classification",
+      "required_phrases": [
+        "Exact evidence first",
+        "INTRODUCED",
+        "INHERITED",
+        "FLAKY",
+        "PROVIDER",
+        "ENVIRONMENT",
+        "POLICY",
+        "UNKNOWN"
+      ]
+    },
+    {
+      "id": "timeout-root-cause",
+      "required_phrases": [
+        "Timeout/cancelled — это симптом",
+        "Не повторяй deterministic failure без cause classification",
+        "Не превращай конкретный endpoint в глобальный blacklist"
+      ]
+    },
+    {
+      "id": "repair-layer",
+      "required_phrases": [
+        "GENERIC_FRAMEWORK",
+        "PROJECT_PACK",
+        "CONSUMER_INTEGRATION_CONFIG",
+        "CONSUMER_PRODUCT",
+        "downstream chain"
+      ]
+    },
+    {
+      "id": "fail-closed",
+      "required_phrases": [
+        "UNKNOWN` => `BLOCK/NOT_VERIFIED",
+        "FREE_ONLY"
+      ],
+      "forbidden_phrases": [
+        "retry until green"
+      ]
+    }
+  ]
+}
