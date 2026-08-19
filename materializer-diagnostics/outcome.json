@@ -1,0 +1,11 @@
+{
+  "source_sha": "86d943b03a1fc591b5b533d1ac211da93dc70694",
+  "source_tree": "d75b43087ee6ebe3c773866936161028ad92749c",
+  "cas": "success",
+  "patch": "success",
+  "focused": "success",
+  "manifest": "success",
+  "diff": "success",
+  "verify": "failure",
+  "publish": "skipped"
+}

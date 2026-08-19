@@ -87,8 +87,19 @@ def resolve_provider_phase(project_root: str|Path, framework_root: str|Path, cli
     checks=client.check_runs(subject_sha); matched=[]; failures=[]
     for decl in declarations:
         candidates=[c for c in checks if c.get("name")==decl["check_name"] and c.get("head_sha")==subject_sha and (c.get("app") or {}).get("slug")==decl["app_slug"] and (c.get("app") or {}).get("id")==decl["app_id"]]
-        if len(candidates)!=1: failures.append("AMBIGUOUS_OR_MISSING:"+decl["check_name"]); continue
-        c=candidates[0]
+        if not candidates: failures.append("AMBIGUOUS_OR_MISSING:"+decl["check_name"]); continue
+        if len(candidates)>1:
+            provider_ids=[]; invalid_identity=False
+            for candidate in candidates:
+                provider_id=candidate.get("id")
+                if isinstance(provider_id,bool) or not isinstance(provider_id,int) or provider_id<=0:
+                    invalid_identity=True; break
+                provider_ids.append(provider_id)
+            if invalid_identity or len(set(provider_ids))!=len(provider_ids):
+                failures.append("AMBIGUOUS_OR_MISSING:"+decl["check_name"]); continue
+            c=max(candidates,key=lambda item:item["id"])
+        else:
+            c=candidates[0]
         if c.get("status")!="completed" or c.get("conclusion")!="success": failures.append("NOT_SUCCESS:"+decl["check_name"]); continue
         matched.append({"check_name":decl["check_name"],"check_run_id":c.get("id"),"app_slug":decl["app_slug"],"app_id":decl["app_id"]})
     status="VERIFIED" if not failures and (bool(declarations) or phase not in binding["required_phases"]) else "NOT_VERIFIED"

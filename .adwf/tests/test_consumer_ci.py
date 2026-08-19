@@ -122,6 +122,27 @@ class ConsumerCIRouteTests(unittest.TestCase):
             self.assertEqual(result["status"], "VERIFIED")
             self.assertEqual(sleeps, [10, 10])
 
+    def test_bounded_wait_tracks_newest_repeated_check_until_success(self):
+        with tempfile.TemporaryDirectory() as t:
+            _, consumer, _ = ConsumerGateTests()._ready(Path(t)); sha = "1" * 40
+            old_success = {"id": 10, "name": "PR Validation", "head_sha": sha, "status": "completed", "conclusion": "success", "app": {"slug": "github-actions", "id": 15368}}
+            newer_pending = {**old_success, "id": 20, "status": "in_progress", "conclusion": None}
+            newer_success = {**newer_pending, "status": "completed", "conclusion": "success"}
+            sleeps = []
+            result = wait_for_native_phase(consumer, consumer, SequencedClient([[old_success, newer_pending], [old_success, newer_success]]), phase="pr", subject_sha=sha, attempts=2, interval_seconds=7, sleep=sleeps.append)
+            self.assertEqual(result["status"], "VERIFIED")
+            self.assertEqual(result["matched"][0]["check_run_id"], 20)
+            self.assertEqual(sleeps, [7])
+
+    def test_bounded_wait_does_not_reuse_old_success_while_newest_is_pending(self):
+        with tempfile.TemporaryDirectory() as t:
+            _, consumer, _ = ConsumerGateTests()._ready(Path(t)); sha = "2" * 40
+            old_success = {"id": 10, "name": "PR Validation", "head_sha": sha, "status": "completed", "conclusion": "success", "app": {"slug": "github-actions", "id": 15368}}
+            newer_pending = {**old_success, "id": 20, "status": "in_progress", "conclusion": None}
+            sleeps = []
+            with self.assertRaisesRegex(ConsumerCIRouteError, "NATIVE_GATE_NOT_VERIFIED:NOT_SUCCESS:PR Validation"):
+                wait_for_native_phase(consumer, consumer, SequencedClient([[old_success, newer_pending]]), phase="pr", subject_sha=sha, attempts=2, interval_seconds=7, sleep=sleeps.append)
+            self.assertEqual(sleeps, [7])
     def test_bounded_wait_timeout_remains_fail_closed(self):
         with tempfile.TemporaryDirectory() as t:
             _, consumer, _ = ConsumerGateTests()._ready(Path(t)); sha = "f" * 40
