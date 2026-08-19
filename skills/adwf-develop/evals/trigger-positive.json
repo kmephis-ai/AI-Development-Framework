@@ -17,6 +17,11 @@
       "id": "session-ru",
       "input": "Новая сессия должна восстановить состояние проекта",
       "expected_trigger": true
+    },
+    {
+      "id": "ci-triage",
+      "input": "CI failure: workflow timeout на exact SHA",
+      "expected_trigger": true
     }
   ]
 }
