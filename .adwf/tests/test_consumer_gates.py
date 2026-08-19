@@ -23,9 +23,35 @@ class ConsumerGateTests(unittest.TestCase):
  def test_stale_wrong_app_failure_pending_and_duplicate_block(self):
   with tempfile.TemporaryDirectory() as t:
    _,c,_=self._ready(Path(t)); sha="b"*40; base={"id":1,"name":"PR Validation","head_sha":sha,"status":"completed","conclusion":"success","app":{"slug":"github-actions","id":15368}}
-   variants=[[{**base,"head_sha":"c"*40}],[{**base,"app":{"slug":"other","id":1}}],[{**base,"conclusion":"failure"}],[{**base,"status":"in_progress","conclusion":None}],[base,{**base,"id":2}],[]]
+   variants=[[{**base,"head_sha":"c"*40}],[{**base,"app":{"slug":"other","id":1}}],[{**base,"conclusion":"failure"}],[{**base,"status":"in_progress","conclusion":None}],[]]
    for checks in variants:
     self.assertEqual(resolve_provider_phase(c,c,Client(checks),subject_sha=sha,phase="pr")["status"],"NOT_VERIFIED")
+ def test_repeated_check_runs_use_newest_provider_identity(self):
+  with tempfile.TemporaryDirectory() as t:
+   _,c,_=self._ready(Path(t)); sha="c"*40
+   def check(run_id,status="completed",conclusion="success"):
+    return {"id":run_id,"name":"PR Validation","head_sha":sha,"status":status,"conclusion":conclusion,"app":{"slug":"github-actions","id":15368}}
+   result=resolve_provider_phase(c,c,Client([check(20),check(10)]),subject_sha=sha,phase="pr")
+   self.assertEqual(result["status"],"VERIFIED"); self.assertEqual(result["matched"][0]["check_run_id"],20)
+   result=resolve_provider_phase(c,c,Client([check(10,conclusion="failure"),check(20)]),subject_sha=sha,phase="pr")
+   self.assertEqual(result["status"],"VERIFIED"); self.assertEqual(result["matched"][0]["check_run_id"],20)
+   for newest in (check(20,"in_progress",None),check(20,"completed","failure"),check(20,"completed","cancelled"),check(20,"completed","skipped")):
+    result=resolve_provider_phase(c,c,Client([check(10),newest]),subject_sha=sha,phase="pr")
+    self.assertEqual(result["status"],"NOT_VERIFIED"); self.assertEqual(result["failures"],["NOT_SUCCESS:PR Validation"])
+ def test_repeated_check_runs_reject_ambiguous_or_malformed_provider_identity(self):
+  with tempfile.TemporaryDirectory() as t:
+   _,c,_=self._ready(Path(t)); sha="d"*40; base={"id":10,"name":"PR Validation","head_sha":sha,"status":"completed","conclusion":"success","app":{"slug":"github-actions","id":15368}}
+   malformed=(None,"20",True,0,-1)
+   variants=[[base,{**base}],*[[base,{**base,"id":value}] for value in malformed]]
+   for checks in variants:
+    result=resolve_provider_phase(c,c,Client(checks),subject_sha=sha,phase="pr")
+    self.assertEqual(result["status"],"NOT_VERIFIED"); self.assertEqual(result["failures"],["AMBIGUOUS_OR_MISSING:PR Validation"])
+ def test_nonmatching_newer_check_cannot_change_authority(self):
+  with tempfile.TemporaryDirectory() as t:
+   _,c,_=self._ready(Path(t)); sha="e"*40; base={"id":10,"name":"PR Validation","head_sha":sha,"status":"completed","conclusion":"success","app":{"slug":"github-actions","id":15368}}
+   outsiders=[{**base,"id":99,"head_sha":"f"*40},{**base,"id":100,"name":"Other"},{**base,"id":101,"app":{"slug":"other","id":15368}},{**base,"id":102,"app":{"slug":"github-actions","id":1}}]
+   result=resolve_provider_phase(c,c,Client([base,*outsiders]),subject_sha=sha,phase="pr")
+   self.assertEqual(result["status"],"VERIFIED"); self.assertEqual(result["matched"][0]["check_run_id"],10)
  def test_binding_tamper_and_authority_block(self):
   with tempfile.TemporaryDirectory() as t:
    _,c,b=self._ready(Path(t)); p=c/GATES_REL

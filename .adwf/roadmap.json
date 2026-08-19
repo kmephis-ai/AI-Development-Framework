@@ -280,10 +280,18 @@
           "product_impact": false
         },
         {
+          "roadmap_id": "CONSUMER_GATE_RETRY-001",
+          "title_ru": "Provider-authoritative repeated native check-run resolution v1",
+          "dependencies": [
+            "CONSUMER_INSTR-001"
+          ],
+          "product_impact": false
+        },
+        {
           "roadmap_id": "SESSION_CONTINUITY-001",
           "title_ru": "Generic Durable AI Session Handover & Resume — live proof completion",
           "dependencies": [
-            "CONSUMER_INSTR-001"
+            "CONSUMER_GATE_RETRY-001"
           ],
           "product_impact": false
         }
