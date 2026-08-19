@@ -1,0 +1,127 @@
+name: CONSUMER_GATE_RETRY-001 Materializer A6
+
+on:
+  push:
+    branches:
+      - helper/CONSUMER_GATE_RETRY-001-materializer-20260819-a6
+
+permissions:
+  contents: write
+
+env:
+  SOURCE_SHA: 86d943b03a1fc591b5b533d1ac211da93dc70694
+  SOURCE_TREE: d75b43087ee6ebe3c773866936161028ad92749c
+  WRITER_BRANCH: agent/CONSUMER_GATE_RETRY-001-latest-check-run
+  DIAG_BRANCH: helper/CONSUMER_GATE_RETRY-001-diag-20260819-a6
+
+jobs:
+  materialize:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd
+        with:
+          fetch-depth: 0
+
+      - name: Reconstruct exact candidate and CAS
+        id: prep
+        shell: bash
+        run: |
+          set -euo pipefail
+          rm -rf materializer-diagnostics
+          rm -f .github/workflows/consumer-gate-retry-001-materializer-a6.yml
+          test "$(git ls-remote origin refs/heads/main | awk '{print $1}')" = "$SOURCE_SHA"
+          test "$(git ls-remote origin "refs/heads/${WRITER_BRANCH}" | awk '{print $1}')" = "$SOURCE_SHA"
+          printf '%s\n' .adwf/lib/consumer_gates.py .adwf/roadmap.json .adwf/tests/test_consumer_ci.py .adwf/tests/test_consumer_gates.py MANIFEST.json SHA256SUMS.txt | sort > /tmp/pre-expected.txt
+          git diff --name-only "$SOURCE_SHA" | sort > /tmp/pre-actual.txt
+          diff -u /tmp/pre-expected.txt /tmp/pre-actual.txt
+
+      - name: Preserve review interval and refresh watched-source digests
+        id: docsrefresh
+        shell: bash
+        run: |
+          set -euo pipefail
+          python .adwf/scripts/docs_freshness.py --write --reviewed-at 2026-08-13T00:00:00Z --valid-until 2026-11-13T00:00:00Z
+          python .adwf/scripts/generate_manifest.py
+
+      - name: Focused adversarial tests
+        id: focused
+        shell: bash
+        run: |
+          set -euo pipefail
+          python .adwf/tests/test_consumer_gates.py -v
+          python .adwf/tests/test_consumer_ci.py -v
+
+      - name: Enforce exact seven-file diff
+        id: diff
+        shell: bash
+        run: |
+          set -euo pipefail
+          printf '%s\n' \
+            .adwf/docs-registry.json \
+            .adwf/lib/consumer_gates.py \
+            .adwf/roadmap.json \
+            .adwf/tests/test_consumer_ci.py \
+            .adwf/tests/test_consumer_gates.py \
+            MANIFEST.json \
+            SHA256SUMS.txt | sort > /tmp/expected.txt
+          git diff --name-only "$SOURCE_SHA" | sort > /tmp/actual.txt
+          diff -u /tmp/expected.txt /tmp/actual.txt
+          test -z "$(git diff --name-only "$SOURCE_SHA" -- '.github/**')"
+
+      - name: Canonical framework verification
+        id: verify
+        shell: bash
+        run: |
+          set -euo pipefail
+          python .adwf/scripts/docs_freshness.py
+          python .adwf/scripts/generate_manifest.py --check
+          python .adwf/scripts/validate_ci.py
+          python .adwf/scripts/validate_pipeline_ir.py
+          python .adwf/scripts/validate_capabilities.py
+          python .adwf/scripts/validate_traceability.py
+          python .adwf/scripts/validate_docs.py
+          python .adwf/scripts/validate_framework.py
+          python .adwf/adwf.py doctor --scope package_integrity
+          python .adwf/adwf.py doctor --scope config_health
+          python .adwf/adwf.py self-test
+
+      - name: Commit exact candidate and CAS publish
+        id: publish
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git ls-remote origin refs/heads/main | awk '{print $1}')" = "$SOURCE_SHA"
+          test "$(git ls-remote origin "refs/heads/${WRITER_BRANCH}" | awk '{print $1}')" = "$SOURCE_SHA"
+          git config user.name "adwf-consumer-gate-retry-materializer"
+          git config user.email "adwf-consumer-gate-retry-materializer@users.noreply.github.com"
+          git add .adwf/docs-registry.json .adwf/lib/consumer_gates.py .adwf/roadmap.json .adwf/tests/test_consumer_ci.py .adwf/tests/test_consumer_gates.py MANIFEST.json SHA256SUMS.txt
+          git commit -m "[CONSUMER_GATE_RETRY-001] Resolve newest native check run"
+          test "$(git rev-list --count "$SOURCE_SHA"..HEAD)" = "1"
+          CANDIDATE_SHA="$(git rev-parse HEAD)"
+          CANDIDATE_TREE="$(git rev-parse HEAD^{tree})"
+          git push origin "HEAD:refs/heads/${WRITER_BRANCH}"
+          printf 'CANDIDATE_SHA=%s\nCANDIDATE_TREE=%s\n' "$CANDIDATE_SHA" "$CANDIDATE_TREE"
+
+      - name: Publish fail-closed diagnostics
+        if: always() && steps.publish.outcome != 'success'
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p materializer-diagnostics
+          cat > materializer-diagnostics/outcome.json <<JSON
+          {
+            "source_sha": "${SOURCE_SHA}",
+            "prep": "${{ steps.prep.outcome }}",
+            "docsrefresh": "${{ steps.docsrefresh.outcome }}",
+            "focused": "${{ steps.focused.outcome }}",
+            "diff": "${{ steps.diff.outcome }}",
+            "verify": "${{ steps.verify.outcome }}",
+            "publish": "${{ steps.publish.outcome }}"
+          }
+          JSON
+          git config user.name "adwf-materializer-diagnostic"
+          git config user.email "adwf-materializer-diagnostic@users.noreply.github.com"
+          git add -A
+          git commit -m "[CONSUMER_GATE_RETRY-001] A6 diagnostic snapshot"
+          git push origin "HEAD:refs/heads/${DIAG_BRANCH}"
