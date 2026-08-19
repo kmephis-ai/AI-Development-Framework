@@ -13,6 +13,7 @@ env:
   MAIN_SHA: b10ab53e926b57c637c9c253cd43266e0fe1acfb
   TARGET_BRANCH: agent/UPGRADE_PROOF_CONNECTED-001-existing-installation
   PYTHONDONTWRITEBYTECODE: '1'
+  PYTHONPATH: .adwf:.adwf/tests
 
 jobs:
   patch-and-test:
