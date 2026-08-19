@@ -1,0 +1,169 @@
+name: CONSUMER_GATE_RETRY-001 Postmerge Proof
+
+on:
+  push:
+    branches:
+      - helper/CONSUMER_GATE_RETRY-001-postmerge-proof-20260819-a1
+    paths:
+      - .github/workflows/consumer-gate-retry-001-postmerge-proof.yml
+
+permissions:
+  contents: write
+  actions: read
+  checks: read
+
+env:
+  SOURCE_SHA: 1f38866eeb242f8d1e56c54632b059cf8adde77d
+  CONSUMER_SHA: be31216eccf5f3da249bcec20d46f638b60db16c
+  CONSUMER_REPOSITORY: kmephis-ai/PrihRashOnline-v2
+  HELPER_BRANCH: helper/CONSUMER_GATE_RETRY-001-postmerge-proof-20260819-a1
+
+jobs:
+  prove:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - name: Checkout helper transport
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd
+        with:
+          fetch-depth: 0
+
+      - name: Checkout exact merged ADWF
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd
+        with:
+          repository: kmephis-ai/AI-Development-Framework
+          ref: ${{ env.SOURCE_SHA }}
+          path: framework
+          persist-credentials: false
+          fetch-depth: 1
+
+      - name: Checkout exact PrihRash repeated-check subject
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd
+        with:
+          repository: kmephis-ai/PrihRashOnline-v2
+          ref: ${{ env.CONSUMER_SHA }}
+          path: consumer
+          persist-credentials: false
+          fetch-depth: 1
+
+      - name: Prove merged provider evidence and live repeated-check resolution
+        id: proof
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          set +e
+          python - <<'PY'
+          from __future__ import annotations
+          from pathlib import Path
+          import json, os, sys, urllib.request
+
+          source_sha=os.environ['SOURCE_SHA']
+          consumer_sha=os.environ['CONSUMER_SHA']
+          consumer_repo=os.environ['CONSUMER_REPOSITORY']
+          token=os.environ['GITHUB_TOKEN']
+          out={
+              'source_sha':source_sha,
+              'consumer_sha':consumer_sha,
+              'adwf_main':'NOT_VERIFIED',
+              'platform_smoke':'NOT_VERIFIED',
+              'prihrash_repeated_check':'NOT_VERIFIED',
+          }
+
+          def get_json(url:str, *, auth:bool)->dict:
+              headers={
+                  'Accept':'application/vnd.github+json',
+                  'X-GitHub-Api-Version':'2022-11-28',
+                  'User-Agent':'adwf-consumer-gate-retry-proof',
+              }
+              if auth:
+                  headers['Authorization']='Bearer '+token
+              req=urllib.request.Request(url,headers=headers)
+              with urllib.request.urlopen(req,timeout=30) as response:
+                  return json.loads(response.read().decode('utf-8'))
+
+          error=None
+          try:
+              runs=get_json('https://api.github.com/repos/kmephis-ai/AI-Development-Framework/actions/runs?per_page=100',auth=True).get('workflow_runs') or []
+              def latest(name:str):
+                  rows=[r for r in runs if r.get('name')==name and r.get('event')=='push' and r.get('head_sha')==source_sha]
+                  if not rows:
+                      raise RuntimeError('POSTMERGE_RUN_MISSING:'+name)
+                  return max(rows,key=lambda r:int(r['id']))
+
+              main_run=latest('ADWF Main')
+              smoke_run=latest('ADWF Platform Smoke')
+              if main_run.get('status')!='completed' or main_run.get('conclusion')!='success':
+                  raise RuntimeError('ADWF_MAIN_NOT_SUCCESS')
+              if smoke_run.get('status')!='completed' or smoke_run.get('conclusion')!='success':
+                  raise RuntimeError('PLATFORM_SMOKE_NOT_SUCCESS')
+
+              main_jobs=get_json(main_run['jobs_url']+'?per_page=100',auth=True).get('jobs') or []
+              smoke_jobs=get_json(smoke_run['jobs_url']+'?per_page=100',auth=True).get('jobs') or []
+              if not main_jobs or any(j.get('status')!='completed' or j.get('conclusion')!='success' for j in main_jobs):
+                  raise RuntimeError('ADWF_MAIN_JOB_NOT_SUCCESS')
+              smoke_names={str(j.get('name') or '') for j in smoke_jobs}
+              if len(smoke_jobs)!=2 or any(j.get('status')!='completed' or j.get('conclusion')!='success' for j in smoke_jobs):
+                  raise RuntimeError('PLATFORM_SMOKE_JOB_NOT_SUCCESS')
+              if not any('ubuntu-24.04' in name for name in smoke_names) or not any('windows-2022' in name for name in smoke_names):
+                  raise RuntimeError('PLATFORM_SMOKE_MATRIX_INCOMPLETE')
+              out['adwf_main']='SUCCESS'
+              out['adwf_main_run_id']=main_run['id']
+              out['platform_smoke']='SUCCESS'
+              out['platform_smoke_run_id']=smoke_run['id']
+              out['platform_smoke_jobs']=sorted(smoke_names)
+
+              framework=Path('framework').resolve()
+              consumer=Path('consumer').resolve()
+              if (framework/'.git').is_dir():
+                  pass
+              sys.path.insert(0,str(framework/'.adwf'))
+              from lib.consumer_gates import resolve_provider_phase
+
+              class PublicClient:
+                  def check_runs(self,sha:str):
+                      value=get_json(f'https://api.github.com/repos/{consumer_repo}/commits/{sha}/check-runs?per_page=100',auth=False)
+                      return value.get('check_runs') or []
+
+              result=resolve_provider_phase(consumer,framework,PublicClient(),subject_sha=consumer_sha,phase='pr')
+              if result.get('status')!='VERIFIED':
+                  raise RuntimeError('PRIHRASH_REPEATED_CHECK_NOT_VERIFIED:'+','.join(result.get('failures') or []))
+              matched=result.get('matched') or []
+              if len(matched)!=1 or matched[0].get('check_name')!='validate':
+                  raise RuntimeError('PRIHRASH_MATCHED_EVIDENCE_INVALID')
+              checks=PublicClient().check_runs(consumer_sha)
+              candidates=[c for c in checks if c.get('name')=='validate' and c.get('head_sha')==consumer_sha and (c.get('app') or {}).get('slug')=='github-actions' and (c.get('app') or {}).get('id')==15368]
+              ids=[c.get('id') for c in candidates]
+              if len(candidates)<2 or any(isinstance(i,bool) or not isinstance(i,int) or i<=0 for i in ids):
+                  raise RuntimeError('PRIHRASH_LIVE_REPEATED_SET_INVALID')
+              newest=max(ids)
+              if matched[0].get('check_run_id')!=newest:
+                  raise RuntimeError('PRIHRASH_NEWEST_ID_NOT_SELECTED')
+              newest_row=next(c for c in candidates if c.get('id')==newest)
+              if newest_row.get('status')!='completed' or newest_row.get('conclusion')!='success':
+                  raise RuntimeError('PRIHRASH_NEWEST_NOT_SUCCESS')
+              out['prihrash_repeated_check']='VERIFIED'
+              out['prihrash_matching_check_run_ids']=sorted(ids)
+              out['prihrash_selected_check_run_id']=newest
+              out['resolver_mutation_authority']=result.get('mutation_authority')
+          except Exception as exc:
+              error=f'{type(exc).__name__}:{exc}'
+              out['error']=error
+
+          Path('proof').mkdir(exist_ok=True)
+          Path('proof/outcome.json').write_text(json.dumps(out,indent=2,sort_keys=True)+'\n',encoding='utf-8')
+          print(json.dumps(out,sort_keys=True))
+          raise SystemExit(1 if error else 0)
+          PY
+          exit $?
+
+      - name: Publish disposable proof readback
+        if: always()
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name "adwf-postmerge-proof"
+          git config user.email "adwf-postmerge-proof@users.noreply.github.com"
+          git add proof/outcome.json
+          git commit -m "chore: publish CONSUMER_GATE_RETRY postmerge proof"
+          git push origin "HEAD:refs/heads/${HELPER_BRANCH}"
