@@ -22,7 +22,7 @@ from .consumer_instructions import (
     load_consumer_instruction_policy, validate_consumer_instruction_state,
 )
 from .consumer_installation import (
-    ConsumerInstallationError, _snapshot_from_record, load_record as load_installation_record,
+    REPOSITORY, ConsumerInstallationError, _snapshot_from_record, load_record as load_installation_record,
     validate_fresh_session as validate_installation_fresh_session,
 )
 from .github_auth import detect_repository
@@ -212,7 +212,14 @@ def _assert_no_unhandled_migrations(compatibility: dict[str, Any]) -> None:
         raise ConsumerUpgradeError("UPGRADE_APPLY_UNSUPPORTED_MIGRATION:" + ",".join(unsupported))
 
 
-def _trusted_source_snapshot(source_root: Path, target_root: Path, consumer: Path, snapshot: dict[str, Any]) -> None:
+def _trusted_source_snapshot(
+    source_root: Path,
+    target_root: Path,
+    consumer: Path,
+    snapshot: dict[str, Any],
+    *,
+    consumer_repository: str | None = None,
+) -> None:
     try:
         _validate_snapshot(snapshot, source_root)
     except ManagedSurfaceError as exc:
@@ -267,9 +274,14 @@ def _trusted_source_snapshot(source_root: Path, target_root: Path, consumer: Pat
             raise ConsumerUpgradeError("UPGRADE_APPLY_SOURCE_ADOPTION_SNAPSHOT_PROVENANCE_MISMATCH")
         return
 
-    repository = detect_repository(consumer)
-    if repository is None:
-        raise ConsumerUpgradeError("UPGRADE_APPLY_INSTALLATION_REPOSITORY_NOT_VERIFIABLE")
+    if consumer_repository is None:
+        repository = detect_repository(consumer)
+        if repository is None:
+            raise ConsumerUpgradeError("UPGRADE_APPLY_INSTALLATION_REPOSITORY_NOT_VERIFIABLE")
+    else:
+        repository = str(consumer_repository)
+        if not REPOSITORY.fullmatch(repository):
+            raise ConsumerUpgradeError("UPGRADE_APPLY_INSTALLATION_REPOSITORY_INVALID")
     try:
         validate_installation_fresh_session(
             consumer, source_root, expected_repository=repository,
@@ -315,6 +327,7 @@ def _build_target_profile(consumer: Path, source_root: Path, target_root: Path, 
 def _validate_static_apply_bindings(
     source_root: Path, target_root: Path, consumer: Path,
     compatibility: dict[str, Any], plan: dict[str, Any], snapshot: dict[str, Any],
+    *, consumer_repository: str | None = None,
 ) -> None:
     """Validate immutable upgrade identities without requiring consumer to still be at A."""
     _verify_revision(source_root, str(plan.get("source_revision") or ""))
@@ -332,7 +345,10 @@ def _validate_static_apply_bindings(
         raise ConsumerUpgradeError("UPGRADE_APPLY_SOURCE_MANIFEST_MISMATCH")
     if target_inventory["manifest_sha256"] != plan["target_manifest_sha256"]:
         raise ConsumerUpgradeError("UPGRADE_APPLY_TARGET_MANIFEST_MISMATCH")
-    _trusted_source_snapshot(source_root, target_root, consumer, snapshot)
+    _trusted_source_snapshot(
+        source_root, target_root, consumer, snapshot,
+        consumer_repository=consumer_repository,
+    )
     if snapshot.get("source_revision") != plan["source_revision"] or snapshot.get("source_manifest_sha256") != plan["source_manifest_sha256"]:
         raise ConsumerUpgradeError("UPGRADE_APPLY_SOURCE_SNAPSHOT_BINDING_MISMATCH")
 
@@ -362,8 +378,12 @@ def _source_snapshot_map(snapshot: dict[str, Any]) -> dict[str, dict[str, Any]]:
 def _preflight(
     source_root: Path, target_root: Path, consumer: Path,
     compatibility: dict[str, Any], plan: dict[str, Any], snapshot: dict[str, Any],
+    *, consumer_repository: str | None = None,
 ) -> tuple[dict[str, Any], dict[str, Any], dict[str, Any], bytes]:
-    _validate_static_apply_bindings(source_root, target_root, consumer, compatibility, plan, snapshot)
+    _validate_static_apply_bindings(
+        source_root, target_root, consumer, compatibility, plan, snapshot,
+        consumer_repository=consumer_repository,
+    )
     source_inventory = load_source_inventory(source_root)
     target_inventory = load_source_inventory(target_root)
     try:
@@ -1029,11 +1049,15 @@ def _recover_locked(source_root: Path, target_root: Path, consumer: Path, store:
 
 def apply_upgrade(
     source_framework_root: str | Path, target_framework_root: str | Path, consumer_root: str | Path,
-    compatibility: dict[str, Any], plan: dict[str, Any], source_snapshot: dict[str, Any], *, fault_at: str | None = None,
+    compatibility: dict[str, Any], plan: dict[str, Any], source_snapshot: dict[str, Any], *,
+    fault_at: str | None = None, consumer_repository: str | None = None,
 ) -> dict[str, Any]:
     """Apply a READY upgrade plan; no write happens before full exact-state preflight."""
     source_root = Path(source_framework_root).resolve(); target_root = Path(target_framework_root).resolve(); consumer = _safe_consumer(consumer_root)
-    _validate_static_apply_bindings(source_root, target_root, consumer, compatibility, plan, source_snapshot)
+    _validate_static_apply_bindings(
+        source_root, target_root, consumer, compatibility, plan, source_snapshot,
+        consumer_repository=consumer_repository,
+    )
     txid = _transaction_identity(plan, compatibility, source_snapshot, consumer)
     probe = UpgradeTransactionStore(target_root, consumer, txid, create=False)
     if probe.transactions.is_dir() and probe.path.is_file():
@@ -1043,7 +1067,10 @@ def apply_upgrade(
                 _assert_static_journal_identity(committed, compatibility, plan, source_snapshot, consumer, txid)
                 snapshot = _verify_committed(source_root, target_root, consumer, probe, committed)
                 return {"status": "ALREADY_COMMITTED", "transaction_id": txid, "snapshot": snapshot, "write_performed": False}
-    _, _, target_profile, profile_payload = _preflight(source_root, target_root, consumer, compatibility, plan, source_snapshot)
+    _, _, target_profile, profile_payload = _preflight(
+        source_root, target_root, consumer, compatibility, plan, source_snapshot,
+        consumer_repository=consumer_repository,
+    )
     target_snapshot = _target_snapshot(target_root, consumer, source_snapshot, plan, txid)
     store = UpgradeTransactionStore(target_root, consumer, txid, create=True)
     with exclusive_file_lock(store.lock):

@@ -336,4 +336,47 @@ class UpgradeTransactionTests(unittest.TestCase):
         finally:
             temp.cleanup()
 
+    def test_25_explicit_installation_repository_ignores_unrelated_ambient_executor_repo(self):
+        temp, source, target, consumer, snapshot, compatibility, plan = prepared_transaction(ROOT)
+        try:
+            self.publish_installation_record(source, consumer, snapshot, repository="example/consumer")
+            shutil.rmtree(consumer / ".adwf-runtime")
+            with patch("lib.consumer_upgrade_transaction.detect_repository", return_value="executor/adwf"), \
+                 patch("lib.consumer_installation._git") as git:
+                git.side_effect = lambda _root, *args: (
+                    snapshot["source_revision"] if args == ("rev-parse", "HEAD") else "c" * 40
+                )
+                result = self.apply(
+                    source, target, consumer, compatibility, plan, snapshot,
+                    consumer_repository="example/consumer",
+                )
+            self.assertEqual(result["status"], "COMMITTED")
+            self.assert_b(target, consumer)
+        finally:
+            temp.cleanup()
+
+    def test_26_explicit_foreign_installation_repository_blocks_before_write(self):
+        temp, source, target, consumer, snapshot, compatibility, plan = prepared_transaction(ROOT)
+        try:
+            self.publish_installation_record(source, consumer, snapshot, repository="example/consumer")
+            shutil.rmtree(consumer / ".adwf-runtime")
+            with patch("lib.consumer_upgrade_transaction.detect_repository", return_value="example/consumer"), \
+                 patch("lib.consumer_installation._git") as git:
+                git.side_effect = lambda _root, *args: (
+                    snapshot["source_revision"] if args == ("rev-parse", "HEAD") else "c" * 40
+                )
+                with self.assertRaisesRegex(
+                    ConsumerUpgradeError,
+                    "UPGRADE_APPLY_SOURCE_INSTALLATION_PROVENANCE_INVALID:INSTALLATION_CONSUMER_REPOSITORY_MISMATCH",
+                ):
+                    self.apply(
+                        source, target, consumer, compatibility, plan, snapshot,
+                        consumer_repository="foreign/consumer",
+                    )
+            self.assertFalse((consumer / ".adwf-runtime/consumer-upgrade").exists())
+            self.assert_a(source, consumer)
+        finally:
+            temp.cleanup()
+
+
 if __name__ == "__main__": unittest.main()
