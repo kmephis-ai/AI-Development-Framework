@@ -12,7 +12,8 @@
     "startup_visible": true,
     "routed_by": [],
     "routes": [
-      "adwf-local-git-mirror"
+      "adwf-local-git-mirror",
+      "adwf-ci-failure-triage"
     ],
     "trigger_terms": [
       "release",
@@ -20,7 +21,10 @@
       "upgrade",
       "rollback",
       "cost",
-      "runtime operation"
+      "runtime operation",
+      "ci failure",
+      "workflow timeout",
+      "pipeline failed"
     ],
     "negative_terms": [
       "только аудит",
