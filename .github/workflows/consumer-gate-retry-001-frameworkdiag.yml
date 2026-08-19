@@ -1,0 +1,40 @@
+name: CONSUMER_GATE_RETRY-001 Framework Diagnostic A5
+
+on:
+  push:
+    branches:
+      - helper/CONSUMER_GATE_RETRY-001-frameworkdiag-20260819-a5
+
+permissions:
+  contents: write
+
+env:
+  SOURCE_SHA: 86d943b03a1fc591b5b533d1ac211da93dc70694
+  OUTPUT_BRANCH: helper/CONSUMER_GATE_RETRY-001-frameworkdiag-output-20260819-a5
+
+jobs:
+  diagnose:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd
+        with:
+          fetch-depth: 0
+      - name: Capture exact validator output
+        shell: bash
+        run: |
+          set -euo pipefail
+          rm -rf materializer-diagnostics verify-diagnostics
+          rm -f .github/workflows/consumer-gate-retry-001-frameworkdiag.yml
+          set +e
+          python .adwf/scripts/validate_framework.py > /tmp/framework.log 2>&1
+          STATUS=$?
+          set -e
+          mkdir -p framework-diagnostics
+          cp /tmp/framework.log framework-diagnostics/framework.log
+          printf '{"status":%s}\n' "$STATUS" > framework-diagnostics/outcome.json
+          git config user.name "adwf-framework-diagnostic"
+          git config user.email "adwf-framework-diagnostic@users.noreply.github.com"
+          git add -A
+          git commit -m "[CONSUMER_GATE_RETRY-001] Framework validator diagnostic"
+          git push origin "HEAD:refs/heads/${OUTPUT_BRANCH}"
