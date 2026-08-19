@@ -1,0 +1,84 @@
+name: CONSUMER_GATE_RETRY-001 Postmerge Evidence
+
+on:
+  push:
+    branches:
+      - helper/CONSUMER_GATE_RETRY-001-postmerge-evidence-20260819-a1
+
+permissions:
+  actions: read
+  contents: write
+
+env:
+  TARGET_SHA: 1f38866eeb242f8d1e56c54632b059cf8adde77d
+  OUTPUT_BRANCH: helper/CONSUMER_GATE_RETRY-001-postmerge-evidence-output-20260819-a1
+
+jobs:
+  collect:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd
+        with:
+          fetch-depth: 2
+      - name: Collect exact push-run evidence
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          import json, os, time, urllib.request
+          repo=os.environ['GITHUB_REPOSITORY']; token=os.environ['GH_TOKEN']; target=os.environ['TARGET_SHA']
+          api='https://api.github.com'
+          headers={'Authorization':f'Bearer {token}','Accept':'application/vnd.github+json','X-GitHub-Api-Version':'2022-11-28'}
+          def get(url):
+              req=urllib.request.Request(url,headers=headers)
+              with urllib.request.urlopen(req,timeout=30) as r: return json.load(r)
+          def main_sha():
+              return get(f'{api}/repos/{repo}/git/ref/heads/main')['object']['sha']
+          start_main=main_sha()
+          selected={}; observed=[]
+          names={'ADWF Main','ADWF Platform Smoke'}
+          for attempt in range(40):
+              data=get(f'{api}/repos/{repo}/actions/runs?head_sha={target}&event=push&per_page=100')
+              runs=[r for r in data.get('workflow_runs',[]) if r.get('name') in names and r.get('head_sha')==target and r.get('event')=='push']
+              observed=[{k:r.get(k) for k in ('id','name','event','head_sha','status','conclusion','run_number','workflow_id','created_at','updated_at','html_url')} for r in sorted(runs,key=lambda x:x['id'])]
+              selected={}
+              for name in names:
+                  candidates=[r for r in runs if r.get('name')==name]
+                  if candidates: selected[name]=max(candidates,key=lambda r:r['id'])
+              if len(selected)==2 and all(r.get('status')=='completed' for r in selected.values()): break
+              time.sleep(15)
+          end_main=main_sha()
+          selected_summary={name:{k:r.get(k) for k in ('id','name','event','head_sha','status','conclusion','run_number','workflow_id','created_at','updated_at','html_url')} for name,r in selected.items()}
+          reasons=[]
+          if start_main!=target: reasons.append(f'START_MAIN_MISMATCH:{start_main}')
+          if end_main!=target: reasons.append(f'END_MAIN_MISMATCH:{end_main}')
+          for name in sorted(names):
+              r=selected.get(name)
+              if r is None: reasons.append(f'MISSING:{name}')
+              elif r.get('status')!='completed' or r.get('conclusion')!='success': reasons.append(f'NOT_SUCCESS:{name}:{r.get("status")}:{r.get("conclusion")}')
+          report={'schema_version':1,'repository':repo,'target_sha':target,'start_main_sha':start_main,'end_main_sha':end_main,'observed_push_runs':observed,'selected_latest_by_name':selected_summary,'result':'PASS' if not reasons else 'BLOCK','reasons':reasons,'mutation_authority':'NONE_EVIDENCE_ONLY'}
+          os.makedirs('postmerge-evidence',exist_ok=True)
+          with open('postmerge-evidence/report.json','w',encoding='utf-8') as f: json.dump(report,f,indent=2,sort_keys=True); f.write('\n')
+          print(json.dumps(report,sort_keys=True))
+          PY
+      - name: Publish disposable evidence report
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name "adwf-postmerge-evidence"
+          git config user.email "adwf-postmerge-evidence@users.noreply.github.com"
+          git add postmerge-evidence/report.json
+          git commit -m "[CONSUMER_GATE_RETRY-001] Publish postmerge workflow evidence"
+          git push origin "HEAD:refs/heads/${OUTPUT_BRANCH}"
+      - name: Enforce successful evidence
+        shell: bash
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          import json
+          r=json.load(open('postmerge-evidence/report.json',encoding='utf-8'))
+          if r['result']!='PASS': raise SystemExit('POSTMERGE_EVIDENCE_BLOCK:'+','.join(r['reasons']))
+          PY
