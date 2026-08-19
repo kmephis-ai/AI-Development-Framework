@@ -9,6 +9,7 @@ import unittest
 from unittest.mock import patch
 
 from consumer_upgrade_fixture import build_framework, seal_inventory
+from lib.consumer_installation import RECORD_REL, build_record, seal_record, write_record
 from lib.external_consumer_upgrade_proof import (
     ExternalConsumerUpgradeProofError,
     run_external_consumer_upgrade_proof,
@@ -185,6 +186,77 @@ class ExternalConsumerUpgradeProofTests(unittest.TestCase):
             sha = self._git(consumer, "rev-parse", "HEAD"); tree = self._git(consumer, "rev-parse", "HEAD^{tree}")
             with self.assertRaisesRegex(ExternalConsumerUpgradeProofError, "TRACKED_SYMLINK_FORBIDDEN"):
                 self._run(fixture, consumer_sha=sha, consumer_tree=tree)
+        finally:
+            fixture[0].cleanup()
+
+
+    def _connected_fixture(self):
+        fixture = list(self._fixture())
+        temp, source, target, consumer, source_sha, source_tree, target_sha, target_tree, consumer_sha, consumer_tree = fixture
+        plan = proof_mod.plan_adoption(source, consumer, source_revision=source_sha)
+        self.assertEqual(plan["status"], "READY")
+        adoption = proof_mod.apply_adoption(source, consumer, plan)
+        self.assertEqual(adoption["status"], "COMMITTED")
+        profile = proof_mod.apply_consumer_profile(
+            consumer, source, product_name="Real Product", default_branch="main",
+            repository_visibility="PUBLIC",
+        )
+        self.assertIn(profile["status"], {"APPLIED", "ALREADY_MATERIALIZED"})
+        record = build_record(
+            source, consumer, adoption, consumer_repository="owner/real-product",
+            consumer_base_sha=consumer_sha, consumer_base_tree=consumer_tree,
+        )
+        write_record(record, consumer, source)
+        runtime = consumer / ".adwf-runtime"
+        if runtime.exists():
+            shutil.rmtree(runtime)
+        self._git(consumer, "add", "-A")
+        self._git(consumer, "commit", "-q", "-m", "connected consumer installed A")
+        fixture[-2] = self._git(consumer, "rev-parse", "HEAD")
+        fixture[-1] = self._git(consumer, "rev-parse", "HEAD^{tree}")
+        return tuple(fixture)
+
+    def test_connected_installed_consumer_uses_durable_proof_without_readoption(self):
+        fixture = self._connected_fixture()
+        try:
+            with patch.object(proof_mod, "apply_adoption", side_effect=AssertionError("connected proof must not re-adopt")) as adoption:
+                report = self._run(fixture)
+            adoption.assert_not_called()
+            self.assertEqual(report["transitions"]["adoption"], "VERIFIED_EXISTING")
+            self.assertEqual(
+                [item["label"] for item in report["preservation_checkpoints"]],
+                ["CONNECTED_A", "UPGRADE_B", "ROLLBACK_A", "RETRY_B"],
+            )
+            self.assertLess(
+                report["preservation_checkpoints"][0]["file_count"],
+                report["consumer"]["tracked_regular_file_count"],
+            )
+            self.assertTrue(report["external_source_unchanged"])
+            self.assertFalse(report["write_back_performed"])
+            self.assertEqual(validate_external_consumer_upgrade_proof(report, fixture[2]), [])
+        finally:
+            fixture[0].cleanup()
+
+    def test_connected_foreign_installation_blocks_without_readoption(self):
+        fixture = list(self._connected_fixture())
+        try:
+            consumer = fixture[3]
+            path = consumer / RECORD_REL
+            value = json.loads(path.read_text(encoding="utf-8"))
+            value["consumer"]["repository"] = "foreign/consumer"
+            value = seal_record(value)
+            path.write_text(json.dumps(value, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+            self._git(consumer, "add", RECORD_REL)
+            self._git(consumer, "commit", "-q", "-m", "foreign installation binding")
+            fixture[-2] = self._git(consumer, "rev-parse", "HEAD")
+            fixture[-1] = self._git(consumer, "rev-parse", "HEAD^{tree}")
+            with patch.object(proof_mod, "apply_adoption") as adoption:
+                with self.assertRaisesRegex(
+                    ExternalConsumerUpgradeProofError,
+                    "CONNECTED_INSTALLATION_INVALID:INSTALLATION_CONSUMER_REPOSITORY_MISMATCH",
+                ):
+                    self._run(tuple(fixture))
+            adoption.assert_not_called()
         finally:
             fixture[0].cleanup()
 

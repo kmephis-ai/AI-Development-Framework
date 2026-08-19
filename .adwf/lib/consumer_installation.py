@@ -238,13 +238,23 @@ def load_record(consumer_root: str | Path, framework_root: str | Path) -> dict[s
     return value
 
 
-def rebind_snapshot_for_fresh_session(consumer_root: str | Path, framework_root: str | Path) -> dict[str, Any]:
+def rebind_snapshot_for_fresh_session(
+    consumer_root: str | Path,
+    framework_root: str | Path,
+    *,
+    expected_repository: str | None = None,
+) -> dict[str, Any]:
     """Reconstruct the exact adopted snapshot after revalidating durable installation proof."""
     consumer = Path(consumer_root).resolve()
     framework = Path(framework_root).resolve()
-    repository = detect_repository(consumer)
-    if repository is None:
-        raise ConsumerInstallationError("INSTALLATION_CONSUMER_REPOSITORY_NOT_VERIFIABLE")
+    if expected_repository is None:
+        repository = detect_repository(consumer)
+        if repository is None:
+            raise ConsumerInstallationError("INSTALLATION_CONSUMER_REPOSITORY_NOT_VERIFIABLE")
+    else:
+        repository = str(expected_repository)
+        if not REPOSITORY.fullmatch(repository):
+            raise ConsumerInstallationError("INSTALLATION_CONSUMER_REPOSITORY_INVALID")
     validate_fresh_session(consumer, framework, expected_repository=repository)
     snapshot = _snapshot_from_record(load_record(consumer, framework))
     # The absolute checkout path is session-local, not durable installation identity.

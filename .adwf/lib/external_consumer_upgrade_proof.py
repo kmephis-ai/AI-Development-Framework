@@ -16,7 +16,8 @@ import shutil
 import subprocess
 import tempfile
 
-from .consumer_profile import apply_consumer_profile, load_consumer_profile
+from .consumer_installation import ConsumerInstallationError, RECORD_REL, rebind_snapshot_for_fresh_session
+from .consumer_profile import PROFILE_REL, apply_consumer_profile, load_consumer_profile
 from .consumer_upgrade import build_upgrade_compatibility, plan_consumer_upgrade
 from .consumer_upgrade_transaction import apply_upgrade, rollback_upgrade
 from .contracts import validate
@@ -143,6 +144,29 @@ def _copy_tracked_files(source: Path, target: Path, baseline: dict[str, str]) ->
             raise ExternalConsumerUpgradeProofError("EXTERNAL_PROOF_COPY_DIGEST_MISMATCH:" + rel)
 
 
+def _installation_record_present(consumer: Path) -> bool:
+    path = consumer / RECORD_REL
+    return path.exists() or path.is_symlink()
+
+
+def _connected_preservation_baseline(baseline: dict[str, str], snapshot: dict[str, Any]) -> dict[str, str]:
+    managed = {
+        str(item.get("path") or "")
+        for item in snapshot.get("entries") or []
+        if item.get("managed_by_adwf") is True
+    }
+    preserved = {
+        rel: digest
+        for rel, digest in baseline.items()
+        if rel not in managed and rel != PROFILE_REL
+    }
+    if RECORD_REL not in baseline:
+        raise ExternalConsumerUpgradeProofError("EXTERNAL_PROOF_CONNECTED_INSTALLATION_NOT_TRACKED")
+    if not preserved:
+        raise ExternalConsumerUpgradeProofError("EXTERNAL_PROOF_CONNECTED_PRESERVATION_REQUIRED")
+    return dict(sorted(preserved.items()))
+
+
 def _checkpoint(consumer: Path, baseline: dict[str, str], label: str) -> dict[str, Any]:
     current: dict[str, str] = {}
     for rel, expected in baseline.items():
@@ -177,10 +201,21 @@ def validate_external_consumer_upgrade_proof(value: dict[str, Any], framework_ro
     if value.get("status") != "PASS":
         errors.append("EXTERNAL_PROOF_STATUS_NOT_PASS")
     transitions = value.get("transitions") or {}
-    if transitions != {"adoption": "COMMITTED", "upgrade_b": "COMMITTED", "rollback_a": "ROLLED_BACK", "retry_b": "COMMITTED"}:
+    source_transition = transitions.get("adoption")
+    if (
+        source_transition not in {"COMMITTED", "VERIFIED_EXISTING"}
+        or transitions.get("upgrade_b") != "COMMITTED"
+        or transitions.get("rollback_a") != "ROLLED_BACK"
+        or transitions.get("retry_b") != "COMMITTED"
+        or set(transitions) != {"adoption", "upgrade_b", "rollback_a", "retry_b"}
+    ):
         errors.append("EXTERNAL_PROOF_TRANSITION_MISMATCH")
     checkpoints = value.get("preservation_checkpoints") or []
     baseline_sha = value.get("preservation_set_sha256")
+    expected_first = "CONNECTED_A" if source_transition == "VERIFIED_EXISTING" else "ADOPTION_A"
+    labels = [item.get("label") for item in checkpoints]
+    if labels != [expected_first, "UPGRADE_B", "ROLLBACK_A", "RETRY_B"]:
+        errors.append("EXTERNAL_PROOF_CHECKPOINT_SEQUENCE_MISMATCH")
     if len(checkpoints) != 4 or any(item.get("preservation_sha256") != baseline_sha for item in checkpoints):
         errors.append("EXTERNAL_PROOF_PRESERVATION_BINDING_MISMATCH")
     source = value.get("framework") or {}
@@ -221,31 +256,48 @@ def run_external_consumer_upgrade_proof(
         raise ExternalConsumerUpgradeProofError("EXTERNAL_PROOF_FRAMEWORK_REVISIONS_MUST_DIFFER")
 
     baseline = _tracked_regular_files(external)
-    baseline_sha = _preservation_sha(baseline)
     with tempfile.TemporaryDirectory(prefix="adwf-external-upgrade-proof-") as tmp:
         consumer = Path(tmp) / "consumer"
         _assert_disposable_isolated(consumer, external, source, target)
         _copy_tracked_files(external, consumer, baseline)
 
-        adoption_plan = plan_adoption(source, consumer, source_revision=source_sha)
-        if adoption_plan.get("status") != "READY":
-            raise ExternalConsumerUpgradeProofError("EXTERNAL_PROOF_ADOPTION_NOT_READY:" + ";".join(adoption_plan.get("blockers") or []))
-        adoption = apply_adoption(source, consumer, adoption_plan)
-        if adoption.get("status") != "COMMITTED" or not isinstance(adoption.get("snapshot"), dict):
-            raise ExternalConsumerUpgradeProofError("EXTERNAL_PROOF_ADOPTION_FAILED")
-        checkpoint_adoption = _checkpoint(consumer, baseline, "ADOPTION_A")
+        if _installation_record_present(consumer):
+            try:
+                snapshot_a = rebind_snapshot_for_fresh_session(
+                    consumer, source, expected_repository=repo,
+                )
+            except ConsumerInstallationError as exc:
+                raise ExternalConsumerUpgradeProofError(
+                    "EXTERNAL_PROOF_CONNECTED_INSTALLATION_INVALID:" + str(exc).split(":", 1)[0]
+                ) from exc
+            profile_a = load_consumer_profile(consumer, source, required=True)
+            if profile_a is None or profile_a.get("project_packs", {}).get("selected") != "apps-script":
+                raise ExternalConsumerUpgradeProofError("EXTERNAL_PROOF_APPS_SCRIPT_PACK_REQUIRED")
+            preservation = _connected_preservation_baseline(baseline, snapshot_a)
+            checkpoint_source = _checkpoint(consumer, preservation, "CONNECTED_A")
+            source_transition = "VERIFIED_EXISTING"
+        else:
+            adoption_plan = plan_adoption(source, consumer, source_revision=source_sha)
+            if adoption_plan.get("status") != "READY":
+                raise ExternalConsumerUpgradeProofError("EXTERNAL_PROOF_ADOPTION_NOT_READY:" + ";".join(adoption_plan.get("blockers") or []))
+            adoption = apply_adoption(source, consumer, adoption_plan)
+            if adoption.get("status") != "COMMITTED" or not isinstance(adoption.get("snapshot"), dict):
+                raise ExternalConsumerUpgradeProofError("EXTERNAL_PROOF_ADOPTION_FAILED")
+            preservation = baseline
+            checkpoint_source = _checkpoint(consumer, preservation, "ADOPTION_A")
 
-        profile_result = apply_consumer_profile(
-            consumer, source, product_name=product_name, default_branch=default_branch,
-            repository_visibility=repository_visibility,
-        )
-        if profile_result.get("status") not in {"APPLIED", "ALREADY_MATERIALIZED"}:
-            raise ExternalConsumerUpgradeProofError("EXTERNAL_PROOF_PROFILE_FAILED:" + str(profile_result.get("reason") or "UNKNOWN"))
-        profile_a = load_consumer_profile(consumer, source, required=True)
-        if profile_a is None or profile_a.get("project_packs", {}).get("selected") != "apps-script":
-            raise ExternalConsumerUpgradeProofError("EXTERNAL_PROOF_APPS_SCRIPT_PACK_REQUIRED")
-
-        snapshot_a = adoption["snapshot"]
+            profile_result = apply_consumer_profile(
+                consumer, source, product_name=product_name, default_branch=default_branch,
+                repository_visibility=repository_visibility,
+            )
+            if profile_result.get("status") not in {"APPLIED", "ALREADY_MATERIALIZED"}:
+                raise ExternalConsumerUpgradeProofError("EXTERNAL_PROOF_PROFILE_FAILED:" + str(profile_result.get("reason") or "UNKNOWN"))
+            profile_a = load_consumer_profile(consumer, source, required=True)
+            if profile_a is None or profile_a.get("project_packs", {}).get("selected") != "apps-script":
+                raise ExternalConsumerUpgradeProofError("EXTERNAL_PROOF_APPS_SCRIPT_PACK_REQUIRED")
+            snapshot_a = adoption["snapshot"]
+            source_transition = "COMMITTED"
+        baseline_sha = _preservation_sha(preservation)
         compatibility = build_upgrade_compatibility(
             source, target, consumer, source_revision=source_sha, target_revision=target_sha, snapshot=snapshot_a,
         )
@@ -256,10 +308,13 @@ def run_external_consumer_upgrade_proof(
             codes = [str(item.get("code")) for item in compatibility.get("findings") or []]
             raise ExternalConsumerUpgradeProofError("EXTERNAL_PROOF_UPGRADE_NOT_READY:" + ",".join(codes))
 
-        upgraded = apply_upgrade(source, target, consumer, compatibility, plan, snapshot_a)
+        upgraded = apply_upgrade(
+            source, target, consumer, compatibility, plan, snapshot_a,
+            consumer_repository=repo,
+        )
         if upgraded.get("status") != "COMMITTED":
             raise ExternalConsumerUpgradeProofError("EXTERNAL_PROOF_UPGRADE_B_FAILED:" + str(upgraded.get("status")))
-        checkpoint_b = _checkpoint(consumer, baseline, "UPGRADE_B")
+        checkpoint_b = _checkpoint(consumer, preservation, "UPGRADE_B")
         profile_b = load_consumer_profile(consumer, target, required=True)
         if profile_b is None:
             raise ExternalConsumerUpgradeProofError("EXTERNAL_PROOF_TARGET_PROFILE_MISSING")
@@ -268,15 +323,18 @@ def run_external_consumer_upgrade_proof(
         rolled_back = rollback_upgrade(source, target, consumer, transaction_id)
         if rolled_back.get("status") != "ROLLED_BACK":
             raise ExternalConsumerUpgradeProofError("EXTERNAL_PROOF_ROLLBACK_A_FAILED:" + str(rolled_back.get("status")))
-        checkpoint_rollback = _checkpoint(consumer, baseline, "ROLLBACK_A")
+        checkpoint_rollback = _checkpoint(consumer, preservation, "ROLLBACK_A")
         restored_profile = load_consumer_profile(consumer, source, required=True)
         if restored_profile is None or restored_profile.get("profile_sha256") != profile_a.get("profile_sha256"):
             raise ExternalConsumerUpgradeProofError("EXTERNAL_PROOF_ROLLBACK_PROFILE_MISMATCH")
 
-        retried = apply_upgrade(source, target, consumer, compatibility, plan, snapshot_a)
+        retried = apply_upgrade(
+            source, target, consumer, compatibility, plan, snapshot_a,
+            consumer_repository=repo,
+        )
         if retried.get("status") != "COMMITTED":
             raise ExternalConsumerUpgradeProofError("EXTERNAL_PROOF_RETRY_B_FAILED:" + str(retried.get("status")))
-        checkpoint_final = _checkpoint(consumer, baseline, "RETRY_B")
+        checkpoint_final = _checkpoint(consumer, preservation, "RETRY_B")
         final_profile = load_consumer_profile(consumer, target, required=True)
         if final_profile is None or final_profile.get("profile_sha256") != profile_b.get("profile_sha256"):
             raise ExternalConsumerUpgradeProofError("EXTERNAL_PROOF_FINAL_PROFILE_MISMATCH")
@@ -301,9 +359,9 @@ def run_external_consumer_upgrade_proof(
                 "transaction_id": transaction_id,
                 "retry_transaction_id": str(retried.get("transaction_id") or ""),
             },
-            "transitions": {"adoption": "COMMITTED", "upgrade_b": "COMMITTED", "rollback_a": "ROLLED_BACK", "retry_b": "COMMITTED"},
+            "transitions": {"adoption": source_transition, "upgrade_b": "COMMITTED", "rollback_a": "ROLLED_BACK", "retry_b": "COMMITTED"},
             "preservation_set_sha256": baseline_sha,
-            "preservation_checkpoints": [checkpoint_adoption, checkpoint_b, checkpoint_rollback, checkpoint_final],
+            "preservation_checkpoints": [checkpoint_source, checkpoint_b, checkpoint_rollback, checkpoint_final],
             "provider": {"run_id": str(provider_run_id), "check": str(provider_check)},
             "external_source_unchanged": True,
             "write_back_performed": False,
