@@ -1,0 +1,52 @@
+name: ADWF UPGRADE Proof Connected Governance Reader
+
+on:
+  pull_request:
+    branches:
+      - helper/upgrade-proof-connected-governance-base-20260819-a1
+    types: [opened]
+
+permissions:
+  contents: read
+  actions: read
+
+jobs:
+  readback:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd
+        with:
+          ref: helper/upgrade-proof-connected-governance-base-20260819-a1
+          fetch-depth: 1
+          persist-credentials: false
+      - uses: actions/setup-python@a309ff8b426b58ec0e2a45f0f869d46889d02405
+        with:
+          python-version: '3.12.10'
+          check-latest: false
+      - name: Read canonical repository governance
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          import json, os, sys
+          from pathlib import Path
+          sys.path.insert(0,str(Path('.adwf').resolve()))
+          from lib.github_provider import GitHubClient
+          from lib.github_rulesets import verify_rulesets, verify_runtime_anchor_ruleset
+          client=GitHubClient(os.environ['GITHUB_REPOSITORY'],os.environ['GITHUB_TOKEN'])
+          rows=client.get(f"/repos/{os.environ['GITHUB_REPOSITORY']}/rulesets?includes_parents=false")
+          if not isinstance(rows,list): raise SystemExit('RULESET_LIST_INVALID')
+          full=[]
+          for row in rows:
+              rid=row.get('id') if isinstance(row,dict) else None
+              if not isinstance(rid,int): continue
+              full.append(client.get(f"/repos/{os.environ['GITHUB_REPOSITORY']}/rulesets/{rid}"))
+          main=verify_rulesets(full,expected_integration_id=15368)
+          anchors=verify_runtime_anchor_ruleset(full)
+          out={'main':main,'runtime_anchors':anchors,'ruleset_ids':[x.get('id') for x in full if isinstance(x,dict)]}
+          print(json.dumps(out,sort_keys=True),flush=True)
+          if main.get('status')!='VERIFIED' or anchors.get('status')!='VERIFIED': raise SystemExit('GOVERNANCE_NOT_VERIFIED')
+          PY
