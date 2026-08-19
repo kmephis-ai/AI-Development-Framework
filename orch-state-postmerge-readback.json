@@ -1,0 +1,40 @@
+{
+  "adwf_main": {
+    "conclusion": "success",
+    "jobs": [
+      {
+        "conclusion": "success",
+        "id": 95958141938,
+        "name": "canonical-verification",
+        "status": "completed"
+      }
+    ],
+    "run_id": 32216222330,
+    "status": "completed"
+  },
+  "expected_tree": "4f88026c22de3cd7bd39bac9590299e8edd2d2ca",
+  "main_sha": "3ccc9048c2cf9569586a467072ad90f3286c6b28",
+  "merge_sha": "3ccc9048c2cf9569586a467072ad90f3286c6b28",
+  "merge_tree": "4f88026c22de3cd7bd39bac9590299e8edd2d2ca",
+  "platform_smoke": {
+    "conclusion": "success",
+    "jobs": [
+      {
+        "conclusion": "success",
+        "id": 95958141722,
+        "name": "smoke (windows-2022)",
+        "status": "completed"
+      },
+      {
+        "conclusion": "success",
+        "id": 95958141880,
+        "name": "smoke (ubuntu-24.04)",
+        "status": "completed"
+      }
+    ],
+    "run_id": 32216222297,
+    "status": "completed"
+  },
+  "schema_version": 1,
+  "status": "VERIFIED"
+}
