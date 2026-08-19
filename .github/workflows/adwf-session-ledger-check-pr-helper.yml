@@ -1,0 +1,69 @@
+name: ADWF SESSION Ledger Exact Check Reader
+
+on:
+  pull_request:
+    branches:
+      - helper/session-ledger-check-base-20260819-a1
+    paths:
+      - .adwf-evidence/session-ledger-check.trigger
+
+permissions:
+  contents: write
+  checks: read
+  actions: read
+
+env:
+  SUBJECT_SHA: b14246eba6f2722a6f10728d58c98b344575bac7
+  EXPECTED_MAIN: 3ccc9048c2cf9569586a467072ad90f3286c6b28
+  EXPECTED_PR: '160'
+  GITHUB_TOKEN: ${{ github.token }}
+  PYTHONDONTWRITEBYTECODE: '1'
+
+jobs:
+  readback:
+    if: github.event.action == 'opened'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd
+        with:
+          ref: helper/session-ledger-check-base-20260819-a1
+          fetch-depth: 1
+          persist-credentials: false
+      - uses: actions/setup-python@a309ff8b426b58ec0e2a45f0f869d46889d02405
+        with:
+          python-version: '3.12.10'
+          check-latest: false
+      - name: Verify exact required checks from provider
+        shell: bash
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          import json, os, sys, time
+          from pathlib import Path
+          sys.path.insert(0, str(Path('.adwf').resolve()))
+          from lib.github_provider import GitHubClient
+          client=GitHubClient(os.environ['GITHUB_REPOSITORY'],os.environ['GITHUB_TOKEN'])
+          required={'fast-feedback','adwf/governance-gate','adwf/trusted-gate'}
+          final=None
+          for _ in range(24):
+              main=str((client.branch('main').get('commit') or {}).get('sha') or '')
+              pr=client.pull(int(os.environ['EXPECTED_PR']))
+              head=str((pr.get('head') or {}).get('sha') or '')
+              rows=[]
+              for check in client.check_runs(os.environ['SUBJECT_SHA']):
+                  app=check.get('app') or {}
+                  rows.append({'name':check.get('name'),'status':check.get('status'),'conclusion':check.get('conclusion'),'app_slug':app.get('slug'),'app_id':app.get('id'),'id':check.get('id')})
+              by_name={str(r['name']):r for r in rows if r.get('name') in required}
+              final={'schema_version':1,'main_sha':main,'pr_number':int(os.environ['EXPECTED_PR']),'pr_head_sha':head,'subject_sha':os.environ['SUBJECT_SHA'],'required_checks':by_name,'checks':rows}
+              if main!=os.environ['EXPECTED_MAIN']: raise SystemExit('SESSION_LEDGER_CHECK_MAIN_DRIFT')
+              if head!=os.environ['SUBJECT_SHA']: raise SystemExit('SESSION_LEDGER_CHECK_HEAD_DRIFT')
+              if set(by_name)==required and all(r.get('status')=='completed' and r.get('conclusion')=='success' and r.get('app_slug')=='github-actions' for r in by_name.values()):
+                  final['status']='VERIFIED'; break
+              time.sleep(5)
+          else:
+              final['status']='NOT_VERIFIED'
+          Path('session-ledger-check-readback.json').write_text(json.dumps(final,sort_keys=True,indent=2)+'\n')
+          print(json.dumps(final,sort_keys=True),flush=True)
+          if final.get('status')!='VERIFIED': raise SystemExit('SESSION_LEDGER_REQUIRED_CHECKS_NOT_VERIFIED')
+          PY
