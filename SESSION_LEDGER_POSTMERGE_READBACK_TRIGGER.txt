@@ -1,0 +1,2 @@
+Disposable read-only post-merge readback trigger for SESSION_LEDGER_RACE-001 / #157 / PR #160.
+DO NOT MERGE.
