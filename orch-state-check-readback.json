@@ -1,0 +1,65 @@
+{
+  "checks": [
+    {
+      "app_id": 15368,
+      "app_slug": "github-actions",
+      "conclusion": "success",
+      "id": 95957659139,
+      "name": "adwf/trusted-gate",
+      "status": "completed"
+    },
+    {
+      "app_id": 15368,
+      "app_slug": "github-actions",
+      "conclusion": "success",
+      "id": 95957653659,
+      "name": "adwf/governance-gate",
+      "status": "completed"
+    },
+    {
+      "app_id": 15368,
+      "app_slug": "github-actions",
+      "conclusion": "success",
+      "id": 95957107540,
+      "name": "fast-feedback",
+      "status": "completed"
+    }
+  ],
+  "main_sha": "aea2327c9bea12a4c2eb455187ae81ea02804636",
+  "pr_head_sha": "b926164369dcb065b19516d764ed375f8bf23cbd",
+  "pr_number": 156,
+  "required": [
+    "adwf/governance-gate",
+    "adwf/trusted-gate",
+    "fast-feedback"
+  ],
+  "required_checks": {
+    "adwf/governance-gate": {
+      "app_id": 15368,
+      "app_slug": "github-actions",
+      "conclusion": "success",
+      "id": 95957653659,
+      "name": "adwf/governance-gate",
+      "status": "completed"
+    },
+    "adwf/trusted-gate": {
+      "app_id": 15368,
+      "app_slug": "github-actions",
+      "conclusion": "success",
+      "id": 95957659139,
+      "name": "adwf/trusted-gate",
+      "status": "completed"
+    },
+    "fast-feedback": {
+      "app_id": 15368,
+      "app_slug": "github-actions",
+      "conclusion": "success",
+      "id": 95957107540,
+      "name": "fast-feedback",
+      "status": "completed"
+    }
+  },
+  "schema_version": 1,
+  "status": "VERIFIED",
+  "subject_sha": "b926164369dcb065b19516d764ed375f8bf23cbd"
+}
