@@ -1,0 +1,176 @@
+name: CONSUMER_GATE_RETRY-001 Materializer A3
+
+on:
+  push:
+    branches:
+      - helper/CONSUMER_GATE_RETRY-001-materializer-20260819-a3
+
+permissions:
+  contents: write
+
+env:
+  SOURCE_SHA: 86d943b03a1fc591b5b533d1ac211da93dc70694
+  SOURCE_TREE: d75b43087ee6ebe3c773866936161028ad92749c
+  WRITER_BRANCH: agent/CONSUMER_GATE_RETRY-001-latest-check-run
+  DIAG_BRANCH: helper/CONSUMER_GATE_RETRY-001-diag-20260819-a3
+
+jobs:
+  materialize:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd
+        with:
+          ref: 86d943b03a1fc591b5b533d1ac211da93dc70694
+          fetch-depth: 0
+
+      - name: Exact source and writer CAS
+        id: cas
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "$SOURCE_SHA"
+          test "$(git rev-parse HEAD^{tree})" = "$SOURCE_TREE"
+          test "$(git ls-remote origin refs/heads/main | awk '{print $1}')" = "$SOURCE_SHA"
+          test "$(git ls-remote origin "refs/heads/${WRITER_BRANCH}" | awk '{print $1}')" = "$SOURCE_SHA"
+
+      - name: Apply bounded generic resolver repair
+        id: patch
+        shell: bash
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          from pathlib import Path
+          import json
+          root=Path('.')
+          path=root/'.adwf/lib/consumer_gates.py'; text=path.read_text(encoding='utf-8')
+          old=('        if len(candidates)!=1: failures.append("AMBIGUOUS_OR_MISSING:"+decl["check_name"]); continue\n' '        c=candidates[0]\n')
+          new='\n'.join([
+            '        if not candidates: failures.append("AMBIGUOUS_OR_MISSING:"+decl["check_name"]); continue',
+            '        if len(candidates)>1:',
+            '            provider_ids=[]; invalid_identity=False',
+            '            for candidate in candidates:',
+            '                provider_id=candidate.get("id")',
+            '                if isinstance(provider_id,bool) or not isinstance(provider_id,int) or provider_id<=0:',
+            '                    invalid_identity=True; break',
+            '                provider_ids.append(provider_id)',
+            '            if invalid_identity or len(set(provider_ids))!=len(provider_ids):',
+            '                failures.append("AMBIGUOUS_OR_MISSING:"+decl["check_name"]); continue',
+            '            c=max(candidates,key=lambda item:item["id"])',
+            '        else:',
+            '            c=candidates[0]',
+          ])+'\n'
+          if text.count(old)!=1: raise SystemExit('CONSUMER_GATE_PRODUCTION_PATCH_ANCHOR_MISMATCH')
+          path.write_text(text.replace(old,new),encoding='utf-8')
+
+          path=root/'.adwf/tests/test_consumer_gates.py'; text=path.read_text(encoding='utf-8')
+          old_variants='   variants=[[{**base,"head_sha":"c"*40}],[{**base,"app":{"slug":"other","id":1}}],[{**base,"conclusion":"failure"}],[{**base,"status":"in_progress","conclusion":None}],[base,{**base,"id":2}],[]]\n'
+          new_variants='   variants=[[{**base,"head_sha":"c"*40}],[{**base,"app":{"slug":"other","id":1}}],[{**base,"conclusion":"failure"}],[{**base,"status":"in_progress","conclusion":None}],[]]\n'
+          if text.count(old_variants)!=1: raise SystemExit('CONSUMER_GATE_VARIANTS_PATCH_ANCHOR_MISMATCH')
+          text=text.replace(old_variants,new_variants)
+          marker=' def test_binding_tamper_and_authority_block(self):\n'
+          methods='\n'.join([
+            ' def test_repeated_check_runs_use_newest_provider_identity(self):','  with tempfile.TemporaryDirectory() as t:','   _,c,_=self._ready(Path(t)); sha="c"*40','   def check(run_id,status="completed",conclusion="success"):','    return {"id":run_id,"name":"PR Validation","head_sha":sha,"status":status,"conclusion":conclusion,"app":{"slug":"github-actions","id":15368}}','   result=resolve_provider_phase(c,c,Client([check(20),check(10)]),subject_sha=sha,phase="pr")','   self.assertEqual(result["status"],"VERIFIED"); self.assertEqual(result["matched"][0]["check_run_id"],20)','   result=resolve_provider_phase(c,c,Client([check(10,conclusion="failure"),check(20)]),subject_sha=sha,phase="pr")','   self.assertEqual(result["status"],"VERIFIED"); self.assertEqual(result["matched"][0]["check_run_id"],20)','   for newest in (check(20,"in_progress",None),check(20,"completed","failure"),check(20,"completed","cancelled"),check(20,"completed","skipped")):','    result=resolve_provider_phase(c,c,Client([check(10),newest]),subject_sha=sha,phase="pr")','    self.assertEqual(result["status"],"NOT_VERIFIED"); self.assertEqual(result["failures"],["NOT_SUCCESS:PR Validation"])',' def test_repeated_check_runs_reject_ambiguous_or_malformed_provider_identity(self):','  with tempfile.TemporaryDirectory() as t:','   _,c,_=self._ready(Path(t)); sha="d"*40; base={"id":10,"name":"PR Validation","head_sha":sha,"status":"completed","conclusion":"success","app":{"slug":"github-actions","id":15368}}','   malformed=(None,"20",True,0,-1)','   variants=[[base,{**base}],*[[base,{**base,"id":value}] for value in malformed]]','   for checks in variants:','    result=resolve_provider_phase(c,c,Client(checks),subject_sha=sha,phase="pr")','    self.assertEqual(result["status"],"NOT_VERIFIED"); self.assertEqual(result["failures"],["AMBIGUOUS_OR_MISSING:PR Validation"])',' def test_nonmatching_newer_check_cannot_change_authority(self):','  with tempfile.TemporaryDirectory() as t:','   _,c,_=self._ready(Path(t)); sha="e"*40; base={"id":10,"name":"PR Validation","head_sha":sha,"status":"completed","conclusion":"success","app":{"slug":"github-actions","id":15368}}','   outsiders=[{**base,"id":99,"head_sha":"f"*40},{**base,"id":100,"name":"Other"},{**base,"id":101,"app":{"slug":"other","id":15368}},{**base,"id":102,"app":{"slug":"github-actions","id":1}}]','   result=resolve_provider_phase(c,c,Client([base,*outsiders]),subject_sha=sha,phase="pr")','   self.assertEqual(result["status"],"VERIFIED"); self.assertEqual(result["matched"][0]["check_run_id"],10)',
+          ])+'\n'
+          if text.count(marker)!=1: raise SystemExit('CONSUMER_GATE_TEST_INSERT_ANCHOR_MISMATCH')
+          path.write_text(text.replace(marker,methods+marker),encoding='utf-8')
+
+          path=root/'.adwf/tests/test_consumer_ci.py'; text=path.read_text(encoding='utf-8'); marker='    def test_bounded_wait_timeout_remains_fail_closed(self):\n'
+          methods='\n'.join([
+            '    def test_bounded_wait_tracks_newest_repeated_check_until_success(self):','        with tempfile.TemporaryDirectory() as t:','            _, consumer, _ = ConsumerGateTests()._ready(Path(t)); sha = "1" * 40','            old_success = {"id": 10, "name": "PR Validation", "head_sha": sha, "status": "completed", "conclusion": "success", "app": {"slug": "github-actions", "id": 15368}}','            newer_pending = {**old_success, "id": 20, "status": "in_progress", "conclusion": None}','            newer_success = {**newer_pending, "status": "completed", "conclusion": "success"}','            sleeps = []','            result = wait_for_native_phase(consumer, consumer, SequencedClient([[old_success, newer_pending], [old_success, newer_success]]), phase="pr", subject_sha=sha, attempts=2, interval_seconds=7, sleep=sleeps.append)','            self.assertEqual(result["status"], "VERIFIED")','            self.assertEqual(result["matched"][0]["check_run_id"], 20)','            self.assertEqual(sleeps, [7])','','    def test_bounded_wait_does_not_reuse_old_success_while_newest_is_pending(self):','        with tempfile.TemporaryDirectory() as t:','            _, consumer, _ = ConsumerGateTests()._ready(Path(t)); sha = "2" * 40','            old_success = {"id": 10, "name": "PR Validation", "head_sha": sha, "status": "completed", "conclusion": "success", "app": {"slug": "github-actions", "id": 15368}}','            newer_pending = {**old_success, "id": 20, "status": "in_progress", "conclusion": None}','            sleeps = []','            with self.assertRaisesRegex(ConsumerCIRouteError, "NATIVE_GATE_NOT_VERIFIED:NOT_SUCCESS:PR Validation"):','                wait_for_native_phase(consumer, consumer, SequencedClient([[old_success, newer_pending]]), phase="pr", subject_sha=sha, attempts=2, interval_seconds=7, sleep=sleeps.append)','            self.assertEqual(sleeps, [7])','',
+          ])
+          if text.count(marker)!=1: raise SystemExit('CONSUMER_CI_TEST_INSERT_ANCHOR_MISMATCH')
+          path.write_text(text.replace(marker,methods+marker),encoding='utf-8')
+
+          path=root/'.adwf/roadmap.json'; roadmap=json.loads(path.read_text(encoding='utf-8')); tasks=[task for goal in roadmap['goals'] for task in goal['tasks']]
+          if any(task.get('roadmap_id')=='CONSUMER_GATE_RETRY-001' for task in tasks): raise SystemExit('ROADMAP_ITEM_ALREADY_PRESENT')
+          session=next(task for task in tasks if task.get('roadmap_id')=='SESSION_CONTINUITY-001')
+          if session.get('dependencies')!=['CONSUMER_INSTR-001']: raise SystemExit('ROADMAP_SESSION_DEPENDENCY_DRIFT')
+          done=False
+          for goal in roadmap['goals']:
+            for index,task in enumerate(goal['tasks']):
+              if task.get('roadmap_id')=='SESSION_CONTINUITY-001':
+                goal['tasks'].insert(index,{'roadmap_id':'CONSUMER_GATE_RETRY-001','title_ru':'Provider-authoritative repeated native check-run resolution v1','dependencies':['CONSUMER_INSTR-001'],'product_impact':False}); goal['tasks'][index+1]['dependencies']=['CONSUMER_GATE_RETRY-001']; done=True; break
+            if done: break
+          if not done: raise SystemExit('ROADMAP_SESSION_ITEM_NOT_FOUND')
+          path.write_text(json.dumps(roadmap,ensure_ascii=False,indent=2)+'\n',encoding='utf-8')
+          PY
+
+      - name: Focused adversarial tests
+        id: focused
+        shell: bash
+        run: |
+          set -euo pipefail
+          python .adwf/tests/test_consumer_gates.py -v
+          python .adwf/tests/test_consumer_ci.py -v
+
+      - name: Regenerate canonical integrity projections
+        id: manifest
+        run: python .adwf/scripts/generate_manifest.py
+
+      - name: Enforce exact bounded diff
+        id: diff
+        shell: bash
+        run: |
+          set -euo pipefail
+          printf '%s\n' .adwf/lib/consumer_gates.py .adwf/roadmap.json .adwf/tests/test_consumer_ci.py .adwf/tests/test_consumer_gates.py MANIFEST.json SHA256SUMS.txt | sort > /tmp/expected.txt
+          git diff --name-only "$SOURCE_SHA" | sort > /tmp/actual.txt
+          diff -u /tmp/expected.txt /tmp/actual.txt
+          test -z "$(git diff --name-only "$SOURCE_SHA" -- '.github/**')"
+
+      - name: Canonical framework verification
+        id: verify
+        shell: bash
+        run: |
+          set -euo pipefail
+          python .adwf/scripts/generate_manifest.py --check
+          python .adwf/scripts/validate_ci.py
+          python .adwf/scripts/validate_pipeline_ir.py
+          python .adwf/scripts/validate_capabilities.py
+          python .adwf/scripts/validate_traceability.py
+          python .adwf/scripts/validate_docs.py
+          python .adwf/scripts/validate_framework.py
+          python .adwf/adwf.py doctor --scope package_integrity
+          python .adwf/adwf.py doctor --scope config_health
+          python .adwf/adwf.py self-test
+
+      - name: Commit exact candidate and CAS publish
+        id: publish
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git ls-remote origin refs/heads/main | awk '{print $1}')" = "$SOURCE_SHA"
+          test "$(git ls-remote origin "refs/heads/${WRITER_BRANCH}" | awk '{print $1}')" = "$SOURCE_SHA"
+          git config user.name "adwf-consumer-gate-retry-materializer"
+          git config user.email "adwf-consumer-gate-retry-materializer@users.noreply.github.com"
+          git add .adwf/lib/consumer_gates.py .adwf/roadmap.json .adwf/tests/test_consumer_ci.py .adwf/tests/test_consumer_gates.py MANIFEST.json SHA256SUMS.txt
+          git commit -m "[CONSUMER_GATE_RETRY-001] Resolve newest native check run"
+          test "$(git rev-list --count "$SOURCE_SHA"..HEAD)" = "1"
+          CANDIDATE_SHA="$(git rev-parse HEAD)"; CANDIDATE_TREE="$(git rev-parse HEAD^{tree})"
+          git push origin "HEAD:refs/heads/${WRITER_BRANCH}"
+          printf 'CANDIDATE_SHA=%s\nCANDIDATE_TREE=%s\n' "$CANDIDATE_SHA" "$CANDIDATE_TREE"
+
+      - name: Publish fail-closed diagnostics
+        if: always() && steps.publish.outcome != 'success'
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p materializer-diagnostics
+          cat > materializer-diagnostics/outcome.json <<JSON
+          {
+            "source_sha": "${SOURCE_SHA}",
+            "source_tree": "${SOURCE_TREE}",
+            "cas": "${{ steps.cas.outcome }}",
+            "patch": "${{ steps.patch.outcome }}",
+            "focused": "${{ steps.focused.outcome }}",
+            "manifest": "${{ steps.manifest.outcome }}",
+            "diff": "${{ steps.diff.outcome }}",
+            "verify": "${{ steps.verify.outcome }}",
+            "publish": "${{ steps.publish.outcome }}"
+          }
+          JSON
+          git config user.name "adwf-materializer-diagnostic"
+          git config user.email "adwf-materializer-diagnostic@users.noreply.github.com"
+          git add -A
+          git commit -m "[CONSUMER_GATE_RETRY-001] Materializer diagnostic snapshot"
+          git push origin "HEAD:refs/heads/${DIAG_BRANCH}"
