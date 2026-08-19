@@ -1,0 +1,77 @@
+name: ADWF SESSION Ledger Postmerge Reader
+
+on:
+  pull_request:
+    branches:
+      - helper/session-ledger-postmerge-base-20260819-a1
+    types: [opened, synchronize, reopened]
+
+permissions:
+  contents: read
+  actions: read
+
+env:
+  MERGE_SHA: b10ab53e926b57c637c9c253cd43266e0fe1acfb
+  EXPECTED_TREE: aa8d72c61d1392147840698ce9960dd99b35381f
+  PYTHONDONTWRITEBYTECODE: '1'
+  GITHUB_TOKEN: ${{ github.token }}
+
+jobs:
+  readback:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd
+        with:
+          ref: helper/session-ledger-postmerge-base-20260819-a1
+          fetch-depth: 1
+          persist-credentials: false
+      - uses: actions/setup-python@a309ff8b426b58ec0e2a45f0f869d46889d02405
+        with:
+          python-version: '3.12.10'
+          check-latest: false
+      - name: Verify exact post-merge provider runs
+        shell: bash
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          import json, os, sys, time
+          from pathlib import Path
+          sys.path.insert(0, str(Path('.adwf').resolve()))
+          from lib.github_provider import GitHubClient
+
+          client=GitHubClient(os.environ['GITHUB_REPOSITORY'],os.environ['GITHUB_TOKEN'])
+          merge_sha=os.environ['MERGE_SHA']; expected_tree=os.environ['EXPECTED_TREE']
+          final=None
+          for _ in range(36):
+              main_sha=str((client.branch('main').get('commit') or {}).get('sha') or '')
+              commit=client.get(f"/repos/{os.environ['GITHUB_REPOSITORY']}/git/commits/{merge_sha}")
+              tree_sha=str((commit.get('tree') or {}).get('sha') or '')
+              runs=client.recent_runs(limit=100)
+              exact=[r for r in runs if str(r.get('head_sha') or '')==merge_sha and str(r.get('head_branch') or '')=='main' and str(r.get('event') or '')=='push']
+              main_runs=[r for r in exact if r.get('name')=='ADWF Main']
+              smoke_runs=[r for r in exact if r.get('name')=='ADWF Platform Smoke']
+              main_run=main_runs[0] if main_runs else None
+              smoke_run=smoke_runs[0] if smoke_runs else None
+              result={'schema_version':1,'main_sha':main_sha,'merge_sha':merge_sha,'merge_tree':tree_sha,'expected_tree':expected_tree,'adwf_main':None,'platform_smoke':None}
+              if main_sha!=merge_sha: raise SystemExit('SESSION_LEDGER_POSTMERGE_MAIN_DRIFT')
+              if tree_sha!=expected_tree: raise SystemExit('SESSION_LEDGER_POSTMERGE_TREE_MISMATCH')
+              if main_run:
+                  jobs=client.jobs(int(main_run['id']))
+                  result['adwf_main']={'run_id':int(main_run['id']),'status':main_run.get('status'),'conclusion':main_run.get('conclusion'),'jobs':[{'id':j.get('id'),'name':j.get('name'),'status':j.get('status'),'conclusion':j.get('conclusion')} for j in jobs]}
+              if smoke_run:
+                  jobs=client.jobs(int(smoke_run['id']))
+                  result['platform_smoke']={'run_id':int(smoke_run['id']),'status':smoke_run.get('status'),'conclusion':smoke_run.get('conclusion'),'jobs':[{'id':j.get('id'),'name':j.get('name'),'status':j.get('status'),'conclusion':j.get('conclusion')} for j in jobs]}
+              if main_run and smoke_run and main_run.get('status')=='completed' and main_run.get('conclusion')=='success' and smoke_run.get('status')=='completed' and smoke_run.get('conclusion')=='success':
+                  mjobs=result['adwf_main']['jobs']; sjobs=result['platform_smoke']['jobs']
+                  canonical=[j for j in mjobs if j.get('name')=='canonical-verification']
+                  ubuntu=[j for j in sjobs if 'ubuntu-24.04' in str(j.get('name') or '')]
+                  windows=[j for j in sjobs if 'windows-2022' in str(j.get('name') or '')]
+                  if len(canonical)==1 and canonical[0].get('status')=='completed' and canonical[0].get('conclusion')=='success' and len(ubuntu)==1 and ubuntu[0].get('status')=='completed' and ubuntu[0].get('conclusion')=='success' and len(windows)==1 and windows[0].get('status')=='completed' and windows[0].get('conclusion')=='success':
+                      result['status']='VERIFIED'; final=result; break
+              final=result; time.sleep(5)
+          if final is None: final={'schema_version':1,'status':'NOT_VERIFIED','merge_sha':merge_sha}
+          elif final.get('status')!='VERIFIED': final['status']='NOT_VERIFIED'
+          print(json.dumps(final,sort_keys=True),flush=True)
+          if final.get('status')!='VERIFIED': raise SystemExit('SESSION_LEDGER_POSTMERGE_NOT_VERIFIED')
+          PY
