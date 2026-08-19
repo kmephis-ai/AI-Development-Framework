@@ -1,4 +1,5 @@
 roadmap_id=SESSION_LEDGER_RACE_001
 issue=157
 writer_lease=87d73892-d3e3-4b6e-8aa2-cbbb8d43960e
-target_head=8030a950641a1915835dc323421839e042bc80a3
+target_head=009e887be27630bd637753918ea936a3ec52099f
+attempt=2
