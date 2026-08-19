@@ -2,10 +2,12 @@
 
 The public Issue stores only Durable Orchestrator state + a safe Work Memory
 projection. Every checkpoint is externally anchored by a unique protected
-annotated Git tag whose name contains the event hash. The separate tag ruleset
-blocks update/deletion, so deleting/replacing Issue comments leaves orphan
-anchors that the verifier detects instead of silently accepting a rewritten
-history.
+annotated Git tag whose name contains the event hash. A deterministic protected
+root anchor elects the one canonical Runtime Ledger Issue before append, so
+eventually-consistent Issue listings cannot create a second authoritative ledger.
+The separate tag ruleset blocks update/deletion, so deleting/replacing Issue
+comments leaves orphan anchors that the verifier detects instead of silently
+accepting a rewritten history.
 """
 from __future__ import annotations
 from datetime import datetime,timezone
@@ -15,9 +17,11 @@ import hashlib,json,os,tempfile,copy,re
 from .durable_orchestrator import validate_journal
 from .github_provider import GitHubClient
 from .github_rulesets import verify_runtime_anchor_ruleset
+from .provider_contracts import ProviderContractError
 from .session_continuity import reconcile_checkpoint,validate_checkpoint
 
 TITLE='[ADWF] Runtime Ledger';PREFIX='<!-- ADWF-RUNTIME-EVENT v3 -->\n```json\n';SUFFIX='\n```';ANCHOR_PREFIX='adwf-runtime-anchor-'
+ROOT_ANCHOR=ANCHOR_PREFIX+'ledger-root-v1';ROOT_ROLE='ADWF_RUNTIME_LEDGER_ROOT_V1'
 def _now()->str:return datetime.now(timezone.utc).isoformat().replace('+00:00','Z')
 def _canonical(v:Any)->bytes:return json.dumps(v,sort_keys=True,separators=(',',':'),ensure_ascii=False).encode()
 def _hash(v:Any)->str:return hashlib.sha256(_canonical(v)).hexdigest()
@@ -97,20 +101,86 @@ def verify_remote_events(events:list[dict[str,Any]])->list[str]:
 
 class GitHubRuntimeStore:
     def __init__(self,client:GitHubClient):self.client=client
+
+    def _open_ledger_issues(self)->list[dict[str,Any]]:
+        return [i for i in self.client.issues() if i.get('title')==TITLE and i.get('state')=='open']
+
+    def _optional_tag_ref(self,tag:str)->dict[str,Any]|None:
+        try:return self.client.tag_ref(tag)
+        except ProviderContractError as exc:
+            if str(exc)=='PROVIDER_HTTP_404':return None
+            raise
+
+    def _root_issue(self)->dict[str,Any]|None:
+        ref=self._optional_tag_ref(ROOT_ANCHOR)
+        if ref is None:return None
+        tag_sha=str((ref.get('object') or {}).get('sha') or '')
+        if not tag_sha:raise ValueError('REMOTE_RUNTIME_LEDGER_ROOT_REF_INVALID')
+        try:
+            obj=self.client.tag_object(tag_sha)
+            payload=json.loads(str(obj.get('message') or '{}'))
+        except (ProviderContractError,ValueError,json.JSONDecodeError) as exc:
+            raise ValueError('REMOTE_RUNTIME_LEDGER_ROOT_OBJECT_INVALID') from exc
+        issue_number=payload.get('issue_number')
+        if payload.get('role')!=ROOT_ROLE or payload.get('title')!=TITLE or isinstance(issue_number,bool) or not isinstance(issue_number,int) or issue_number<1:
+            raise ValueError('REMOTE_RUNTIME_LEDGER_ROOT_BINDING_INVALID')
+        try:issue=self.client.get(f"/repos/{self.client.repo}/issues/{issue_number}")
+        except ProviderContractError as exc:raise ValueError('REMOTE_RUNTIME_LEDGER_ROOT_ISSUE_UNAVAILABLE') from exc
+        if issue.get('title')!=TITLE or issue.get('state')!='open' or int(issue.get('number') or 0)!=issue_number:
+            raise ValueError('REMOTE_RUNTIME_LEDGER_ROOT_ISSUE_INVALID')
+        return issue
+
+    def _root_message(self,issue:dict[str,Any])->str:
+        number=issue.get('number')
+        if isinstance(number,bool) or not isinstance(number,int) or number<1:raise ValueError('REMOTE_RUNTIME_LEDGER_ISSUE_ID_INVALID')
+        return json.dumps({'issue_number':number,'role':ROOT_ROLE,'title':TITLE},sort_keys=True,separators=(',',':'))
+
+    def _elect_root(self,candidate:dict[str,Any])->dict[str,Any]:
+        rules=self._anchor_rules_verified()
+        if rules.get('readback_verified') is not True:raise ValueError('REMOTE_RUNTIME_ANCHOR_RULESET_REQUIRED_BEFORE_LEDGER_INIT')
+        info=self.client.repo_info();default=str(info.get('default_branch') or 'main');head=str((self.client.branch(default).get('commit') or {}).get('sha') or '')
+        if not head:raise ValueError('REMOTE_RUNTIME_LEDGER_ROOT_TARGET_MISSING')
+        tag_obj=self.client.create_tag_object(ROOT_ANCHOR,head,self._root_message(candidate));tag_sha=str(tag_obj.get('sha') or '')
+        if not tag_sha:raise ValueError('REMOTE_RUNTIME_LEDGER_ROOT_OBJECT_CREATE_FAILED')
+        try:
+            ref=self.client.create_tag_ref(ROOT_ANCHOR,tag_sha)
+            if str((ref.get('object') or {}).get('sha') or '')!=tag_sha:raise ValueError('REMOTE_RUNTIME_LEDGER_ROOT_REF_READBACK_FAILED')
+            return candidate
+        except ProviderContractError as exc:
+            if str(exc) not in {'PROVIDER_HTTP_409','PROVIDER_HTTP_422'}:raise
+            winner=self._root_issue()
+            if winner is None:raise ValueError('REMOTE_RUNTIME_LEDGER_ROOT_ELECTION_UNRESOLVED') from exc
+            return winner
+
     def ensure_issue(self)->dict[str,Any]:
-        issues=self.client.issues();matches=[i for i in issues if i.get('title')==TITLE and i.get('state')=='open']
+        root=self._root_issue()
+        if root is not None:return root
+        matches=self._open_ledger_issues()
         if len(matches)>1:raise ValueError('MULTIPLE_RUNTIME_LEDGER_ISSUES')
-        if matches:return matches[0]
-        return self.client.create_issue(TITLE,'Public-safe ADWF checkpoint projection. Raw Work Memory is never stored in this public ledger.')
+        created=False
+        if matches:candidate=matches[0]
+        else:
+            candidate=self.client.create_issue(TITLE,'Public-safe ADWF checkpoint projection. Raw Work Memory is never stored in this public ledger.')
+            created=True
+        winner=self._elect_root(candidate)
+        if int(winner.get('number') or 0)==int(candidate.get('number') or 0):return winner
+        if not created:raise ValueError('REMOTE_RUNTIME_LEDGER_ROOT_CONFLICT')
+        try:closed=self.client.close_issue(int(candidate['number']))
+        except Exception as exc:raise ValueError('REMOTE_RUNTIME_LEDGER_NONCANONICAL_CANDIDATE_CLEANUP_FAILED') from exc
+        if closed.get('state')!='closed':raise ValueError('REMOTE_RUNTIME_LEDGER_NONCANONICAL_CANDIDATE_CLEANUP_NOT_VERIFIED')
+        return winner
+
     def _anchor_rules_verified(self)->dict[str,Any]:
         try:return verify_runtime_anchor_ruleset(self.client.rulesets())
         except Exception:return {'status':'NOT_VERIFIED','readback_verified':False,'reason_codes':['RUNTIME_ANCHOR_RULESET_READBACK_FAILED']}
+
     def _anchor_refs(self)->dict[str,dict[str,Any]]:
         refs=self.client.matching_tag_refs(ANCHOR_PREFIX);out={}
         for ref in refs:
             name=str(ref.get('ref') or '').split('refs/tags/',1)[-1]
-            if name.startswith(ANCHOR_PREFIX):out[name]=ref
+            if name.startswith(ANCHOR_PREFIX) and name!=ROOT_ANCHOR:out[name]=ref
         return out
+
     def _verify_tag_anchors(self,events:list[dict[str,Any]])->list[str]:
         errors=[];refs=self._anchor_refs();expected={_tag_name(e):e for e in events}
         extras=sorted(set(refs)-set(expected))
@@ -125,8 +195,9 @@ class GitHubRuntimeStore:
             if payload.get('event_hash')!=event.get('event_hash') or str(payload.get('provider_comment_id'))!=str(event.get('provider_object_id')):
                 errors.append('REMOTE_RUNTIME_EXTERNAL_ANCHOR_BINDING_MISMATCH:'+name)
         return errors
-    def read(self)->tuple[dict[str,Any],list[dict[str,Any]]]:
-        issue=self.ensure_issue();comments=self.client.issue_comments(int(issue['number']));events=[]
+
+    def _read_issue_events(self,issue:dict[str,Any])->list[dict[str,Any]]:
+        comments=self.client.issue_comments(int(issue['number']));events=[]
         for c in comments:
             event=_parse(str(c.get('body') or ''))
             if event:
@@ -137,7 +208,17 @@ class GitHubRuntimeStore:
         rules=self._anchor_rules_verified()
         if events and rules.get('readback_verified') is not True:errors.append('REMOTE_RUNTIME_ANCHOR_RULESET_NOT_VERIFIED')
         if errors:raise ValueError('REMOTE_RUNTIME_LEDGER_INVALID:'+','.join(errors))
-        return issue,events
+        return events
+
+    def read(self)->tuple[dict[str,Any]|None,list[dict[str,Any]]]:
+        issue=self._root_issue()
+        if issue is None:
+            matches=self._open_ledger_issues()
+            if len(matches)>1:raise ValueError('MULTIPLE_RUNTIME_LEDGER_ISSUES')
+            issue=matches[0] if matches else None
+        if issue is None:return None,[]
+        return issue,self._read_issue_events(issue)
+
     def append(self,state:dict[str,Any],work_memory:dict[str,Any]|None=None,session_checkpoint:dict[str,Any]|None=None)->dict[str,Any]:
         if validate_journal(state):raise ValueError('REMOTE_RUNTIME_STATE_INVALID')
         safe_state=public_state_projection(state)
@@ -146,7 +227,7 @@ class GitHubRuntimeStore:
         if checkpoint:
             binding_errors=_checkpoint_state_binding_errors(checkpoint,safe_state)
             if binding_errors:raise ValueError('REMOTE_RUNTIME_SESSION_CONTINUITY_BINDING_INVALID:'+','.join(binding_errors))
-        issue,events=self.read();prev=events[-1]['event_hash'] if events else None;prev_object=events[-1].get('provider_object_id') if events else None
+        issue=self.ensure_issue();events=self._read_issue_events(issue);prev=events[-1]['event_hash'] if events else None;prev_object=events[-1].get('provider_object_id') if events else None
         checkpoint_digest=(checkpoint or {}).get('checkpoint_digest')
         if events and events[-1].get('state_digest')==_hash(safe_state) and (checkpoint is None or events[-1].get('session_continuity_digest')==checkpoint_digest):return {'status':'UNCHANGED','issue_number':issue['number'],'event':events[-1]}
         public=public_memory_projection(work_memory)
@@ -167,6 +248,7 @@ class GitHubRuntimeStore:
         ref=self.client.create_tag_ref(_tag_name(event),tag_sha)
         if str((ref.get('object') or {}).get('sha') or '')!=tag_sha:raise ValueError('REMOTE_RUNTIME_EXTERNAL_ANCHOR_READBACK_FAILED')
         return {'status':'APPENDED','issue_number':issue['number'],'comment_id':comment['id'],'event':anchored,'public_projection_only':True,'external_anchor':{'tag':_tag_name(event),'tag_object_sha':tag_sha,'ruleset_verified':True}}
+
     def restore_latest(self,root:str|Path)->dict[str,Any]|None:
         _,events=self.read()
         if not events:return None
@@ -178,6 +260,7 @@ class GitHubRuntimeStore:
         finally:
             if os.path.exists(tmp):os.unlink(tmp)
         return state
+
     def restore_latest_session_continuity(self,*,actual_main_sha:str,actual_head_sha:str|None=None)->dict[str,Any]|None:
         _,events=self.read()
         for event in reversed(events):
