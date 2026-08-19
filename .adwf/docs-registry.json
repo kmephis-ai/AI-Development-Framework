@@ -24,7 +24,7 @@
         "skills/**"
       ],
       "mode": "manual-governance",
-      "source_digest": "92626448608aa0ebf8ceb9f47b48ec4254545e4d764229a9604c6418d43277de",
+      "source_digest": "7811e3823ef36852da1ab0df7670bd0993d00f97ec1fadd484cd45038e7e0a2d",
       "reviewed_at": "2026-08-13T00:00:00Z",
       "valid_until": "2026-11-13T00:00:00Z"
     },
@@ -121,7 +121,7 @@
         ".adwf/scripts/generate_skill_registry.py"
       ],
       "mode": "operations",
-      "source_digest": "b73efed85abf805badba59d14e7328e81a3613d39892d641b8c4eb2d686cf566",
+      "source_digest": "1510aeb1334388b58298f20991551ba6745a739c45f3ab918c3d0bc918b2bebe",
       "reviewed_at": "2026-08-13T00:00:00Z",
       "valid_until": "2026-11-13T00:00:00Z"
     },
