@@ -1,0 +1,186 @@
+name: ADWF UPGRADE Proof Connected Full Verifier
+
+on:
+  pull_request:
+    branches:
+      - helper/upgrade-proof-connected-full-verify-base-20260819-a1
+    types: [opened]
+
+permissions:
+  contents: write
+
+env:
+  MAIN_SHA: b10ab53e926b57c637c9c253cd43266e0fe1acfb
+  SEMANTIC_SHA: ca7a0112d76ad3ad443016c935ffc57d6ccc5b6d
+  SEMANTIC_TREE: e3b1ec94b3b0408156f7ad01e9407c3ea5317e0a
+  TARGET_BRANCH: agent/UPGRADE_PROOF_CONNECTED-001-existing-installation
+  CONSUMER_SHA: 59bb5319052f378f10a0216ee3956f12944c0b77
+  CONSUMER_TREE: 38918d7993329d564b9cc920bec9317714638379
+  SOURCE_SHA: 017042c1f2bcde8d89d4b344201e848d873ec5a9
+  SOURCE_TREE: c7e709a29df431460abb9bc17025d62d7803cda1
+  PYTHONDONTWRITEBYTECODE: '1'
+  PYTHONPATH: .adwf:.adwf/tests
+
+jobs:
+  verify:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - name: Checkout exact semantic writer candidate
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd
+        with:
+          repository: kmephis-ai/AI-Development-Framework
+          ref: ${{ env.SEMANTIC_SHA }}
+          path: target
+          fetch-depth: 0
+          persist-credentials: true
+      - name: Checkout exact installed framework A
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd
+        with:
+          repository: kmephis-ai/AI-Development-Framework
+          ref: ${{ env.SOURCE_SHA }}
+          path: source
+          fetch-depth: 1
+          persist-credentials: false
+      - name: Checkout exact connected PrihRash consumer
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd
+        with:
+          repository: kmephis-ai/PrihRashOnline-v2
+          ref: ${{ env.CONSUMER_SHA }}
+          path: consumer
+          fetch-depth: 1
+          persist-credentials: false
+      - uses: actions/setup-python@a309ff8b426b58ec0e2a45f0f869d46889d02405
+        with:
+          python-version: '3.12.10'
+          check-latest: false
+      - name: Assert exact provider and local CAS
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git -C target rev-parse HEAD)" = "$SEMANTIC_SHA"
+          test "$(git -C target rev-parse HEAD^{tree})" = "$SEMANTIC_TREE"
+          test "$(git -C source rev-parse HEAD)" = "$SOURCE_SHA"
+          test "$(git -C source rev-parse HEAD^{tree})" = "$SOURCE_TREE"
+          test "$(git -C consumer rev-parse HEAD)" = "$CONSUMER_SHA"
+          test "$(git -C consumer rev-parse HEAD^{tree})" = "$CONSUMER_TREE"
+          test -z "$(git -C target status --porcelain=v1 --untracked-files=all)"
+          test -z "$(git -C source status --porcelain=v1 --untracked-files=all)"
+          test -z "$(git -C consumer status --porcelain=v1 --untracked-files=all)"
+          test "$(git -C target ls-remote origin refs/heads/main | cut -f1)" = "$MAIN_SHA"
+          test "$(git -C target ls-remote origin refs/heads/$TARGET_BRANCH | cut -f1)" = "$SEMANTIC_SHA"
+          test "$(git -C consumer ls-remote origin refs/heads/main | cut -f1)" = "$CONSUMER_SHA"
+      - name: Re-run focused connected proof suite
+        working-directory: target
+        shell: bash
+        run: python -m unittest discover -s .adwf/tests -p 'test_external_consumer_upgrade_proof.py' -v
+      - name: Re-run focused installation suite
+        working-directory: target
+        shell: bash
+        run: python -m unittest discover -s .adwf/tests -p 'test_consumer_installation.py' -v
+      - name: Re-run focused upgrade transaction suite
+        working-directory: target
+        shell: bash
+        run: python -m unittest discover -s .adwf/tests -p 'test_consumer_upgrade_transaction.py' -v
+      - name: Materialize canonical generated projections locally
+        working-directory: target
+        shell: bash
+        run: |
+          set -euo pipefail
+          python .adwf/scripts/docs_freshness.py --write
+          python .adwf/scripts/generate_manifest.py
+          python .adwf/scripts/docs_freshness.py
+          python .adwf/scripts/generate_manifest.py --check
+          python .adwf/scripts/validate_framework.py
+      - name: Enforce generated-only delta from semantic candidate
+        shell: bash
+        run: |
+          set -euo pipefail
+          git -C target diff --check
+          git -C target diff --name-only > "$RUNNER_TEMP/generated-paths.txt"
+          python - "$RUNNER_TEMP/generated-paths.txt" <<'PY'
+          import sys
+          actual={x.strip() for x in open(sys.argv[1],encoding='utf-8') if x.strip()}
+          allowed={'.adwf/docs-registry.json','MANIFEST.json','SHA256SUMS.txt'}
+          if not actual:
+              raise SystemExit('UPGRADE_PROOF_CONNECTED_GENERATED_DELTA_EMPTY')
+          if not actual.issubset(allowed):
+              raise SystemExit('UPGRADE_PROOF_CONNECTED_GENERATED_SCOPE:'+','.join(sorted(actual)))
+          print('generated_scope='+','.join(sorted(actual)))
+          PY
+          test -z "$(git -C target status --porcelain=v1 --untracked-files=all | grep '^??' || true)"
+      - name: Full ADWF self-test on generated working tree
+        working-directory: target
+        shell: bash
+        run: python .adwf/adwf.py self-test
+      - name: Create local exact generated candidate
+        working-directory: target
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name 'adwf-upgrade-proof-connected-verifier'
+          git config user.email 'adwf-upgrade-proof-connected-verifier@users.noreply.github.com'
+          git add .adwf/docs-registry.json MANIFEST.json SHA256SUMS.txt
+          git commit -m '[UPGRADE_PROOF_CONNECTED-001] Sync canonical generated projections'
+          test -z "$(git status --porcelain=v1 --untracked-files=all)"
+          echo "generated_candidate_sha=$(git rev-parse HEAD)"
+          echo "generated_candidate_tree=$(git rev-parse HEAD^{tree})"
+      - name: Real PrihRash installed-consumer A-B-A-B proof
+        shell: bash
+        run: |
+          set -euo pipefail
+          CANDIDATE_SHA="$(git -C target rev-parse HEAD)"
+          CANDIDATE_TREE="$(git -C target rev-parse HEAD^{tree})"
+          python target/.adwf/scripts/run_external_consumer_upgrade_proof.py \
+            --consumer-root consumer \
+            --consumer-repository kmephis-ai/PrihRashOnline-v2 \
+            --consumer-sha "$CONSUMER_SHA" --consumer-tree "$CONSUMER_TREE" \
+            --source-root source --source-sha "$SOURCE_SHA" --source-tree "$SOURCE_TREE" \
+            --target-root target --target-sha "$CANDIDATE_SHA" --target-tree "$CANDIDATE_TREE" \
+            --provider-run-id "$GITHUB_RUN_ID" > "$RUNNER_TEMP/real-connected-proof.json"
+          cat "$RUNNER_TEMP/real-connected-proof.json"
+          python - "$RUNNER_TEMP/real-connected-proof.json" "$CANDIDATE_SHA" "$CANDIDATE_TREE" <<'PY'
+          import json,sys
+          r=json.load(open(sys.argv[1],encoding='utf-8'))
+          assert r['status']=='PASS', r
+          assert r['write_back_performed'] is False, r
+          assert r['external_source_unchanged'] is True, r
+          assert r['transitions']=={
+              'adoption':'VERIFIED_EXISTING',
+              'upgrade_b':'COMMITTED',
+              'rollback_a':'ROLLED_BACK',
+              'retry_b':'COMMITTED',
+          }, r['transitions']
+          assert [x['label'] for x in r['preservation_checkpoints']]==['CONNECTED_A','UPGRADE_B','ROLLBACK_A','RETRY_B']
+          assert r['consumer']['sha']==r['consumer']['sha']
+          assert r['target']['sha']==sys.argv[2]
+          assert r['target']['tree']==sys.argv[3]
+          print(json.dumps({
+              'status':r['status'],
+              'report_sha256':r['report_sha256'],
+              'transitions':r['transitions'],
+              'preservation_set_sha256':r['preservation_set_sha256'],
+              'target_sha':r['target']['sha'],
+              'target_tree':r['target']['tree'],
+              'write_back_performed':r['write_back_performed'],
+          },sort_keys=True))
+          PY
+          test "$(git -C consumer rev-parse HEAD)" = "$CONSUMER_SHA"
+          test "$(git -C consumer rev-parse HEAD^{tree})" = "$CONSUMER_TREE"
+          test -z "$(git -C consumer status --porcelain=v1 --untracked-files=all)"
+          test "$(git -C source rev-parse HEAD)" = "$SOURCE_SHA"
+          test -z "$(git -C source status --porcelain=v1 --untracked-files=all)"
+          test "$(git -C target rev-parse HEAD)" = "$CANDIDATE_SHA"
+          test -z "$(git -C target status --porcelain=v1 --untracked-files=all)"
+      - name: Final provider CAS and publish exact verified candidate
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git -C target ls-remote origin refs/heads/main | cut -f1)" = "$MAIN_SHA"
+          test "$(git -C target ls-remote origin refs/heads/$TARGET_BRANCH | cut -f1)" = "$SEMANTIC_SHA"
+          test "$(git -C consumer ls-remote origin refs/heads/main | cut -f1)" = "$CONSUMER_SHA"
+          CANDIDATE_SHA="$(git -C target rev-parse HEAD)"
+          CANDIDATE_TREE="$(git -C target rev-parse HEAD^{tree})"
+          echo "published_candidate_sha=$CANDIDATE_SHA"
+          echo "published_candidate_tree=$CANDIDATE_TREE"
+          git -C target push origin HEAD:refs/heads/$TARGET_BRANCH
