@@ -1,0 +1,1 @@
+Read-only governance readback trigger A2. DO NOT MERGE.
