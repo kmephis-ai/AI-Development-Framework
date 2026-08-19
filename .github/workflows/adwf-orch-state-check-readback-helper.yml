@@ -1,0 +1,79 @@
+name: ADWF ORCH_STATE Check Readback Helper
+
+on:
+  push:
+    branches:
+      - helper/orch-state-check-readback-20260819-a1
+    paths:
+      - .github/workflows/adwf-orch-state-check-readback-helper.yml
+
+permissions:
+  contents: write
+  actions: read
+  checks: read
+
+env:
+  SUBJECT_SHA: b926164369dcb065b19516d764ed375f8bf23cbd
+  EXPECTED_MAIN: aea2327c9bea12a4c2eb455187ae81ea02804636
+  EXPECTED_PR: '156'
+  PYTHONDONTWRITEBYTECODE: '1'
+  GITHUB_TOKEN: ${{ github.token }}
+
+jobs:
+  readback:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd
+        with:
+          ref: helper/orch-state-check-readback-20260819-a1
+          fetch-depth: 1
+      - uses: actions/setup-python@a309ff8b426b58ec0e2a45f0f869d46889d02405
+        with:
+          python-version: '3.12.10'
+          check-latest: false
+      - name: Read exact candidate gates from provider
+        shell: bash
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          import json, os, sys, time
+          from pathlib import Path
+          sys.path.insert(0, str(Path('.adwf').resolve()))
+          from lib.github_provider import GitHubClient
+
+          client=GitHubClient(os.environ['GITHUB_REPOSITORY'],os.environ['GITHUB_TOKEN'])
+          required={'fast-feedback','adwf/governance-gate','adwf/trusted-gate'}
+          final=None
+          for _ in range(12):
+              main=str((client.branch('main').get('commit') or {}).get('sha') or '')
+              pr=client.pull(int(os.environ['EXPECTED_PR']))
+              head=str((pr.get('head') or {}).get('sha') or '')
+              checks=client.check_runs(os.environ['SUBJECT_SHA'])
+              rows=[]
+              for check in checks:
+                  app=check.get('app') or {}
+                  rows.append({'name':check.get('name'),'status':check.get('status'),'conclusion':check.get('conclusion'),'app_slug':app.get('slug'),'app_id':app.get('id'),'id':check.get('id')})
+              by_name={str(row.get('name')):row for row in rows if row.get('name') in required}
+              final={'schema_version':1,'main_sha':main,'pr_number':int(os.environ['EXPECTED_PR']),'pr_head_sha':head,'subject_sha':os.environ['SUBJECT_SHA'],'required':sorted(required),'checks':rows,'required_checks':by_name}
+              if main!=os.environ['EXPECTED_MAIN']: raise SystemExit('ORCH_STATE_READBACK_MAIN_DRIFT')
+              if head!=os.environ['SUBJECT_SHA']: raise SystemExit('ORCH_STATE_READBACK_HEAD_DRIFT')
+              if set(by_name)==required and all(row.get('status')=='completed' and row.get('conclusion')=='success' and row.get('app_slug')=='github-actions' for row in by_name.values()):
+                  final['status']='VERIFIED'
+                  break
+              time.sleep(5)
+          else:
+              final['status']='NOT_VERIFIED'
+          Path('orch-state-check-readback.json').write_text(json.dumps(final,ensure_ascii=False,sort_keys=True,indent=2)+'\n',encoding='utf-8')
+          print(json.dumps(final,sort_keys=True),flush=True)
+          if final.get('status')!='VERIFIED': raise SystemExit('ORCH_STATE_REQUIRED_CHECKS_NOT_VERIFIED')
+          PY
+      - name: Persist bounded provider evidence on helper branch
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name 'adwf-provider-readback'
+          git config user.email 'adwf-provider-readback@users.noreply.github.com'
+          git add orch-state-check-readback.json
+          git commit -m '[EVIDENCE] ORCH_STATE-001 exact check readback'
+          git push origin HEAD:helper/orch-state-check-readback-20260819-a1
