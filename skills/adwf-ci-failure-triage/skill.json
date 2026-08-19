@@ -1,0 +1,55 @@
+{
+  "schema_version": 1,
+  "id": "adwf-ci-failure-triage",
+  "kind": "leaf",
+  "lifecycle": "ACTIVE",
+  "origin": {
+    "kind": "first_party"
+  },
+  "description": "Диагностирует CI failure по fresh exact-SHA provider evidence, определяет failure boundary/classification и минимальный safe repair без weakening gates или ложного product blame.",
+  "entrypoint": "SKILL.md",
+  "routing": {
+    "startup_visible": false,
+    "routed_by": [
+      "adwf-develop",
+      "adwf-operate"
+    ],
+    "routes": [],
+    "trigger_terms": [
+      "ci failure",
+      "ci упал",
+      "pipeline failed",
+      "workflow timeout",
+      "job timeout",
+      "github actions упал",
+      "flaky ci",
+      "provider failure",
+      "environment failure"
+    ],
+    "negative_terms": [
+      "release notes only",
+      "погода на завтра"
+    ]
+  },
+  "effects": {
+    "shell": false,
+    "filesystem": "none",
+    "network": "none",
+    "secrets": "none"
+  },
+  "external_domains": [],
+  "dependencies": [],
+  "evals": {
+    "trigger_positive": "evals/trigger-positive.json",
+    "trigger_negative": "evals/trigger-negative.json",
+    "success_cases": "evals/success-cases.json",
+    "adversarial": "evals/adversarial.json"
+  },
+  "quality": {
+    "min_no_trigger_precision": 1.0
+  },
+  "context_budget": {
+    "max_description_chars": 320,
+    "max_skill_md_chars": 16000
+  }
+}
