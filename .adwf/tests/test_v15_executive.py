@@ -10,6 +10,7 @@ from lib.impact_router import route_paths
 from lib.preview_engine import capture_preview,PLAYWRIGHT_VERSION
 from lib.github_rulesets import canonical_ruleset_payload,verify_rulesets
 from lib.github_runtime_store import GitHubRuntimeStore,verify_remote_events
+from lib.provider_contracts import ProviderContractError
 from lib.semantic_release import release_plan
 from lib.github_owner_decisions import GitHubOwnerDecisionStore
 from lib.owner_portal import start_autopilot
@@ -22,10 +23,22 @@ class Proc:
 
 class FakeGitHub:
     def __init__(self):
-        self._issues=[];self.comments={};self.cid=0;self.tags={};self.tag_objects={};self.next_tag=0
+        self.repo='kmephis-ai/AI-Development-Framework';self._issues=[];self.comments={};self.cid=0;self.tags={};self.tag_objects={};self.next_tag=0
     def issues(self):return list(self._issues)
+    def get(self,path):
+        prefix=f'/repos/{self.repo}/issues/'
+        if path.startswith(prefix):
+            number=int(path[len(prefix):])
+            for item in self._issues:
+                if item['number']==number:return dict(item)
+            raise ProviderContractError('PROVIDER_HTTP_404')
+        raise AssertionError(f'UNEXPECTED_GET:{path}')
     def create_issue(self,title,body):
         item={'number':len(self._issues)+1,'title':title,'body':body,'state':'open'};self._issues.append(item);self.comments[item['number']]=[];return item
+    def close_issue(self,n):
+        for item in self._issues:
+            if item['number']==n:item['state']='closed';return dict(item)
+        raise ProviderContractError('PROVIDER_HTTP_404')
     def issue_comments(self,n):return list(self.comments.get(n,[]))
     def add_issue_comment(self,n,body):
         self.cid+=1;c={'id':self.cid,'body':body,'created_at':'2026-08-14T00:00:00Z','user':{'login':'owner'}};self.comments[n].append(c);return c
@@ -40,7 +53,11 @@ class FakeGitHub:
     def create_tag_object(self,tag,target,message):
         self.next_tag+=1;sha=f'{self.next_tag:040x}';obj={'sha':sha,'message':message,'object':{'sha':target}};self.tag_objects[sha]=obj;return obj
     def create_tag_ref(self,tag,sha):
+        if tag in self.tags:raise ProviderContractError('PROVIDER_HTTP_422')
         ref={'ref':'refs/tags/'+tag,'object':{'sha':sha}};self.tags[tag]=ref;return ref
+    def tag_ref(self,tag):
+        if tag not in self.tags:raise ProviderContractError('PROVIDER_HTTP_404')
+        return self.tags[tag]
     def tag_object(self,sha):return self.tag_objects[sha]
 
 class V15ExecutiveTests(unittest.TestCase):
