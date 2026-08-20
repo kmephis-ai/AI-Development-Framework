@@ -1,0 +1,71 @@
+name: ADWF CODE_QUALITY Projection Proof
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+
+permissions:
+  contents: read
+
+env:
+  CANDIDATE_SHA: f6e7b453af5d709b99878a743347fee8696bff00
+
+jobs:
+  projection-proof:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - name: Checkout exact candidate
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd
+        with:
+          ref: ${{ env.CANDIDATE_SHA }}
+          fetch-depth: 0
+          persist-credentials: false
+          path: candidate
+
+      - uses: actions/setup-python@a309ff8b426b58ec0e2a45f0f869d46889d02405
+        with:
+          python-version: "3.12.10"
+
+      - name: Generate canonical projections and validate
+        shell: bash
+        working-directory: candidate
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "${CANDIDATE_SHA}"
+          rm -f .github/workflows/adwf-code-quality-roadmap-materialize.yml
+          python .adwf/scripts/docs_freshness.py --write --reviewed-at 2026-08-13T00:00:00Z --valid-until 2026-11-13T00:00:00Z
+          python .adwf/scripts/generate_manifest.py
+          python .adwf/scripts/validate_ci.py
+          python .adwf/scripts/validate_framework.py
+          python .adwf/scripts/validate_pipeline_ir.py
+          python .adwf/scripts/validate_docs.py
+          python .adwf/scripts/generate_manifest.py --check
+          python .adwf/adwf.py doctor --scope package_integrity
+          python .adwf/adwf.py doctor --scope config_health
+          python .adwf/adwf.py self-test
+          python - <<'PY'
+          from pathlib import Path
+          import hashlib, json
+          files=['.adwf/roadmap.json','.adwf/docs-registry.json','MANIFEST.json','SHA256SUMS.txt']
+          status={'status':'PASS','candidate_sha':'f6e7b453af5d709b99878a743347fee8696bff00','files':{}}
+          for rel in files:
+              data=Path(rel).read_bytes()
+              status['files'][rel]={'sha256':hashlib.sha256(data).hexdigest(),'bytes':len(data)}
+          Path('CODE_QUALITY_STATUS.json').write_text(json.dumps(status,indent=2)+'\n',encoding='utf-8')
+          PY
+
+      - name: Upload exact generated outputs
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: code-quality-001-projections
+          path: |
+            candidate/.adwf/roadmap.json
+            candidate/.adwf/docs-registry.json
+            candidate/MANIFEST.json
+            candidate/SHA256SUMS.txt
+            candidate/CODE_QUALITY_STATUS.json
+          if-no-files-found: error
+          retention-days: 1
+          compression-level: 0
