@@ -3,8 +3,8 @@
   "version": "1.6.0",
   "schema_version": 3,
   "scope": "FRAMEWORK_OWNED_TRUST_BOUNDARY",
-  "file_count_excluding_manifests": 565,
-  "total_bytes_excluding_manifests": 2957022,
+  "file_count_excluding_manifests": 566,
+  "total_bytes_excluding_manifests": 2959750,
   "files": [
     ".adwf/SETUP_CHECKLIST.md",
     ".adwf/actions-lock.json",
@@ -423,6 +423,7 @@
     ".github/ISSUE_TEMPLATE/bug-report.yml",
     ".github/ISSUE_TEMPLATE/config.yml",
     ".github/pull_request_template.md",
+    ".github/workflows/adwf-code-quality-roadmap-materialize.yml",
     ".github/workflows/adwf-control.yml",
     ".github/workflows/adwf-main.yml",
     ".github/workflows/adwf-platform-smoke.yml",
