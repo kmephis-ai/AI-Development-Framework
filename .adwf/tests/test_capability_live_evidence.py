@@ -256,7 +256,7 @@ class CapabilityLiveEvidenceTests(unittest.TestCase):
     def _session_registry_and_trace(self):
         cert, provider = self._session_fixture()
         registry = copy.deepcopy(self.registry)
-        registry["certifications"].append(cert)
+        registry["session_certifications"] = [cert]
         registry = seal_registry(registry)
         trace = copy.deepcopy(self.trace)
         session = next(item for item in trace["capabilities"] if item["id"] == "SESSION_CONTINUITY")
@@ -272,7 +272,7 @@ class CapabilityLiveEvidenceTests(unittest.TestCase):
 
     def test_session_provider_readback_binds_runs_jobs_tags_blobs_and_safety(self):
         registry, _, provider = self._session_registry_and_trace()
-        cert = registry["certifications"][-1]
+        cert = registry["session_certifications"][-1]
         client, _, factory = self._session_clients(cert, provider)
         with mock.patch("lib.github_provider.GitHubClient", side_effect=factory):
             result = verify_provider_certification(client, cert)
@@ -300,7 +300,7 @@ class CapabilityLiveEvidenceTests(unittest.TestCase):
 
     def test_session_provider_wrong_comment_hash_fails(self):
         registry, _, provider = self._session_registry_and_trace()
-        cert = registry["certifications"][-1]
+        cert = registry["session_certifications"][-1]
         cert["connected_consumer"]["issue"]["terminal_comment_sha256"] = "0" * 64
         client, _, factory = self._session_clients(cert, provider)
         with mock.patch("lib.github_provider.GitHubClient", side_effect=factory):
@@ -310,7 +310,7 @@ class CapabilityLiveEvidenceTests(unittest.TestCase):
 
     def test_session_provider_wrong_tag_object_fails(self):
         registry, _, provider = self._session_registry_and_trace()
-        cert = registry["certifications"][-1]
+        cert = registry["session_certifications"][-1]
         client, _, factory = self._session_clients(cert, provider, wrong_tag=True)
         with mock.patch("lib.github_provider.GitHubClient", side_effect=factory):
             result = verify_provider_certification(client, cert)
@@ -319,7 +319,7 @@ class CapabilityLiveEvidenceTests(unittest.TestCase):
 
     def test_session_provider_blob_safety_substitution_fails(self):
         registry, _, provider = self._session_registry_and_trace()
-        cert = registry["certifications"][-1]
+        cert = registry["session_certifications"][-1]
         client, _, factory = self._session_clients(cert, provider, wrong_blob_safety=True)
         with mock.patch("lib.github_provider.GitHubClient", side_effect=factory):
             result = verify_provider_certification(client, cert)
@@ -328,7 +328,7 @@ class CapabilityLiveEvidenceTests(unittest.TestCase):
 
     def test_session_provider_consumer_tree_substitution_fails(self):
         registry, _, provider = self._session_registry_and_trace()
-        cert = registry["certifications"][-1]
+        cert = registry["session_certifications"][-1]
         client, _, factory = self._session_clients(cert, provider, wrong_consumer_tree=True)
         with mock.patch("lib.github_provider.GitHubClient", side_effect=factory):
             result = verify_provider_certification(client, cert)
