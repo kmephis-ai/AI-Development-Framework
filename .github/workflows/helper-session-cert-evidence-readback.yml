@@ -19,7 +19,7 @@ jobs:
       - name: Read immutable session evidence
         shell: python
         run: |
-          import hashlib, json, os, urllib.parse, urllib.request
+          import base64, hashlib, json, os, urllib.parse, urllib.request
 
           token = os.environ["GH_TOKEN"]
           headers = {
@@ -33,8 +33,10 @@ jobs:
                   return json.load(r)
           def api(repo, path):
               return get(f"https://api.github.com/repos/{repo}{path}")
+          def digest_bytes(raw):
+              return hashlib.sha256(raw).hexdigest()
           def digest_text(text):
-              return hashlib.sha256(str(text).encode("utf-8")).hexdigest()
+              return digest_bytes(str(text).encode("utf-8"))
           def run_fact(repo, run_id):
               run = api(repo, f"/actions/runs/{run_id}")
               jobs = api(repo, f"/actions/runs/{run_id}/jobs?per_page=100").get("jobs", [])
@@ -66,15 +68,19 @@ jobs:
           def commit_fact(repo, sha):
               c = api(repo, f"/git/commits/{sha}")
               return {"sha": c.get("sha"), "tree": (c.get("tree") or {}).get("sha")}
-          def branch_runs(repo, branch):
-              q = urllib.parse.urlencode({"branch": branch, "per_page": 100})
-              runs = api(repo, f"/actions/runs?{q}").get("workflow_runs", [])
-              return [{"id": r.get("id"), "name": r.get("name"), "event": r.get("event"),
-                       "head_branch": r.get("head_branch"), "head_sha": r.get("head_sha"),
-                       "status": r.get("status"), "conclusion": r.get("conclusion")} for r in runs]
+          def content_fact(repo, sha, path):
+              qpath = "/".join(urllib.parse.quote(part, safe="") for part in path.split("/"))
+              p = api(repo, f"/contents/{qpath}?ref={sha}")
+              raw = base64.b64decode("".join(str(p.get("content") or "").split()), validate=True)
+              data = json.loads(raw.decode("utf-8"))
+              return {"path": path, "blob_sha": p.get("sha"), "sha256": digest_bytes(raw), "json": data}
 
           adwf = "kmephis-ai/AI-Development-Framework"
           consumer = "kmephis-ai/PrihRashOnline-v2"
+          self_a = run_fact(adwf, 32098974683)
+          self_b = run_fact(adwf, 32099048963)
+          con_a = run_fact(consumer, 32302616125)
+          con_b = run_fact(consumer, 32302924442)
           evidence = {
               "self_host": {
                   "issue": issue_fact(adwf, 149),
@@ -82,8 +88,10 @@ jobs:
                   "ledger_issue": issue_fact(adwf, 3),
                   "ledger_comment": comment_fact(adwf, 5323578406),
                   "event_anchor": tag_fact(adwf, "adwf-runtime-anchor-000001-611cbcec83b883b7"),
-                  "session_a_branch_runs": branch_runs(adwf, "agent/proof-session-selfhost-a-20260818-a1"),
-                  "session_b_run": run_fact(adwf, 32099048963),
+                  "session_a_run": self_a,
+                  "session_b_run": self_b,
+                  "session_a_evidence": content_fact(adwf, self_a["head_sha"], "session-a-evidence.json"),
+                  "session_b_evidence": content_fact(adwf, self_b["head_sha"], "session-b-evidence.json"),
                   "subject_commit": commit_fact(adwf, "017042c1f2bcde8d89d4b344201e848d873ec5a9"),
               },
               "connected_consumer": {
@@ -94,8 +102,10 @@ jobs:
                   "ledger_comment": comment_fact(consumer, 5337377059),
                   "root_anchor": tag_fact(consumer, "adwf-runtime-anchor-ledger-root-v1"),
                   "event_anchor": tag_fact(consumer, "adwf-runtime-anchor-000001-e545573a2c2640f1"),
-                  "session_a_run": run_fact(consumer, 32302616125),
-                  "session_b_run": run_fact(consumer, 32302924442),
+                  "session_a_run": con_a,
+                  "session_b_run": con_b,
+                  "session_a_evidence": content_fact(consumer, con_a["head_sha"], "session-root-a-evidence.json"),
+                  "session_b_evidence": content_fact(consumer, con_b["head_sha"], "session-root-b-evidence.json"),
                   "consumer_commit": commit_fact(consumer, "91d91252cd7d08e33a3c004290d486024424a69e"),
                   "installed_framework_commit": commit_fact(adwf, "1f38866eeb242f8d1e56c54632b059cf8adde77d"),
                   "upstream_defect": issue_fact(adwf, 157),
@@ -103,11 +113,13 @@ jobs:
           }
           print("SESSION_CERT_EVIDENCE=" + json.dumps(evidence, sort_keys=True, separators=(",", ":")))
 
-          a = evidence["connected_consumer"]["session_a_run"]
-          b = evidence["connected_consumer"]["session_b_run"]
-          assert a["id"] != b["id"]
-          assert a["status"] == b["status"] == "completed"
-          assert a["conclusion"] == b["conclusion"] == "success"
+          assert self_a["id"] != self_b["id"]
+          assert self_a["status"] == self_b["status"] == "completed"
+          assert self_a["conclusion"] == self_b["conclusion"] == "success"
+          assert con_a["id"] != con_b["id"]
+          assert con_a["status"] == con_b["status"] == "completed"
+          assert con_a["conclusion"] == con_b["conclusion"] == "success"
+          assert con_a["jobs"][0]["runner_name"] != con_b["jobs"][0]["runner_name"]
           assert evidence["connected_consumer"]["issue"]["state"] == "closed"
           assert evidence["connected_consumer"]["legacy_duplicate"]["state"] == "closed"
           assert evidence["connected_consumer"]["upstream_defect"]["state"] == "closed"
