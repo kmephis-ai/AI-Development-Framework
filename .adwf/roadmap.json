@@ -328,6 +328,99 @@
           "product_impact": false
         }
       ]
+    },
+    {
+      "id": "PRODUCT-EVALUATION-INTELLIGENCE",
+      "title_ru": "Product Truth & Evaluation Intelligence — long-horizon architecture",
+      "tasks": [
+        {
+          "roadmap_id": "PRODUCT_TRUTH-001",
+          "title_ru": "Контракт продуктового замысла и пользовательского опыта Consumer",
+          "dependencies": [
+            "CONSUMER_OPS-001"
+          ],
+          "product_impact": true
+        },
+        {
+          "roadmap_id": "EVAL-001",
+          "title_ru": "Независимая продуктовая оценка и Quality Intelligence",
+          "dependencies": [
+            "PRODUCT_TRUTH-001",
+            "AGENTQUAL-001",
+            "CONSUMER_GATE-001"
+          ],
+          "product_impact": true
+        },
+        {
+          "roadmap_id": "CONTEXT-001",
+          "title_ru": "Context Compiler / Agent Context Engineering",
+          "dependencies": [
+            "PRODUCT_TRUTH-001",
+            "AIWORK-001",
+            "TRACE-001",
+            "SESSION_CONTINUITY-001"
+          ],
+          "product_impact": false
+        },
+        {
+          "roadmap_id": "AGENT_EVAL-001",
+          "title_ru": "Continuous Real-Agent Qualification & Task-Class Routing",
+          "dependencies": [
+            "AGENTQUAL-001",
+            "EVAL-001",
+            "PPCF-001"
+          ],
+          "product_impact": false
+        },
+        {
+          "roadmap_id": "ARCH_FITNESS-001",
+          "title_ru": "Agent-legible Architecture Fitness Functions",
+          "dependencies": [
+            "AIWORK-001",
+            "TRACE-001"
+          ],
+          "product_impact": false
+        },
+        {
+          "roadmap_id": "AGENT_RUNTIME_SAFE-001",
+          "title_ru": "Secure Agent Execution Identity/Egress Envelope",
+          "dependencies": [
+            "ENVSAFE-001",
+            "PPCF-001",
+            "ORCH-001"
+          ],
+          "product_impact": false
+        },
+        {
+          "roadmap_id": "AGENT_OBS-001",
+          "title_ru": "Agentic Execution & Evaluation Observability",
+          "dependencies": [
+            "ORCH-001",
+            "EVAL-001",
+            "PPCF-001"
+          ],
+          "product_impact": false
+        },
+        {
+          "roadmap_id": "EPI-001",
+          "title_ru": "External Practice Intelligence — evidence-driven capability discovery",
+          "dependencies": [
+            "TRACE-001",
+            "PPCF-001"
+          ],
+          "product_impact": false
+        },
+        {
+          "roadmap_id": "INTEROP-001",
+          "title_ru": "Optional Agent/Tool Interoperability Profile",
+          "dependencies": [
+            "PPCF-001",
+            "ORCH-001",
+            "AGENT_RUNTIME_SAFE-001"
+          ],
+          "product_impact": false
+        }
+      ]
     }
   ]
 }
