@@ -4,6 +4,9 @@ on:
   push:
     branches:
       - agent/local-mirror-ROADMAP_FLEET_2026-001-20260820-a1
+  pull_request:
+    branches:
+      - main
 
 permissions:
   contents: read
