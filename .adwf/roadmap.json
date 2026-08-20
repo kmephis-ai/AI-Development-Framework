@@ -294,6 +294,38 @@
             "CONSUMER_GATE_RETRY-001"
           ],
           "product_impact": false
+        },
+        {
+          "roadmap_id": "DELIVERY_SHA_IDENTITY-001",
+          "title_ru": "Exact merged delivery revision continuity through PROMOTE/OBSERVE",
+          "dependencies": [
+            "SESSION_CONTINUITY-001"
+          ],
+          "product_impact": false
+        },
+        {
+          "roadmap_id": "ORCH-001",
+          "title_ru": "Durable autonomous development orchestration + Human-by-Exception",
+          "dependencies": [
+            "DELIVERY_SHA_IDENTITY-001"
+          ],
+          "product_impact": false
+        },
+        {
+          "roadmap_id": "MULTIWRITER-001",
+          "title_ru": "Conflict-domain safe multi-writer orchestration",
+          "dependencies": [
+            "ORCH-001"
+          ],
+          "product_impact": false
+        },
+        {
+          "roadmap_id": "PPCF-001",
+          "title_ru": "Provider & Plugin Capability Framework",
+          "dependencies": [
+            "SESSION_CONTINUITY-001"
+          ],
+          "product_impact": false
         }
       ]
     }
