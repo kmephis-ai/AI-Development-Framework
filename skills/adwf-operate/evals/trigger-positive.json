@@ -17,6 +17,11 @@
       "id": "rollback",
       "input": "Нужен rollback неудачного обновления",
       "expected_trigger": true
+    },
+    {
+      "id": "ci-incident",
+      "input": "CI failure: workflow timeout в hosted runner",
+      "expected_trigger": true
     }
   ]
 }

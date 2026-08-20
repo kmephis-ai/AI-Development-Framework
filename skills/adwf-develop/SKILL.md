@@ -9,6 +9,7 @@ description: Route ADWF development, debugging, local-workspace recovery, sessio
 
 ## Routes
 - `adwf-local-git-mirror` — когда direct Git недоступен, а Connector может восстановить exact-SHA workspace.
+- `adwf-ci-failure-triage` — когда CI/workflow/job упал, timeout/cancelled/flaky и нужно evidence-bound cause classification до retry/repair.
 - `adwf-session-bootstrap` — когда новая AI-сессия должна восстановить live provider/workspace/task state.
 - `adwf-session-handoff` — когда нужен durable handoff между сессиями без secrets и hidden reasoning.
 - `adwf-verification-before-completion` — когда работа близка к DONE/PASS и требуется fresh evidence.

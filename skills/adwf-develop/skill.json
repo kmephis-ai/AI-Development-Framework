@@ -15,7 +15,8 @@
       "adwf-local-git-mirror",
       "adwf-session-bootstrap",
       "adwf-session-handoff",
-      "adwf-verification-before-completion"
+      "adwf-verification-before-completion",
+      "adwf-ci-failure-triage"
     ],
     "trigger_terms": [
       "разработ",
@@ -24,7 +25,10 @@
       "локальный git",
       "новая сессия",
       "handoff",
-      "verification before completion"
+      "verification before completion",
+      "ci failure",
+      "pipeline failed",
+      "workflow timeout"
     ],
     "negative_terms": [
       "release only",

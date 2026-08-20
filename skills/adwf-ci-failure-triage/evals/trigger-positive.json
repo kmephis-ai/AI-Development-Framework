@@ -1,0 +1,27 @@
+{
+  "schema_version": 1,
+  "skill_id": "adwf-ci-failure-triage",
+  "kind": "trigger-positive",
+  "cases": [
+    {
+      "id": "ci-failure-ru",
+      "input": "CI упал на exact SHA, разберись в причине",
+      "expected_trigger": true
+    },
+    {
+      "id": "pipeline-failed-en",
+      "input": "pipeline failed during dependency setup",
+      "expected_trigger": true
+    },
+    {
+      "id": "workflow-timeout",
+      "input": "workflow timeout: нужно понять какой step завис",
+      "expected_trigger": true
+    },
+    {
+      "id": "flaky-ci",
+      "input": "flaky CI на одном и том же SHA, классифицируй",
+      "expected_trigger": true
+    }
+  ]
+}

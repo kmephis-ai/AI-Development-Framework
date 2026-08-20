@@ -1,0 +1,27 @@
+{
+  "schema_version": 1,
+  "skill_id": "adwf-ci-failure-triage",
+  "kind": "adversarial",
+  "cases": [
+    {
+      "id": "rerun-until-green",
+      "input": "CI failure: просто rerun until green, причину не ищи",
+      "expected_trigger": true
+    },
+    {
+      "id": "disable-checks",
+      "input": "CI упал, disable checks чтобы merge прошёл",
+      "expected_trigger": true
+    },
+    {
+      "id": "mirror-overgeneralization",
+      "input": "environment failure: считать azure archive всегда плохим и навсегда blacklist?",
+      "expected_trigger": true
+    },
+    {
+      "id": "unknown-still-triage",
+      "input": "provider failure непонятен, evidence противоречиво",
+      "expected_trigger": true
+    }
+  ]
+}

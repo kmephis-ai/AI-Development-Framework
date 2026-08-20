@@ -1,34 +1,34 @@
 {
   "schema_version": 1,
-  "id": "adwf-operate",
-  "kind": "router",
+  "id": "adwf-ci-failure-triage",
+  "kind": "leaf",
   "lifecycle": "ACTIVE",
   "origin": {
     "kind": "first_party"
   },
-  "description": "Router ADWF для release, incident, upgrade, rollback, cost и runtime operations с минимальной загрузкой leaf Skills и FREE_ONLY boundary.",
+  "description": "Диагностирует CI failure по fresh exact-SHA provider evidence, определяет failure boundary/classification и минимальный safe repair без weakening gates или ложного product blame.",
   "entrypoint": "SKILL.md",
   "routing": {
-    "startup_visible": true,
-    "routed_by": [],
-    "routes": [
-      "adwf-local-git-mirror",
-      "adwf-ci-failure-triage"
+    "startup_visible": false,
+    "routed_by": [
+      "adwf-develop",
+      "adwf-operate"
     ],
+    "routes": [],
     "trigger_terms": [
-      "release",
-      "incident",
-      "upgrade",
-      "rollback",
-      "cost",
-      "runtime operation",
       "ci failure",
+      "ci упал",
+      "pipeline failed",
       "workflow timeout",
-      "pipeline failed"
+      "job timeout",
+      "github actions упал",
+      "flaky ci",
+      "provider failure",
+      "environment failure"
     ],
     "negative_terms": [
-      "только аудит",
-      "pure code implementation"
+      "release notes only",
+      "погода на завтра"
     ]
   },
   "effects": {
@@ -50,6 +50,6 @@
   },
   "context_budget": {
     "max_description_chars": 320,
-    "max_skill_md_chars": 12000
+    "max_skill_md_chars": 16000
   }
 }

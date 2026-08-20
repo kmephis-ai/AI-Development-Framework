@@ -8,16 +8,35 @@
   ],
   "skills": [
     {
+      "id": "adwf-ci-failure-triage",
+      "kind": "leaf",
+      "lifecycle": "ACTIVE",
+      "path": "skills/adwf-ci-failure-triage",
+      "entrypoint": "SKILL.md",
+      "descriptor_sha256": "6bf5bd1d097e4130f49b6e4a1da0827171b9c1cb968f4dde0fcf77e8f1cdf3c8",
+      "package_sha256": "5cda9c21b5f26bc2fa2db3cfd3d81fbcacf312b070d06bf9fa872e9348fb4604",
+      "startup_visible": false,
+      "routed_by": [
+        "adwf-develop",
+        "adwf-operate"
+      ],
+      "routes": [],
+      "security_status": "PASS",
+      "eval_status": "PASS",
+      "no_trigger_precision": 1.0
+    },
+    {
       "id": "adwf-develop",
       "kind": "router",
       "lifecycle": "ACTIVE",
       "path": "skills/adwf-develop",
       "entrypoint": "SKILL.md",
-      "descriptor_sha256": "39428377fe210fb2ea959d9825f27c94c32888f0c138acf3314a44becfd90adc",
-      "package_sha256": "f22d8d7db909011253452d48e52c4fd540d32c72c3a51f6656550f24091d6340",
+      "descriptor_sha256": "774e26fed8bfae2ae24eb45f5e86eb277220c316e390991f35c86001c37dd930",
+      "package_sha256": "c62fc1d7a9bedc0d50b47f9707c5e1a7cf194aa5b3b34e30c12a87e16039ecab",
       "startup_visible": true,
       "routed_by": [],
       "routes": [
+        "adwf-ci-failure-triage",
         "adwf-local-git-mirror",
         "adwf-session-bootstrap",
         "adwf-session-handoff",
@@ -69,11 +88,12 @@
       "lifecycle": "ACTIVE",
       "path": "skills/adwf-operate",
       "entrypoint": "SKILL.md",
-      "descriptor_sha256": "2a3eaf1bbf0550b41a3a65ec7d922f2a5387e4aaf24d04ab53c2fe85694badf6",
-      "package_sha256": "eac6a8187846b990bab0d5db1b9489c85062614c51e2d258b17142de81878cec",
+      "descriptor_sha256": "7ca9c79e7a867206887c4be603a0c180244dd820d3f473dbfb409ee5173f814c",
+      "package_sha256": "f99a1cc6a86fa196ce2edffedc47ab7a6942ea2caba30f3fd44fb5d235502e9d",
       "startup_visible": true,
       "routed_by": [],
       "routes": [
+        "adwf-ci-failure-triage",
         "adwf-local-git-mirror"
       ],
       "security_status": "PASS",
