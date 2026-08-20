@@ -1,0 +1,170 @@
+name: ROADMAP SKILLS 2026 Materializer
+
+on:
+  push:
+    branches:
+      - helper/roadmap-skills-2026-materialize-20260820-a1
+
+permissions:
+  contents: write
+
+jobs:
+  materialize:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    env:
+      BASE_SHA: 9ec018f292e7b8537e324e7db645f1176d8cd83f
+      WRITER_BRANCH: agent/ROADMAP_SKILLS_2026-001-skill-intelligence-roadmap
+      WORK_ID: ROADMAP_SKILLS_2026-001
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd
+        with:
+          ref: ${{ env.BASE_SHA }}
+          fetch-depth: 0
+      - uses: actions/setup-python@a309ff8b426b58ec0e2a45f0f869d46889d02405
+        with:
+          python-version: "3.12.10"
+      - name: Exact source and writer CAS preflight
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "$BASE_SHA"
+          MAIN_REMOTE="$(git ls-remote origin refs/heads/main | awk '{print $1}')"
+          WRITER_REMOTE="$(git ls-remote origin "refs/heads/$WRITER_BRANCH" | awk '{print $1}')"
+          test "$MAIN_REMOTE" = "$BASE_SHA"
+          test "$WRITER_REMOTE" = "$BASE_SHA"
+      - name: Materialize Skill Intelligence Roadmap goal
+        shell: python
+        run: |
+          import json
+          from pathlib import Path
+
+          path = Path('.adwf/roadmap.json')
+          data = json.loads(path.read_text(encoding='utf-8'))
+          goals = data.get('goals') or []
+          if any(g.get('id') == 'SKILL-INTELLIGENCE' for g in goals):
+              raise SystemExit('SKILL_INTELLIGENCE_GOAL_ALREADY_EXISTS')
+
+          existing = {}
+          for goal in goals:
+              for task in goal.get('tasks') or []:
+                  rid = task.get('roadmap_id')
+                  if not rid or rid in existing:
+                      raise SystemExit(f'INVALID_OR_DUPLICATE_EXISTING_ID:{rid}')
+                  existing[rid] = goal.get('id')
+
+          tasks = [
+              {
+                  'roadmap_id': 'SKILL_RUNTIME-002',
+                  'title_ru': 'Portable Trusted Skill Runtime v2',
+                  'dependencies': ['SKILL-001', 'CONSUMER_INSTR-001'],
+                  'product_impact': False,
+              },
+              {
+                  'roadmap_id': 'SKILL_EVAL-002',
+                  'title_ru': 'Differential Real-Agent Skill Evaluation v2',
+                  'dependencies': ['SKILL_RUNTIME-002', 'AGENTQUAL-001', 'EVAL-001'],
+                  'product_impact': False,
+              },
+              {
+                  'roadmap_id': 'CONSUMER_SKILL_SDK-001',
+                  'title_ru': 'Layered Skill Ownership & Project Pack/Consumer Translation SDK',
+                  'dependencies': ['SKILL_RUNTIME-002', 'PACKSDK-001', 'CONSUMER_INSTR-001', 'UPGRADE-001'],
+                  'product_impact': False,
+              },
+              {
+                  'roadmap_id': 'SKILL_FACTORY-001',
+                  'title_ru': 'Evidence-driven Skill Discovery, Improvement & Retirement',
+                  'dependencies': ['SKILL_EVAL-002', 'CONSUMER_SKILL_SDK-001', 'EPI-001', 'AGENT_OBS-001'],
+                  'product_impact': False,
+              },
+          ]
+
+          all_ids = set(existing)
+          for task in tasks:
+              rid = task['roadmap_id']
+              if rid in all_ids:
+                  raise SystemExit(f'ROADMAP_ID_ALREADY_EXISTS:{rid}')
+              all_ids.add(rid)
+          for task in tasks:
+              unknown = [dep for dep in task['dependencies'] if dep not in all_ids]
+              if unknown:
+                  raise SystemExit(f'UNKNOWN_DEPENDENCY:{task["roadmap_id"]}:{unknown}')
+
+          goals.append({
+              'id': 'SKILL-INTELLIGENCE',
+              'title_ru': 'Skill Intelligence Layer v2 — portable, measurable, consumer-translatable competence',
+              'tasks': tasks,
+          })
+          path.write_text(json.dumps(data, ensure_ascii=False, indent=2) + '\n', encoding='utf-8')
+
+          graph = {}
+          for goal in data['goals']:
+              for task in goal.get('tasks') or []:
+                  graph[task['roadmap_id']] = list(task.get('dependencies') or [])
+          for rid, deps in graph.items():
+              for dep in deps:
+                  if dep not in graph:
+                      raise SystemExit(f'UNKNOWN_GRAPH_DEPENDENCY:{rid}:{dep}')
+          state = {}
+          def visit(node):
+              mark = state.get(node, 0)
+              if mark == 1:
+                  raise SystemExit(f'ROADMAP_CYCLE:{node}')
+              if mark == 2:
+                  return
+              state[node] = 1
+              for dep in graph[node]:
+                  visit(dep)
+              state[node] = 2
+          for node in graph:
+              visit(node)
+          print('ROADMAP_SKILL_INTELLIGENCE=PASS')
+      - name: Canonical generated projections
+        shell: bash
+        run: |
+          set -euo pipefail
+          python .adwf/scripts/docs_freshness.py --write
+          python .adwf/scripts/generate_manifest.py
+          python .adwf/scripts/generate_manifest.py --check
+      - name: Canonical validation
+        shell: bash
+        run: |
+          set -euo pipefail
+          python .adwf/scripts/validate_ci.py
+          python .adwf/scripts/validate_framework.py
+          python .adwf/scripts/validate_pipeline_ir.py
+          python .adwf/scripts/validate_docs.py
+          python .adwf/adwf.py doctor --scope package_integrity
+          python .adwf/adwf.py doctor --scope config_health
+          python .adwf/adwf.py self-test
+      - name: Verify bounded final diff
+        shell: python
+        run: |
+          import subprocess
+          allowed = {
+              '.adwf/roadmap.json',
+              '.adwf/docs-registry.json',
+              'MANIFEST.json',
+              'SHA256SUMS.txt',
+          }
+          changed = set(subprocess.check_output(['git','diff','--name-only'], text=True).splitlines())
+          print('CHANGED=' + ','.join(sorted(changed)))
+          if changed != allowed:
+              raise SystemExit(f'DIFF_SCOPE_MISMATCH:{sorted(changed)}')
+      - name: Publish one exact candidate commit
+        shell: bash
+        run: |
+          set -euo pipefail
+          MAIN_REMOTE="$(git ls-remote origin refs/heads/main | awk '{print $1}')"
+          WRITER_REMOTE="$(git ls-remote origin "refs/heads/$WRITER_BRANCH" | awk '{print $1}')"
+          test "$MAIN_REMOTE" = "$BASE_SHA"
+          test "$WRITER_REMOTE" = "$BASE_SHA"
+          git config user.name "roadmap-skills-2026-materializer"
+          git config user.email "roadmap-skills-2026-materializer@users.noreply.github.com"
+          git add .adwf/roadmap.json .adwf/docs-registry.json MANIFEST.json SHA256SUMS.txt
+          git commit -m "[$WORK_ID] Materialize Skill Intelligence architecture"
+          test "$(git rev-list --count "$BASE_SHA"..HEAD)" = "1"
+          git push origin "HEAD:refs/heads/$WRITER_BRANCH"
+          echo "CANDIDATE_SHA=$(git rev-parse HEAD)"
+          echo "CANDIDATE_TREE=$(git rev-parse HEAD^{tree})"
