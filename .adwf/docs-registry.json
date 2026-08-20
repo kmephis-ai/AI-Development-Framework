@@ -11,7 +11,7 @@
         ".github/workflows/**"
       ],
       "mode": "generated-status-block+manual",
-      "source_digest": "c9428cee621e0312d928d7045cf9e61e46d3fc7000378a81ef29bb0c8a524bcd",
+      "source_digest": "e1f762326248f68a39c6f857d46711cf49a8692832b2ce879c318faf650b93f6",
       "reviewed_at": "2026-08-13T00:00:00Z",
       "valid_until": "2026-11-13T00:00:00Z"
     },
@@ -24,7 +24,7 @@
         "skills/**"
       ],
       "mode": "manual-governance",
-      "source_digest": "7811e3823ef36852da1ab0df7670bd0993d00f97ec1fadd484cd45038e7e0a2d",
+      "source_digest": "fa967faf3a5f9ed4273e88c71525d604493fc956ce5d5a7d105ab8f038065070",
       "reviewed_at": "2026-08-13T00:00:00Z",
       "valid_until": "2026-11-13T00:00:00Z"
     },
@@ -65,7 +65,7 @@
         ".adwf/scripts/validate_capabilities.py"
       ],
       "mode": "implementation-certification",
-      "source_digest": "edc91c39ac3ae722eac48912921be94028854005506c068e8bfa8d6e272f8286",
+      "source_digest": "329346c098692faa6d43106036c7bc4609e4f0dbbfb92f6a8c510c4e9de8ed2e",
       "reviewed_at": "2026-08-13T00:00:00Z",
       "valid_until": "2026-11-13T00:00:00Z"
     },
@@ -330,7 +330,7 @@
         ".adwf/tests/test_capability_live_evidence.py"
       ],
       "mode": "governance-contract",
-      "source_digest": "de0b763debec8753338a059c2f437fdb39eb2b20c526c8b7f7e4b927fb8c7100",
+      "source_digest": "9a69bd6fb13a84d0134f754d795ad4ab398fccbe281f528f7a7bbdb6a1577f45",
       "reviewed_at": "2026-08-13T00:00:00Z",
       "valid_until": "2026-11-13T00:00:00Z"
     },
