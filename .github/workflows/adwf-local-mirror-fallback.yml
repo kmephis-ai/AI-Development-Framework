@@ -1,4 +1,4 @@
-name: ADWF Local Git Mirror Fallback
+name: ADWF CODE_QUALITY Disposable Projection Runner
 
 on:
   push:
@@ -8,55 +8,85 @@ on:
 permissions:
   contents: write
 
-env:
-  SOURCE_SHA: 9ec018f292e7b8537e324e7db645f1176d8cd83f
-  SOURCE_BRANCH: main
-
 jobs:
-  build-chunks:
+  materialize:
+    if: ${{ !contains(github.event.head_commit.message, '[materialized-output]') }}
     runs-on: ubuntu-24.04
-    timeout-minutes: 10
+    timeout-minutes: 15
     steps:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd
         with:
           fetch-depth: 0
 
-      - name: Build exact-source Base64 chunks
+      - name: Generate and validate candidate in disposable worktree
         shell: bash
         run: |
           set -euo pipefail
-          git cat-file -e "${SOURCE_SHA}^{commit}"
-          git branch -f adwf-source "${SOURCE_SHA}"
-          rm -rf mirror
-          mkdir -p mirror/chunks
-          git bundle create /tmp/repository.bundle refs/heads/adwf-source --tags
-          git bundle verify /tmp/repository.bundle
-          BUNDLE_SHA256="$(sha256sum /tmp/repository.bundle | awk '{print $1}')"
-          BUNDLE_BYTES="$(wc -c < /tmp/repository.bundle | tr -d ' ')"
-          base64 -w0 /tmp/repository.bundle > /tmp/repository.bundle.b64
-          split -b 45000 -d -a 4 --additional-suffix=.b64part /tmp/repository.bundle.b64 mirror/chunks/part-
-          PARTS="$(find mirror/chunks -type f -name 'part-*.b64part' | wc -l | tr -d ' ')"
-          cat > mirror/manifest.json <<JSON
-          {
-            "schema_version": 1,
-            "source_repository": "${GITHUB_REPOSITORY}",
-            "source_branch": "${SOURCE_BRANCH}",
-            "source_sha": "${SOURCE_SHA}",
-            "transport_sha": "${GITHUB_SHA}",
-            "bundle_sha256": "${BUNDLE_SHA256}",
-            "bundle_bytes": ${BUNDLE_BYTES},
-            "chunk_bytes": 45000,
-            "parts": ${PARTS},
-            "bundle_ref": "refs/heads/adwf-source"
+          git fetch origin agent/CODE_QUALITY-001-roadmap:refs/remotes/origin/agent/CODE_QUALITY-001-roadmap
+          rm -rf /tmp/code-quality-work
+          git worktree add /tmp/code-quality-work refs/remotes/origin/agent/CODE_QUALITY-001-roadmap
+          cd /tmp/code-quality-work
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          data=json.loads(Path('.adwf/roadmap.json').read_text(encoding='utf-8'))
+          matches=[t for g in data['goals'] for t in g['tasks'] if t.get('roadmap_id')=='CODE_QUALITY-001']
+          expected={
+            'roadmap_id':'CODE_QUALITY-001',
+            'title_ru':'Evidence-backed Critical Code Quality & Mutation-Sensitive Verification',
+            'dependencies':['ARCH_FITNESS-001','EVAL-001'],
+            'product_impact':False,
           }
-          JSON
+          if len(matches)!=1 or matches[0]!=expected:
+              raise SystemExit('CODE_QUALITY_ROADMAP_CONTRACT_MISMATCH')
+          PY
+          rm -f .github/workflows/adwf-code-quality-roadmap-materialize.yml
+          python .adwf/scripts/docs_freshness.py --write --reviewed-at 2026-08-13T00:00:00Z --valid-until 2026-11-13T00:00:00Z
+          python .adwf/scripts/generate_manifest.py
 
-      - name: Publish chunks on disposable branch
+          set +e
+          python .adwf/scripts/validate_ci.py; V_CI=$?
+          python .adwf/scripts/validate_framework.py; V_FRAMEWORK=$?
+          python .adwf/scripts/validate_pipeline_ir.py; V_PIPELINE=$?
+          python .adwf/scripts/validate_docs.py; V_DOCS=$?
+          python .adwf/scripts/generate_manifest.py --check; V_MANIFEST=$?
+          python .adwf/adwf.py doctor --scope package_integrity; V_PACKAGE=$?
+          python .adwf/adwf.py doctor --scope config_health; V_CONFIG=$?
+          python .adwf/adwf.py self-test; V_SELFTEST=$?
+          set -e
+
+          rm -rf /tmp/code-quality-output
+          mkdir -p /tmp/code-quality-output
+          cp .adwf/roadmap.json /tmp/code-quality-output/roadmap.json
+          cp .adwf/docs-registry.json /tmp/code-quality-output/docs-registry.json
+          cp MANIFEST.json /tmp/code-quality-output/MANIFEST.json
+          cp SHA256SUMS.txt /tmp/code-quality-output/SHA256SUMS.txt
+          python - <<PY
+          import json
+          from pathlib import Path
+          values={
+            'validate_ci': int('${V_CI}'),
+            'validate_framework': int('${V_FRAMEWORK}'),
+            'validate_pipeline_ir': int('${V_PIPELINE}'),
+            'validate_docs': int('${V_DOCS}'),
+            'manifest_check': int('${V_MANIFEST}'),
+            'package_integrity': int('${V_PACKAGE}'),
+            'config_health': int('${V_CONFIG}'),
+            'self_test': int('${V_SELFTEST}'),
+          }
+          Path('/tmp/code-quality-output/status.json').write_text(json.dumps({'status':'PASS' if all(v==0 for v in values.values()) else 'FAIL','checks':values},indent=2)+'\n',encoding='utf-8')
+          PY
+          sha256sum /tmp/code-quality-output/roadmap.json /tmp/code-quality-output/docs-registry.json /tmp/code-quality-output/MANIFEST.json /tmp/code-quality-output/SHA256SUMS.txt > /tmp/code-quality-output/output-sha256.txt
+
+      - name: Publish disposable evidence/output
         shell: bash
         run: |
           set -euo pipefail
+          rm -rf materialized
+          mkdir materialized
+          cp /tmp/code-quality-output/* materialized/
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add mirror
-          git commit -m "chore: publish local mirror fallback chunks [mirror-output]"
+          git add materialized
+          git commit -m "chore: publish CODE_QUALITY projection result [materialized-output]"
           git push origin HEAD:${GITHUB_REF_NAME}
