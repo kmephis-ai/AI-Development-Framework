@@ -4,6 +4,8 @@ on:
   push:
     branches:
       - helper/local-mirror-DELIVERY_SHA_IDENTITY-001-20260820-a1
+  pull_request:
+    branches: [main]
 
 permissions:
   contents: read
