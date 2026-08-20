@@ -9,7 +9,7 @@ permissions:
   contents: write
 
 env:
-  SOURCE_SHA: 58ef8456f35668919d3c7caf9053f8c93ff5067b
+  SOURCE_SHA: f81be1ba655ba864b7bbb59025f3062a44ff3cfc
 
 jobs:
   materialize:
