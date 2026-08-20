@@ -21,7 +21,14 @@ jobs:
         with:
           python-version: '3.12.10'
           check-latest: false
-      - name: Materialize canonical projections
+      - name: Remove disposable helper from final validation tree
+        run: |
+          set -euo pipefail
+          git config user.name 'adwf-session-cert-materializer'
+          git config user.email 'adwf-session-cert-materializer@users.noreply.github.com'
+          git rm .github/workflows/helper-session-cert-materialize.yml
+          git commit -m '[SESSION_CERT-001] Drop disposable materializer from validation tree'
+      - name: Materialize canonical projections from final tree
         run: |
           set -euo pipefail
           python .adwf/scripts/docs_freshness.py --write
@@ -35,17 +42,11 @@ jobs:
               *) echo "unexpected generated path: $path" >&2; exit 1 ;;
             esac
           done
-          git config user.name 'adwf-session-cert-materializer'
-          git config user.email 'adwf-session-cert-materializer@users.noreply.github.com'
           git add .adwf/docs-registry.json MANIFEST.json SHA256SUMS.txt
           if ! git diff --cached --quiet; then
             git commit -m '[SESSION_CERT-001] Materialize generated projections'
           fi
-      - name: Remove disposable helper before canonical validation
-        run: |
-          set -euo pipefail
-          git rm .github/workflows/helper-session-cert-materialize.yml
-          git commit -m '[SESSION_CERT-001] Drop disposable materializer from validation tree'
+          python .adwf/scripts/docs_freshness.py
           python .adwf/scripts/generate_manifest.py --check
           python .adwf/adwf.py doctor --scope package_integrity
           test -z "$(git status --porcelain)"
