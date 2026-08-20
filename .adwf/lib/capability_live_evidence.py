@@ -59,6 +59,8 @@ def seal_certification(certification: dict[str, Any]) -> dict[str, Any]:
 def seal_registry(registry: dict[str, Any]) -> dict[str, Any]:
     value = copy.deepcopy(registry)
     value["certifications"] = [seal_certification(item) for item in value.get("certifications", [])]
+    if "session_certifications" in value:
+        value["session_certifications"] = [seal_certification(item) for item in value.get("session_certifications", [])]
     value["registry_sha256"] = _digest(_without(value, "registry_sha256"))
     return value
 
@@ -221,7 +223,7 @@ def validate_certification_registry(
     if registry.get("schema_version") != 1 or registry.get("role") != "CANONICAL_CAPABILITY_LIVE_EVIDENCE_CERTIFICATIONS":
         errors.append("LIVE_CERT_REGISTRY_IDENTITY_INVALID")
     seen: set[str] = set()
-    for cert in registry.get("certifications") or []:
+    for cert in [*(registry.get("certifications") or []), *(registry.get("session_certifications") or [])]:
         cid = str(cert.get("id") or "")
         if not cid or cid in seen:
             errors.append("LIVE_CERT_DUPLICATE_OR_MISSING_ID:" + (cid or "?"))
@@ -252,7 +254,7 @@ def resolve_capability_live_evidence(trace: dict[str, Any], registry: dict[str, 
     known = {str(item.get("id") or "") for item in capabilities if item.get("id")}
     errors = validate_certification_registry(registry, schema=schema, known_capability_ids=known)
     certs: dict[str, dict[str, Any]] = {}
-    for item in registry.get("certifications") or []:
+    for item in [*(registry.get("certifications") or []), *(registry.get("session_certifications") or [])]:
         cid = str(item.get("id") or "")
         if cid and cid not in certs:
             certs[cid] = item
@@ -652,7 +654,12 @@ def _verify_session_certification(client: Any, certification: dict[str, Any]) ->
 
 
 def verify_provider_certification(client: Any, certification: dict[str, Any]) -> dict[str, Any]:
-    """Fresh provider readback for one durable certification."""
+    """Fresh provider readback for one durable certification.
+
+    Local/offline validation never calls this provider function, so offline and
+    Windows self-tests remain deterministic while trusted provider verification
+    stays a separate exact-object readback boundary.
+    """
     evidence_class = str(certification.get("evidence_class") or "")
     if evidence_class == UPGRADE_CLASS:
         return _verify_upgrade_certification(client, certification)
