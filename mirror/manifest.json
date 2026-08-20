@@ -1,0 +1,12 @@
+{
+  "schema_version": 1,
+  "source_repository": "kmephis-ai/AI-Development-Framework",
+  "source_branch": "agent/GOV-029-session-cert-provider-gate",
+  "source_sha": "58ef8456f35668919d3c7caf9053f8c93ff5067b",
+  "transport_sha": "1eb1a3f8047285256fe632e530aeea4f0782c796",
+  "bundle_sha256": "497308cf0624a4e850b9f00ce9cd479f52dadc1f572ff15665bee56294141615",
+  "bundle_bytes": 1529023,
+  "chunk_bytes": 45000,
+  "parts": 46,
+  "bundle_ref": "refs/heads/adwf-source"
+}
