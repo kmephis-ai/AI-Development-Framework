@@ -1,0 +1,76 @@
+name: Disposable Fleet Base Readback
+
+on:
+  pull_request:
+    branches: [main]
+
+permissions:
+  actions: read
+  contents: read
+  pull-requests: read
+
+jobs:
+  provider-readback:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    env:
+      EXPECTED_MAIN_SHA: cd1b0ddc1173d2917e86888bcaec9537686b8ea1
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - name: Verify canonical main and post-merge workflows
+        shell: bash
+        run: |
+          set -euo pipefail
+          actual_main="$(gh api "repos/${GITHUB_REPOSITORY}/branches/main" --jq '.commit.sha')"
+          echo "main_sha=${actual_main}"
+          test "${actual_main}" = "${EXPECTED_MAIN_SHA}"
+
+          runs_json="$(gh api "repos/${GITHUB_REPOSITORY}/actions/runs?head_sha=${EXPECTED_MAIN_SHA}&per_page=100")"
+          echo "Post-merge runs for ${EXPECTED_MAIN_SHA}:"
+          printf '%s' "${runs_json}" | jq -r '.workflow_runs[] | [.id,.name,.event,.status,(.conclusion // "null"),.run_attempt] | @tsv'
+
+          for workflow in "ADWF Main" "ADWF Platform Smoke"; do
+            match="$(printf '%s' "${runs_json}" | jq -c --arg w "${workflow}" '[.workflow_runs[] | select(.name==$w and .event=="push" and .head_sha==env.EXPECTED_MAIN_SHA)] | sort_by(.run_number) | last // empty')"
+            if [ -z "${match}" ]; then
+              echo "MISSING_POSTMERGE_WORKFLOW:${workflow}" >&2
+              exit 1
+            fi
+            conclusion="$(printf '%s' "${match}" | jq -r '.conclusion // ""')"
+            status="$(printf '%s' "${match}" | jq -r '.status // ""')"
+            echo "${workflow}: status=${status} conclusion=${conclusion} run_id=$(printf '%s' "${match}" | jq -r '.id')"
+            test "${status}" = "completed"
+            test "${conclusion}" = "success"
+          done
+
+      - name: Verify rulesets and writer serialization facts
+        shell: bash
+        run: |
+          set -euo pipefail
+          rulesets="$(gh api "repos/${GITHUB_REPOSITORY}/rulesets?per_page=100")"
+          echo "Rulesets:"
+          printf '%s' "${rulesets}" | jq -r '.[] | [.id,.name,.enforcement] | @tsv'
+
+          for name in "ADWF protected main" "ADWF runtime anchor"; do
+            id="$(printf '%s' "${rulesets}" | jq -r --arg n "${name}" '.[] | select(.name==$n and .enforcement=="active") | .id' | head -n1)"
+            if [ -z "${id}" ]; then
+              echo "MISSING_ACTIVE_RULESET:${name}" >&2
+              exit 1
+            fi
+            detail="$(gh api "repos/${GITHUB_REPOSITORY}/rulesets/${id}")"
+            bypass_count="$(printf '%s' "${detail}" | jq '.bypass_actors | length')"
+            echo "${name}: id=${id} bypass_count=${bypass_count}"
+            test "${bypass_count}" -eq 0
+            if [ "${name}" = "ADWF protected main" ]; then
+              printf '%s' "${detail}" | jq -r '.rules[]? | select(.type=="required_status_checks") | .parameters.required_status_checks[]?.context' | sort -u > /tmp/required-checks.txt
+              cat /tmp/required-checks.txt
+              grep -Fx 'fast-feedback' /tmp/required-checks.txt
+              grep -Fx 'adwf/governance-gate' /tmp/required-checks.txt
+              grep -Fx 'adwf/trusted-gate' /tmp/required-checks.txt
+            fi
+          done
+
+          prs="$(gh api "repos/${GITHUB_REPOSITORY}/pulls?state=open&per_page=100")"
+          echo "Open PRs:"
+          printf '%s' "${prs}" | jq -r '.[] | [.number,.head.ref,.base.ref] | @tsv'
+          unexpected="$(printf '%s' "${prs}" | jq --argjson self '${{ github.event.pull_request.number }}' '[.[] | select(.number != $self)] | length')"
+          test "${unexpected}" -eq 0
