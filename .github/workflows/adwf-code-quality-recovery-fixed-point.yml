@@ -1,0 +1,104 @@
+name: ADWF CODE_QUALITY Recovery Fixed Point
+
+on:
+  push:
+    branches:
+      - agent/CODE_QUALITY-001-roadmap
+
+permissions:
+  contents: write
+
+env:
+  BASE_SHA: 9ec018f292e7b8537e324e7db645f1176d8cd83f
+  TARGET_BRANCH: agent/CODE_QUALITY-001-roadmap
+  HELPER_PATH: .github/workflows/adwf-code-quality-recovery-fixed-point.yml
+
+jobs:
+  recover:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd
+        with:
+          ref: ${{ github.sha }}
+          fetch-depth: 0
+
+      - uses: actions/setup-python@a309ff8b426b58ec0e2a45f0f869d46889d02405
+        with:
+          python-version: '3.12.10'
+          check-latest: false
+
+      - name: Rebuild projections after helper removal
+        shell: bash
+        run: |
+          set -euo pipefail
+          git fetch origin main "${TARGET_BRANCH}"
+          test "$(git rev-parse origin/main)" = "${BASE_SHA}" || { echo MAIN_BASE_DRIFT; exit 1; }
+          test "$(git rev-parse HEAD)" = "${GITHUB_SHA}" || { echo HEAD_IDENTITY_DRIFT; exit 1; }
+          test "$(git rev-parse origin/${TARGET_BRANCH})" = "${GITHUB_SHA}" || { echo WRITER_BRANCH_DRIFT; exit 1; }
+          test "$(git merge-base "${BASE_SHA}" HEAD)" = "${BASE_SHA}" || { echo BASE_ANCESTRY_MISMATCH; exit 1; }
+
+          git rm "${HELPER_PATH}"
+
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          data=json.loads(Path('.adwf/roadmap.json').read_text(encoding='utf-8'))
+          items=[t for g in data['goals'] for t in g['tasks'] if t.get('roadmap_id')=='CODE_QUALITY-001']
+          expected={
+              'roadmap_id':'CODE_QUALITY-001',
+              'title_ru':'Evidence-backed Critical Code Quality & Mutation-Sensitive Verification',
+              'dependencies':['ARCH_FITNESS-001','EVAL-001'],
+              'product_impact':False,
+          }
+          if len(items)!=1 or items[0]!=expected:
+              raise SystemExit('CODE_QUALITY_ROADMAP_CONTRACT_MISMATCH')
+          PY
+
+          python .adwf/scripts/docs_freshness.py --write --reviewed-at 2026-08-13T00:00:00Z --valid-until 2026-11-13T00:00:00Z
+          python .adwf/scripts/generate_manifest.py
+
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          manifest=json.loads(Path('MANIFEST.json').read_text(encoding='utf-8'))
+          helper='.github/workflows/adwf-code-quality-recovery-fixed-point.yml'
+          old='.github/workflows/adwf-code-quality-roadmap-materialize.yml'
+          files=set(manifest.get('files') or [])
+          if helper in files or old in files:
+              raise SystemExit('DISPOSABLE_HELPER_LEAKED_INTO_MANIFEST')
+          PY
+
+          mapfile -t changed < <(git diff --name-only "${BASE_SHA}" -- | sort)
+          expected=(.adwf/docs-registry.json .adwf/roadmap.json MANIFEST.json SHA256SUMS.txt)
+          mapfile -t expected_sorted < <(printf '%s\n' "${expected[@]}" | sort)
+          printf 'FINAL_CHANGED=%s\n' "${changed[*]}"
+          test "${#changed[@]}" -eq "${#expected_sorted[@]}"
+          for i in "${!expected_sorted[@]}"; do
+            test "${changed[$i]}" = "${expected_sorted[$i]}"
+          done
+
+      - name: Validate full canonical contour
+        shell: bash
+        run: |
+          set -euo pipefail
+          python .adwf/scripts/validate_ci.py
+          python .adwf/scripts/validate_framework.py
+          python .adwf/scripts/validate_pipeline_ir.py
+          python .adwf/scripts/validate_docs.py
+          python .adwf/adwf.py doctor --scope package_integrity
+          python .adwf/adwf.py doctor --scope config_health
+          python .adwf/adwf.py self-test
+
+      - name: Publish fixed-point candidate after CAS
+        shell: bash
+        run: |
+          set -euo pipefail
+          git fetch origin main "${TARGET_BRANCH}"
+          test "$(git rev-parse origin/main)" = "${BASE_SHA}" || { echo MAIN_BASE_DRIFT_BEFORE_PUSH; exit 1; }
+          test "$(git rev-parse origin/${TARGET_BRANCH})" = "${GITHUB_SHA}" || { echo WRITER_BRANCH_DRIFT_BEFORE_PUSH; exit 1; }
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          git commit -m "[CODE_QUALITY-001] Restore fixed-point Roadmap projections"
+          git push origin HEAD:"${TARGET_BRANCH}"
