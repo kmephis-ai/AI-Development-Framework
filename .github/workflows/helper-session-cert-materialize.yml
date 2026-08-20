@@ -1,0 +1,60 @@
+name: SESSION CERT Materialize
+
+on:
+  push:
+    branches:
+      - helper/session-cert-001-materialize-20260820-a1
+    paths:
+      - .github/workflows/helper-session-cert-materialize.yml
+
+permissions:
+  contents: write
+
+jobs:
+  materialize:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-python@a309ff8b426b58ec0e2a45f0f869d46889d02405
+        with:
+          python-version: '3.12.10'
+          check-latest: false
+      - name: Materialize canonical projections
+        run: |
+          set -euo pipefail
+          python .adwf/scripts/docs_freshness.py --write
+          python .adwf/scripts/generate_manifest.py
+          python .adwf/scripts/generate_manifest.py --check
+      - name: Focused and canonical validation
+        run: |
+          set -euo pipefail
+          python -m py_compile .adwf/lib/capability_live_evidence.py .adwf/tests/test_capability_live_evidence.py
+          python .adwf/tests/test_capability_live_evidence.py -v
+          python .adwf/scripts/validate_capabilities.py
+          python .adwf/scripts/validate_docs.py
+          python .adwf/scripts/validate_framework.py
+          python .adwf/adwf.py self-test
+          git diff --check
+      - name: Publish generated projections only
+        run: |
+          set -euo pipefail
+          mapfile -t changed < <(git status --porcelain | sed -E 's/^.. //')
+          printf 'changed=%s\n' "${changed[*]}"
+          for path in "${changed[@]}"; do
+            case "$path" in
+              .adwf/docs-registry.json|MANIFEST.json|SHA256SUMS.txt) ;;
+              *) echo "unexpected generated path: $path" >&2; exit 1 ;;
+            esac
+          done
+          git config user.name 'adwf-session-cert-materializer'
+          git config user.email 'adwf-session-cert-materializer@users.noreply.github.com'
+          git add .adwf/docs-registry.json MANIFEST.json SHA256SUMS.txt
+          if git diff --cached --quiet; then
+            echo 'no generated changes'
+            exit 0
+          fi
+          git commit -m '[SESSION_CERT-001] Materialize generated projections'
+          git push origin HEAD:helper/session-cert-001-materialize-20260820-a1
