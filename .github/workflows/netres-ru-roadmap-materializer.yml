@@ -1,0 +1,163 @@
+name: NETRES RU Roadmap Materializer
+
+on:
+  pull_request:
+    branches: [main]
+    types: [opened]
+
+permissions:
+  contents: write
+
+env:
+  BASE_SHA: ccc96ebc7628bd82cec2a19a555b0bf9e48f9992
+  TARGET_BRANCH: agent/NETRES-RU-001-restricted-network-roadmap
+
+jobs:
+  materialize:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd
+        with:
+          ref: ${{ env.BASE_SHA }}
+          fetch-depth: 0
+          persist-credentials: true
+
+      - name: Verify exact provider CAS
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "$BASE_SHA"
+          test "$(git ls-remote origin refs/heads/main | awk '{print $1}')" = "$BASE_SHA"
+          test "$(git ls-remote origin "refs/heads/${TARGET_BRANCH}" | awk '{print $1}')" = "$BASE_SHA"
+
+      - name: Materialize bounded NETRES Roadmap outcome
+        shell: bash
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          import json
+          from pathlib import Path
+
+          path = Path('.adwf/roadmap.json')
+          data = json.loads(path.read_text(encoding='utf-8'))
+          goals = data.get('goals')
+          if not isinstance(goals, list):
+              raise SystemExit('ROADMAP_GOALS_INVALID')
+
+          all_ids = []
+          for goal in goals:
+              tasks = goal.get('tasks')
+              if not isinstance(tasks, list):
+                  raise SystemExit('ROADMAP_TASKS_INVALID')
+              for task in tasks:
+                  rid = task.get('roadmap_id')
+                  if not isinstance(rid, str) or not rid:
+                      raise SystemExit('ROADMAP_ID_INVALID')
+                  all_ids.append(rid)
+          if len(all_ids) != len(set(all_ids)):
+              raise SystemExit('ROADMAP_DUPLICATE_ID')
+          required = {'DEVENV-001', 'ENVSAFE-001', 'PPCF-001', 'ORCH-001', 'MULTIWRITER-001'}
+          missing = sorted(required - set(all_ids))
+          if missing:
+              raise SystemExit('ROADMAP_REQUIRED_DEPENDENCY_MISSING:' + ','.join(missing))
+          if 'NETRES-RU-001' in all_ids:
+              raise SystemExit('NETRES_ALREADY_PRESENT')
+          if any(goal.get('id') == 'RESTRICTED-NETWORK-RESILIENCE' for goal in goals):
+              raise SystemExit('NETRES_GOAL_ALREADY_PRESENT')
+
+          goals.append({
+              'id': 'RESTRICTED-NETWORK-RESILIENCE',
+              'title_ru': 'Restricted-Network Execution Resilience — RU reference profile',
+              'tasks': [{
+                  'roadmap_id': 'NETRES-RU-001',
+                  'title_ru': 'Устойчивость разработки и CI к сетевым ограничениям + RU reference profile',
+                  'dependencies': ['DEVENV-001', 'ENVSAFE-001', 'PPCF-001'],
+                  'product_impact': False,
+              }],
+          })
+          path.write_text(json.dumps(data, ensure_ascii=False, indent=2) + '\n', encoding='utf-8')
+
+          # Re-parse and prove the exact intended semantic contract before generators.
+          check = json.loads(path.read_text(encoding='utf-8'))
+          matches = [
+              task
+              for goal in check['goals']
+              for task in goal['tasks']
+              if task.get('roadmap_id') == 'NETRES-RU-001'
+          ]
+          if len(matches) != 1:
+              raise SystemExit('NETRES_NOT_UNIQUE')
+          task = matches[0]
+          if task.get('dependencies') != ['DEVENV-001', 'ENVSAFE-001', 'PPCF-001']:
+              raise SystemExit('NETRES_DEPENDENCIES_DRIFT')
+          if task.get('product_impact') is not False:
+              raise SystemExit('NETRES_PRODUCT_IMPACT_DRIFT')
+          PY
+
+          python .adwf/scripts/docs_freshness.py --write --reviewed-at 2026-08-13T00:00:00Z --valid-until 2026-11-13T00:00:00Z
+          python .adwf/scripts/generate_manifest.py
+          git diff --check
+
+          ACTUAL="$(git diff --name-only | sort)"
+          EXPECTED="$(printf '%s\n' '.adwf/docs-registry.json' '.adwf/roadmap.json' 'MANIFEST.json' 'SHA256SUMS.txt' | sort)"
+          test "$ACTUAL" = "$EXPECTED"
+
+      - name: Verify canonical contours
+        shell: bash
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          data = json.loads(Path('.adwf/roadmap.json').read_text(encoding='utf-8'))
+          ids = {task['roadmap_id'] for goal in data['goals'] for task in goal['tasks']}
+          for goal in data['goals']:
+              for task in goal['tasks']:
+                  for dep in task.get('dependencies', []):
+                      if dep not in ids:
+                          raise SystemExit(f'UNKNOWN_DEPENDENCY:{task["roadmap_id"]}->{dep}')
+          # Generic cycle check.
+          deps = {task['roadmap_id']: list(task.get('dependencies', [])) for goal in data['goals'] for task in goal['tasks']}
+          visiting, done = set(), set()
+          def visit(node):
+              if node in done:
+                  return
+              if node in visiting:
+                  raise SystemExit('ROADMAP_CYCLE:' + node)
+              visiting.add(node)
+              for dep in deps[node]:
+                  visit(dep)
+              visiting.remove(node)
+              done.add(node)
+          for node in deps:
+              visit(node)
+          print('ROADMAP_DAG=PASS')
+          PY
+          python .adwf/scripts/validate_ci.py
+          python .adwf/scripts/validate_framework.py
+          python .adwf/scripts/validate_pipeline_ir.py
+          python .adwf/scripts/validate_docs.py
+          python .adwf/scripts/generate_manifest.py --check
+          python .adwf/adwf.py doctor --scope package_integrity
+          python .adwf/adwf.py doctor --scope config_health
+          python .adwf/adwf.py self-test
+          git diff --check
+
+      - name: Publish one clean writer commit with final CAS
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git ls-remote origin refs/heads/main | awk '{print $1}')" = "$BASE_SHA"
+          test "$(git ls-remote origin "refs/heads/${TARGET_BRANCH}" | awk '{print $1}')" = "$BASE_SHA"
+          ACTUAL="$(git diff --name-only | sort)"
+          EXPECTED="$(printf '%s\n' '.adwf/docs-registry.json' '.adwf/roadmap.json' 'MANIFEST.json' 'SHA256SUMS.txt' | sort)"
+          test "$ACTUAL" = "$EXPECTED"
+          git config user.name 'kmephis-ai'
+          git config user.email 'kmephis@gmail.com'
+          git add .adwf/docs-registry.json .adwf/roadmap.json MANIFEST.json SHA256SUMS.txt
+          test "$(git diff --cached --name-only | wc -l | tr -d ' ')" = '4'
+          git commit -m '[NETRES-RU-001] Materialize restricted-network resilience roadmap'
+          git push origin "HEAD:refs/heads/${TARGET_BRANCH}"
+          echo "CANDIDATE_SHA=$(git rev-parse HEAD)"
+          echo "CANDIDATE_TREE=$(git rev-parse HEAD^{tree})"
