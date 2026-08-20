@@ -421,6 +421,22 @@
           "product_impact": false
         }
       ]
+    },
+    {
+      "id": "RESTRICTED-NETWORK-RESILIENCE",
+      "title_ru": "Restricted-Network Execution Resilience — RU reference profile",
+      "tasks": [
+        {
+          "roadmap_id": "NETRES-RU-001",
+          "title_ru": "Устойчивость разработки и CI к сетевым ограничениям + RU reference profile",
+          "dependencies": [
+            "DEVENV-001",
+            "ENVSAFE-001",
+            "PPCF-001"
+          ],
+          "product_impact": false
+        }
+      ]
     }
   ]
 }
