@@ -1,16 +1,13 @@
-name: SESSION CERT Trusted Diagnostic
+name: SESSION CERT Postmerge Readback
 
 on:
   pull_request:
-    types: [opened, reopened]
+    types: [reopened]
     branches: [main]
 
 permissions:
   contents: read
   actions: read
-  checks: read
-  issues: read
-  pull-requests: read
 
 jobs:
   diagnose:
@@ -19,35 +16,87 @@ jobs:
     steps:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd
         with:
-          ref: ac95b871e7f8796c9f9f61c917911cf1d40674c2
+          ref: dfbd7f202e0b6e6c6585fc81a8a9efef6a36e6cb
           persist-credentials: false
           fetch-depth: 2
       - uses: actions/setup-python@a309ff8b426b58ec0e2a45f0f869d46889d02405
         with:
           python-version: '3.12.10'
           check-latest: false
-      - name: Evaluate exact trusted gate read-only
+      - name: Read back exact postmerge provider runs
         env:
           GITHUB_TOKEN: ${{ github.token }}
           GITHUB_REPOSITORY: ${{ github.repository }}
         run: |
           set -euo pipefail
           python - <<'PY'
-          import importlib.util
           import json
           import os
-          from pathlib import Path
           import sys
           sys.path.insert(0, '.adwf')
           from lib.github_provider import GitHubClient
-          path = Path('.adwf/scripts/publish_trusted_gate.py')
-          spec = importlib.util.spec_from_file_location('publish_trusted_gate_diag', path)
-          module = importlib.util.module_from_spec(spec)
-          assert spec and spec.loader
-          spec.loader.exec_module(module)
+
           repo = os.environ['GITHUB_REPOSITORY']
-          client = GitHubClient(repo, os.environ['GITHUB_TOKEN'])
-          live = client.get(f'/repos/{repo}/actions/runs/32342823128')
-          result = module.evaluate_trusted_gate(client, repo, live)
-          print('TRUSTED_GATE_DIAGNOSTIC=' + json.dumps(result, ensure_ascii=False, sort_keys=True))
+          token = os.environ['GITHUB_TOKEN']
+          merge_sha = 'dfbd7f202e0b6e6c6585fc81a8a9efef6a36e6cb'
+          client = GitHubClient(repo, token)
+
+          main_ref = client.git_ref('main')
+          current_main = str((main_ref.get('object') or {}).get('sha') or '')
+          if current_main != merge_sha:
+              raise SystemExit(f'MAIN_DRIFT:{current_main}')
+
+          runs = [r for r in client.recent_runs(limit=100) if str(r.get('head_sha') or '') == merge_sha]
+          evidence = []
+          for run in runs:
+              if run.get('name') not in {'ADWF Main', 'ADWF Platform Smoke'}:
+                  continue
+              jobs = client.jobs(int(run['id']))
+              evidence.append({
+                  'id': int(run['id']),
+                  'name': run.get('name'),
+                  'event': run.get('event'),
+                  'head_sha': run.get('head_sha'),
+                  'head_branch': run.get('head_branch'),
+                  'status': run.get('status'),
+                  'conclusion': run.get('conclusion'),
+                  'jobs': [{
+                      'id': int(job['id']),
+                      'name': job.get('name'),
+                      'status': job.get('status'),
+                      'conclusion': job.get('conclusion'),
+                      'runner_name': job.get('runner_name'),
+                      'labels': job.get('labels'),
+                  } for job in jobs],
+              })
+
+          main_runs = [r for r in evidence if r['name'] == 'ADWF Main' and r['event'] == 'push']
+          smoke_runs = [r for r in evidence if r['name'] == 'ADWF Platform Smoke' and r['event'] == 'push']
+          if len(main_runs) != 1:
+              raise SystemExit('POSTMERGE_MAIN_RUN_COUNT:' + str(len(main_runs)))
+          if len(smoke_runs) != 1:
+              raise SystemExit('POSTMERGE_SMOKE_RUN_COUNT:' + str(len(smoke_runs)))
+
+          main = main_runs[0]
+          smoke = smoke_runs[0]
+          if main['status'] != 'completed' or main['conclusion'] != 'success':
+              raise SystemExit('POSTMERGE_MAIN_NOT_SUCCESS:' + json.dumps(main, sort_keys=True))
+          if smoke['status'] != 'completed' or smoke['conclusion'] != 'success':
+              raise SystemExit('POSTMERGE_SMOKE_NOT_SUCCESS:' + json.dumps(smoke, sort_keys=True))
+          if not main['jobs'] or any(j['status'] != 'completed' or j['conclusion'] != 'success' for j in main['jobs']):
+              raise SystemExit('POSTMERGE_MAIN_JOB_NOT_SUCCESS:' + json.dumps(main['jobs'], sort_keys=True))
+          if len(smoke['jobs']) != 2 or any(j['status'] != 'completed' or j['conclusion'] != 'success' for j in smoke['jobs']):
+              raise SystemExit('POSTMERGE_SMOKE_JOBS_NOT_SUCCESS:' + json.dumps(smoke['jobs'], sort_keys=True))
+          names = {str(j['name']) for j in smoke['jobs']}
+          if not any('ubuntu-24.04' in name for name in names) or not any('windows-2022' in name for name in names):
+              raise SystemExit('POSTMERGE_SMOKE_MATRIX_INCOMPLETE:' + json.dumps(sorted(names)))
+
+          result = {
+              'merge_sha': merge_sha,
+              'main_ref': current_main,
+              'adwf_main': main,
+              'platform_smoke': smoke,
+              'verified': True,
+          }
+          print('POSTMERGE_READBACK=' + json.dumps(result, ensure_ascii=False, sort_keys=True))
           PY
