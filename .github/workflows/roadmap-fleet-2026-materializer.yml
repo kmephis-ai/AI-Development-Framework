@@ -1,0 +1,197 @@
+name: ROADMAP FLEET 2026 Materializer
+
+on:
+  pull_request:
+    branches: [main]
+    types: [opened]
+
+permissions:
+  contents: write
+
+env:
+  BASE_SHA: cd1b0ddc1173d2917e86888bcaec9537686b8ea1
+  TARGET_BRANCH: agent/ROADMAP_FLEET_2026-001-consumer-fleet-evolution
+
+jobs:
+  materialize:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd
+        with:
+          ref: ${{ env.BASE_SHA }}
+          fetch-depth: 0
+          persist-credentials: true
+
+      - name: Verify exact provider CAS
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "$BASE_SHA"
+          test "$(git ls-remote origin refs/heads/main | awk '{print $1}')" = "$BASE_SHA"
+          test "$(git ls-remote origin "refs/heads/${TARGET_BRANCH}" | awk '{print $1}')" = "$BASE_SHA"
+
+      - name: Materialize bounded Fleet Roadmap architecture
+        shell: bash
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          import json
+          from pathlib import Path
+
+          path = Path('.adwf/roadmap.json')
+          data = json.loads(path.read_text(encoding='utf-8'))
+          goals = data.get('goals')
+          if not isinstance(goals, list):
+              raise SystemExit('ROADMAP_GOALS_INVALID')
+
+          existing_ids = []
+          for goal in goals:
+              tasks = goal.get('tasks')
+              if not isinstance(tasks, list):
+                  raise SystemExit('ROADMAP_TASKS_INVALID')
+              for task in tasks:
+                  rid = task.get('roadmap_id')
+                  if not isinstance(rid, str) or not rid:
+                      raise SystemExit('ROADMAP_ID_INVALID')
+                  existing_ids.append(rid)
+          if len(existing_ids) != len(set(existing_ids)):
+              raise SystemExit('ROADMAP_DUPLICATE_ID')
+
+          required = {
+              'CONSUMER_OPS-001', 'PACKSDK-001', 'TRACE-001', 'EVAL-001',
+              'UPGRADE-002', 'ORCH-001', 'CONSUMER_GATE_RETRY-001',
+              'MULTIWRITER-001', 'PPCF-001', 'CODE_QUALITY-001'
+          }
+          missing = sorted(required - set(existing_ids))
+          if missing:
+              raise SystemExit('ROADMAP_REQUIRED_DEPENDENCY_MISSING:' + ','.join(missing))
+
+          new_ids = {
+              'FLEET_CONTRACT-001', 'CONSUMER_FEEDBACK-001',
+              'SOLUTION_RECIPE-001', 'FLEET_ROLLOUT-001'
+          }
+          if set(existing_ids) & new_ids:
+              raise SystemExit('FLEET_TASK_ALREADY_PRESENT')
+          if any(goal.get('id') == 'CONSUMER-FLEET-EVOLUTION' for goal in goals):
+              raise SystemExit('FLEET_GOAL_ALREADY_PRESENT')
+
+          goals.append({
+              'id': 'CONSUMER-FLEET-EVOLUTION',
+              'title_ru': 'Consumer Fleet Evolution & Convergence — semantic contracts and evidence loop',
+              'tasks': [
+                  {
+                      'roadmap_id': 'FLEET_CONTRACT-001',
+                      'title_ru': 'Consumer Desired/Observed State + Conformance/Exception Contract',
+                      'dependencies': ['CONSUMER_OPS-001', 'PACKSDK-001', 'TRACE-001'],
+                      'product_impact': False,
+                  },
+                  {
+                      'roadmap_id': 'CONSUMER_FEEDBACK-001',
+                      'title_ru': 'Cross-Consumer Problem & Friction Intelligence',
+                      'dependencies': ['FLEET_CONTRACT-001', 'EVAL-001', 'TRACE-001'],
+                      'product_impact': False,
+                  },
+                  {
+                      'roadmap_id': 'SOLUTION_RECIPE-001',
+                      'title_ru': 'Versioned Reusable Remediation & Migration Recipes',
+                      'dependencies': ['CONSUMER_FEEDBACK-001', 'UPGRADE-002', 'PACKSDK-001'],
+                      'product_impact': False,
+                  },
+                  {
+                      'roadmap_id': 'FLEET_ROLLOUT-001',
+                      'title_ru': 'Staged Consumer Fleet Reconciliation & Rollout',
+                      'dependencies': ['SOLUTION_RECIPE-001', 'ORCH-001', 'CONSUMER_GATE_RETRY-001'],
+                      'product_impact': False,
+                  },
+              ],
+          })
+          path.write_text(json.dumps(data, ensure_ascii=False, indent=2) + '\n', encoding='utf-8')
+
+          check = json.loads(path.read_text(encoding='utf-8'))
+          fleet_goals = [g for g in check['goals'] if g.get('id') == 'CONSUMER-FLEET-EVOLUTION']
+          if len(fleet_goals) != 1:
+              raise SystemExit('FLEET_GOAL_NOT_UNIQUE')
+          expected = {
+              'FLEET_CONTRACT-001': (['CONSUMER_OPS-001', 'PACKSDK-001', 'TRACE-001'], False),
+              'CONSUMER_FEEDBACK-001': (['FLEET_CONTRACT-001', 'EVAL-001', 'TRACE-001'], False),
+              'SOLUTION_RECIPE-001': (['CONSUMER_FEEDBACK-001', 'UPGRADE-002', 'PACKSDK-001'], False),
+              'FLEET_ROLLOUT-001': (['SOLUTION_RECIPE-001', 'ORCH-001', 'CONSUMER_GATE_RETRY-001'], False),
+          }
+          actual = {t['roadmap_id']: (t.get('dependencies'), t.get('product_impact')) for t in fleet_goals[0]['tasks']}
+          if actual != expected:
+              raise SystemExit('FLEET_SEMANTIC_CONTRACT_DRIFT')
+          print('FLEET_SEMANTIC_CONTRACT=PASS')
+          PY
+
+          python .adwf/scripts/docs_freshness.py --write --reviewed-at 2026-08-13T00:00:00Z --valid-until 2026-11-13T00:00:00Z
+          python .adwf/scripts/generate_manifest.py
+          git diff --check
+
+          ACTUAL="$(git diff --name-only | sort)"
+          EXPECTED="$(printf '%s\n' '.adwf/docs-registry.json' '.adwf/roadmap.json' 'MANIFEST.json' 'SHA256SUMS.txt' | sort)"
+          test "$ACTUAL" = "$EXPECTED"
+
+      - name: Verify canonical contours
+        shell: bash
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          data = json.loads(Path('.adwf/roadmap.json').read_text(encoding='utf-8'))
+          tasks = [task for goal in data['goals'] for task in goal['tasks']]
+          ids = [task['roadmap_id'] for task in tasks]
+          if len(ids) != len(set(ids)):
+              raise SystemExit('ROADMAP_DUPLICATE_ID')
+          known = set(ids)
+          deps = {}
+          for task in tasks:
+              rid = task['roadmap_id']
+              task_deps = list(task.get('dependencies', []))
+              for dep in task_deps:
+                  if dep not in known:
+                      raise SystemExit(f'UNKNOWN_DEPENDENCY:{rid}->{dep}')
+              deps[rid] = task_deps
+          visiting, done = set(), set()
+          def visit(node):
+              if node in done:
+                  return
+              if node in visiting:
+                  raise SystemExit('ROADMAP_CYCLE:' + node)
+              visiting.add(node)
+              for dep in deps[node]:
+                  visit(dep)
+              visiting.remove(node)
+              done.add(node)
+          for node in deps:
+              visit(node)
+          print('ROADMAP_DAG=PASS')
+          PY
+          python .adwf/scripts/validate_ci.py
+          python .adwf/scripts/validate_framework.py
+          python .adwf/scripts/validate_pipeline_ir.py
+          python .adwf/scripts/validate_docs.py
+          python .adwf/scripts/generate_manifest.py --check
+          python .adwf/adwf.py doctor --scope package_integrity
+          python .adwf/adwf.py doctor --scope config_health
+          python .adwf/adwf.py self-test
+          git diff --check
+
+      - name: Publish one clean writer commit with final CAS
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git ls-remote origin refs/heads/main | awk '{print $1}')" = "$BASE_SHA"
+          test "$(git ls-remote origin "refs/heads/${TARGET_BRANCH}" | awk '{print $1}')" = "$BASE_SHA"
+          ACTUAL="$(git diff --name-only | sort)"
+          EXPECTED="$(printf '%s\n' '.adwf/docs-registry.json' '.adwf/roadmap.json' 'MANIFEST.json' 'SHA256SUMS.txt' | sort)"
+          test "$ACTUAL" = "$EXPECTED"
+          git config user.name 'roadmap-fleet-2026-materializer'
+          git config user.email 'roadmap-fleet-2026-materializer@users.noreply.github.com'
+          git add .adwf/docs-registry.json .adwf/roadmap.json MANIFEST.json SHA256SUMS.txt
+          test "$(git diff --cached --name-only | wc -l | tr -d ' ')" = '4'
+          git commit -m '[ROADMAP_FLEET_2026-001] Materialize Consumer Fleet architecture'
+          git push origin "HEAD:refs/heads/${TARGET_BRANCH}"
+          echo "CANDIDATE_SHA=$(git rev-parse HEAD)"
+          echo "CANDIDATE_TREE=$(git rev-parse HEAD^{tree})"
