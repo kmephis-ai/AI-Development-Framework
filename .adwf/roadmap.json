@@ -382,6 +382,15 @@
           "product_impact": false
         },
         {
+          "roadmap_id": "CODE_QUALITY-001",
+          "title_ru": "Evidence-backed Critical Code Quality & Mutation-Sensitive Verification",
+          "dependencies": [
+            "ARCH_FITNESS-001",
+            "EVAL-001"
+          ],
+          "product_impact": false
+        },
+        {
           "roadmap_id": "AGENT_RUNTIME_SAFE-001",
           "title_ru": "Secure Agent Execution Identity/Egress Envelope",
           "dependencies": [
