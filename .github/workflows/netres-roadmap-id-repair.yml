@@ -1,0 +1,131 @@
+name: NETRES Roadmap ID Repair
+
+on:
+  pull_request:
+    branches: [main]
+    types: [opened]
+
+permissions:
+  contents: write
+
+env:
+  BASE_SHA: ccc96ebc7628bd82cec2a19a555b0bf9e48f9992
+  PRIOR_HEAD: b772c9fdda1bed35e9f29f61fed0f6e21879a774
+  TARGET_BRANCH: agent/NETRES-RU-001-restricted-network-roadmap
+
+jobs:
+  repair:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd
+        with:
+          ref: ${{ env.PRIOR_HEAD }}
+          fetch-depth: 0
+          persist-credentials: true
+
+      - name: Verify exact CAS
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "$PRIOR_HEAD"
+          test "$(git ls-remote origin refs/heads/main | awk '{print $1}')" = "$BASE_SHA"
+          test "$(git ls-remote origin "refs/heads/${TARGET_BRANCH}" | awk '{print $1}')" = "$PRIOR_HEAD"
+
+      - name: Normalize canonical Roadmap ID
+        shell: bash
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          import json, re
+          from pathlib import Path
+
+          path = Path('.adwf/roadmap.json')
+          data = json.loads(path.read_text(encoding='utf-8'))
+          matches = [task for goal in data['goals'] for task in goal['tasks'] if task.get('roadmap_id') == 'NETRES-RU-001']
+          if len(matches) != 1:
+              raise SystemExit(f'OLD_NETRES_ID_COUNT:{len(matches)}')
+          if any(task.get('roadmap_id') == 'NETRES_RU-001' for goal in data['goals'] for task in goal['tasks']):
+              raise SystemExit('NEW_NETRES_ID_ALREADY_PRESENT')
+          matches[0]['roadmap_id'] = 'NETRES_RU-001'
+          if matches[0].get('dependencies') != ['DEVENV-001', 'ENVSAFE-001', 'PPCF-001']:
+              raise SystemExit('NETRES_DEPENDENCIES_DRIFT')
+          if matches[0].get('product_impact') is not False:
+              raise SystemExit('NETRES_PRODUCT_IMPACT_DRIFT')
+          ids = [task['roadmap_id'] for goal in data['goals'] for task in goal['tasks']]
+          grammar = re.compile(r'^[A-Z][A-Z0-9_]*-[0-9]+$')
+          invalid = sorted(rid for rid in ids if grammar.fullmatch(rid) is None)
+          if invalid:
+              raise SystemExit('ROADMAP_ID_GRAMMAR_INVALID:' + ','.join(invalid))
+          if len(ids) != len(set(ids)):
+              raise SystemExit('ROADMAP_DUPLICATE_ID')
+          path.write_text(json.dumps(data, ensure_ascii=False, indent=2) + '\n', encoding='utf-8')
+          PY
+
+          python .adwf/scripts/docs_freshness.py --write --reviewed-at 2026-08-13T00:00:00Z --valid-until 2026-11-13T00:00:00Z
+          python .adwf/scripts/generate_manifest.py
+          git diff --check
+
+      - name: Verify full canonical contour
+        shell: bash
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          data = json.loads(Path('.adwf/roadmap.json').read_text(encoding='utf-8'))
+          tasks = [task for goal in data['goals'] for task in goal['tasks']]
+          ids = {task['roadmap_id'] for task in tasks}
+          if 'NETRES-RU-001' in ids or 'NETRES_RU-001' not in ids:
+              raise SystemExit('NETRES_ID_NORMALIZATION_FAILED')
+          deps = {task['roadmap_id']: list(task.get('dependencies', [])) for task in tasks}
+          for node, dependencies in deps.items():
+              for dep in dependencies:
+                  if dep not in ids:
+                      raise SystemExit(f'UNKNOWN_DEPENDENCY:{node}->{dep}')
+          visiting, done = set(), set()
+          def visit(node):
+              if node in done:
+                  return
+              if node in visiting:
+                  raise SystemExit('ROADMAP_CYCLE:' + node)
+              visiting.add(node)
+              for dep in deps[node]:
+                  visit(dep)
+              visiting.remove(node)
+              done.add(node)
+          for node in deps:
+              visit(node)
+          print('ROADMAP_DAG=PASS')
+          PY
+          python .adwf/scripts/validate_ci.py
+          python .adwf/scripts/validate_framework.py
+          python .adwf/scripts/validate_pipeline_ir.py
+          python .adwf/scripts/validate_docs.py
+          python .adwf/scripts/generate_manifest.py --check
+          python .adwf/adwf.py doctor --scope package_integrity
+          python .adwf/adwf.py doctor --scope config_health
+          python .adwf/adwf.py self-test
+          git diff --check
+
+          ACTUAL="$(git diff --name-only "$BASE_SHA" | sort)"
+          EXPECTED="$(printf '%s\n' '.adwf/docs-registry.json' '.adwf/roadmap.json' 'MANIFEST.json' 'SHA256SUMS.txt' | sort)"
+          test "$ACTUAL" = "$EXPECTED"
+
+      - name: Publish repair commit after final CAS
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git ls-remote origin refs/heads/main | awk '{print $1}')" = "$BASE_SHA"
+          test "$(git ls-remote origin "refs/heads/${TARGET_BRANCH}" | awk '{print $1}')" = "$PRIOR_HEAD"
+          git config user.name 'kmephis-ai'
+          git config user.email 'kmephis@gmail.com'
+          git add .adwf/docs-registry.json .adwf/roadmap.json MANIFEST.json SHA256SUMS.txt
+          test -n "$(git diff --cached --name-only)"
+          git commit -m '[NETRES_RU-001] Normalize canonical Roadmap ID'
+          git push origin "HEAD:refs/heads/${TARGET_BRANCH}"
+          echo "CANDIDATE_SHA=$(git rev-parse HEAD)"
+          echo "CANDIDATE_TREE=$(git rev-parse HEAD^{tree})"
+          ACTUAL="$(git diff --name-only "$BASE_SHA" HEAD | sort)"
+          EXPECTED="$(printf '%s\n' '.adwf/docs-registry.json' '.adwf/roadmap.json' 'MANIFEST.json' 'SHA256SUMS.txt' | sort)"
+          test "$ACTUAL" = "$EXPECTED"
