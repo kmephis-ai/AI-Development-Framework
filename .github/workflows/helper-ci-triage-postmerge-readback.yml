@@ -1,0 +1,49 @@
+name: CI TRIAGE Postmerge Readback
+
+on:
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  actions: read
+  contents: read
+
+jobs:
+  readback:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    env:
+      TARGET_SHA: ac95b871e7f8796c9f9f61c917911cf1d40674c2
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - name: Read exact merge push workflows
+        shell: python
+        run: |
+          import json, os, urllib.request
+          repo = os.environ["GITHUB_REPOSITORY"]
+          sha = os.environ["TARGET_SHA"]
+          req = urllib.request.Request(
+              f"https://api.github.com/repos/{repo}/actions/runs?head_sha={sha}&per_page=100",
+              headers={
+                  "Authorization": f"Bearer {os.environ['GH_TOKEN']}",
+                  "Accept": "application/vnd.github+json",
+                  "X-GitHub-Api-Version": "2022-11-28",
+              },
+          )
+          with urllib.request.urlopen(req, timeout=30) as response:
+              payload = json.load(response)
+          selected = []
+          for run in payload.get("workflow_runs", []):
+              if run.get("head_sha") != sha or run.get("event") != "push":
+                  continue
+              if run.get("name") not in {"ADWF Main", "ADWF Platform Smoke"}:
+                  continue
+              selected.append({key: run.get(key) for key in (
+                  "id", "name", "event", "head_sha", "head_branch", "status", "conclusion", "run_attempt", "created_at", "updated_at"
+              )})
+          selected.sort(key=lambda item: (item["name"], item["id"]))
+          print("POSTMERGE_READBACK=" + json.dumps(selected, sort_keys=True, separators=(",", ":")))
+          names = {item["name"] for item in selected if item["status"] == "completed" and item["conclusion"] == "success"}
+          if names != {"ADWF Main", "ADWF Platform Smoke"}:
+              raise SystemExit("required exact-merge push workflows are not both successful")
