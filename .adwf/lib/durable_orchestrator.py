@@ -70,6 +70,8 @@ EVIDENCE_PHASES = {"CI", "REVIEW", "PREVIEW", "MERGE", "PROMOTE", "OBSERVE", "DO
 SHA_PHASES = {"OPEN_PR", "CI", "REVIEW", "PREVIEW", "OWNER_ACCEPTANCE", "MERGE", "PROMOTE", "OBSERVE", "DONE"}
 OUTCOMES = {"PASS", "FAIL", "BLOCK", "HUMAN_REQUIRED", "RETRY", "CHANGES_REQUESTED", "ROADMAP_COMPLETE", "NEXT_READY"}
 ACTIVE_STATUSES = {"RUNNING", "RETRY_WAIT", "RECOVERY", "HUMAN_REQUIRED"}
+DELIVERY_RESULT_PHASES = {"PROMOTE", "OBSERVE", "DONE"}
+DELIVERY_STATE_PHASES = {"PROMOTE", "OBSERVE", "DONE", "CLEANUP", "NEXT"}
 
 
 def _now() -> str:
@@ -178,6 +180,14 @@ def validate_journal(value: dict[str, Any]) -> list[str]:
         previous = event.get("event_hash")
     if value.get("event_head") != previous:
         findings.append("EVENT_HEAD")
+    delivery_sha = value.get("delivery_sha")
+    if delivery_sha is not None and (not isinstance(delivery_sha, str) or re.fullmatch(r"[0-9a-f]{40}", delivery_sha) is None):
+        findings.append("DELIVERY_SHA")
+    if value.get("phase") in DELIVERY_STATE_PHASES:
+        if not isinstance(delivery_sha, str) or re.fullmatch(r"[0-9a-f]{40}", delivery_sha) is None:
+            findings.append("DELIVERY_SHA_REQUIRED")
+        elif value.get("subject_sha") != delivery_sha:
+            findings.append("DELIVERY_SUBJECT_MISMATCH")
     return findings
 
 
@@ -271,6 +281,18 @@ def _normalize_result(result: dict[str, Any], state: dict[str, Any]) -> dict[str
         if not isinstance(sha, str) or re.fullmatch(r"[0-9a-f]{40}", sha) is None:
             raise ValueError("EXACT_SHA_REQUIRED")
         normalized["subject_sha"] = sha
+    if normalized["phase"] == "MERGE" and normalized["outcome"] == "PASS":
+        merge_sha = normalized["metadata"].get("merge_sha")
+        if merge_sha is None:
+            raise ValueError("MERGE_SHA_REQUIRED")
+        if not isinstance(merge_sha, str) or re.fullmatch(r"[0-9a-f]{40}", merge_sha) is None:
+            raise ValueError("MERGE_SHA_INVALID")
+    if normalized["phase"] in DELIVERY_RESULT_PHASES:
+        delivery_sha = state.get("delivery_sha")
+        if not isinstance(delivery_sha, str) or re.fullmatch(r"[0-9a-f]{40}", delivery_sha) is None:
+            raise ValueError("DELIVERY_SHA_REQUIRED")
+        if normalized["subject_sha"] != delivery_sha:
+            raise ValueError("DELIVERY_SUBJECT_SHA_MISMATCH")
     if normalized["outcome"] == "PASS" and normalized["phase"] in EVIDENCE_PHASES:
         if not normalized["evidence_refs"] and not normalized["metadata"].get("not_applicable_reason"):
             raise ValueError("EVIDENCE_REQUIRED")
@@ -400,11 +422,12 @@ def advance_run(
         state["pull_request_number"] = int(metadata["pull_request_number"])
     if phase == "PREVIEW" and metadata.get("attestation_id"):
         state["preview_attestation_id"] = str(metadata["attestation_id"])
-    if phase == "MERGE" and metadata.get("merge_sha"):
+    if phase == "MERGE" and outcome == "PASS":
         merge_sha = str(metadata["merge_sha"])
-        if re.fullmatch(r"[0-9a-f]{40}", merge_sha) is None:
-            raise ValueError("MERGE_SHA_INVALID")
         state["delivery_sha"] = merge_sha
+        # The MERGE event remains bound to the candidate HEAD, while all durable
+        # downstream delivery phases switch to the provider-confirmed merge revision.
+        state["subject_sha"] = merge_sha
     if phase == "PREVIEW" and outcome == "PASS":
         state["preview_digest"] = result["preview_digest"]
     if phase == "OWNER_ACCEPTANCE" and outcome == "PASS":

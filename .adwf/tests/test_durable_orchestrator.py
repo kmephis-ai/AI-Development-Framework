@@ -102,6 +102,94 @@ class DurableOrchestratorTests(unittest.TestCase):
         self.assertEqual(state["phase"], "MERGE")
         self.assertEqual(state["owner_acceptance_sha"], sha)
 
+
+    def advance_to_merge(self, sha):
+        for phase in ["RECONCILE", "AUTHORIZE", "CLAIM", "WORKSPACE", "EXECUTE"]:
+            self.advance(self.result(phase))
+        self.advance(self.result("OPEN_PR", subject_sha=sha))
+        self.advance(self.result("CI", subject_sha=sha, evidence_refs=["ev-ci"]))
+        self.advance(self.result("REVIEW", subject_sha=sha, evidence_refs=["ev-review"]))
+        self.advance(self.result("PREVIEW", subject_sha=sha, preview_digest="c" * 64, evidence_refs=["ev-preview"]))
+        owner_context = dict(SAFE)
+        owner_context["human_approved"] = True
+        return self.advance(self.result(
+            "OWNER_ACCEPTANCE",
+            subject_sha=sha,
+            metadata={"owner_acceptance_exact": True, "accepted_preview_digest": "c" * 64},
+        ), owner_context)
+
+    def test_exact_merge_revision_is_canonical_through_promote_observe_done_and_restart(self):
+        candidate = "a" * 40
+        delivery = "b" * 40
+        state = self.advance_to_merge(candidate)
+        self.assertEqual(state["phase"], "MERGE")
+
+        state = self.advance(self.result(
+            "MERGE", subject_sha=candidate, evidence_refs=["ev-merge"],
+            metadata={"merge_sha": delivery},
+        ))
+        self.assertEqual(state["phase"], "PROMOTE")
+        self.assertEqual(state["subject_sha"], delivery)
+        self.assertEqual(state["delivery_sha"], delivery)
+        self.assertEqual(state["owner_acceptance_sha"], candidate)
+        self.assertEqual(state["events"][-1]["subject_sha"], candidate)
+        self.assertEqual(state["events"][-1]["metadata"]["merge_sha"], delivery)
+
+        restarted = OrchestrationJournal(self.root).load(self.run["run_id"])
+        self.assertEqual(restarted["subject_sha"], delivery)
+        self.assertEqual(restarted["delivery_sha"], delivery)
+
+        event_count = len(restarted["events"])
+        with self.assertRaisesRegex(ValueError, "DELIVERY_SUBJECT_SHA_MISMATCH"):
+            self.advance(self.result(
+                "PROMOTE", subject_sha=candidate, evidence_refs=["ev-stale-promote"],
+            ))
+        self.assertEqual(len(OrchestrationJournal(self.root).load(self.run["run_id"])["events"]), event_count)
+
+        state = self.advance(self.result("PROMOTE", subject_sha=delivery, evidence_refs=["ev-promote"]))
+        self.assertEqual(state["phase"], "OBSERVE")
+        self.assertEqual(state["subject_sha"], delivery)
+        state = self.advance(self.result("OBSERVE", subject_sha=delivery, evidence_refs=["ev-observe"]))
+        self.assertEqual(state["phase"], "DONE")
+        state = self.advance(self.result("DONE", subject_sha=delivery, evidence_refs=["ev-done"]))
+        self.assertEqual(state["phase"], "CLEANUP")
+        self.assertEqual(state["subject_sha"], delivery)
+        self.assertEqual(validate_journal(state), [])
+
+    def test_successful_merge_requires_strict_provider_merge_sha(self):
+        candidate = "a" * 40
+        self.advance_to_merge(candidate)
+        journal = OrchestrationJournal(self.root)
+        before = journal.load(self.run["run_id"])
+        event_count = len(before["events"])
+
+        with self.assertRaisesRegex(ValueError, "MERGE_SHA_REQUIRED"):
+            self.advance(self.result("MERGE", subject_sha=candidate, evidence_refs=["ev-merge"]))
+        self.assertEqual(len(journal.load(self.run["run_id"])["events"]), event_count)
+
+        with self.assertRaisesRegex(ValueError, "MERGE_SHA_INVALID"):
+            self.advance(self.result(
+                "MERGE", subject_sha=candidate, evidence_refs=["ev-merge"],
+                metadata={"merge_sha": "not-a-sha"},
+            ))
+        self.assertEqual(len(journal.load(self.run["run_id"])["events"]), event_count)
+
+    def test_persisted_downstream_delivery_identity_mismatch_fails_closed(self):
+        candidate = "a" * 40
+        delivery = "b" * 40
+        self.advance_to_merge(candidate)
+        self.advance(self.result(
+            "MERGE", subject_sha=candidate, evidence_refs=["ev-merge"],
+            metadata={"merge_sha": delivery},
+        ))
+        journal = OrchestrationJournal(self.root)
+        state = journal.load(self.run["run_id"])
+        state["subject_sha"] = candidate
+        self.assertIn("DELIVERY_SUBJECT_MISMATCH", validate_journal(state))
+        journal.save(state, expected_revision=state["revision"])
+        with self.assertRaisesRegex(ValueError, "ORCHESTRATION_JOURNAL_INVALID:.*DELIVERY_SUBJECT_MISMATCH"):
+            journal.load(self.run["run_id"])
+
     def test_deterministic_failure_enters_recovery_without_retry(self):
         self.advance(self.result("RECONCILE"))
         state = self.advance(self.result("AUTHORIZE", outcome="FAIL", reason_codes=["CONFIG_DRIFT"]))
