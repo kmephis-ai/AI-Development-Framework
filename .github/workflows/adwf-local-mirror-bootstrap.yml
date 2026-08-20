@@ -1,4 +1,4 @@
-name: ADWF Local Git Mirror Bootstrap
+name: GOV-029 Canonical Materializer Helper
 
 on:
   push:
@@ -6,53 +6,41 @@ on:
       - helper/local-mirror-gov029-candidate-20260820-a1
 
 permissions:
-  contents: read
+  contents: write
 
 env:
   SOURCE_SHA: 58ef8456f35668919d3c7caf9053f8c93ff5067b
-  SOURCE_BRANCH: agent/GOV-029-session-cert-provider-gate
-  MIRROR_ARTIFACT_NAME: adwf-local-mirror-gov029-candidate-20260820-a1
 
 jobs:
-  build-bundle:
+  materialize:
     runs-on: ubuntu-24.04
     timeout-minutes: 10
     steps:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd
         with:
           fetch-depth: 0
-          persist-credentials: false
+          persist-credentials: true
 
-      - name: Build exact-source bundle
+      - name: Materialize exact candidate projections
         shell: bash
         run: |
           set -euo pipefail
           git cat-file -e "${SOURCE_SHA}^{commit}"
-          git branch -f adwf-source "${SOURCE_SHA}"
-          mkdir -p mirror-artifact
-          git bundle create mirror-artifact/repository.bundle refs/heads/adwf-source --tags
-          git bundle verify mirror-artifact/repository.bundle
-          BUNDLE_SHA256="$(sha256sum mirror-artifact/repository.bundle | awk '{print $1}')"
-          BUNDLE_BYTES="$(wc -c < mirror-artifact/repository.bundle | tr -d ' ')"
-          printf '%s  %s\n' "${BUNDLE_SHA256}" "repository.bundle" > mirror-artifact/SHA256SUMS.txt
-          cat > mirror-artifact/manifest.json <<JSON
-          {
-            "schema_version": 1,
-            "source_repository": "${GITHUB_REPOSITORY}",
-            "source_branch": "${SOURCE_BRANCH}",
-            "source_sha": "${SOURCE_SHA}",
-            "transport_sha": "${GITHUB_SHA}",
-            "bundle_sha256": "${BUNDLE_SHA256}",
-            "bundle_bytes": ${BUNDLE_BYTES},
-            "bundle_ref": "refs/heads/adwf-source"
-          }
-          JSON
-
-      - name: Upload bundle artifact
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
-        with:
-          name: ${{ env.MIRROR_ARTIFACT_NAME }}
-          path: mirror-artifact/
-          if-no-files-found: error
-          retention-days: 1
-          compression-level: 0
+          rm -rf /tmp/gov029-source
+          git worktree add --detach /tmp/gov029-source "${SOURCE_SHA}"
+          python /tmp/gov029-source/.adwf/scripts/docs_freshness.py --root /tmp/gov029-source --write
+          python /tmp/gov029-source/.adwf/scripts/generate_manifest.py --root /tmp/gov029-source
+          python /tmp/gov029-source/.adwf/scripts/docs_freshness.py --root /tmp/gov029-source
+          python /tmp/gov029-source/.adwf/scripts/generate_manifest.py --root /tmp/gov029-source --check
+          cp /tmp/gov029-source/.adwf/docs-registry.json .adwf/docs-registry.json
+          cp /tmp/gov029-source/MANIFEST.json MANIFEST.json
+          cp /tmp/gov029-source/SHA256SUMS.txt SHA256SUMS.txt
+          git add .adwf/docs-registry.json MANIFEST.json SHA256SUMS.txt
+          if git diff --cached --quiet; then
+            echo "Canonical projections already materialized"
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git commit -m "chore: materialize GOV-029 canonical projections"
+          git push origin HEAD:helper/local-mirror-gov029-candidate-20260820-a1
