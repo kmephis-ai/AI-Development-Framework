@@ -1,0 +1,83 @@
+name: ROADMAP FLEET Premerge Ruleset Readback
+
+on:
+  pull_request:
+    branches: [main]
+    types: [opened]
+
+permissions:
+  contents: read
+  actions: read
+
+jobs:
+  readback:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - name: Read exact main and live rulesets
+        env:
+          GH_TOKEN: ${{ github.token }}
+          EXPECTED_MAIN: cd1b0ddc1173d2917e86888bcaec9537686b8ea1
+        shell: bash
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          import json, os, urllib.request
+          repo = os.environ['GITHUB_REPOSITORY']
+          token = os.environ['GH_TOKEN']
+          expected = os.environ['EXPECTED_MAIN']
+          headers = {
+              'Authorization': f'Bearer {token}',
+              'Accept': 'application/vnd.github+json',
+              'X-GitHub-Api-Version': '2022-11-28',
+          }
+          def get(url):
+              req = urllib.request.Request(url, headers=headers)
+              with urllib.request.urlopen(req, timeout=30) as response:
+                  return json.load(response)
+          branch = get(f'https://api.github.com/repos/{repo}/branches/main')
+          main_sha = str((branch.get('commit') or {}).get('sha') or '')
+          print('MAIN_SHA=' + main_sha)
+          if main_sha != expected:
+              raise SystemExit('MAIN_SHA_DRIFT')
+          rulesets = get(f'https://api.github.com/repos/{repo}/rulesets')
+          by_name = {item.get('name'): item for item in rulesets}
+          required_names = {'ADWF protected main', 'ADWF immutable runtime anchors'}
+          missing = required_names - set(by_name)
+          if missing:
+              raise SystemExit('RULESET_MISSING:' + ','.join(sorted(missing)))
+          for name in sorted(required_names):
+              item = by_name[name]
+              print('RULESET_SUMMARY=' + json.dumps({
+                  'id': item.get('id'), 'name': name, 'enforcement': item.get('enforcement'),
+                  'bypass_actors': item.get('bypass_actors'), 'current_user_can_bypass': item.get('current_user_can_bypass')
+              }, sort_keys=True, separators=(',', ':')))
+              if item.get('enforcement') != 'active':
+                  raise SystemExit('RULESET_NOT_ACTIVE:' + name)
+              if item.get('bypass_actors'):
+                  raise SystemExit('RULESET_BYPASS_ACTORS:' + name)
+              if item.get('current_user_can_bypass') not in (None, 'never'):
+                  raise SystemExit('RULESET_USER_BYPASS:' + name)
+          protected = get(f"https://api.github.com/repos/{repo}/rulesets/{by_name['ADWF protected main']['id']}")
+          rules = protected.get('rules') or []
+          req = [rule for rule in rules if rule.get('type') == 'required_status_checks']
+          if len(req) != 1:
+              raise SystemExit('REQUIRED_STATUS_RULE_COUNT')
+          params = req[0].get('parameters') or {}
+          if params.get('strict_required_status_checks_policy') is not True:
+              raise SystemExit('STRICT_REQUIRED_CHECKS_DISABLED')
+          checks = params.get('required_status_checks') or []
+          normalized = sorted((c.get('context'), c.get('integration_id')) for c in checks)
+          expected_checks = sorted([
+              ('fast-feedback', 15368),
+              ('adwf/governance-gate', 15368),
+              ('adwf/trusted-gate', 15368),
+          ])
+          print('REQUIRED_CHECKS=' + json.dumps(normalized, separators=(',', ':')))
+          if normalized != expected_checks:
+              raise SystemExit('REQUIRED_CHECKS_DRIFT')
+          runtime = get(f"https://api.github.com/repos/{repo}/rulesets/{by_name['ADWF immutable runtime anchors']['id']}")
+          print('PROTECTED_RULESET_ID=' + str(protected.get('id')))
+          print('RUNTIME_RULESET_ID=' + str(runtime.get('id')))
+          print('RULESET_READBACK=PASS')
+          PY
