@@ -1,0 +1,172 @@
+name: ROADMAP AI 2026 Materializer
+
+on:
+  pull_request:
+    branches: [main]
+    types: [opened, synchronize, reopened]
+
+permissions:
+  contents: write
+
+env:
+  SOURCE_SHA: 81a3e358b2271710bcb132dfd00990f34f3fbee3
+  WRITER_BRANCH: agent/ROADMAP_AI_2026-001-product-eval-roadmap
+  HELPER_BRANCH: helper/roadmap-ai-2026-materialize-20260820-a1
+
+jobs:
+  materialize:
+    if: github.event.pull_request.head.ref == 'helper/roadmap-ai-2026-materialize-20260820-a1'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          fetch-depth: 0
+          persist-credentials: true
+      - uses: actions/setup-python@a309ff8b426b58ec0e2a45f0f869d46889d02405
+        with:
+          python-version: '3.12.10'
+      - name: Materialize exact bounded Roadmap delta
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "${GITHUB_HEAD_REF}" = "${HELPER_BRANCH}"
+          test "${GITHUB_BASE_REF}" = "main"
+          test "$(git merge-base "$SOURCE_SHA" HEAD)" = "$SOURCE_SHA"
+          test "$(git ls-remote origin refs/heads/main | awk '{print $1}')" = "$SOURCE_SHA"
+          test "$(git ls-remote origin "refs/heads/${WRITER_BRANCH}" | awk '{print $1}')" = "$SOURCE_SHA"
+          git diff --name-only "$SOURCE_SHA" | sort > /tmp/pre-paths
+          printf '%s\n' '.github/workflows/adwf-roadmap-ai-2026-materialize.yml' | sort > /tmp/expected-pre-paths
+          diff -u /tmp/expected-pre-paths /tmp/pre-paths
+          rm .github/workflows/adwf-roadmap-ai-2026-materialize.yml
+
+          python - <<'PY'
+          import json
+          from pathlib import Path
+
+          path = Path('.adwf/roadmap.json')
+          data = json.loads(path.read_text(encoding='utf-8'))
+          goals = data.get('goals')
+          if not isinstance(goals, list):
+              raise SystemExit('ROADMAP_GOALS_INVALID')
+          if any(g.get('id') == 'PRODUCT-EVALUATION-INTELLIGENCE' for g in goals if isinstance(g, dict)):
+              raise SystemExit('TARGET_GOAL_ALREADY_PRESENT')
+
+          all_tasks = []
+          for goal in goals:
+              if not isinstance(goal, dict) or not isinstance(goal.get('tasks'), list):
+                  raise SystemExit('ROADMAP_GOAL_INVALID')
+              all_tasks.extend(goal['tasks'])
+          ids = [str(t.get('roadmap_id')) for t in all_tasks if isinstance(t, dict)]
+          if len(ids) != len(set(ids)):
+              raise SystemExit('ROADMAP_ID_DUPLICATE_PREEXISTING')
+
+          by_id = {str(t.get('roadmap_id')): t for t in all_tasks if isinstance(t, dict)}
+          required_existing = {
+              'CONSUMER_OPS-001', 'AGENTQUAL-001', 'CONSUMER_GATE-001', 'AIWORK-001',
+              'TRACE-001', 'SESSION_CONTINUITY-001', 'PPCF-001', 'ENVSAFE-001',
+              'ORCH-001', 'DELIVERY_SHA_IDENTITY-001', 'MULTIWRITER-001',
+          }
+          missing = sorted(required_existing - set(by_id))
+          if missing:
+              raise SystemExit('ROADMAP_DEPENDENCY_MISSING:' + ','.join(missing))
+          if by_id['DELIVERY_SHA_IDENTITY-001'].get('dependencies') != ['SESSION_CONTINUITY-001']:
+              raise SystemExit('DELIVERY_SHA_IDENTITY_BASELINE_DRIFT')
+          if by_id['ORCH-001'].get('dependencies') != ['DELIVERY_SHA_IDENTITY-001']:
+              raise SystemExit('ORCH_BASELINE_DRIFT')
+          if by_id['MULTIWRITER-001'].get('dependencies') != ['ORCH-001']:
+              raise SystemExit('MULTIWRITER_BASELINE_DRIFT')
+          if by_id['PPCF-001'].get('dependencies') != ['SESSION_CONTINUITY-001']:
+              raise SystemExit('PPCF_BASELINE_DRIFT')
+
+          new_tasks = [
+              {
+                  'roadmap_id': 'PRODUCT_TRUTH-001',
+                  'title_ru': 'Контракт продуктового замысла и пользовательского опыта Consumer',
+                  'dependencies': ['CONSUMER_OPS-001'],
+                  'product_impact': True,
+              },
+              {
+                  'roadmap_id': 'EVAL-001',
+                  'title_ru': 'Независимая продуктовая оценка и Quality Intelligence',
+                  'dependencies': ['PRODUCT_TRUTH-001', 'AGENTQUAL-001', 'CONSUMER_GATE-001'],
+                  'product_impact': True,
+              },
+              {
+                  'roadmap_id': 'CONTEXT-001',
+                  'title_ru': 'Context Compiler / Agent Context Engineering',
+                  'dependencies': ['PRODUCT_TRUTH-001', 'AIWORK-001', 'TRACE-001', 'SESSION_CONTINUITY-001'],
+                  'product_impact': False,
+              },
+              {
+                  'roadmap_id': 'AGENT_EVAL-001',
+                  'title_ru': 'Continuous Real-Agent Qualification & Task-Class Routing',
+                  'dependencies': ['AGENTQUAL-001', 'EVAL-001', 'PPCF-001'],
+                  'product_impact': False,
+              },
+              {
+                  'roadmap_id': 'ARCH_FITNESS-001',
+                  'title_ru': 'Agent-legible Architecture Fitness Functions',
+                  'dependencies': ['AIWORK-001', 'TRACE-001'],
+                  'product_impact': False,
+              },
+              {
+                  'roadmap_id': 'AGENT_RUNTIME_SAFE-001',
+                  'title_ru': 'Secure Agent Execution Identity/Egress Envelope',
+                  'dependencies': ['ENVSAFE-001', 'PPCF-001', 'ORCH-001'],
+                  'product_impact': False,
+              },
+              {
+                  'roadmap_id': 'AGENT_OBS-001',
+                  'title_ru': 'Agentic Execution & Evaluation Observability',
+                  'dependencies': ['ORCH-001', 'EVAL-001', 'PPCF-001'],
+                  'product_impact': False,
+              },
+              {
+                  'roadmap_id': 'EPI-001',
+                  'title_ru': 'External Practice Intelligence — evidence-driven capability discovery',
+                  'dependencies': ['TRACE-001', 'PPCF-001'],
+                  'product_impact': False,
+              },
+              {
+                  'roadmap_id': 'INTEROP-001',
+                  'title_ru': 'Optional Agent/Tool Interoperability Profile',
+                  'dependencies': ['PPCF-001', 'ORCH-001', 'AGENT_RUNTIME_SAFE-001'],
+                  'product_impact': False,
+              },
+          ]
+          new_ids = {t['roadmap_id'] for t in new_tasks}
+          collision = sorted(new_ids.intersection(ids))
+          if collision:
+              raise SystemExit('ROADMAP_TARGET_ALREADY_PRESENT:' + ','.join(collision))
+          goals.append({
+              'id': 'PRODUCT-EVALUATION-INTELLIGENCE',
+              'title_ru': 'Product Truth & Evaluation Intelligence — long-horizon architecture',
+              'tasks': new_tasks,
+          })
+          path.write_text(json.dumps(data, ensure_ascii=False, indent=2) + '\n', encoding='utf-8')
+          PY
+
+          python .adwf/scripts/docs_freshness.py --write
+          python .adwf/scripts/generate_manifest.py
+          python .adwf/scripts/validate_framework.py
+          python .adwf/scripts/validate_docs.py
+          python .adwf/adwf.py self-test
+          git diff --check "$SOURCE_SHA"
+
+          git diff --name-only "$SOURCE_SHA" | sort > /tmp/actual-final-paths
+          printf '%s\n' '.adwf/docs-registry.json' '.adwf/roadmap.json' 'MANIFEST.json' 'SHA256SUMS.txt' | sort > /tmp/expected-final-paths
+          diff -u /tmp/expected-final-paths /tmp/actual-final-paths
+
+          test "$(git ls-remote origin refs/heads/main | awk '{print $1}')" = "$SOURCE_SHA"
+          test "$(git ls-remote origin "refs/heads/${WRITER_BRANCH}" | awk '{print $1}')" = "$SOURCE_SHA"
+
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add -A
+          git diff --cached --name-only | sort > /tmp/actual-staged-paths
+          printf '%s\n' '.adwf/docs-registry.json' '.adwf/roadmap.json' '.github/workflows/adwf-roadmap-ai-2026-materialize.yml' 'MANIFEST.json' 'SHA256SUMS.txt' | sort > /tmp/expected-staged-paths
+          diff -u /tmp/expected-staged-paths /tmp/actual-staged-paths
+          git commit -m '[ROADMAP_AI_2026-001] Materialize Product Truth and evaluation architecture [helper-output]'
+          git push origin "HEAD:${HELPER_BRANCH}"
