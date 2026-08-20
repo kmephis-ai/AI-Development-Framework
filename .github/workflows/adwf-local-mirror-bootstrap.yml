@@ -4,6 +4,8 @@ on:
   push:
     branches:
       - agent/local-mirror-ROADMAP_SKILLS_2026-001-20260821-a1
+  pull_request:
+    types: [opened, synchronize, reopened]
 
 permissions:
   contents: read
