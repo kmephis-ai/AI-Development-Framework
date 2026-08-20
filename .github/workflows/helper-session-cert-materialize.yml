@@ -27,6 +27,7 @@ jobs:
           python .adwf/scripts/docs_freshness.py --write
           python .adwf/scripts/generate_manifest.py
           python .adwf/scripts/generate_manifest.py --check
+          python .adwf/adwf.py doctor --scope package_integrity
       - name: Focused and canonical validation
         run: |
           set -euo pipefail
