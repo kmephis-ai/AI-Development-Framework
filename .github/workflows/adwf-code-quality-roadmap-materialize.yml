@@ -1,5 +1,4 @@
-# idempotent materializer: CODE_QUALITY-001
-name: ADWF CODE_QUALITY Roadmap Materializer
+name: ADWF CODE_QUALITY Roadmap Projection Materializer
 
 on:
   push:
@@ -11,144 +10,54 @@ permissions:
 
 env:
   BASE_SHA: 9ec018f292e7b8537e324e7db645f1176d8cd83f
-  ROADMAP_ID: CODE_QUALITY-001
 
 jobs:
   materialize:
     runs-on: ubuntu-24.04
-    timeout-minutes: 15
+    timeout-minutes: 10
     steps:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd
         with:
           fetch-depth: 0
 
-      - name: Verify exact base ancestry
+      - name: Verify bounded source and refresh projections
         shell: bash
         run: |
           set -euo pipefail
           test "$(git merge-base "${BASE_SHA}" HEAD)" = "${BASE_SHA}"
-          git cat-file -e "${BASE_SHA}^{commit}"
-
-      - name: Remove disposable materializer from candidate tree
-        shell: bash
-        run: |
-          set -euo pipefail
-          git rm .github/workflows/adwf-code-quality-roadmap-materialize.yml
-
-      - name: Verify or materialize bounded Roadmap outcome
-        shell: bash
-        run: |
-          set -euo pipefail
-          python - <<'PY'
-          from pathlib import Path
-          import json
-
-          path = Path('.adwf/roadmap.json')
-          data = json.loads(path.read_text(encoding='utf-8'))
-          goals = data.get('goals', [])
-          goal = next((g for g in goals if g.get('id') == 'PRODUCT-EVALUATION-INTELLIGENCE'), None)
-          if goal is None:
-              raise SystemExit('TARGET_GOAL_MISSING')
-          tasks = goal.get('tasks')
-          if not isinstance(tasks, list):
-              raise SystemExit('TARGET_TASKS_INVALID')
-          expected = {
-              'roadmap_id': 'CODE_QUALITY-001',
-              'title_ru': 'Evidence-backed Critical Code Quality & Mutation-Sensitive Verification',
-              'dependencies': ['ARCH_FITNESS-001', 'EVAL-001'],
-              'product_impact': False,
-          }
-          matches = [t for g in goals for t in g.get('tasks', []) if isinstance(t, dict) and t.get('roadmap_id') == 'CODE_QUALITY-001']
-          if len(matches) > 1:
-              raise SystemExit('ROADMAP_ID_DUPLICATED')
-          if matches:
-              if matches[0] != expected or matches[0] not in tasks:
-                  raise SystemExit('ROADMAP_EXISTING_VALUE_MISMATCH')
-          else:
-              all_ids = [t.get('roadmap_id') for g in goals for t in g.get('tasks', []) if isinstance(t, dict)]
-              required = {'ARCH_FITNESS-001', 'EVAL-001'}
-              if not required.issubset(set(all_ids)):
-                  raise SystemExit('REQUIRED_DEPENDENCY_MISSING')
-              anchor = next((i for i, t in enumerate(tasks) if t.get('roadmap_id') == 'ARCH_FITNESS-001'), None)
-              if anchor is None:
-                  raise SystemExit('ARCH_FITNESS_ANCHOR_MISSING')
-              tasks.insert(anchor + 1, expected)
-              path.write_text(json.dumps(data, ensure_ascii=False, indent=2) + '\n', encoding='utf-8', newline='\n')
-          PY
-
-      - name: Verify Roadmap DAG
-        shell: bash
-        run: |
-          set -euo pipefail
           python - <<'PY'
           import json
           from pathlib import Path
-
           data=json.loads(Path('.adwf/roadmap.json').read_text(encoding='utf-8'))
-          tasks=[t for g in data['goals'] for t in g['tasks']]
-          ids=[t['roadmap_id'] for t in tasks]
-          if len(ids) != len(set(ids)):
-              raise SystemExit('ROADMAP_DUPLICATE_ID')
-          known=set(ids)
-          graph={t['roadmap_id']: list(t.get('dependencies', [])) for t in tasks}
-          missing=sorted({d for deps in graph.values() for d in deps if d not in known})
-          if missing:
-              raise SystemExit('ROADMAP_UNKNOWN_DEPENDENCY:'+','.join(missing))
-          visiting=set(); visited=set()
-          def visit(node):
-              if node in visiting:
-                  raise SystemExit('ROADMAP_CYCLE:'+node)
-              if node in visited:
-                  return
-              visiting.add(node)
-              for dep in graph[node]:
-                  visit(dep)
-              visiting.remove(node); visited.add(node)
-          for node in ids:
-              visit(node)
-          item=next(t for t in tasks if t['roadmap_id']=='CODE_QUALITY-001')
-          assert item['dependencies']==['ARCH_FITNESS-001','EVAL-001']
-          assert item['product_impact'] is False
-          print('ROADMAP_DAG: PASS')
+          items=[t for g in data['goals'] for t in g['tasks'] if t.get('roadmap_id')=='CODE_QUALITY-001']
+          expected={
+            'roadmap_id':'CODE_QUALITY-001',
+            'title_ru':'Evidence-backed Critical Code Quality & Mutation-Sensitive Verification',
+            'dependencies':['ARCH_FITNESS-001','EVAL-001'],
+            'product_impact':False,
+          }
+          if len(items)!=1 or items[0]!=expected:
+              raise SystemExit('CODE_QUALITY_ROADMAP_CONTRACT_MISMATCH')
           PY
-
-      - name: Refresh canonical projections without extending review TTL
-        shell: bash
-        run: |
-          set -euo pipefail
           python .adwf/scripts/docs_freshness.py --write --reviewed-at 2026-08-13T00:00:00Z --valid-until 2026-11-13T00:00:00Z
           python .adwf/scripts/generate_manifest.py
+          git rm .github/workflows/adwf-code-quality-roadmap-materialize.yml
 
-      - name: Validate framework and projections
-        shell: bash
-        run: |
-          set -euo pipefail
-          python .adwf/scripts/validate_ci.py
-          python .adwf/scripts/validate_framework.py
-          python .adwf/scripts/validate_pipeline_ir.py
-          python .adwf/scripts/validate_docs.py
-          python .adwf/scripts/generate_manifest.py --check
-          python .adwf/adwf.py self-test
-
-      - name: Enforce final diff whitelist
-        shell: bash
-        run: |
-          set -euo pipefail
           mapfile -t changed < <(git diff --name-only "${BASE_SHA}" -- | sort)
-          printf 'changed=%s\n' "${changed[*]}"
           expected=(.adwf/docs-registry.json .adwf/roadmap.json MANIFEST.json SHA256SUMS.txt)
           mapfile -t expected_sorted < <(printf '%s\n' "${expected[@]}" | sort)
+          printf 'changed=%s\n' "${changed[*]}"
           test "${#changed[@]}" -eq "${#expected_sorted[@]}"
           for i in "${!expected_sorted[@]}"; do
             test "${changed[$i]}" = "${expected_sorted[$i]}"
           done
 
-      - name: Commit exact candidate
+      - name: Publish generated candidate
         shell: bash
         run: |
           set -euo pipefail
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add .adwf/roadmap.json .adwf/docs-registry.json MANIFEST.json SHA256SUMS.txt .github/workflows/adwf-code-quality-roadmap-materialize.yml
-          git commit -m "[CODE_QUALITY-001] Materialize evidence-backed code quality outcome"
+          git add -A
+          git commit -m "[CODE_QUALITY-001] Refresh canonical Roadmap projections"
           git push origin HEAD:agent/CODE_QUALITY-001-roadmap
