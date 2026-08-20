@@ -437,6 +437,53 @@
           "product_impact": false
         }
       ]
+    },
+    {
+      "id": "SKILL-INTELLIGENCE",
+      "title_ru": "Skill Intelligence Layer v2 — portable, measurable, consumer-translatable competence",
+      "tasks": [
+        {
+          "roadmap_id": "SKILL_RUNTIME-002",
+          "title_ru": "Portable Trusted Skill Runtime v2",
+          "dependencies": [
+            "SKILL-001",
+            "CONSUMER_INSTR-001"
+          ],
+          "product_impact": false
+        },
+        {
+          "roadmap_id": "SKILL_EVAL-002",
+          "title_ru": "Differential Real-Agent Skill Evaluation v2",
+          "dependencies": [
+            "SKILL_RUNTIME-002",
+            "AGENTQUAL-001",
+            "EVAL-001"
+          ],
+          "product_impact": false
+        },
+        {
+          "roadmap_id": "CONSUMER_SKILL_SDK-001",
+          "title_ru": "Layered Skill Ownership & Project Pack/Consumer Translation SDK",
+          "dependencies": [
+            "SKILL_RUNTIME-002",
+            "PACKSDK-001",
+            "CONSUMER_INSTR-001",
+            "UPGRADE-001"
+          ],
+          "product_impact": false
+        },
+        {
+          "roadmap_id": "SKILL_FACTORY-001",
+          "title_ru": "Evidence-driven Skill Discovery, Improvement & Retirement",
+          "dependencies": [
+            "SKILL_EVAL-002",
+            "CONSUMER_SKILL_SDK-001",
+            "EPI-001",
+            "AGENT_OBS-001"
+          ],
+          "product_impact": false
+        }
+      ]
     }
   ]
 }
