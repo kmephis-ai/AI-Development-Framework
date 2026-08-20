@@ -1,0 +1,159 @@
+name: ROADMAP FLEET 2026 Resume Materializer
+
+on:
+  pull_request:
+    branches: [main]
+    types: [opened]
+
+permissions:
+  contents: write
+
+env:
+  BASE_SHA: cd1b0ddc1173d2917e86888bcaec9537686b8ea1
+  TARGET_BRANCH: agent/ROADMAP_FLEET_2026-001-consumer-fleet-evolution
+
+jobs:
+  resume-materialize:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd
+        with:
+          ref: ${{ env.TARGET_BRANCH }}
+          fetch-depth: 0
+          persist-credentials: true
+
+      - name: Reconcile current target and exact base
+        id: reconcile
+        shell: bash
+        run: |
+          set -euo pipefail
+          START_TARGET="$(git rev-parse HEAD)"
+          OBSERVED_MAIN="$(git ls-remote origin refs/heads/main | awk '{print $1}')"
+          OBSERVED_TARGET="$(git ls-remote origin "refs/heads/${TARGET_BRANCH}" | awk '{print $1}')"
+          echo "START_TARGET=$START_TARGET"
+          echo "OBSERVED_MAIN=$OBSERVED_MAIN"
+          echo "OBSERVED_TARGET=$OBSERVED_TARGET"
+          test "$OBSERVED_MAIN" = "$BASE_SHA"
+          test "$OBSERVED_TARGET" = "$START_TARGET"
+          git merge-base --is-ancestor "$BASE_SHA" "$START_TARGET"
+
+          mapfile -t ACTUAL < <(git diff --name-only "$BASE_SHA...$START_TARGET" | sort)
+          printf 'CURRENT_DIFF=%s\n' "${ACTUAL[*]}"
+          for path in "${ACTUAL[@]}"; do
+            case "$path" in
+              .adwf/roadmap.json|.adwf/docs-registry.json|MANIFEST.json|SHA256SUMS.txt) ;;
+              *) echo "UNEXPECTED_TARGET_PATH=$path"; exit 1 ;;
+            esac
+          done
+          printf '%s\n' "$START_TARGET" > /tmp/start-target.txt
+
+      - name: Verify Fleet semantic contract before generation
+        shell: bash
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          data = json.loads(Path('.adwf/roadmap.json').read_text(encoding='utf-8'))
+          goals = data.get('goals')
+          if not isinstance(goals, list):
+              raise SystemExit('ROADMAP_GOALS_INVALID')
+          fleet = [g for g in goals if g.get('id') == 'CONSUMER-FLEET-EVOLUTION']
+          if len(fleet) != 1:
+              raise SystemExit('FLEET_GOAL_NOT_UNIQUE')
+          expected = {
+              'FLEET_CONTRACT-001': (['CONSUMER_OPS-001', 'PACKSDK-001', 'TRACE-001'], False),
+              'CONSUMER_FEEDBACK-001': (['FLEET_CONTRACT-001', 'EVAL-001', 'TRACE-001'], False),
+              'SOLUTION_RECIPE-001': (['CONSUMER_FEEDBACK-001', 'UPGRADE-002', 'PACKSDK-001'], False),
+              'FLEET_ROLLOUT-001': (['SOLUTION_RECIPE-001', 'ORCH-001', 'CONSUMER_GATE_RETRY-001'], False),
+          }
+          actual = {t.get('roadmap_id'): (t.get('dependencies'), t.get('product_impact')) for t in fleet[0].get('tasks', [])}
+          if actual != expected:
+              raise SystemExit('FLEET_SEMANTIC_CONTRACT_DRIFT')
+          all_ids = [t['roadmap_id'] for g in goals for t in g.get('tasks', [])]
+          if len(all_ids) != len(set(all_ids)):
+              raise SystemExit('ROADMAP_DUPLICATE_ID')
+          print('FLEET_SEMANTIC_CONTRACT=PASS')
+          PY
+
+      - name: Complete canonical projections
+        shell: bash
+        run: |
+          set -euo pipefail
+          python .adwf/scripts/docs_freshness.py --write --reviewed-at 2026-08-13T00:00:00Z --valid-until 2026-11-13T00:00:00Z
+          python .adwf/scripts/generate_manifest.py
+          git diff --check
+          mapfile -t ACTUAL < <(git diff --name-only "$BASE_SHA" | sort)
+          EXPECTED=(.adwf/docs-registry.json .adwf/roadmap.json MANIFEST.json SHA256SUMS.txt)
+          printf 'MATERIALIZED_DIFF=%s\n' "${ACTUAL[*]}"
+          test "${#ACTUAL[@]}" = 4
+          for i in 0 1 2 3; do test "${ACTUAL[$i]}" = "${EXPECTED[$i]}"; done
+
+      - name: Verify canonical contours
+        shell: bash
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          data = json.loads(Path('.adwf/roadmap.json').read_text(encoding='utf-8'))
+          tasks = [task for goal in data['goals'] for task in goal['tasks']]
+          ids = [task['roadmap_id'] for task in tasks]
+          if len(ids) != len(set(ids)):
+              raise SystemExit('ROADMAP_DUPLICATE_ID')
+          known = set(ids)
+          deps = {}
+          for task in tasks:
+              rid = task['roadmap_id']
+              ds = list(task.get('dependencies', []))
+              for dep in ds:
+                  if dep not in known:
+                      raise SystemExit(f'UNKNOWN_DEPENDENCY:{rid}->{dep}')
+              deps[rid] = ds
+          visiting, done = set(), set()
+          def visit(node):
+              if node in done: return
+              if node in visiting: raise SystemExit('ROADMAP_CYCLE:' + node)
+              visiting.add(node)
+              for dep in deps[node]: visit(dep)
+              visiting.remove(node); done.add(node)
+          for node in deps: visit(node)
+          print('ROADMAP_DAG=PASS')
+          PY
+          python .adwf/scripts/validate_ci.py
+          python .adwf/scripts/validate_framework.py
+          python .adwf/scripts/validate_pipeline_ir.py
+          python .adwf/scripts/validate_docs.py
+          python .adwf/scripts/generate_manifest.py --check
+          python .adwf/adwf.py doctor --scope package_integrity
+          python .adwf/adwf.py doctor --scope config_health
+          python .adwf/adwf.py self-test
+          git diff --check
+
+      - name: Publish completed target only after final CAS
+        shell: bash
+        run: |
+          set -euo pipefail
+          START_TARGET="$(cat /tmp/start-target.txt)"
+          OBSERVED_MAIN="$(git ls-remote origin refs/heads/main | awk '{print $1}')"
+          OBSERVED_TARGET="$(git ls-remote origin "refs/heads/${TARGET_BRANCH}" | awk '{print $1}')"
+          echo "FINAL_MAIN=$OBSERVED_MAIN"
+          echo "FINAL_TARGET_BEFORE_PUBLISH=$OBSERVED_TARGET"
+          test "$OBSERVED_MAIN" = "$BASE_SHA"
+          test "$OBSERVED_TARGET" = "$START_TARGET"
+
+          mapfile -t FINAL_DIFF < <(git diff --name-only "$BASE_SHA" | sort)
+          EXPECTED=(.adwf/docs-registry.json .adwf/roadmap.json MANIFEST.json SHA256SUMS.txt)
+          test "${#FINAL_DIFF[@]}" = 4
+          for i in 0 1 2 3; do test "${FINAL_DIFF[$i]}" = "${EXPECTED[$i]}"; done
+
+          if ! git diff --quiet; then
+            git config user.name 'roadmap-fleet-2026-materializer'
+            git config user.email 'roadmap-fleet-2026-materializer@users.noreply.github.com'
+            git add .adwf/docs-registry.json .adwf/roadmap.json MANIFEST.json SHA256SUMS.txt
+            git commit -m '[ROADMAP_FLEET_2026-001] Complete canonical projections'
+            git push origin "HEAD:refs/heads/${TARGET_BRANCH}"
+          fi
+          echo "CANDIDATE_SHA=$(git rev-parse HEAD)"
+          echo "CANDIDATE_TREE=$(git rev-parse HEAD^{tree})"
