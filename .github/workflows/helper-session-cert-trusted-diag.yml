@@ -2,7 +2,7 @@ name: SESSION CERT Postmerge Readback
 
 on:
   pull_request:
-    types: [reopened]
+    types: [reopened, synchronize]
     branches: [main]
 
 permissions:
