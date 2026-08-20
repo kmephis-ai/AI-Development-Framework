@@ -1,9 +1,9 @@
 name: ADWF Local Git Mirror Bootstrap
 
 on:
-  pull_request:
+  push:
     branches:
-      - main
+      - helper/local-mirror-gov029-candidate-20260820-a1
 
 permissions:
   contents: read
