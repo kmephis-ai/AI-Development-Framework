@@ -50,7 +50,7 @@ jobs:
           echo "Rulesets:"
           printf '%s' "${rulesets}" | jq -r '.[] | [.id,.name,.enforcement] | @tsv'
 
-          for name in "ADWF protected main" "ADWF runtime anchor"; do
+          for name in "ADWF protected main" "ADWF immutable runtime anchors"; do
             id="$(printf '%s' "${rulesets}" | jq -r --arg n "${name}" '.[] | select(.name==$n and .enforcement=="active") | .id' | head -n1)"
             if [ -z "${id}" ]; then
               echo "MISSING_ACTIVE_RULESET:${name}" >&2
