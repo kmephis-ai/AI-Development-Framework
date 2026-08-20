@@ -1,0 +1,39 @@
+name: ROADMAP REALIGN Materializer Readback
+
+on:
+  pull_request:
+    branches: [main]
+
+permissions:
+  actions: read
+  contents: read
+
+jobs:
+  readback:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    env:
+      TARGET_SHA: 94d9d5fff5b749f2a8d1d8d6ed611193435c2601
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - name: Read exact helper workflow runs
+        shell: python
+        run: |
+          import json, os, urllib.request
+          repo = os.environ['GITHUB_REPOSITORY']
+          sha = os.environ['TARGET_SHA']
+          req = urllib.request.Request(
+              f'https://api.github.com/repos/{repo}/actions/runs?head_sha={sha}&per_page=100',
+              headers={
+                  'Authorization': f"Bearer {os.environ['GH_TOKEN']}",
+                  'Accept': 'application/vnd.github+json',
+                  'X-GitHub-Api-Version': '2022-11-28',
+              },
+          )
+          with urllib.request.urlopen(req, timeout=30) as response:
+              payload = json.load(response)
+          rows = [{k: run.get(k) for k in ('id','name','event','head_sha','status','conclusion','run_attempt','created_at','updated_at')} for run in payload.get('workflow_runs', []) if run.get('head_sha') == sha]
+          rows.sort(key=lambda r: r['id'])
+          print('HELPER_RUN_READBACK=' + json.dumps(rows, sort_keys=True, separators=(',', ':')))
+          if not rows:
+              raise SystemExit('NO_RUNS_FOR_EXACT_HELPER_SHA')
