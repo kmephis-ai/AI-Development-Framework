@@ -176,7 +176,6 @@ def _provider_diff_records(client:GitHubClient,pr:dict[str,Any],patterns:list[An
     if not records:raise ValueError('PR_DIFF_INSPECTION_INVALID')
     return records
 
-
 def _provider_trust_classification(client:GitHubClient,pr:dict[str,Any])->dict[str,Any]:
     number=int(pr.get('number') or 0)
     if number<1:raise ValueError('PR_NUMBER_INVALID')
@@ -226,7 +225,8 @@ def _capability_live_evidence_provider_gate(client:GitHubClient,pr:dict[str,Any]
     reasons.extend(resolve_capability_live_evidence(trace,registry,schema=schema))
     provider=[]
     if not reasons:
-        for cert in registry.get('certifications') or []:
+        certifications=[*(registry.get('certifications') or []),*(registry.get('session_certifications') or [])]
+        for cert in certifications:
             result=verify_provider_certification(client,cert);provider.append({'id':cert.get('id'),**result})
             if result.get('verified') is not True:
                 reasons.extend(result.get('reason_codes') or ['LIVE_CERT_PROVIDER_NOT_VERIFIED'])
