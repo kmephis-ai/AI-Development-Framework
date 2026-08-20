@@ -1,0 +1,41 @@
+name: CODE_QUALITY Postmerge Readback
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+
+permissions:
+  actions: read
+  contents: read
+
+jobs:
+  readback:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - name: Read exact merge push workflows
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TARGET_SHA: cd1b0ddc1173d2917e86888bcaec9537686b8ea1
+        shell: python
+        run: |
+          import json, os, urllib.request
+          repo=os.environ['GITHUB_REPOSITORY']; sha=os.environ['TARGET_SHA']
+          headers={'Authorization':f"Bearer {os.environ['GH_TOKEN']}",'Accept':'application/vnd.github+json','X-GitHub-Api-Version':'2022-11-28'}
+          def get(url):
+              req=urllib.request.Request(url,headers=headers)
+              with urllib.request.urlopen(req,timeout=30) as r:return json.load(r)
+          main=get(f'https://api.github.com/repos/{repo}/branches/main')
+          main_sha=str((main.get('commit') or {}).get('sha') or '')
+          print('MAIN_SHA='+main_sha)
+          if main_sha != sha: raise SystemExit('MAIN_SHA_DRIFT')
+          payload=get(f'https://api.github.com/repos/{repo}/actions/runs?head_sha={sha}&per_page=100')
+          selected=[]
+          for run in payload.get('workflow_runs',[]):
+              if run.get('head_sha')==sha and run.get('event')=='push' and run.get('name') in {'ADWF Main','ADWF Platform Smoke'}:
+                  selected.append({k:run.get(k) for k in ('id','name','event','head_sha','head_branch','status','conclusion','run_attempt','created_at','updated_at')})
+          selected.sort(key=lambda x:(x['name'],x['id']))
+          print('POSTMERGE_READBACK='+json.dumps(selected,sort_keys=True,separators=(',',':')))
+          if {x['name'] for x in selected} != {'ADWF Main','ADWF Platform Smoke'}:
+              raise SystemExit('REQUIRED_POSTMERGE_RUNS_MISSING')
+          print('POSTMERGE_RUNS_DISCOVERED=PASS')
