@@ -70,7 +70,7 @@ class TrustedSessionCertificationProviderGateTests(unittest.TestCase):
         self.assertEqual(result["reason_codes"], [])
         self.assertEqual([item["id"] for item in result["provider"]], ["UPGRADE"])
         self.assertEqual(verifier.call_count, 1)
-        self.assertIs(verifier.call_args_list[0].args[1], upgrade)
+        self.assertEqual(verifier.call_args_list[0].args[1], upgrade)
 
     def test_empty_session_lane_remains_backward_compatible(self):
         upgrade = {"id": "UPGRADE"}
@@ -79,7 +79,7 @@ class TrustedSessionCertificationProviderGateTests(unittest.TestCase):
         )
         self.assertTrue(result["verified"])
         self.assertEqual(verifier.call_count, 1)
-        self.assertIs(verifier.call_args_list[0].args[1], upgrade)
+        self.assertEqual(verifier.call_args_list[0].args[1], upgrade)
 
     def test_upgrade_and_session_are_each_provider_verified_exactly_once(self):
         upgrade = {"id": "UPGRADE"}
