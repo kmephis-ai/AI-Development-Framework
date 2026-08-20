@@ -1,0 +1,451 @@
+{
+  "schema_version": 1,
+  "goals": [
+    {
+      "id": "EXECUTIVE-AUTOPILOT",
+      "title_ru": "Executive Autopilot",
+      "tasks": [
+        {
+          "roadmap_id": "CEO-001",
+          "title_ru": "Нулевой технический контроль владельца",
+          "dependencies": [],
+          "product_impact": true
+        },
+        {
+          "roadmap_id": "PREVIEW-001",
+          "title_ru": "Встроенный desktop/mobile preview",
+          "dependencies": [
+            "CEO-001"
+          ],
+          "product_impact": true
+        },
+        {
+          "roadmap_id": "RUNTIME-001",
+          "title_ru": "Возобновляемая многодневная работа",
+          "dependencies": [
+            "CEO-001"
+          ],
+          "product_impact": false
+        }
+      ]
+    },
+    {
+      "id": "FOUNDATION-ENGINEERING-OS",
+      "title_ru": "Engineering OS Foundation — critical path",
+      "tasks": [
+        {
+          "roadmap_id": "FND-001",
+          "title_ru": "Capability Truth Model v2",
+          "dependencies": [],
+          "product_impact": false
+        },
+        {
+          "roadmap_id": "DEVENV-001",
+          "title_ru": "Developer Execution Resilience / Local Git Mirror",
+          "dependencies": [
+            "FND-001"
+          ],
+          "product_impact": false
+        },
+        {
+          "roadmap_id": "SKILL-001",
+          "title_ru": "Skill Operating Layer v1",
+          "dependencies": [
+            "DEVENV-001"
+          ],
+          "product_impact": false
+        },
+        {
+          "roadmap_id": "ROADMAP-001",
+          "title_ru": "Roadmap DAG + Verified Outcome Progress",
+          "dependencies": [
+            "SKILL-001"
+          ],
+          "product_impact": false
+        },
+        {
+          "roadmap_id": "AIWORK-001",
+          "title_ru": "First-class AI Work Contracts",
+          "dependencies": [
+            "ROADMAP-001"
+          ],
+          "product_impact": false
+        },
+        {
+          "roadmap_id": "TRACE-001",
+          "title_ru": "Durable Decision + Requirement Traceability Graph v1",
+          "dependencies": [
+            "AIWORK-001"
+          ],
+          "product_impact": false
+        },
+        {
+          "roadmap_id": "LIFECYCLE-001",
+          "title_ru": "Managed Surface Contract v1 — project must outlive framework",
+          "dependencies": [
+            "TRACE-001"
+          ],
+          "product_impact": false
+        },
+        {
+          "roadmap_id": "LIFECYCLE-002",
+          "title_ru": "Transactional Adoption Apply + Rollback/Recovery v1",
+          "dependencies": [
+            "LIFECYCLE-001"
+          ],
+          "product_impact": false
+        },
+        {
+          "roadmap_id": "LIFECYCLE-003",
+          "title_ru": "Guarded Transactional Detach/Uninstall v1",
+          "dependencies": [
+            "LIFECYCLE-002"
+          ],
+          "product_impact": false
+        },
+        {
+          "roadmap_id": "PACKSDK-001",
+          "title_ru": "Formal Project Pack Contract + Safety Declarations v1",
+          "dependencies": [
+            "LIFECYCLE-003"
+          ],
+          "product_impact": false
+        },
+        {
+          "roadmap_id": "ENVSAFE-001",
+          "title_ru": "Project Command Runtime Environment/Data Safety Envelope v1",
+          "dependencies": [
+            "PACKSDK-001"
+          ],
+          "product_impact": false
+        },
+        {
+          "roadmap_id": "LIFECYCLE-004",
+          "title_ru": "Adoption Resume Regression Repair after Guarded Detach",
+          "dependencies": [
+            "ENVSAFE-001"
+          ],
+          "product_impact": false
+        },
+        {
+          "roadmap_id": "LIFECYCLE-005",
+          "title_ru": "Consumer Profile Overlay + Project Pack Bootstrap Finalization v1",
+          "dependencies": [
+            "LIFECYCLE-004"
+          ],
+          "product_impact": false
+        },
+        {
+          "roadmap_id": "WEBREF-001",
+          "title_ru": "Reference Web Consumer End-to-End Conformance v1",
+          "dependencies": [
+            "LIFECYCLE-005"
+          ],
+          "product_impact": false
+        },
+        {
+          "roadmap_id": "ASREF-001",
+          "title_ru": "Apps Script Project Pack + Reference Data-Centric Conformance v1",
+          "dependencies": [
+            "WEBREF-001"
+          ],
+          "product_impact": false
+        },
+        {
+          "roadmap_id": "UPGRADE-001",
+          "title_ru": "Consumer Framework Upgrade Planning + Compatibility Contract v1",
+          "dependencies": [
+            "ASREF-001"
+          ],
+          "product_impact": false
+        },
+        {
+          "roadmap_id": "UPGRADE-002",
+          "title_ru": "Transactional Consumer Framework Upgrade Apply + Rollback/Recovery v1",
+          "dependencies": [
+            "UPGRADE-001"
+          ],
+          "product_impact": false
+        },
+        {
+          "roadmap_id": "LIFECYCLE-006",
+          "title_ru": "Сохранение существующих SHARED_GUARDED файлов при adoption v1",
+          "dependencies": [
+            "UPGRADE-002"
+          ],
+          "product_impact": false
+        },
+        {
+          "roadmap_id": "LIFECYCLE-007",
+          "title_ru": "Preserved Preimage Provenance through Upgrade Lifecycle v1",
+          "dependencies": [
+            "LIFECYCLE-006"
+          ],
+          "product_impact": false
+        },
+        {
+          "roadmap_id": "UPGRADE_FIX-001",
+          "title_ru": "Committed Rollback with Unchanged Consumer Profile",
+          "dependencies": [
+            "LIFECYCLE-007"
+          ],
+          "product_impact": false
+        },
+        {
+          "roadmap_id": "UPGRADE-003",
+          "title_ru": "Real External Consumer Exact A→B→Rollback→B Proof v1",
+          "dependencies": [
+            "UPGRADE_FIX-001"
+          ],
+          "product_impact": false
+        },
+        {
+          "roadmap_id": "GOV-021",
+          "title_ru": "Provider-Resolved Live Evidence Governance + Upgrade Capability Promotion v1",
+          "dependencies": [
+            "UPGRADE-003"
+          ],
+          "product_impact": false
+        },
+        {
+          "roadmap_id": "EDGEREF-001",
+          "title_ru": "Reference Edge Controller End-to-End Conformance v1",
+          "dependencies": [
+            "GOV-021"
+          ],
+          "product_impact": false
+        },
+        {
+          "roadmap_id": "AGENTQUAL-001",
+          "title_ru": "Replaceable Creative Agent Qualification Contract + Reference Adapter v1",
+          "dependencies": [
+            "EDGEREF-001"
+          ],
+          "product_impact": false
+        },
+        {
+          "roadmap_id": "CONSUMER_INSTALL-001",
+          "title_ru": "Provider-durable Consumer Installation Record + Fresh-session Integrity v1",
+          "dependencies": [
+            "AGENTQUAL-001"
+          ],
+          "product_impact": false
+        },
+        {
+          "roadmap_id": "CONSUMER_OPS-001",
+          "title_ru": "Consumer Operational State + Native Roadmap Binding v1",
+          "dependencies": [
+            "CONSUMER_INSTALL-001"
+          ],
+          "product_impact": false
+        },
+        {
+          "roadmap_id": "CONSUMER_GATE-001",
+          "title_ru": "Consumer Native Gate Binding + exact provider readback v1",
+          "dependencies": [
+            "CONSUMER_OPS-001"
+          ],
+          "product_impact": false
+        },
+        {
+          "roadmap_id": "CONSUMER_ROUTE-001",
+          "title_ru": "Consumer-aware CI Routing + Native Gate Delegation v1",
+          "dependencies": [
+            "CONSUMER_GATE-001"
+          ],
+          "product_impact": false
+        },
+        {
+          "roadmap_id": "CONSUMER_WAIT-001",
+          "title_ru": "Bounded Native Gate Wait for Real Consumer CI Latency",
+          "dependencies": [
+            "CONSUMER_ROUTE-001"
+          ],
+          "product_impact": false
+        },
+        {
+          "roadmap_id": "CONSUMER_CONTROL-001",
+          "title_ru": "Consumer-aware Trusted Control Routing v1",
+          "dependencies": [
+            "CONSUMER_WAIT-001"
+          ],
+          "product_impact": false
+        },
+        {
+          "roadmap_id": "CONSUMER_INSTR-001",
+          "title_ru": "Layered AI Instruction Ownership for Connected Consumers v1",
+          "dependencies": [
+            "CONSUMER_CONTROL-001"
+          ],
+          "product_impact": false
+        },
+        {
+          "roadmap_id": "CONSUMER_GATE_RETRY-001",
+          "title_ru": "Provider-authoritative repeated native check-run resolution v1",
+          "dependencies": [
+            "CONSUMER_INSTR-001"
+          ],
+          "product_impact": false
+        },
+        {
+          "roadmap_id": "SESSION_CONTINUITY-001",
+          "title_ru": "Generic Durable AI Session Handover & Resume — live proof completion",
+          "dependencies": [
+            "CONSUMER_GATE_RETRY-001"
+          ],
+          "product_impact": false
+        },
+        {
+          "roadmap_id": "DELIVERY_SHA_IDENTITY-001",
+          "title_ru": "Exact merged delivery revision continuity through PROMOTE/OBSERVE",
+          "dependencies": [
+            "SESSION_CONTINUITY-001"
+          ],
+          "product_impact": false
+        },
+        {
+          "roadmap_id": "ORCH-001",
+          "title_ru": "Durable autonomous development orchestration + Human-by-Exception",
+          "dependencies": [
+            "DELIVERY_SHA_IDENTITY-001"
+          ],
+          "product_impact": false
+        },
+        {
+          "roadmap_id": "MULTIWRITER-001",
+          "title_ru": "Conflict-domain safe multi-writer orchestration",
+          "dependencies": [
+            "ORCH-001"
+          ],
+          "product_impact": false
+        },
+        {
+          "roadmap_id": "PPCF-001",
+          "title_ru": "Provider & Plugin Capability Framework",
+          "dependencies": [
+            "SESSION_CONTINUITY-001"
+          ],
+          "product_impact": false
+        }
+      ]
+    },
+    {
+      "id": "PRODUCT-EVALUATION-INTELLIGENCE",
+      "title_ru": "Product Truth & Evaluation Intelligence — long-horizon architecture",
+      "tasks": [
+        {
+          "roadmap_id": "PRODUCT_TRUTH-001",
+          "title_ru": "Контракт продуктового замысла и пользовательского опыта Consumer",
+          "dependencies": [
+            "CONSUMER_OPS-001"
+          ],
+          "product_impact": true
+        },
+        {
+          "roadmap_id": "EVAL-001",
+          "title_ru": "Независимая продуктовая оценка и Quality Intelligence",
+          "dependencies": [
+            "PRODUCT_TRUTH-001",
+            "AGENTQUAL-001",
+            "CONSUMER_GATE-001"
+          ],
+          "product_impact": true
+        },
+        {
+          "roadmap_id": "CONTEXT-001",
+          "title_ru": "Context Compiler / Agent Context Engineering",
+          "dependencies": [
+            "PRODUCT_TRUTH-001",
+            "AIWORK-001",
+            "TRACE-001",
+            "SESSION_CONTINUITY-001"
+          ],
+          "product_impact": false
+        },
+        {
+          "roadmap_id": "AGENT_EVAL-001",
+          "title_ru": "Continuous Real-Agent Qualification & Task-Class Routing",
+          "dependencies": [
+            "AGENTQUAL-001",
+            "EVAL-001",
+            "PPCF-001"
+          ],
+          "product_impact": false
+        },
+        {
+          "roadmap_id": "ARCH_FITNESS-001",
+          "title_ru": "Agent-legible Architecture Fitness Functions",
+          "dependencies": [
+            "AIWORK-001",
+            "TRACE-001"
+          ],
+          "product_impact": false
+        },
+        {
+          "roadmap_id": "CODE_QUALITY-001",
+          "title_ru": "Evidence-backed Critical Code Quality & Mutation-Sensitive Verification",
+          "dependencies": [
+            "ARCH_FITNESS-001",
+            "EVAL-001"
+          ],
+          "product_impact": false
+        },
+        {
+          "roadmap_id": "AGENT_RUNTIME_SAFE-001",
+          "title_ru": "Secure Agent Execution Identity/Egress Envelope",
+          "dependencies": [
+            "ENVSAFE-001",
+            "PPCF-001",
+            "ORCH-001"
+          ],
+          "product_impact": false
+        },
+        {
+          "roadmap_id": "AGENT_OBS-001",
+          "title_ru": "Agentic Execution & Evaluation Observability",
+          "dependencies": [
+            "ORCH-001",
+            "EVAL-001",
+            "PPCF-001"
+          ],
+          "product_impact": false
+        },
+        {
+          "roadmap_id": "EPI-001",
+          "title_ru": "External Practice Intelligence — evidence-driven capability discovery",
+          "dependencies": [
+            "TRACE-001",
+            "PPCF-001"
+          ],
+          "product_impact": false
+        },
+        {
+          "roadmap_id": "INTEROP-001",
+          "title_ru": "Optional Agent/Tool Interoperability Profile",
+          "dependencies": [
+            "PPCF-001",
+            "ORCH-001",
+            "AGENT_RUNTIME_SAFE-001"
+          ],
+          "product_impact": false
+        }
+      ]
+    },
+    {
+      "id": "RESTRICTED-NETWORK-RESILIENCE",
+      "title_ru": "Restricted-Network Execution Resilience — RU reference profile",
+      "tasks": [
+        {
+          "roadmap_id": "NETRES_RU-001",
+          "title_ru": "Устойчивость разработки и CI к сетевым ограничениям + RU reference profile",
+          "dependencies": [
+            "DEVENV-001",
+            "ENVSAFE-001",
+            "PPCF-001"
+          ],
+          "product_impact": false
+        }
+      ]
+    }
+  ]
+}

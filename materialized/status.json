@@ -1,0 +1,13 @@
+{
+  "status": "PASS",
+  "checks": {
+    "validate_ci": 0,
+    "validate_framework": 0,
+    "validate_pipeline_ir": 0,
+    "validate_docs": 0,
+    "manifest_check": 0,
+    "package_integrity": 0,
+    "config_health": 0,
+    "self_test": 0
+  }
+}

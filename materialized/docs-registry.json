@@ -1,0 +1,410 @@
+{
+  "version": "1.6.0",
+  "documents": [
+    {
+      "path": "README.md",
+      "watched": [
+        "docs/**",
+        ".adwf/project-state.json",
+        ".adwf/lib/**",
+        ".adwf/capability-traceability.json",
+        ".github/workflows/**"
+      ],
+      "mode": "generated-status-block+manual",
+      "source_digest": "6f4ec63eb1203b79e17fbd3f5b1f08635aeba5ffdff9c4578fd75aa6140cf3ff",
+      "reviewed_at": "2026-08-13T00:00:00Z",
+      "valid_until": "2026-11-13T00:00:00Z"
+    },
+    {
+      "path": "AGENTS.md",
+      "watched": [
+        ".adwf/**",
+        ".github/workflows/**",
+        ".gitlab-ci.yml",
+        "skills/**"
+      ],
+      "mode": "manual-governance",
+      "source_digest": "5b91db72e092e1ee255819b0d08c83ede04ffef294e754cd62c7cef88259c512",
+      "reviewed_at": "2026-08-13T00:00:00Z",
+      "valid_until": "2026-11-13T00:00:00Z"
+    },
+    {
+      "path": "docs/architecture/CI_CD_ARCHITECTURE.md",
+      "watched": [
+        ".github/workflows/**",
+        ".gitlab-ci.yml",
+        ".adwf/providers/gitlab/ci/**",
+        ".adwf/scripts/**"
+      ],
+      "mode": "architecture",
+      "source_digest": "670ae183e9ace1a3ac54e1e0e2b2f5b366de933fe6c5a74cc5b9e6701de1d10e",
+      "reviewed_at": "2026-08-13T00:00:00Z",
+      "valid_until": "2026-11-13T00:00:00Z"
+    },
+    {
+      "path": "CONTROL_CENTER.md",
+      "watched": [
+        ".adwf/project-state.json",
+        ".adwf/providers.json",
+        ".adwf/evidence-ledger.json"
+      ],
+      "mode": "generated",
+      "source_digest": "bf76d0c9ddcd11614474038c97c363480abdaa7bba2d46f2f65af1b6a1bed5f7",
+      "reviewed_at": "2026-08-13T00:00:00Z",
+      "valid_until": "2026-11-13T00:00:00Z"
+    },
+    {
+      "path": "docs/V1_6_IMPLEMENTATION_REPORT.md",
+      "watched": [
+        "SPECIFICATION.md",
+        ".adwf/lib/**",
+        ".adwf/schemas/**",
+        ".github/workflows/**",
+        ".gitlab-ci.yml",
+        ".adwf/capability-traceability.json",
+        ".adwf/scripts/validate_capabilities.py"
+      ],
+      "mode": "implementation-certification",
+      "source_digest": "d9cdb2fc8abac3e3e654a4690f0fa900cc07a7478d10a9156f4bc9d7d81004dc",
+      "reviewed_at": "2026-08-13T00:00:00Z",
+      "valid_until": "2026-11-13T00:00:00Z"
+    },
+    {
+      "path": "docs/operations/OWNER_AI_GUIDE.md",
+      "watched": [
+        ".adwf/lib/owner_experience.py",
+        ".adwf/lib/dashboard.py",
+        ".adwf/project-state.json",
+        ".github/ISSUE_TEMPLATE/bug-report.yml"
+      ],
+      "mode": "owner-guide",
+      "source_digest": "825bce6785f2038c6acd5cf1e48eb9a914a18fed713efa8eb2be6e28d104e2ed",
+      "reviewed_at": "2026-08-13T00:00:00Z",
+      "valid_until": "2026-11-13T00:00:00Z"
+    },
+    {
+      "path": "docs/governance/RECOVERY_PLAYBOOK.md",
+      "watched": [
+        ".adwf/lib/healing.py",
+        ".adwf/lib/incidents.py",
+        ".adwf/healing-config.json",
+        ".adwf/schemas/repair-recipe.schema.json"
+      ],
+      "mode": "governance",
+      "source_digest": "68f0c11d641d731c0a6560fe566f0aeb307aed37ed5bd812cf1773ef4ca7b3e4",
+      "reviewed_at": "2026-08-13T00:00:00Z",
+      "valid_until": "2026-11-13T00:00:00Z"
+    },
+    {
+      "path": "docs/operations/FREE_LIMITS_AND_NOTIFICATIONS.md",
+      "watched": [
+        ".adwf/config.json",
+        ".adwf/providers.json",
+        ".adwf/profiles/**",
+        ".adwf/lib/cost_guard.py"
+      ],
+      "mode": "provider-facts",
+      "source_digest": "61094eb026194041ef8d6e7dd8a0efc3c17182b12bbb3313cc6460ce342d60a9",
+      "reviewed_at": "2026-08-13T00:00:00Z",
+      "valid_until": "2026-11-13T00:00:00Z"
+    },
+    {
+      "path": "docs/operations/SKILL_OPERATING_LAYER.md",
+      "watched": [
+        "skills/**",
+        ".adwf/lib/skill_layer.py",
+        ".adwf/schemas/skill.schema.json",
+        ".adwf/schemas/skill-eval.schema.json",
+        ".adwf/schemas/skill-registry.schema.json",
+        ".adwf/scripts/validate_skills.py",
+        ".adwf/scripts/eval_skills.py",
+        ".adwf/scripts/generate_skill_registry.py"
+      ],
+      "mode": "operations",
+      "source_digest": "1510aeb1334388b58298f20991551ba6745a739c45f3ab918c3d0bc918b2bebe",
+      "reviewed_at": "2026-08-13T00:00:00Z",
+      "valid_until": "2026-11-13T00:00:00Z"
+    },
+    {
+      "path": "docs/governance/AI_WORK_CONTRACTS.md",
+      "watched": [
+        ".adwf/lib/ai_work_contracts.py",
+        ".adwf/lib/runtime_supervisor.py",
+        ".adwf/lib/action_executors.py",
+        ".adwf/lib/github_agent_inbox.py",
+        ".adwf/schemas/ai-work-package.schema.json",
+        ".adwf/schemas/ai-work-result.schema.json",
+        ".adwf/tests/test_ai_work_contracts.py"
+      ],
+      "mode": "governance",
+      "source_digest": "bef8a158f8b4563c97e7f9b12f634bd3262fb64239305630c85159b266ce9486",
+      "reviewed_at": "2026-08-13T00:00:00Z",
+      "valid_until": "2026-11-13T00:00:00Z"
+    },
+    {
+      "path": "docs/governance/DECISION_REQUIREMENT_TRACEABILITY.md",
+      "watched": [
+        ".adwf/decision-requirement-traceability.json",
+        ".adwf/lib/decision_traceability.py",
+        ".adwf/schemas/decision-requirement-traceability.schema.json",
+        ".adwf/scripts/validate_traceability.py",
+        ".adwf/tests/test_decision_traceability.py",
+        ".adwf/capability-traceability.json",
+        ".adwf/roadmap.json"
+      ],
+      "mode": "governance",
+      "source_digest": "52e7692d6b4aa522d8240807a54fbc1e135629ead83e3f2c4d55cf9f3e54fd55",
+      "reviewed_at": "2026-08-13T00:00:00Z",
+      "valid_until": "2026-11-13T00:00:00Z"
+    },
+    {
+      "path": "docs/governance/PROJECT_PACK_SDK.md",
+      "watched": [
+        ".adwf/packs/**",
+        ".adwf/lib/project_packs.py",
+        ".adwf/lib/pack_materializer.py",
+        ".adwf/schemas/project-pack.schema.json",
+        ".adwf/scripts/validate_project_packs.py",
+        ".adwf/lib/project_execution.py",
+        ".adwf/scripts/run_project_gates.py",
+        ".adwf/scripts/run_preview.py",
+        ".adwf/lib/consumer_profile.py",
+        ".adwf/schemas/consumer-profile.schema.json"
+      ],
+      "mode": "governance-contract",
+      "source_digest": "1040529c313a92ada017e6c659c9ab5cbc5a98eeb4c5a0515078d8a6a370a9dc",
+      "reviewed_at": "2026-08-13T00:00:00Z",
+      "valid_until": "2026-11-13T00:00:00Z"
+    },
+    {
+      "path": "docs/governance/PROJECT_RUNTIME_SAFETY.md",
+      "watched": [
+        ".adwf/lib/project_execution.py",
+        ".adwf/lib/preview_engine.py",
+        ".adwf/scripts/run_project_gates.py",
+        ".adwf/scripts/run_preview.py",
+        ".adwf/schemas/project-execution-evidence.schema.json",
+        ".adwf/tests/test_project_execution_safety.py",
+        ".adwf/lib/project_packs.py",
+        ".adwf/lib/pack_materializer.py",
+        ".adwf/lib/consumer_profile.py",
+        ".adwf/schemas/consumer-profile.schema.json"
+      ],
+      "mode": "governance-contract",
+      "source_digest": "ad920bdf665633c16c0be4e0f9f8f1270434b8e5a65c588f4babc4be2ef2c99d",
+      "reviewed_at": "2026-08-13T00:00:00Z",
+      "valid_until": "2026-11-13T00:00:00Z"
+    },
+    {
+      "path": "docs/governance/CONSUMER_PROFILE_CONTRACT.md",
+      "watched": [
+        ".adwf/lib/consumer_profile.py",
+        ".adwf/schemas/consumer-profile.schema.json",
+        ".adwf/lib/pack_materializer.py",
+        ".adwf/lib/github_bootstrap.py",
+        ".adwf/scripts/run_project_gates.py",
+        ".adwf/scripts/run_preview.py",
+        ".adwf/tests/test_consumer_profile.py",
+        ".adwf/roadmap.json",
+        ".adwf/capability-traceability.json",
+        ".adwf/decision-requirement-traceability.json"
+      ],
+      "mode": "governance-contract",
+      "source_digest": "a6f32a8b7f86b84683b7be67bead8076026b69e090bea49a0a64aa15a44ee616",
+      "reviewed_at": "2026-08-13T00:00:00Z",
+      "valid_until": "2026-11-13T00:00:00Z"
+    },
+    {
+      "path": "docs/governance/REFERENCE_WEB_CONFORMANCE.md",
+      "watched": [
+        ".adwf/lib/reference_conformance.py",
+        ".adwf/schemas/reference-conformance-report.schema.json",
+        ".adwf/scripts/reference_web_conformance.py",
+        ".adwf/tests/test_reference_web_conformance.py",
+        ".adwf/reference-consumers/web/**",
+        ".adwf/lib/managed_surface_transaction.py",
+        ".adwf/lib/project_execution.py",
+        ".adwf/lib/consumer_profile.py",
+        ".adwf/roadmap.json",
+        ".adwf/capability-traceability.json",
+        ".adwf/decision-requirement-traceability.json"
+      ],
+      "mode": "governance-contract",
+      "source_digest": "56a5759a19b83eae640d224d0e41d2f7b1b12e490eab5fa2a231d0bc1f35985f",
+      "reviewed_at": "2026-08-13T00:00:00Z",
+      "valid_until": "2026-11-13T00:00:00Z"
+    },
+    {
+      "path": "docs/governance/REFERENCE_APPS_SCRIPT_CONFORMANCE.md",
+      "watched": [
+        ".adwf/packs/apps-script.json",
+        ".adwf/lib/project_packs.py",
+        ".adwf/lib/reference_conformance.py",
+        ".adwf/schemas/reference-conformance-report.schema.json",
+        ".adwf/scripts/reference_apps_script_conformance.py",
+        ".adwf/tests/test_reference_apps_script_conformance.py",
+        ".adwf/tests/test_project_pack_sdk.py",
+        ".adwf/reference-consumers/apps-script/**",
+        ".adwf/lib/managed_surface_transaction.py",
+        ".adwf/lib/project_execution.py",
+        ".adwf/lib/consumer_profile.py",
+        ".adwf/roadmap.json",
+        ".adwf/capability-traceability.json",
+        ".adwf/decision-requirement-traceability.json"
+      ],
+      "mode": "governance-contract",
+      "source_digest": "dbd119c49152a85093752bf55e74557dc2cc85b8ce57821d795b5a983561749e",
+      "reviewed_at": "2026-08-13T00:00:00Z",
+      "valid_until": "2026-11-13T00:00:00Z"
+    },
+    {
+      "path": "docs/governance/REFERENCE_EDGE_CONFORMANCE.md",
+      "watched": [
+        ".adwf/packs/edge-controller.json",
+        ".adwf/lib/project_packs.py",
+        ".adwf/lib/reference_conformance.py",
+        ".adwf/schemas/reference-conformance-report.schema.json",
+        ".adwf/scripts/reference_edge_conformance.py",
+        ".adwf/tests/test_reference_edge_conformance.py",
+        ".adwf/tests/test_project_pack_sdk.py",
+        ".adwf/reference-consumers/edge-controller/**",
+        ".adwf/lib/managed_surface_transaction.py",
+        ".adwf/lib/project_execution.py",
+        ".adwf/lib/consumer_profile.py",
+        ".adwf/roadmap.json",
+        ".adwf/capability-traceability.json",
+        ".adwf/decision-requirement-traceability.json"
+      ],
+      "mode": "governance-contract",
+      "source_digest": "2d480dc134f09ec2085073441d359e5218e52eba2b0fe4aef5b3ba7ec20f71fd",
+      "reviewed_at": "2026-08-13T00:00:00Z",
+      "valid_until": "2026-11-13T00:00:00Z"
+    },
+    {
+      "path": "docs/governance/CONSUMER_FRAMEWORK_UPGRADE_PLANNING.md",
+      "watched": [
+        ".adwf/lib/consumer_upgrade.py",
+        ".adwf/scripts/plan_consumer_upgrade.py",
+        ".adwf/consumer-upgrade-migrations.json",
+        ".adwf/schemas/consumer-upgrade-compatibility.schema.json",
+        ".adwf/schemas/consumer-upgrade-plan.schema.json",
+        ".adwf/schemas/consumer-upgrade-migrations.schema.json",
+        ".adwf/tests/test_consumer_upgrade_core.py",
+        ".adwf/tests/test_consumer_upgrade_adversarial.py",
+        ".adwf/roadmap.json",
+        ".adwf/capability-traceability.json",
+        ".adwf/decision-requirement-traceability.json"
+      ],
+      "mode": "governance-contract",
+      "source_digest": "8dce14393e4add207132f4da75fdf1afcc3cb5775e72ef225c7b158e2022d718",
+      "reviewed_at": "2026-08-13T00:00:00Z",
+      "valid_until": "2026-11-13T00:00:00Z"
+    },
+    {
+      "path": "docs/governance/CONSUMER_FRAMEWORK_UPGRADE_TRANSACTION.md",
+      "watched": [
+        ".adwf/lib/consumer_upgrade_transaction.py",
+        ".adwf/scripts/apply_consumer_upgrade.py",
+        ".adwf/schemas/consumer-upgrade-transaction.schema.json",
+        ".adwf/tests/consumer_upgrade_transaction_fixture.py",
+        ".adwf/tests/test_consumer_upgrade_transaction.py",
+        ".adwf/tests/test_consumer_upgrade_transaction_adversarial.py",
+        ".adwf/roadmap.json",
+        ".adwf/capability-traceability.json",
+        ".adwf/decision-requirement-traceability.json"
+      ],
+      "mode": "governance-contract",
+      "source_digest": "d2e9576b37d3abbef5539acb10f6db0af9fc68d99238e38bb97d3b2b6582dcb3",
+      "reviewed_at": "2026-08-13T00:00:00Z",
+      "valid_until": "2026-11-13T00:00:00Z"
+    },
+    {
+      "path": "docs/governance/CAPABILITY_LIVE_EVIDENCE.md",
+      "watched": [
+        ".adwf/capability-live-evidence.json",
+        ".adwf/lib/capability_live_evidence.py",
+        ".adwf/schemas/capability-live-evidence-certification.schema.json",
+        ".adwf/scripts/validate_capabilities.py",
+        ".adwf/scripts/publish_trusted_gate.py",
+        ".adwf/capability-traceability.json",
+        ".adwf/tests/test_capability_live_evidence.py"
+      ],
+      "mode": "governance-contract",
+      "source_digest": "7ad3c2d9c8f315e904dbb1b910c25aeebf7b0635a0ceb767c80c69693d31163c",
+      "reviewed_at": "2026-08-13T00:00:00Z",
+      "valid_until": "2026-11-13T00:00:00Z"
+    },
+    {
+      "path": "docs/governance/CREATIVE_AGENT_QUALIFICATION.md",
+      "watched": [
+        ".adwf/lib/creative_agent_qualification.py",
+        ".adwf/lib/action_executors.py",
+        ".adwf/creative-agent-adapters.json",
+        ".adwf/creative-agent-qualification.json",
+        ".adwf/schemas/creative-agent-adapters.schema.json",
+        ".adwf/schemas/creative-agent-qualification-report.schema.json",
+        ".adwf/scripts/reference_agent_adapter.py",
+        ".adwf/scripts/qualify_creative_agent.py",
+        ".adwf/tests/test_creative_agent_qualification.py",
+        ".adwf/roadmap.json",
+        ".adwf/capability-traceability.json",
+        ".adwf/decision-requirement-traceability.json"
+      ],
+      "mode": "governance-contract",
+      "source_digest": "e69635fc2488226c2ccb0ab5b491c987f6c3e7852f7a8532a20c317c1e0c2383",
+      "reviewed_at": "2026-08-13T00:00:00Z",
+      "valid_until": "2026-11-13T00:00:00Z"
+    },
+    {
+      "path": "docs/governance/CONSUMER_INSTALLATION_RECORD.md",
+      "watched": [
+        ".adwf/capability-traceability.json",
+        ".adwf/decision-requirement-traceability.json",
+        ".adwf/lib/consumer_installation.py",
+        ".adwf/lib/consumer_upgrade_transaction.py",
+        ".adwf/roadmap.json",
+        ".adwf/schemas/consumer-installation-record.schema.json",
+        ".adwf/scripts/consumer_installation.py",
+        ".adwf/tests/consumer_upgrade_transaction_fixture.py",
+        ".adwf/tests/test_consumer_installation.py",
+        ".adwf/tests/test_consumer_upgrade_transaction.py"
+      ],
+      "mode": "governance-contract",
+      "source_digest": "2fb4d2afd1d26c27c783c165b0f919e0bad5536c11d826de7d2d6a15ed884954",
+      "reviewed_at": "2026-08-13T00:00:00Z",
+      "valid_until": "2026-11-13T00:00:00Z"
+    },
+    {
+      "path": "docs/governance/CONSUMER_OPERATIONAL_BINDING.md",
+      "watched": [
+        ".adwf/lib/consumer_operational.py",
+        ".adwf/lib/roadmap_view.py",
+        ".adwf/adwf.py",
+        ".adwf/schemas/consumer-operational-binding.schema.json",
+        ".adwf/tests/test_consumer_operational.py",
+        ".adwf/roadmap.json",
+        ".adwf/capability-traceability.json",
+        ".adwf/decision-requirement-traceability.json"
+      ],
+      "mode": "governance-contract",
+      "source_digest": "c8e7e50410da1e2243579adb1eff2b0b79e2545bc708b0e9101c171549cc8b58",
+      "reviewed_at": "2026-08-13T00:00:00Z",
+      "valid_until": "2026-11-13T00:00:00Z"
+    },
+    {
+      "path": "docs/governance/CONSUMER_NATIVE_GATES.md",
+      "watched": [
+        ".adwf/lib/consumer_gates.py",
+        ".adwf/schemas/consumer-gates.schema.json",
+        ".adwf/tests/test_consumer_gates.py",
+        ".adwf/roadmap.json",
+        ".adwf/capability-traceability.json",
+        ".adwf/decision-requirement-traceability.json"
+      ],
+      "mode": "governance-contract",
+      "source_digest": "aeede752d3d12e4a4831cb2421aae99c2f63c390adc4b9e267483f5f7e06b009",
+      "reviewed_at": "2026-08-13T00:00:00Z",
+      "valid_until": "2026-11-13T00:00:00Z"
+    }
+  ]
+}
