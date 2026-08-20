@@ -1,4 +1,4 @@
-# trigger-refresh: CODE_QUALITY-001 bounded materialization
+# idempotent materializer: CODE_QUALITY-001
 name: ADWF CODE_QUALITY Roadmap Materializer
 
 on:
@@ -35,7 +35,7 @@ jobs:
           set -euo pipefail
           git rm .github/workflows/adwf-code-quality-roadmap-materialize.yml
 
-      - name: Materialize bounded Roadmap outcome
+      - name: Verify or materialize bounded Roadmap outcome
         shell: bash
         run: |
           set -euo pipefail
@@ -52,23 +52,28 @@ jobs:
           tasks = goal.get('tasks')
           if not isinstance(tasks, list):
               raise SystemExit('TARGET_TASKS_INVALID')
-          all_ids = [t.get('roadmap_id') for g in goals for t in g.get('tasks', []) if isinstance(t, dict)]
-          if 'CODE_QUALITY-001' in all_ids:
-              raise SystemExit('ROADMAP_ID_ALREADY_EXISTS')
-          required = {'ARCH_FITNESS-001', 'EVAL-001'}
-          if not required.issubset(set(all_ids)):
-              raise SystemExit('REQUIRED_DEPENDENCY_MISSING')
-          item = {
+          expected = {
               'roadmap_id': 'CODE_QUALITY-001',
               'title_ru': 'Evidence-backed Critical Code Quality & Mutation-Sensitive Verification',
               'dependencies': ['ARCH_FITNESS-001', 'EVAL-001'],
               'product_impact': False,
           }
-          anchor = next((i for i, t in enumerate(tasks) if t.get('roadmap_id') == 'ARCH_FITNESS-001'), None)
-          if anchor is None:
-              raise SystemExit('ARCH_FITNESS_ANCHOR_MISSING')
-          tasks.insert(anchor + 1, item)
-          path.write_text(json.dumps(data, ensure_ascii=False, indent=2) + '\n', encoding='utf-8', newline='\n')
+          matches = [t for g in goals for t in g.get('tasks', []) if isinstance(t, dict) and t.get('roadmap_id') == 'CODE_QUALITY-001']
+          if len(matches) > 1:
+              raise SystemExit('ROADMAP_ID_DUPLICATED')
+          if matches:
+              if matches[0] != expected or matches[0] not in tasks:
+                  raise SystemExit('ROADMAP_EXISTING_VALUE_MISMATCH')
+          else:
+              all_ids = [t.get('roadmap_id') for g in goals for t in g.get('tasks', []) if isinstance(t, dict)]
+              required = {'ARCH_FITNESS-001', 'EVAL-001'}
+              if not required.issubset(set(all_ids)):
+                  raise SystemExit('REQUIRED_DEPENDENCY_MISSING')
+              anchor = next((i for i, t in enumerate(tasks) if t.get('roadmap_id') == 'ARCH_FITNESS-001'), None)
+              if anchor is None:
+                  raise SystemExit('ARCH_FITNESS_ANCHOR_MISSING')
+              tasks.insert(anchor + 1, expected)
+              path.write_text(json.dumps(data, ensure_ascii=False, indent=2) + '\n', encoding='utf-8', newline='\n')
           PY
 
       - name: Verify Roadmap DAG
