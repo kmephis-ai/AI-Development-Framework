@@ -432,6 +432,52 @@
       ]
     },
     {
+      "id": "CONSUMER-FLEET-EVOLUTION",
+      "title_ru": "Consumer Fleet Evolution & Convergence — long-horizon architecture",
+      "tasks": [
+        {
+          "roadmap_id": "FLEET_CONTRACT-001",
+          "title_ru": "Consumer Desired/Observed State + Conformance/Exception Contract",
+          "dependencies": [
+            "CONSUMER_OPS-001",
+            "PACKSDK-001",
+            "TRACE-001"
+          ],
+          "product_impact": false
+        },
+        {
+          "roadmap_id": "CONSUMER_FEEDBACK-001",
+          "title_ru": "Cross-Consumer Problem & Friction Intelligence",
+          "dependencies": [
+            "FLEET_CONTRACT-001",
+            "EVAL-001",
+            "TRACE-001"
+          ],
+          "product_impact": false
+        },
+        {
+          "roadmap_id": "SOLUTION_RECIPE-001",
+          "title_ru": "Versioned Reusable Remediation & Migration Recipes",
+          "dependencies": [
+            "CONSUMER_FEEDBACK-001",
+            "UPGRADE-002",
+            "PACKSDK-001"
+          ],
+          "product_impact": false
+        },
+        {
+          "roadmap_id": "FLEET_ROLLOUT-001",
+          "title_ru": "Staged Consumer Fleet Reconciliation & Rollout",
+          "dependencies": [
+            "SOLUTION_RECIPE-001",
+            "ORCH-001",
+            "CONSUMER_GATE_RETRY-001"
+          ],
+          "product_impact": false
+        }
+      ]
+    },
+    {
       "id": "RESTRICTED-NETWORK-RESILIENCE",
       "title_ru": "Restricted-Network Execution Resilience — RU reference profile",
       "tasks": [
