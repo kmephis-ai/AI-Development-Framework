@@ -1,11 +1,9 @@
 name: SESSION CERT Materialize
 
 on:
-  push:
-    branches:
-      - helper/session-cert-001-materialize-20260820-a1
-    paths:
-      - .github/workflows/helper-session-cert-materialize.yml
+  pull_request:
+    types: [reopened]
+    branches: [main]
 
 permissions:
   contents: write
@@ -17,6 +15,7 @@ jobs:
     steps:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd
         with:
+          ref: ${{ github.event.pull_request.head.sha }}
           fetch-depth: 0
       - uses: actions/setup-python@a309ff8b426b58ec0e2a45f0f869d46889d02405
         with:
