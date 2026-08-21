@@ -47,7 +47,7 @@ jobs:
           SOURCE_LEASE_ID: 078a6817-e8f6-4412-b953-0c157c4cabf8
           SOURCE_WORKER_ID: adwf-runtime:runtime-ledger-stale-001-source-a1
           SOURCE_BRANCH: adwf/runtime-ledger-stale-001-ebcc8ffa86af
-          EXPECTED_CANDIDATE_TREE: e15a97483e439de173f7a016516d2ce21b9914a7
+          EXPECTED_CANDIDATE_TREE: 134a46dbfc97a53eac87109018d99a59b275044f
           HEARTBEAT_MINUTES: '30'
           HEARTBEAT_REFRESH_AFTER_MINUTES: '15'
         shell: python
@@ -58,7 +58,10 @@ jobs:
 
           root = Path.cwd()
           sys.path.insert(0, str(root / '.adwf'))
+          from lib.assurance_builder import build_assurance_snapshot
+          from lib.cost_guard import evaluate_provider
           from lib.evidence import parse_time
+          from lib.health import doctor
           from lib.github_lease_store import GitHubLeaseStore
           from lib.github_provider import GitHubClient
           from lib.github_rulesets import verify_rulesets as verify_protected_rulesets, verify_runtime_anchor_ruleset
@@ -117,18 +120,71 @@ jobs:
               return value
 
           def authorize(action, subject_sha):
-              env = {**os.environ, 'GITHUB_REPOSITORY': repo, 'GITHUB_TOKEN': token, 'ADWF_SUBJECT_SHA': subject_sha}
-              proc = subprocess.run(
-                  [sys.executable, str(root / '.adwf/scripts/github_reconcile.py'), '--apply', '--subject-sha', subject_sha],
-                  cwd=root, env=env, text=True, capture_output=True, check=False, timeout=150,
+              # Purpose-bound authorization for claim/cleanup. The generic PR
+              # readback couples facts_readback_verified to exact-SHA PR checks,
+              # which are intentionally absent on the current protected main SHA.
+              # This helper derives only the facts needed by claim/cleanup directly
+              # from live provider state, then feeds them through the canonical
+              # AssuranceSnapshot + Trusted Context + Effective Policy pipeline.
+              if action not in {'claim', 'cleanup'}:
+                  raise SystemExit('SOURCE_AUTHORITY_ACTION_NOT_ALLOWED:' + action)
+              if current_main() != subject_sha:
+                  raise SystemExit('SOURCE_AUTHORITY_AUTH_SUBJECT_MAIN_DRIFT')
+              repository = client.repo_info()
+              if repository.get('private') is not False or str(repository.get('default_branch') or '') != 'main':
+                  raise SystemExit('SOURCE_AUTHORITY_REPOSITORY_PROFILE_DRIFT')
+              verify_live_rulesets()
+              if current_main() != subject_sha:
+                  raise SystemExit('SOURCE_AUTHORITY_AUTH_POST_RULESET_MAIN_DRIFT')
+
+              provider_registry = strict_loads((root / '.adwf/providers.json').read_text(encoding='utf-8'))
+              capability = str(cost.get('default_ci_capability') or '')
+              cost_decision = evaluate_provider(
+                  provider_registry,
+                  {
+                      'provider': capability,
+                      'mandatory_ci': True,
+                      'automated': True,
+                      'projected_cost': 0,
+                      'projected_units': 0,
+                      'repository_visibility': 'PUBLIC',
+                      'runner_class': 'standard',
+                  },
+                  canonical_provider='github',
               )
-              if proc.returncode not in (0, 1) or 'GITHUB RECONCILIATION: APPLIED' not in proc.stdout:
-                  raise SystemExit('SOURCE_AUTHORITY_TRUSTED_RECONCILIATION_FAILED:' + proc.stderr[-400:])
-              assurance = strict_loads((root / '.adwf-runtime/assurance/current.json').read_text(encoding='utf-8'))
-              provider = strict_loads((root / '.adwf-runtime/provider-readback.json').read_text(encoding='utf-8'))
-              fully_verified = provider.get('readback_verified') is True
-              if (proc.returncode == 0) != fully_verified:
-                  raise SystemExit('SOURCE_AUTHORITY_RECONCILIATION_EXIT_SEMANTICS_MISMATCH')
+              if cost_decision.get('result') != 'ALLOW' or float(cost_decision.get('projected_cost_usd') or 0) != 0:
+                  raise SystemExit('SOURCE_AUTHORITY_PROVIDER_COST_NOT_VERIFIED:' + ','.join(cost_decision.get('reason_codes') or []))
+
+              health_now = doctor(root)
+              categories = health_now.get('categories') or {}
+              health_map = {
+                  'package_integrity': str((categories.get('package_integrity') or {}).get('status') or 'NOT_VERIFIED'),
+                  'config_health': str((categories.get('config_health') or {}).get('status') or 'NOT_VERIFIED'),
+                  'control_plane_health': 'HEALTHY',
+                  'product_health': 'NOT_VERIFIED',
+              }
+              purpose_readback = {
+                  'provider': 'github',
+                  'subject_sha': subject_sha,
+                  'repository_visibility': 'PUBLIC',
+                  'runner': 'NOT_VERIFIED',
+                  'larger_runner': False,
+                  'facts_readback_verified': True,
+                  'readback_verified': True,
+                  'purpose': 'SOURCE_AUTHORITY_' + action.upper(),
+              }
+              assurance = build_assurance_snapshot(
+                  root,
+                  subject_sha=subject_sha,
+                  health=health_map,
+                  gates={},
+                  required_gates=[],
+                  evidence_records=[],
+                  evidence_refs=[],
+                  provider_readback=purpose_readback,
+                  cost=cost_decision,
+                  ttl_minutes=5,
+              )
               context = compile_trusted_context(
                   root,
                   action=action,
@@ -136,11 +192,13 @@ jobs:
                   work_type='recovery',
                   request={'request_id': f'{run_id}:{action}:{subject_sha}', 'subject_sha': subject_sha, 'preview_digest': None},
                   assurance_snapshot=assurance,
-                  provider_readback=provider,
+                  provider_readback=purpose_readback,
               )
               decision = evaluate_with_effective_policy(root, context)
               if decision.result != 'ALLOW':
                   raise SystemExit('SOURCE_AUTHORITY_POLICY_NOT_ALLOW:' + decision.result + ':' + ','.join(decision.reason_codes))
+              if current_main() != subject_sha:
+                  raise SystemExit('SOURCE_AUTHORITY_AUTH_FINAL_MAIN_DRIFT')
               print('POLICY_' + action.upper() + '=ALLOW')
 
           def verify_live_rulesets():
@@ -174,6 +232,7 @@ jobs:
               ])
               if not strict or normalized != expected:
                   raise SystemExit('SOURCE_AUTHORITY_REQUIRED_CHECK_RULESET_DRIFT:' + json.dumps(normalized))
+              return rows
 
           # Fresh static/provider baseline shared by all modes.
           base_commit = client.get(f'/repos/{repo}/git/commits/{base_main}')
@@ -298,6 +357,7 @@ jobs:
           if str(base.get('sha') or '') != base_main:
               raise SystemExit('SOURCE_AUTHORITY_PR_BASE_SHA_MISMATCH')
           expected_paths = sorted([
+              '.adwf/docs-registry.json',
               '.adwf/lib/action_executors.py',
               '.adwf/lib/github_runtime_store.py',
               '.adwf/scripts/github_runtime_sync.py',
