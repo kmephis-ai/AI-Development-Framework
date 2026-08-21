@@ -385,8 +385,8 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
+          python .adwf/scripts/docs_freshness.py --write
           python .adwf/scripts/generate_manifest.py
-          python .adwf/scripts/docs_freshness.py --write || python .adwf/scripts/docs_freshness.py
           git diff --check
 
       - name: Canonical structural and integrity verification
