@@ -4,6 +4,12 @@ on:
   push:
     branches:
       - helper/roadmap-fleet-2026-postmerge-readback-20260821-a1
+  pull_request:
+    branches:
+      - main
+    types: [opened, synchronize, reopened]
+    paths:
+      - .github/workflows/roadmap-fleet-2026-postmerge-readback.yml
 
 permissions:
   contents: read
@@ -54,14 +60,12 @@ jobs:
           payload = get(f'https://api.github.com/repos/{repo}/actions/runs?head_sha={expected}&event=push&per_page=100')
           runs = payload.get('workflow_runs') or []
           required = ['ADWF Main', 'ADWF Platform Smoke']
-          selected = {}
           for name in required:
               candidates = [r for r in runs if r.get('name') == name and r.get('head_sha') == expected and r.get('event') == 'push']
               if not candidates:
                   raise SystemExit('POSTMERGE_RUN_MISSING:' + name)
               candidates.sort(key=lambda r: (int(r.get('run_attempt') or 0), int(r.get('id') or 0)), reverse=True)
               run = candidates[0]
-              selected[name] = run
               print('RUN=' + json.dumps({
                   'name': name,
                   'id': run.get('id'),
