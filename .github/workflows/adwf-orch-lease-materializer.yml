@@ -28,10 +28,12 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
+          sha256sum .helper/orch-lease-001/patch.*
           cat .helper/orch-lease-001/patch.* > /tmp/orch-lease.patch
           ACTUAL="$(sha256sum /tmp/orch-lease.patch | awk '{print $1}')"
+          echo "ACTUAL_PATCH_SHA256=$ACTUAL"
+          echo "EXPECTED_PATCH_SHA256=$PATCH_SHA256"
           test "$ACTUAL" = "$PATCH_SHA256"
-          echo "PATCH_SHA256=$ACTUAL"
 
       - name: Exact source and writer CAS before materialization
         shell: bash
