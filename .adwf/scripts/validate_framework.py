@@ -43,7 +43,7 @@ def main() -> int:
         ".adwf/scripts/publish_agent_request.py", ".adwf/scripts/consume_agent_result.py", ".adwf/scripts/github_metrics_collector.py", ".adwf/scripts/generate_pipeline.py",
         ".adwf/scripts/publish_trusted_gate.py", ".adwf/scripts/run_preview.py", ".adwf/scripts/collect_preview_attestation.py", ".adwf/scripts/reference_delivery.py", ".adwf/scripts/release.py",
         ".adwf/lib/action_executors.py", ".adwf/lib/trust_boundary.py", ".adwf/lib/github_provider.py", ".adwf/lib/github_readback.py",
-        ".adwf/lib/github_runtime_store.py", ".adwf/lib/owner_authority.py", ".adwf/lib/owner_intent_service.py", ".adwf/lib/durable_projection.py",
+        ".adwf/lib/github_runtime_store.py", ".adwf/lib/github_lease_store.py", ".adwf/lib/lease_registry.py", ".adwf/lib/leases.py", ".adwf/schemas/writer-lease-registry.schema.json", ".adwf/lib/owner_authority.py", ".adwf/lib/owner_intent_service.py", ".adwf/lib/durable_projection.py",
         ".adwf/lib/controller_wakeup.py", ".adwf/lib/pack_materializer.py", ".adwf/lib/project_packs.py", ".adwf/schemas/project-pack.schema.json", ".adwf/scripts/validate_project_packs.py", ".adwf/lib/performance_evidence.py", ".adwf/lib/delivery_adapters.py",
         ".adwf/lib/release_transaction.py", ".adwf/lib/preview_engine.py", ".adwf/capability-traceability.json", ".adwf/scripts/validate_capabilities.py", ".adwf/roadmap.json",
         ".adwf/lib/skill_layer.py", ".adwf/scripts/validate_skills.py", ".adwf/scripts/generate_skill_registry.py", ".adwf/scripts/eval_skills.py", ".adwf/scripts/vendor_skill.py",
