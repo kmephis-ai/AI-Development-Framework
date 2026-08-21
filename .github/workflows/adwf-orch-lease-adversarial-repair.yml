@@ -1,0 +1,156 @@
+name: ADWF ORCH_LEASE-001 Adversarial Repair
+
+on:
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: write
+
+env:
+  SOURCE_MAIN: 51e586d51ed176c8826ee0c9d3189f48e190a166
+  OLD_HEAD: be127aef88f0d7ce98b9cade277ef7b9b4eb65c0
+  TARGET_BRANCH: agent/ORCH_LEASE-001-provider-durable-arbitration
+
+jobs:
+  repair-and-publish:
+    if: github.event.pull_request.head.ref == 'helper/ORCH_LEASE-001-adversarial-repair-20260821-a1'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - name: Checkout exact old candidate
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd
+        with:
+          ref: ${{ env.OLD_HEAD }}
+          fetch-depth: 0
+
+      - name: Exact main and target CAS before repair
+        shell: bash
+        run: |
+          set -euo pipefail
+          git fetch origin main "$TARGET_BRANCH"
+          test "$(git rev-parse refs/remotes/origin/main)" = "$SOURCE_MAIN"
+          test "$(git rev-parse refs/remotes/origin/$TARGET_BRANCH)" = "$OLD_HEAD"
+          test "$(git rev-parse HEAD)" = "$OLD_HEAD"
+
+      - name: Apply bounded adversarial repair
+        shell: bash
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          from pathlib import Path
+
+          registry = Path('.adwf/lib/lease_registry.py')
+          text = registry.read_text(encoding='utf-8')
+          old = '''    keys = [(item["kind"], item["scope"], item["shared"], item["global"]) for item in validated]\n    if len(keys) != len(set(keys)):\n        raise ValueError("CONFLICT_RESOURCE_DUPLICATE")\n'''
+          new = '''    # Semantic identity is kind+scope. Flags describe authority semantics and\n    # may not create two contradictory declarations of the same resource.\n    keys = [(item["kind"], item["scope"]) for item in validated]\n    if len(keys) != len(set(keys)):\n        raise ValueError("CONFLICT_RESOURCE_DUPLICATE")\n'''
+          if text.count(old) != 1:
+              raise SystemExit('REGISTRY_REPAIR_ANCHOR_MISMATCH')
+          registry.write_text(text.replace(old, new), encoding='utf-8', newline='\n')
+
+          store = Path('.adwf/lib/github_lease_store.py')
+          text = store.read_text(encoding='utf-8')
+          old = '''            winner, winner_anchor = self.read(expected_main_sha=expected_main_sha, policy_max_parallel_writers=policy_max_parallel_writers)\n            suffix = f":anchor={winner_anchor}" if winner_anchor else ""\n            raise ValueError("LEASE_PROVIDER_CAS_LOST:revision=" + str(winner["revision"]) + suffix) from exc\n'''
+          new = '''            winner, winner_anchor = self.read(expected_main_sha=expected_main_sha, policy_max_parallel_writers=policy_max_parallel_writers)\n            # 409/422 alone does not prove a competing winner. Only a provider\n            # readback that advanced beyond our observed revision may be\n            # classified as a lost CAS race.\n            if winner["revision"] <= expected_previous_revision or winner_anchor is None:\n                raise ValueError("LEASE_PROVIDER_CAS_CONFLICT_UNRESOLVED") from exc\n            suffix = f":anchor={winner_anchor}"\n            raise ValueError("LEASE_PROVIDER_CAS_LOST:revision=" + str(winner["revision"]) + suffix) from exc\n'''
+          if text.count(old) != 1:
+              raise SystemExit('STORE_REPAIR_ANCHOR_MISMATCH')
+          store.write_text(text.replace(old, new), encoding='utf-8', newline='\n')
+
+          tests = Path('.adwf/tests/test_orch_provider_leases.py')
+          text = tests.read_text(encoding='utf-8')
+          marker = '\n\nclass LeaseRegistryTests(unittest.TestCase):\n'
+          addition = '''\n    def test_same_semantic_resource_with_contradictory_flags_is_duplicate(self):\n        with self.assertRaisesRegex(ValueError, "CONFLICT_RESOURCE_DUPLICATE"):\n            canonical_conflict_resources([\n                resource("source", "repo/src", shared=False),\n                resource("source", "repo/src", shared=True),\n            ])\n'''
+          if text.count(marker) != 1 or 'test_same_semantic_resource_with_contradictory_flags_is_duplicate' in text:
+              raise SystemExit('TEST_DUPLICATE_INSERT_ANCHOR_MISMATCH')
+          text = text.replace(marker, addition + marker)
+
+          marker = '    def test_provider_ref_substitution_blocks_readback(self):\n'
+          addition = '''    def test_422_without_provider_winner_is_unresolved_not_cas_lost(self):\n        client = FakeGitHubClient()\n        def reject_ref(_tag, _sha):\n            raise ProviderContractError("PROVIDER_HTTP_422")\n        client.create_tag_ref = reject_ref\n        store = GitHubLeaseStore(client)\n        with self.assertRaisesRegex(ValueError, "LEASE_PROVIDER_CAS_CONFLICT_UNRESOLVED"):\n            store.acquire(\n                expected_main_sha=MAIN,\n                policy_max_parallel_writers=1,\n                issue_id="236",\n                roadmap_id="ORCH_LEASE-001",\n                worker_id="worker-a",\n                base_sha=BASE,\n                branch="agent/orch-lease",\n                resources=resources(resource("source", "repo/src")),\n                lease_id="11111111-1111-4111-8111-111111111111",\n                now=self.now,\n                ttl_minutes=30,\n            )\n        self.assertEqual(client.tags, {})\n\n'''
+          if text.count(marker) != 1 or 'test_422_without_provider_winner_is_unresolved_not_cas_lost' in text:
+              raise SystemExit('TEST_422_INSERT_ANCHOR_MISMATCH')
+          tests.write_text(text.replace(marker, addition + marker), encoding='utf-8', newline='\n')
+          PY
+          git diff --check
+          git diff --name-only "$OLD_HEAD" | sort
+          test "$(git diff --name-only "$OLD_HEAD" | sort | tr '\n' ' ')" = ".adwf/lib/github_lease_store.py .adwf/lib/lease_registry.py .adwf/tests/test_orch_provider_leases.py "
+
+      - name: Focused adversarial regression
+        shell: bash
+        run: |
+          set -euo pipefail
+          python .adwf/tests/test_orch_provider_leases.py -v
+          python .adwf/tests/test_session_continuity_persistence.py -v
+          python .adwf/tests/test_leases.py -v
+          python .adwf/tests/test_orchestration.py -v
+          python .adwf/tests/test_autonomous_execution_state.py -v
+          python .adwf/tests/test_provider_http_mock.py -v
+          python .adwf/tests/test_durable_orchestrator.py -v
+          python .adwf/tests/test_v16_remediation.py -v
+
+      - name: Regenerate canonical deterministic projections
+        shell: bash
+        run: |
+          set -euo pipefail
+          python .adwf/scripts/docs_freshness.py --write --reviewed-at 2026-08-13T00:00:00Z --valid-until 2026-11-13T00:00:00Z
+          python .adwf/scripts/generate_manifest.py
+
+      - name: Canonical structural and integrity verification
+        shell: bash
+        run: |
+          set -euo pipefail
+          python -m py_compile .adwf/lib/github_lease_store.py .adwf/lib/lease_registry.py .adwf/tests/test_orch_provider_leases.py
+          python .adwf/scripts/validate_ci.py
+          python .adwf/scripts/validate_framework.py
+          python .adwf/scripts/validate_pipeline_ir.py
+          python .adwf/scripts/docs_freshness.py
+          python .adwf/scripts/generate_manifest.py --check
+          python .adwf/scripts/validate_docs.py
+          python .adwf/scripts/validate_managed_surface.py
+          python .adwf/adwf.py doctor package_integrity
+          python .adwf/adwf.py doctor config_health
+
+      - name: Full ADWF self-test
+        shell: bash
+        run: |
+          set -euo pipefail
+          python .adwf/adwf.py self-test
+
+      - name: Final bounded diff and provider CAS
+        shell: bash
+        run: |
+          set -euo pipefail
+          git diff --check
+          git diff --name-only "$SOURCE_MAIN" | sort > /tmp/paths
+          cat > /tmp/expected <<'EOF'
+          .adwf/docs-registry.json
+          .adwf/lib/github_lease_store.py
+          .adwf/lib/github_runtime_store.py
+          .adwf/lib/lease_registry.py
+          .adwf/schemas/writer-lease-registry.schema.json
+          .adwf/scripts/validate_framework.py
+          .adwf/tests/test_orch_provider_leases.py
+          .adwf/tests/test_session_continuity_persistence.py
+          MANIFEST.json
+          SHA256SUMS.txt
+          EOF
+          diff -u /tmp/expected /tmp/paths
+          git fetch origin main "$TARGET_BRANCH"
+          test "$(git rev-parse refs/remotes/origin/main)" = "$SOURCE_MAIN"
+          test "$(git rev-parse refs/remotes/origin/$TARGET_BRANCH)" = "$OLD_HEAD"
+
+      - name: Publish repaired exact candidate
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name 'ADWF Provider Repair Materializer'
+          git config user.email 'adwf-materializer@users.noreply.github.com'
+          git add -- .adwf/docs-registry.json .adwf/lib/github_lease_store.py .adwf/lib/github_runtime_store.py .adwf/lib/lease_registry.py .adwf/schemas/writer-lease-registry.schema.json .adwf/scripts/validate_framework.py .adwf/tests/test_orch_provider_leases.py .adwf/tests/test_session_continuity_persistence.py MANIFEST.json SHA256SUMS.txt
+          git diff --cached --name-only | sort > /tmp/staged
+          diff -u /tmp/expected /tmp/staged
+          git commit -m '[ORCH_LEASE-001] Harden semantic identity and CAS conflict readback'
+          NEW_HEAD="$(git rev-parse HEAD)"
+          NEW_TREE="$(git rev-parse HEAD^{tree})"
+          echo "NEW_HEAD=$NEW_HEAD"
+          echo "NEW_TREE=$NEW_TREE"
+          git push origin "HEAD:refs/heads/$TARGET_BRANCH"
+          test "$(git ls-remote origin refs/heads/$TARGET_BRANCH | awk '{print $1}')" = "$NEW_HEAD"
