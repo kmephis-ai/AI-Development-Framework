@@ -79,7 +79,7 @@ jobs:
           MANIFEST.json
           SHA256SUMS.txt
           EOF
-          git diff --name-only "$SOURCE_SHA" | sort > /tmp/actual-paths
+          { git diff --name-only "$SOURCE_SHA"; git ls-files --others --exclude-standard; } | sort -u > /tmp/actual-paths
           sort -o /tmp/expected-paths /tmp/expected-paths
           diff -u /tmp/expected-paths /tmp/actual-paths
 
@@ -127,7 +127,7 @@ jobs:
         run: |
           set -euo pipefail
           git diff --check
-          git diff --name-only "$SOURCE_SHA" | sort > /tmp/actual-paths-final
+          { git diff --name-only "$SOURCE_SHA"; git ls-files --others --exclude-standard; } | sort -u > /tmp/actual-paths-final
           diff -u /tmp/expected-paths /tmp/actual-paths-final
           git fetch origin main "$TARGET_BRANCH"
           MAIN_SHA="$(git rev-parse refs/remotes/origin/main)"
