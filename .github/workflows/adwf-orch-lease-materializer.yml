@@ -1,0 +1,153 @@
+name: ADWF ORCH_LEASE-001 Materializer
+
+on:
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: write
+
+env:
+  SOURCE_SHA: 51e586d51ed176c8826ee0c9d3189f48e190a166
+  TARGET_BRANCH: agent/ORCH_LEASE-001-provider-durable-arbitration
+  PATCH_SHA256: cbc5168a3817d61eb237903c267624416d87ef498ae239bd652fdeddf0357295
+
+jobs:
+  materialize-and-publish:
+    if: github.event.pull_request.head.ref == 'helper/ORCH_LEASE-001-materialize-20260821-a1'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - name: Checkout helper transport
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          fetch-depth: 0
+
+      - name: Reconstruct and verify exact patch
+        shell: bash
+        run: |
+          set -euo pipefail
+          cat .helper/orch-lease-001/patch.* > /tmp/orch-lease.patch
+          ACTUAL="$(sha256sum /tmp/orch-lease.patch | awk '{print $1}')"
+          test "$ACTUAL" = "$PATCH_SHA256"
+          echo "PATCH_SHA256=$ACTUAL"
+
+      - name: Exact source and writer CAS before materialization
+        shell: bash
+        run: |
+          set -euo pipefail
+          git fetch origin main "$TARGET_BRANCH"
+          MAIN_SHA="$(git rev-parse refs/remotes/origin/main)"
+          TARGET_SHA="$(git rev-parse "refs/remotes/origin/$TARGET_BRANCH")"
+          echo "MAIN_SHA=$MAIN_SHA"
+          echo "TARGET_SHA=$TARGET_SHA"
+          test "$MAIN_SHA" = "$SOURCE_SHA"
+          test "$TARGET_SHA" = "$SOURCE_SHA"
+
+      - name: Apply bounded candidate to exact BASE
+        shell: bash
+        run: |
+          set -euo pipefail
+          git checkout --detach "$SOURCE_SHA"
+          git apply --check /tmp/orch-lease.patch
+          git apply /tmp/orch-lease.patch
+          git diff --check
+          cat > /tmp/expected-paths <<'EOF'
+          .adwf/docs-registry.json
+          .adwf/lib/github_lease_store.py
+          .adwf/lib/github_runtime_store.py
+          .adwf/lib/lease_registry.py
+          .adwf/schemas/writer-lease-registry.schema.json
+          .adwf/scripts/validate_framework.py
+          .adwf/tests/test_orch_provider_leases.py
+          .adwf/tests/test_session_continuity_persistence.py
+          MANIFEST.json
+          SHA256SUMS.txt
+          EOF
+          git diff --name-only "$SOURCE_SHA" | sort > /tmp/actual-paths
+          sort -o /tmp/expected-paths /tmp/expected-paths
+          diff -u /tmp/expected-paths /tmp/actual-paths
+
+      - name: Focused ORCH lease and compatibility tests
+        shell: bash
+        run: |
+          set -euo pipefail
+          python .adwf/tests/test_orch_provider_leases.py -v
+          python .adwf/tests/test_session_continuity_persistence.py -v
+          python .adwf/tests/test_leases.py -v
+          python .adwf/tests/test_orchestration.py -v
+          python .adwf/tests/test_autonomous_execution_state.py -v
+          python .adwf/tests/test_provider_http_mock.py -v
+          python .adwf/tests/test_durable_orchestrator.py -v
+          python .adwf/tests/test_v16_remediation.py -v
+
+      - name: Canonical structural and integrity verification
+        shell: bash
+        run: |
+          set -euo pipefail
+          python -m py_compile \
+            .adwf/lib/github_lease_store.py \
+            .adwf/lib/lease_registry.py \
+            .adwf/lib/github_runtime_store.py \
+            .adwf/tests/test_orch_provider_leases.py \
+            .adwf/tests/test_session_continuity_persistence.py
+          python .adwf/scripts/validate_ci.py
+          python .adwf/scripts/validate_framework.py
+          python .adwf/scripts/validate_pipeline_ir.py
+          python .adwf/scripts/docs_freshness.py
+          python .adwf/scripts/generate_manifest.py --check
+          python .adwf/scripts/validate_docs.py
+          python .adwf/scripts/validate_managed_surface.py
+          python .adwf/adwf.py doctor package_integrity
+          python .adwf/adwf.py doctor config_health
+
+      - name: Full ADWF self-test
+        shell: bash
+        run: |
+          set -euo pipefail
+          python .adwf/adwf.py self-test
+
+      - name: Final tree and provider CAS before publish
+        shell: bash
+        run: |
+          set -euo pipefail
+          git diff --check
+          git diff --name-only "$SOURCE_SHA" | sort > /tmp/actual-paths-final
+          diff -u /tmp/expected-paths /tmp/actual-paths-final
+          git fetch origin main "$TARGET_BRANCH"
+          MAIN_SHA="$(git rev-parse refs/remotes/origin/main)"
+          TARGET_SHA="$(git rev-parse "refs/remotes/origin/$TARGET_BRANCH")"
+          echo "FINAL_MAIN_SHA=$MAIN_SHA"
+          echo "FINAL_TARGET_SHA=$TARGET_SHA"
+          test "$MAIN_SHA" = "$SOURCE_SHA"
+          test "$TARGET_SHA" = "$SOURCE_SHA"
+
+      - name: Publish one clean candidate commit
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name 'ADWF Provider Materializer'
+          git config user.email 'adwf-materializer@users.noreply.github.com'
+          git add -- \
+            .adwf/docs-registry.json \
+            .adwf/lib/github_lease_store.py \
+            .adwf/lib/github_runtime_store.py \
+            .adwf/lib/lease_registry.py \
+            .adwf/schemas/writer-lease-registry.schema.json \
+            .adwf/scripts/validate_framework.py \
+            .adwf/tests/test_orch_provider_leases.py \
+            .adwf/tests/test_session_continuity_persistence.py \
+            MANIFEST.json \
+            SHA256SUMS.txt
+          git diff --cached --name-only | sort > /tmp/staged-paths
+          diff -u /tmp/expected-paths /tmp/staged-paths
+          git commit -m '[ORCH_LEASE-001] Add provider-durable lease arbitration substrate'
+          CANDIDATE_SHA="$(git rev-parse HEAD)"
+          CANDIDATE_TREE="$(git rev-parse HEAD^{tree})"
+          echo "CANDIDATE_SHA=$CANDIDATE_SHA"
+          echo "CANDIDATE_TREE=$CANDIDATE_TREE"
+          git push origin "HEAD:refs/heads/$TARGET_BRANCH"
+          REMOTE_SHA="$(git ls-remote origin "refs/heads/$TARGET_BRANCH" | awk '{print $1}')"
+          test "$REMOTE_SHA" = "$CANDIDATE_SHA"
+          echo "PUBLISHED_SHA=$REMOTE_SHA"
