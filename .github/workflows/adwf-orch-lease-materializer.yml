@@ -79,9 +79,6 @@ jobs:
               raise SystemExit('BOUNDED_PATCH_NOT_APPLICABLE')
           if len(trees) != 1:
               raise SystemExit('BOUNDED_PATCH_RESULT_TREE_AMBIGUOUS')
-          # Transport-only newline ambiguity is accepted only after proving every
-          # applicable reconstruction produces the exact same staged Git tree.
-          # Choose deterministically by the smallest SHA-256 of reconstructed bytes.
           digest, mask, payload, tree = sorted(variants, key=lambda row: row[0])[0]
           print('SELECTED_BOUNDARY_KEEP_NEWLINE=' + ','.join('1' if flag else '0' for flag in mask))
           print('RECOVERED_PATCH_SHA256=' + digest)
@@ -131,6 +128,8 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
+          echo '--- github_lease_store.py tail diagnostic ---'
+          nl -ba .adwf/lib/github_lease_store.py | tail -80
           python -m py_compile .adwf/lib/github_lease_store.py .adwf/lib/lease_registry.py .adwf/lib/github_runtime_store.py .adwf/tests/test_orch_provider_leases.py .adwf/tests/test_session_continuity_persistence.py
           python .adwf/tests/test_orch_provider_leases.py -v
           python .adwf/tests/test_session_continuity_persistence.py -v
