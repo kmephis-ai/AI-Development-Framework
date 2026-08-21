@@ -1,0 +1,78 @@
+name: ADWF ORCH_LEASE-001 Postmerge Readback
+
+on:
+  pull_request:
+    branches: [main]
+
+permissions:
+  actions: read
+  contents: read
+
+env:
+  MERGE_SHA: fba872d828bc3a6fe5cc404db596393577cd2672
+
+jobs:
+  readback:
+    if: github.event.pull_request.head.ref == 'helper/ORCH_LEASE-001-postmerge-readback-20260821-b1'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - name: Read exact merge-SHA workflow runs
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPOSITORY: ${{ github.repository }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          import json, os, time, urllib.parse, urllib.request
+
+          repo = os.environ['REPOSITORY']
+          sha = os.environ['MERGE_SHA']
+          headers = {
+              'Authorization': f"Bearer {os.environ['GH_TOKEN']}",
+              'Accept': 'application/vnd.github+json',
+              'X-GitHub-Api-Version': '2022-11-28',
+          }
+
+          def get(path):
+              req = urllib.request.Request('https://api.github.com' + path, headers=headers)
+              with urllib.request.urlopen(req, timeout=20) as response:
+                  return json.load(response)
+
+          branch = get(f'/repos/{repo}/branches/main')
+          observed = ((branch.get('commit') or {}).get('sha') or '')
+          if observed != sha:
+              raise SystemExit(f'MAIN_SHA_MISMATCH:{observed}')
+
+          wanted = {'ADWF Main', 'ADWF Platform Smoke'}
+          selected = {}
+          for attempt in range(3):
+              query = urllib.parse.urlencode({'head_sha': sha, 'per_page': 100})
+              data = get(f'/repos/{repo}/actions/runs?{query}')
+              rows = data.get('workflow_runs') or []
+              selected = {
+                  row.get('name'): {
+                      'id': row.get('id'),
+                      'name': row.get('name'),
+                      'event': row.get('event'),
+                      'status': row.get('status'),
+                      'conclusion': row.get('conclusion'),
+                      'head_sha': row.get('head_sha'),
+                      'workflow_id': row.get('workflow_id'),
+                      'created_at': row.get('created_at'),
+                      'updated_at': row.get('updated_at'),
+                  }
+                  for row in rows if row.get('name') in wanted and row.get('head_sha') == sha
+              }
+              print('ATTEMPT=' + str(attempt + 1) + ' RUNS=' + json.dumps(selected, sort_keys=True))
+              if wanted.issubset(selected):
+                  break
+              time.sleep(5)
+
+          missing = sorted(wanted - set(selected))
+          if missing:
+              raise SystemExit('POSTMERGE_RUNS_MISSING:' + ','.join(missing))
+          print('POSTMERGE_RUNS=' + json.dumps(selected, sort_keys=True))
+          print('MAIN_SHA=' + observed)
+          PY
