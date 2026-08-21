@@ -10,7 +10,7 @@ permissions:
 env:
   SOURCE_SHA: 51e586d51ed176c8826ee0c9d3189f48e190a166
   TARGET_BRANCH: agent/ORCH_LEASE-001-provider-durable-arbitration
-  PATCH_SHA256: cbc5168a3817d61eb237903c267624416d87ef498ae239bd652fdeddf0357295
+  PATCH_SHA256: 0c78ccdea3c951bbd5a677c1d96892671c68dfb0751ceddf911de6a532897cef
 
 jobs:
   materialize-and-publish:
