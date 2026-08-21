@@ -10,7 +10,7 @@ permissions:
 env:
   SOURCE_SHA: 51e586d51ed176c8826ee0c9d3189f48e190a166
   TARGET_BRANCH: agent/ORCH_LEASE-001-provider-durable-arbitration
-  PATCH_SHA256: 0c78ccdea3c951bbd5a677c1d96892671c68dfb0751ceddf911de6a532897cef
+  PATCH_SHA256: cbc5168a3817d61eb237903c267624416d87ef498ae239bd652fdeddf0357295
 
 jobs:
   materialize-and-publish:
@@ -29,7 +29,19 @@ jobs:
         run: |
           set -euo pipefail
           sha256sum .helper/orch-lease-001/patch.*
-          cat .helper/orch-lease-001/patch.* > /tmp/orch-lease.patch
+          python - <<'PY'
+          from pathlib import Path
+          chunks = sorted(Path('.helper/orch-lease-001').glob('patch.*'))
+          if not chunks:
+              raise SystemExit('PATCH_CHUNKS_MISSING')
+          out = bytearray()
+          for idx, path in enumerate(chunks):
+              data = path.read_bytes()
+              if idx < len(chunks) - 1 and data.endswith(b'\n'):
+                  data = data[:-1]
+              out.extend(data)
+          Path('/tmp/orch-lease.patch').write_bytes(out)
+          PY
           ACTUAL="$(sha256sum /tmp/orch-lease.patch | awk '{print $1}')"
           echo "ACTUAL_PATCH_SHA256=$ACTUAL"
           echo "EXPECTED_PATCH_SHA256=$PATCH_SHA256"
