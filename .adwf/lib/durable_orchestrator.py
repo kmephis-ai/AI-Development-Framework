@@ -414,7 +414,7 @@ def advance_run(
     metadata = result.get("metadata") or {}
     if phase == "RECONCILE" and metadata.get("issue_id") is not None:
         state["issue_id"] = str(metadata["issue_id"])
-    if phase in {"EXECUTE", "RECOVERY"} and metadata.get("branch"):
+    if phase in {"CLAIM", "EXECUTE", "RECOVERY"} and metadata.get("branch"):
         branch=str(metadata["branch"])
         if not branch.startswith("adwf/") or len(branch)>180: raise ValueError("WORK_BRANCH_INVALID")
         state["work_branch"] = branch
