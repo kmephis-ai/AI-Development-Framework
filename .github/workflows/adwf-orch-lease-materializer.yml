@@ -23,7 +23,7 @@ jobs:
           ref: ${{ github.event.pull_request.head.sha }}
           fetch-depth: 0
 
-      - name: Deterministically recover one applicable bounded patch
+      - name: Recover a tree-equivalent bounded patch
         shell: bash
         run: |
           set -euo pipefail
@@ -35,12 +35,18 @@ jobs:
           import itertools
           import subprocess
 
+          root = '/tmp/orch-lease-base'
           paths = sorted(Path('.helper/orch-lease-001').glob('patch.*'))
           if not paths:
               raise SystemExit('PATCH_CHUNKS_MISSING')
           chunks = [p.read_bytes() for p in paths]
           boundary_count = len(chunks) - 1
-          matches = []
+          variants = []
+          trees = set()
+
+          def run(*args, check=True):
+              return subprocess.run(args, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, check=check)
+
           for keep_newline in itertools.product((False, True), repeat=boundary_count):
               out = bytearray()
               for idx, data in enumerate(chunks):
@@ -48,23 +54,38 @@ jobs:
                   if idx < boundary_count and not keep_newline[idx] and part.endswith(b'\n'):
                       part = part[:-1]
                   out.extend(part)
+              payload = bytes(out)
+              digest = hashlib.sha256(payload).hexdigest()
               candidate = Path('/tmp/orch-lease-candidate.patch')
-              candidate.write_bytes(bytes(out))
-              proc = subprocess.run(
-                  ['git', '-C', '/tmp/orch-lease-base', 'apply', '--check', str(candidate)],
-                  stdout=subprocess.PIPE,
-                  stderr=subprocess.PIPE,
-                  text=True,
-              )
-              if proc.returncode == 0:
-                  matches.append((keep_newline, bytes(out)))
-          if len(matches) != 1:
-              print(f'APPLICABLE_RECONSTRUCTIONS={len(matches)}')
-              raise SystemExit('BOUNDED_PATCH_RECONSTRUCTION_AMBIGUOUS')
-          mask, payload = matches[0]
-          digest = hashlib.sha256(payload).hexdigest()
-          print('BOUNDARY_KEEP_NEWLINE=' + ','.join('1' if flag else '0' for flag in mask))
+              candidate.write_bytes(payload)
+              run('git', '-C', root, 'reset', '--hard', 'HEAD')
+              run('git', '-C', root, 'clean', '-fd')
+              applied = run('git', '-C', root, 'apply', '--check', str(candidate), check=False)
+              if applied.returncode != 0:
+                  continue
+              run('git', '-C', root, 'apply', str(candidate))
+              run('git', '-C', root, 'add', '-A')
+              tree = run('git', '-C', root, 'write-tree').stdout.strip()
+              trees.add(tree)
+              variants.append((digest, keep_newline, payload, tree))
+
+          run('git', '-C', root, 'reset', '--hard', 'HEAD')
+          run('git', '-C', root, 'clean', '-fd')
+          print(f'APPLICABLE_RECONSTRUCTIONS={len(variants)}')
+          print(f'UNIQUE_RESULT_TREES={len(trees)}')
+          for tree in sorted(trees):
+              print('RESULT_TREE=' + tree)
+          if not variants:
+              raise SystemExit('BOUNDED_PATCH_NOT_APPLICABLE')
+          if len(trees) != 1:
+              raise SystemExit('BOUNDED_PATCH_RESULT_TREE_AMBIGUOUS')
+          # Transport-only newline ambiguity is accepted only after proving every
+          # applicable reconstruction produces the exact same staged Git tree.
+          # Choose deterministically by the smallest SHA-256 of reconstructed bytes.
+          digest, mask, payload, tree = sorted(variants, key=lambda row: row[0])[0]
+          print('SELECTED_BOUNDARY_KEEP_NEWLINE=' + ','.join('1' if flag else '0' for flag in mask))
           print('RECOVERED_PATCH_SHA256=' + digest)
+          print('PROVEN_RESULT_TREE=' + tree)
           Path('/tmp/orch-lease.patch').write_bytes(payload)
           PY
           git -C /tmp/orch-lease-base apply --check /tmp/orch-lease.patch
