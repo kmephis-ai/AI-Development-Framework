@@ -106,8 +106,8 @@ jobs:
           python .adwf/scripts/generate_manifest.py --check
           python .adwf/scripts/validate_docs.py
           python .adwf/scripts/validate_managed_surface.py
-          python .adwf/adwf.py doctor package_integrity
-          python .adwf/adwf.py doctor config_health
+          python .adwf/adwf.py doctor --scope package_integrity
+          python .adwf/adwf.py doctor --scope config_health
 
       - name: Full ADWF self-test
         shell: bash
