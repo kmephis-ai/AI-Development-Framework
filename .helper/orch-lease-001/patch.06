@@ -1,0 +1,192 @@
+lently_adopt_new_main(self):
++        state, lease, _ = self.acquire()
++        self.assertEqual(state["observed_main_sha"], MAIN)
++        self.client.main_sha = OTHER_MAIN
++        with self.assertRaisesRegex(ValueError, "RECONCILIATION_REQUIRED"):
++            self.store.heartbeat(
++                expected_main_sha=OTHER_MAIN,
++                policy_max_parallel_writers=1,
++                lease_id=lease["lease_id"],
++                worker_id="worker-a",
++                now=self.now + timedelta(minutes=5),
++            )
++        self.assertNotIn(_tag_name(2), self.client.tags)
++
++    def test_release_requires_provider_reconciliation_and_can_bind_new_main(self):
++        _, lease, anchor1 = self.acquire()
++        self.client.main_sha = OTHER_MAIN
++        with self.assertRaisesRegex(ValueError, "PROVIDER_RECONCILIATION_REQUIRED"):
++            self.store.release(
++                expected_main_sha=OTHER_MAIN,
++                policy_max_parallel_writers=1,
++                lease_id=lease["lease_id"],
++                worker_id="worker-a",
++                provider_reconciled=False,
++                provider_reconciliation_ref="github:issue/236@fresh",
++                now=self.now + timedelta(minutes=5),
++            )
++        released, anchor2 = self.store.release(
++            expected_main_sha=OTHER_MAIN,
++            policy_max_parallel_writers=1,
++            lease_id=lease["lease_id"],
++            worker_id="worker-a",
++            provider_reconciled=True,
++            provider_reconciliation_ref="github:issue/236@fresh",
++            now=self.now + timedelta(minutes=5),
++        )
++        self.assertEqual(released["revision"], 2)
++        self.assertEqual(released["observed_main_sha"], OTHER_MAIN)
++        self.assertEqual(released["leases"][0]["status"], "RELEASED")
++        event2 = json.loads(self.client.tag_object(anchor2)["message"])
++        self.assertEqual(event2["previous_tag_object_sha"], anchor1)
++        self.assertEqual(self.client.tag_object(anchor2)["object"]["sha"], OTHER_MAIN)
++
++    def test_resealed_registry_payload_substitution_is_bound_by_immutable_event_digest(self):
++        state, _lease, anchor = self.acquire()
++        obj = self.client.tag_objects[anchor]
++        event = json.loads(obj["message"])
++        event["registry"]["leases"][0]["worker_id"] = "attacker"
++        reseal_registry(event["registry"])
++        # Deliberately do not reseal the outer event: immutable event integrity must detect it.
++        obj["message"] = _canonical_text(event)
++        with self.assertRaisesRegex(ValueError, "EVENT_INTEGRITY"):
++            self.store.read(expected_main_sha=MAIN, policy_max_parallel_writers=1)
++
++
++if __name__ == "__main__":
++    unittest.main()
+diff --git a/.adwf/tests/test_session_continuity_persistence.py b/.adwf/tests/test_session_continuity_persistence.py
+index 76e36d3..ed97955 100644
+--- a/.adwf/tests/test_session_continuity_persistence.py
++++ b/.adwf/tests/test_session_continuity_persistence.py
+@@ -286,6 +286,17 @@ class SessionContinuityPersistenceTests(unittest.TestCase):
+         self.assertIn(ROOT_ANCHOR, fake.tags)
+         self.assertEqual(store._verify_tag_anchors(events), [])
+ 
++    def test_orch_lease_anchor_subnamespace_is_not_runtime_ledger_orphan(self):
++        fake = FakeRuntimeGitHub()
++        store = GitHubRuntimeStore(fake)
++        store.append(runtime_state(), session_checkpoint=checkpoint())
++        lease_name = 'adwf-runtime-anchor-lease-v1-000000001'
++        fake.tags[lease_name] = {'ref': 'refs/tags/' + lease_name, 'object': {'sha': 'f' * 40}}
++        issue, events = store.read()
++        self.assertEqual(issue['number'], 1)
++        self.assertEqual(len(events), 1)
++        self.assertEqual(store._verify_tag_anchors(events), [])
++
+     def test_invalid_or_private_checkpoint_is_rejected_before_provider_write(self):
+         fake = FakeRuntimeGitHub()
+         store = GitHubRuntimeStore(fake)
+diff --git a/MANIFEST.json b/MANIFEST.json
+index 2a9571a..1da1053 100644
+--- a/MANIFEST.json
++++ b/MANIFEST.json
+@@ -3,8 +3,8 @@
+   "version": "1.6.0",
+   "schema_version": 3,
+   "scope": "FRAMEWORK_OWNED_TRUST_BOUNDARY",
+-  "file_count_excluding_manifests": 565,
+-  "total_bytes_excluding_manifests": 2958714,
++  "file_count_excluding_manifests": 569,
++  "total_bytes_excluding_manifests": 3027006,
+   "files": [
+     ".adwf/SETUP_CHECKLIST.md",
+     ".adwf/actions-lock.json",
+@@ -72,6 +72,7 @@
+     ".adwf/lib/github_agent_inbox.py",
+     ".adwf/lib/github_auth.py",
+     ".adwf/lib/github_bootstrap.py",
++    ".adwf/lib/github_lease_store.py",
+     ".adwf/lib/github_owner_decisions.py",
+     ".adwf/lib/github_provider.py",
+     ".adwf/lib/github_readback.py",
+@@ -83,6 +84,7 @@
+     ".adwf/lib/impact_router.py",
+     ".adwf/lib/incidents.py",
+     ".adwf/lib/issue_contract.py",
++    ".adwf/lib/lease_registry.py",
+     ".adwf/lib/leases.py",
+     ".adwf/lib/managed_surface.py",
+     ".adwf/lib/managed_surface_transaction.py",
+@@ -257,6 +259,7 @@
+     ".adwf/schemas/skill.schema.json",
+     ".adwf/schemas/transition-saga.schema.json",
+     ".adwf/schemas/work-context.schema.json",
++    ".adwf/schemas/writer-lease-registry.schema.json",
+     ".adwf/scripts/README.md",
+     ".adwf/scripts/apply_consumer_upgrade.py",
+     ".adwf/scripts/collect_preview_attestation.py",
+@@ -380,6 +383,7 @@
+     ".adwf/tests/test_migration_v1_3.py",
+     ".adwf/tests/test_migration_v1_4.py",
+     ".adwf/tests/test_migration_v1_5.py",
++    ".adwf/tests/test_orch_provider_leases.py",
+     ".adwf/tests/test_orchestration.py",
+     ".adwf/tests/test_owner_experience.py",
+     ".adwf/tests/test_p0_safety_evidence.py",
+diff --git a/SHA256SUMS.txt b/SHA256SUMS.txt
+index 61bcac0..d88c8ef 100644
+--- a/SHA256SUMS.txt
++++ b/SHA256SUMS.txt
+@@ -14,7 +14,7 @@ c2f0867b37ca2441db2f6d9ac8cb80d8ca4c282772bee7e03558769eef74b0ca  .adwf/creative
+ cc01bfd0f303aa5ea9b059a0f296c9bb56e4968f648f307586a11821be0b1243  .adwf/creative-agent-qualification.json
+ f74add7a0874b58b64f0d597fef9603b88051d2998b1319c237b2180356582c1  .adwf/debt-ledger.json
+ 149723e61a2ced2f91fa1ac41f93321d5532779195fb2106e09c24c4e9f4e65d  .adwf/decision-requirement-traceability.json
+-a25cc06a73385c36a0f5edcb6357b8f51ac1977b9342855d6fdc7ff3a2bfb5cc  .adwf/docs-registry.json
++184a4fa6c8f5de5f35288f816d6e8165be171baac29d98ed4e35cf82e91dcfc7  .adwf/docs-registry.json
+ bebc22ff101c2d5b73014b891b4dc75dc280b652f7b6af37315ceb8f2d4e73e8  .adwf/effective-policy.json
+ 76d745d3c03f850e65efa8e4d2a707ffadfabb0c83847278ce6558eb52e2ec46  .adwf/evidence-ledger.json
+ dea6a49c44402714866a72d0a44a47edbea2e4af8289ab8ea0447cb914540021  .adwf/examples-incident.json
+@@ -64,17 +64,19 @@ f93a98bfc1e0894d1a3d066829dbb4ab354291201e7229650838efe1c9165ab7  .adwf/lib/evid
+ f280899a9c0c80030b785f419a431b567d85b64f53f40f327b8fdd7cda4be8f2  .adwf/lib/github_agent_inbox.py
+ 5e7abb06eb9886ca8fd04e7f2b22ac8cb0c661429d0af3f33807fb6b70067db3  .adwf/lib/github_auth.py
+ d0ff36054dcd1871d8b28f4de066d1defaeff1a923f73c3f5f20d36a91b87b82  .adwf/lib/github_bootstrap.py
++d9c7f7b43a7052900816d05635f348b110a585d456ee7b8ee81683ae80c872c1  .adwf/lib/github_lease_store.py
+ 1a8bcb069868f34b1509198817655faa57e1dc052826050663813d86d8fad6d3  .adwf/lib/github_owner_decisions.py
+ aa2260bf18f7250921149d5ab4c2e2b54cd5c33e50152c7d6eb111831eb17fc3  .adwf/lib/github_provider.py
+ 81f5cc689e04dce6561be6496a0175176a676cba65cb7e516198fc1bba138075  .adwf/lib/github_readback.py
+ d859f366cd855361a2fc9f16fe5ce591204d6b782ffc6e0ddb195f52d6f0485f  .adwf/lib/github_rulesets.py
+-a88126fead2e78e628fc7881beccbc91218b9c77d5fdf5421d87456efba1470b  .adwf/lib/github_runtime_store.py
++07cc62ceec379997a6dc19c4e3d3385d5950028c32bbdac0e0b2f805b6ced291  .adwf/lib/github_runtime_store.py
+ 14f60323fd9473419339ab36c97397a8cfdb1720977ab70ac64e5c70d8921380  .adwf/lib/healing.py
+ 74c8c97b219a310d300fc9c5bb4e9b58be77188ff37142a41a49813af026f66a  .adwf/lib/health.py
+ 053f7e0e2db6eb6fce7ff0d9a454e8b51624e42c82a3d184f423da6f54a2b989  .adwf/lib/http_transport.py
+ e12946c395af0f58db750b37112fd3c18b7eeee03b50ecf95f813123cd847233  .adwf/lib/impact_router.py
+ 51ea7c34439cf75352ceaad64015e438c680a1c64e7325331af6431ba426caa0  .adwf/lib/incidents.py
+ 5f7d888196fca76155433ed6f055d119b807a4016429f9ba4d9f3429af6df85a  .adwf/lib/issue_contract.py
++a09f26096522b3712521d409a06028d33cb6ca57d26ae31d5fd45a858fa7cb84  .adwf/lib/lease_registry.py
+ ea1ec2e1f4a9eba593be2b028d799d292198c1904a958e5bfe5b44cdf1a79c32  .adwf/lib/leases.py
+ 199c2e817adfb3466f1cfb52d1bd4e03e1f400e96fd19b3a45241ae8929ae286  .adwf/lib/managed_surface.py
+ 779c434f3e184f664801f42476c10c4ba99cfd50d49767306609087e5c1f3ec6  .adwf/lib/managed_surface_transaction.py
+@@ -249,6 +251,7 @@ f276ab3da359a5e79ce055a32caf1c2e5e1324d81177fd0ebe2b1c5ca26500dc  .adwf/schemas/
+ 46a93dd4ec7b9908fdb9c27843852a0b44cc9d136bbbb45844fefcb96d523cb9  .adwf/schemas/skill.schema.json
+ 1b55d066c2c1abfceedac2ec46a342a2693ca77688dc00bb84162f36b70deca7  .adwf/schemas/transition-saga.schema.json
+ eaa85af8c8dd17c21c49ed0311fe1be08bf4ab9f0ec3b3d260d3db6de65d75b5  .adwf/schemas/work-context.schema.json
++6cca7fef41aee27af757868f2e74439731c0ed07744d8923bc067e4397f7bdbe  .adwf/schemas/writer-lease-registry.schema.json
+ e5ef634230a83b85651138564e1e77ff87248c580487e2c77158ddf803b215b9  .adwf/scripts/README.md
+ 0a8e2365639c72314aa57eeb2a1e16a60af2fadd077f2f4505332b73d569608e  .adwf/scripts/apply_consumer_upgrade.py
+ 4513035cce9790d866dc1e57d12b0567977cdde2b5f3f31fef1d144efe2e0a56  .adwf/scripts/collect_preview_attestation.py
+@@ -295,7 +298,7 @@ e65aabec0a5f407a77a99c8745954dd8895ed5f68224d7fbbbf1bd308ce4b4f4  .adwf/scripts/
+ 5097898ec838b2151ae215bdcdc41654fa39077566895d7cf1403dd095217635  .adwf/scripts/validate_capabilities.py
+ 3d226d27b3e11ce9f0054e511f7d3857d7957e1547ae820b77772cdfef98248d  .adwf/scripts/validate_ci.py
+ 4725738198248514a95a8ade05782c198dff812d8ac9d46ca8850e075825ee48  .adwf/scripts/validate_docs.py
+-ac6fe562f8a162b4d439442446a342adddd1d5ca7b8a6188e4e4540950fc5a36  .adwf/scripts/validate_framework.py
++a4efcdd8b1a0a7b57d3a919562f5164401e9c5c2db7f80afea5a752d844b0059  .adwf/scripts/validate_framework.py
+ 1e2b6f6d8b0befdd181e4fefca51aa3e3b0806589290182db921095d99061bf8  .adwf/scripts/validate_managed_surface.py
+ b549faf801ad5a404aff3b7120432d3785c085e47e14160a331ac9203f301f91  .adwf/scripts/validate_pipeline_ir.py
+ 34a216fae20cde08a276f2f26497360fb8866c7c931e190bba406c96d115d083  .adwf/scripts/validate_pr.py
+@@ -372,6 +375,7 @@ fade8a64424539ee0346a3c6211d05abf38b4017995f235e2783d1bb23ca429a  .adwf/tests/te
+ 331131fbc3f79e16b8beea20019757446ed86214ded71ab3511bec9b8e0719e1  .adwf/tests/test_migration_v1_3.py
+ 1907d7a8f924607e76d018cad35355c0e241cf56f772679a1ed94207dd2fd7ce  .adwf/tests/test_migration_v1_4.py
+ 505bce19862c7feb158cf0d615aa38609ac1a8384e72fe603acb22b8a52f87f2  .adwf/tests/test_migration_v1_5.py
++9fbd9014fee556782de0bed70a5a301b3d9d26f5b63ed6acf3ab1dd29020366d  .adwf/tests/test_orch_provider_leases.py
+ b259ca45968a2e21a142a1c900fa68508d24f21b9ceeb2b8260c8f338876b13e  .adwf/tests/test_orchestration.py
+ 0e7af8f6470969164fbe77639aee22d08ca5acc09aa8d76adb78208d3ac8bdc6  .adwf/tests/test_owner_experience.py
+ 54af2cca042768087a2bfe9061a53cd9f14af8a4d1eba7c87509b86da2eb1fc1  .adwf/tests/test_p0_safety_evidence.py
+@@ -394,7 +398,7 @@ f0bc58037fe365ea77c18f27f3dcf464daeb3f1f4e192b0d8fd691bcfe1b0e56  .adwf/tests/te
+ d21cd55f770059800c81c4267036de3e5f12ad9944966623b6b8d84a5d1681a3  .adwf/tests/test_roadmap_truth.py
+ ef87cf6d2e0af0a5b08bdbae593ba8e39aeb9271ffbc2c8f578c581bb8c99fb6  .adwf/tests/test_session_consumer_proof.py
+ 332bc75f8033e16c1f6db58b84484f0c04de640b9d069b818a567ef3f298f8c5  .adwf/tests/test_session_continuity.py
+-6fefe0544db6635a037eb5f0a9b5f58f4d42b266b169a5556f3c6ab8fe2f9016  .adwf/tests/test_session_continuity_persistence.py
++d16e35270faa2bcd7150dad6562dd5bde0a15eb51878050794589227cba1966f  .adwf/tests/test_session_continuity_persistence.py
+ d5f0baaefb34d98c8f24aa5dc5e595ca74625e6360e59c3d489df4bbe6fa07d2  .adwf/tests/test_sessio
