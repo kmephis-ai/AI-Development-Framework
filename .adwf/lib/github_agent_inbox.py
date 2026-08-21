@@ -38,7 +38,7 @@ class GitHubAgentInbox:
             raise ValueError('AGENT_REQUEST_WORK_PACKAGE_INVALID')
         safe_memory={k:(work_memory or {}).get(k) for k in ('brief_id','run_id','status','next_action_ru')}
         projection={k:package.get(k) for k in ('package_id','package_digest','base_sha','phase','work_type','risk','allowed_write_surfaces','forbidden_write_surfaces','required_evidence','monetary_budget_usd')}
-        payload={'schema_version':3,'idempotency_key':envelope.get('idempotency_key'),'run_id':envelope.get('run_id'),'revision':envelope.get('revision'),'brief_id':envelope.get('brief_id'),'phase':phase,'capability':envelope.get('capability'),'subject_sha':envelope.get('subject_sha'),'risk':envelope.get('risk'),'monetary_budget_usd':0,'work_package_projection':projection,'work_memory_projection':safe_memory,
+        payload={'schema_version':3,'idempotency_key':envelope.get('idempotency_key'),'run_id':envelope.get('run_id'),'revision':envelope.get('revision'),'brief_id':envelope.get('brief_id'),'phase':phase,'capability':envelope.get('capability'),'subject_sha':envelope.get('subject_sha'),'work_branch':envelope.get('work_branch'),'risk':envelope.get('risk'),'monetary_budget_usd':0,'work_package_projection':projection,'work_memory_projection':safe_memory,
                  'security_note':'LOW_TRUST_WORK_REQUEST_NOT_AUTHORIZATION_OR_EVIDENCE'}
         digest=hashlib.sha256(json.dumps(payload,sort_keys=True,separators=(',',':'),ensure_ascii=False).encode()).hexdigest();payload['request_digest']=digest
         issue=self.ensure_issue();existing=self.client.issue_comments(int(issue['number']))
@@ -65,7 +65,8 @@ def validate_agent_result(value:dict[str,Any],*,request:dict[str,Any])->dict[str
     package=request.get('work_package')
     if not isinstance(package,dict) or request.get('work_package_digest')!=package.get('package_digest'):raise ValueError('AGENT_RESULT_WORK_PACKAGE_MISSING')
     work_result=canonicalize_low_trust_claim(value,package=package)
-    branch=value.get('branch')
+    branch=value.get('branch');expected_branch=request.get('work_branch')
     if branch is not None and (not isinstance(branch,str) or not branch.startswith('adwf/') or len(branch)>180):raise ValueError('AGENT_BRANCH_INVALID')
+    if expected_branch and branch!=expected_branch:raise ValueError('AGENT_BRANCH_BINDING_MISMATCH')
     return {'phase':value['phase'],'outcome':work_result['outcome'],'idempotency_key':value['idempotency_key'],'subject_sha':work_result.get('head_sha'),'preview_digest':None,'evidence_refs':[],
             'reason_codes':work_result['reason_codes'],'transient':work_result['outcome']=='RETRY','cost_usd':0,'metadata':{'source':'LOW_TRUST_AGENT_RESULT','provider_comment_id':value.get('provider_comment_id'),'provider_actor':value.get('provider_actor'),'branch':branch,'summary_ru':work_result['summary_ru'],'ai_work_result':work_result}}

@@ -9,9 +9,12 @@ from __future__ import annotations
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any,Callable
-import json,os,re,subprocess,sys
+from datetime import datetime, timezone
+import hashlib,json,os,re,subprocess,sys
 from .github_auth import detect_repository,discover_token
 from .github_provider import GitHubClient
+from .github_lease_store import GitHubLeaseStore
+from .evidence import parse_time
 from .strict_json import loads as strict_loads
 from .work_memory import WorkMemoryStore
 from .delivery_adapters import promote_reference, observe_reference, run_command_adapter
@@ -77,8 +80,115 @@ def authorize_executor(root:Path,state:dict[str,Any],key:str,envelope:dict[str,A
     return _result(state,key,metadata={'authorization_source':'TRUSTED_CONTEXT_COMPILER'})
 
 
-def claim_executor(root:Path,state:dict[str,Any],key:str,envelope:dict[str,Any])->dict[str,Any]:
-    return _result(state,key,metadata={'lease_model':'DURABLE_SINGLE_WRITER','run_id':state['run_id']})
+def _orchestration_policy(root:Path)->dict[str,int]:
+    cfg=strict_loads((root/'.adwf/config.json').read_text(encoding='utf-8'))
+    orch=cfg.get('orchestration') if isinstance(cfg.get('orchestration'),dict) else {}
+    ceiling=orch.get('max_parallel_writers');ttl=orch.get('lease_ttl_minutes');heartbeat=orch.get('heartbeat_minutes')
+    if ceiling != 1:return {'error':'STAGE1_WRITER_CEILING_NOT_SINGLETON'}
+    if isinstance(ttl,bool) or not isinstance(ttl,int) or not 1<=ttl<=240:return {'error':'LEASE_TTL_POLICY_INVALID'}
+    if isinstance(heartbeat,bool) or not isinstance(heartbeat,int) or not 1<=heartbeat<=120:return {'error':'LEASE_HEARTBEAT_POLICY_INVALID'}
+    return {'max_parallel_writers':ceiling,'lease_ttl_minutes':ttl,'heartbeat_minutes':heartbeat}
+
+
+def _current_main(client:GitHubClient)->tuple[str,str]:
+    info=client.repo_info();default=str(info.get('default_branch') or 'main');sha=str((client.branch(default).get('commit') or {}).get('sha') or '')
+    if not SHA.fullmatch(sha):raise ValueError('DEFAULT_BRANCH_SHA_NOT_VERIFIED')
+    return default,sha
+
+
+def _writer_id(state:dict[str,Any])->str:
+    run_id=str(state.get('run_id') or '')
+    if not run_id:raise ValueError('WRITER_RUN_ID_REQUIRED')
+    return 'adwf-runtime:'+run_id
+
+
+def _writer_branch(state:dict[str,Any])->str:
+    roadmap=str(state.get('roadmap_id') or '').lower().replace('_','-')
+    roadmap=re.sub(r'[^a-z0-9-]+','-',roadmap).strip('-') or 'work'
+    suffix=hashlib.sha256(str(state.get('run_id') or '').encode()).hexdigest()[:12]
+    return f'adwf/{roadmap[:120]}-{suffix}'
+
+
+def _stage1_resources()->list[dict[str,Any]]:
+    # Stage 1 intentionally retains a repository-global writer domain. Typed
+    # disjoint resources remain a later Multi-Writer concern after live proof.
+    return [{'kind':'provider','scope':'global','shared':True,'global':True}]
+
+
+def _same_lease(lease:dict[str,Any],state:dict[str,Any],branch:str,resources:list[dict[str,Any]])->bool:
+    return (
+        lease.get('status')=='ACTIVE' and
+        lease.get('issue_id')==str(state.get('issue_id') or '') and
+        lease.get('roadmap_id')==str(state.get('roadmap_id') or '') and
+        lease.get('worker_id')==_writer_id(state) and
+        lease.get('branch')==branch and
+        lease.get('resources')==resources
+    )
+
+
+def _lease_fresh(lease:dict[str,Any],heartbeat_minutes:int)->bool:
+    try:
+        now=datetime.now(timezone.utc);heartbeat=parse_time(str(lease.get('heartbeat_at')));expires=parse_time(str(lease.get('expires_at')))
+    except (TypeError,ValueError):return False
+    return expires>now and heartbeat<=now and (now-heartbeat).total_seconds() <= heartbeat_minutes*60
+
+
+def _require_live_writer_authority(root:Path,state:dict[str,Any],phase:str)->ExecutorWait|None:
+    client,auth=_github(root)
+    if client is None:return ExecutorWait('HUMAN_REQUIRED','GITHUB_CONNECTION_REQUIRED','claim',auth)
+    policy=_orchestration_policy(root)
+    if 'error' in policy:return ExecutorWait('NOT_VERIFIED',str(policy['error']),'claim')
+    try:
+        _default,current_main=_current_main(client);store=GitHubLeaseStore(client)
+        registry,_anchor=store.read(expected_main_sha=current_main,policy_max_parallel_writers=policy['max_parallel_writers'])
+    except Exception as exc:
+        return ExecutorWait('NOT_VERIFIED','LEASE_PROVIDER_READBACK_FAILED','claim',{'contract_error':str(exc)[:300]})
+    branch=str(state.get('work_branch') or '')
+    matches=[x for x in registry.get('leases') or [] if _same_lease(x,state,branch,_stage1_resources())]
+    if len(matches)!=1:return ExecutorWait('NOT_VERIFIED','LIVE_PROVIDER_LEASE_REQUIRED','claim',{'matches':len(matches),'registry_revision':registry.get('revision')})
+    lease=matches[0]
+    if not _lease_fresh(lease,int(policy['heartbeat_minutes'])):
+        return ExecutorWait('NOT_VERIFIED','LEASE_RECONCILIATION_REQUIRED','claim',{'lease_id':lease.get('lease_id')})
+    delivery=str(state.get('delivery_sha') or '')
+    postmerge=phase in {'PROMOTE','OBSERVE','DONE','CLEANUP','RECOVERY'} and SHA.fullmatch(delivery) is not None
+    if postmerge:
+        if current_main!=delivery:return ExecutorWait('NOT_VERIFIED','DELIVERY_MAIN_RECONCILIATION_REQUIRED','claim',{'current_main':current_main,'delivery_sha':delivery})
+        return None
+    if registry.get('observed_main_sha')!=current_main or lease.get('base_sha')!=current_main:
+        return ExecutorWait('NOT_VERIFIED','LEASE_MAIN_RECONCILIATION_REQUIRED','claim',{'current_main':current_main,'registry_main':registry.get('observed_main_sha'),'lease_base':lease.get('base_sha')})
+    # Heartbeat before half the configured interval has elapsed, avoiding an
+    # anchor per phase while keeping ordinary CI waits safely within freshness.
+    heartbeat=parse_time(str(lease['heartbeat_at']));age=(datetime.now(timezone.utc)-heartbeat).total_seconds()
+    if age >= max(60,int(policy['heartbeat_minutes'])*30):
+        try:store.heartbeat(expected_main_sha=current_main,policy_max_parallel_writers=1,lease_id=str(lease['lease_id']),worker_id=_writer_id(state),ttl_minutes=int(policy['lease_ttl_minutes']))
+        except Exception as exc:return ExecutorWait('NOT_VERIFIED','LEASE_HEARTBEAT_FAILED','claim',{'contract_error':str(exc)[:300]})
+    return None
+
+
+def claim_executor(root:Path,state:dict[str,Any],key:str,envelope:dict[str,Any])->dict[str,Any]|ExecutorWait:
+    client,auth=_github(root)
+    if client is None:return ExecutorWait('HUMAN_REQUIRED','GITHUB_CONNECTION_REQUIRED','claim',auth)
+    policy=_orchestration_policy(root)
+    if 'error' in policy:return ExecutorWait('NOT_VERIFIED',str(policy['error']),'claim')
+    issue_id=str(state.get('issue_id') or '');base_sha=str(state.get('subject_sha') or '');roadmap_id=str(state.get('roadmap_id') or '')
+    if not issue_id.isdigit():return ExecutorWait('NOT_VERIFIED','LEASE_ISSUE_ID_REQUIRED','claim')
+    if not SHA.fullmatch(base_sha):return ExecutorWait('NOT_VERIFIED','LEASE_BASE_SHA_REQUIRED','claim')
+    branch=_writer_branch(state);resources=_stage1_resources();worker=_writer_id(state)
+    try:
+        _default,current_main=_current_main(client)
+        if current_main!=base_sha:return ExecutorWait('NOT_VERIFIED','LEASE_BASE_MAIN_DRIFT','claim',{'expected':base_sha,'actual':current_main})
+        store=GitHubLeaseStore(client);registry,anchor=store.read(expected_main_sha=current_main,policy_max_parallel_writers=1)
+        active=[x for x in registry.get('leases') or [] if x.get('status')=='ACTIVE']
+        compatible=[x for x in active if _same_lease(x,state,branch,resources) and x.get('base_sha')==base_sha]
+        if active:
+            if len(active)==1 and len(compatible)==1 and _lease_fresh(compatible[0],int(policy['heartbeat_minutes'])):
+                lease=compatible[0]
+                return _result(state,key,metadata={'lease_model':'PROVIDER_DURABLE_CAS','lease_id':lease['lease_id'],'lease_anchor':anchor,'lease_registry_revision':registry['revision'],'branch':branch,'resumed_existing':True})
+            return ExecutorWait('NOT_VERIFIED','ACTIVE_PROVIDER_LEASE_INCOMPATIBLE','claim',{'active':len(active),'compatible':len(compatible),'registry_revision':registry.get('revision')})
+        persisted,lease,new_anchor=store.acquire(expected_main_sha=current_main,policy_max_parallel_writers=1,issue_id=issue_id,roadmap_id=roadmap_id,worker_id=worker,base_sha=base_sha,branch=branch,resources=resources,ttl_minutes=int(policy['lease_ttl_minutes']))
+        return _result(state,key,metadata={'lease_model':'PROVIDER_DURABLE_CAS','lease_id':lease['lease_id'],'lease_anchor':new_anchor,'lease_registry_revision':persisted['revision'],'branch':branch,'resumed_existing':False})
+    except Exception as exc:
+        return ExecutorWait('NOT_VERIFIED','LEASE_PROVIDER_ACQUIRE_FAILED','claim',{'contract_error':str(exc)[:300]})
 
 
 def workspace_executor(root:Path,state:dict[str,Any],key:str,envelope:dict[str,Any])->dict[str,Any]:
@@ -257,13 +367,31 @@ def observe_executor(root:Path,state:dict[str,Any],key:str,envelope:dict[str,Any
 
 
 def done_executor(root:Path,state:dict[str,Any],key:str,envelope:dict[str,Any])->dict[str,Any]|ExecutorWait:
-    client,_=_github(root);issue=str(state.get('issue_id') or '')
-    if client is not None and issue.isdigit():client.close_issue(int(issue))
-    return _result(state,key,subject_sha=state.get('subject_sha'),evidence_refs=_evidence_refs(root),metadata={'issue_closed':bool(client and issue.isdigit()),'not_applicable_reason':None if _evidence_refs(root) else 'NO_EXTERNAL_CLOSE_EVIDENCE_REQUIRED'})
+    # Provider lease release is part of terminal correctness. Defer Issue close
+    # until CLEANUP has reconciled and released the authoritative lease.
+    return _result(state,key,subject_sha=state.get('subject_sha'),evidence_refs=_evidence_refs(root),metadata={'issue_close_deferred_to_cleanup':True,'not_applicable_reason':None if _evidence_refs(root) else 'NO_EXTERNAL_CLOSE_EVIDENCE_REQUIRED'})
 
 
-def cleanup_executor(root:Path,state:dict[str,Any],key:str,envelope:dict[str,Any])->dict[str,Any]:
-    return _result(state,key,metadata={'cleanup':'RUNTIME_PROJECTIONS_RETAINED_AUDIT_LOG_IMMUTABLE'})
+def cleanup_executor(root:Path,state:dict[str,Any],key:str,envelope:dict[str,Any])->dict[str,Any]|ExecutorWait:
+    client,auth=_github(root)
+    if client is None:return ExecutorWait('HUMAN_REQUIRED','GITHUB_CONNECTION_REQUIRED','cleanup',auth)
+    policy=_orchestration_policy(root)
+    if 'error' in policy:return ExecutorWait('NOT_VERIFIED',str(policy['error']),'cleanup')
+    try:
+        _default,current_main=_current_main(client);delivery=str(state.get('delivery_sha') or '')
+        if not SHA.fullmatch(delivery) or current_main!=delivery:return ExecutorWait('NOT_VERIFIED','CLEANUP_DELIVERY_MAIN_REQUIRED','cleanup',{'current_main':current_main,'delivery_sha':delivery})
+        store=GitHubLeaseStore(client);registry,_anchor=store.read(expected_main_sha=current_main,policy_max_parallel_writers=1);branch=str(state.get('work_branch') or '')
+        matches=[x for x in registry.get('leases') or [] if _same_lease(x,state,branch,_stage1_resources())]
+        if len(matches)!=1:return ExecutorWait('NOT_VERIFIED','CLEANUP_ACTIVE_LEASE_REQUIRED','cleanup',{'matches':len(matches)})
+        lease=matches[0];released,release_anchor=store.release(expected_main_sha=current_main,policy_max_parallel_writers=1,lease_id=str(lease['lease_id']),worker_id=_writer_id(state),provider_reconciled=True,provider_reconciliation_ref='github:commit:'+current_main)
+        reread,_=store.read(expected_main_sha=current_main,policy_max_parallel_writers=1)
+        if any(x.get('status')=='ACTIVE' and x.get('lease_id')==lease['lease_id'] for x in reread.get('leases') or []):return ExecutorWait('NOT_VERIFIED','LEASE_RELEASE_READBACK_ACTIVE','cleanup')
+        issue=str(state.get('issue_id') or '');issue_closed=False
+        if issue.isdigit():
+            closed=client.close_issue(int(issue));issue_closed=str(closed.get('state') or '')=='closed'
+            if not issue_closed:return ExecutorWait('NOT_VERIFIED','ISSUE_CLOSE_READBACK_NOT_CONFIRMED','cleanup')
+        return _result(state,key,metadata={'cleanup':'RUNTIME_PROJECTIONS_RETAINED_AUDIT_LOG_IMMUTABLE','lease_id':lease['lease_id'],'lease_release_anchor':release_anchor,'lease_registry_revision':released['revision'],'provider_reconciliation_ref':'github:commit:'+current_main,'issue_closed':issue_closed})
+    except Exception as exc:return ExecutorWait('NOT_VERIFIED','LEASE_PROVIDER_RELEASE_FAILED','cleanup',{'contract_error':str(exc)[:300]})
 
 
 def next_executor(root:Path,state:dict[str,Any],key:str,envelope:dict[str,Any])->dict[str,Any]:
@@ -280,6 +408,10 @@ class ActionExecutorRegistry:
     def __init__(self,root:str|Path):self.root=Path(root).resolve()
     def phases(self)->tuple[str,...]:return tuple(REGISTRY)
     def execute(self,state:dict[str,Any],key:str,envelope:dict[str,Any])->dict[str,Any]|ExecutorWait:
-        executor=REGISTRY.get(str(state.get('phase')))
-        if executor is None:raise ValueError('PHASE_EXECUTOR_MISSING:'+str(state.get('phase')))
+        phase=str(state.get('phase'))
+        executor=REGISTRY.get(phase)
+        if executor is None:raise ValueError('PHASE_EXECUTOR_MISSING:'+phase)
+        if phase in {'WORKSPACE','EXECUTE','OPEN_PR','CI','REVIEW','PREVIEW','OWNER_ACCEPTANCE','MERGE','PROMOTE','OBSERVE','DONE','CLEANUP','RECOVERY'}:
+            blocked=_require_live_writer_authority(self.root,state,phase)
+            if blocked is not None:return blocked
         return executor(self.root,state,key,envelope)

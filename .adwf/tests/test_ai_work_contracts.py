@@ -84,19 +84,21 @@ class AIWorkContractTests(unittest.TestCase):
 
     def test_agent_inbox_publishes_safe_package_projection(self):
         pkg=compile_work_package(state(),memory())
-        env={'idempotency_key':'k'*64,'run_id':'run-12345678','revision':4,'brief_id':'AIWORK-001','phase':'EXECUTE','capability':'edit','subject_sha':BASE,'risk':'R1','work_type':'feature','work_package':pkg,'work_package_digest':pkg['package_digest']}
+        env={'idempotency_key':'k'*64,'run_id':'run-12345678','revision':4,'brief_id':'AIWORK-001','phase':'EXECUTE','capability':'edit','subject_sha':BASE,'work_branch':'adwf/aiwork-001','risk':'R1','work_type':'feature','work_package':pkg,'work_package_digest':pkg['package_digest']}
         fake=FakeGitHub();out=GitHubAgentInbox(fake).publish(env,memory());self.assertEqual(out['status'],'PUBLISHED')
-        body=fake.comments[1][0]['body'];self.assertIn(pkg['package_digest'],body);self.assertNotIn(pkg['goal'],body);self.assertNotIn('acceptance_criteria',body)
+        body=fake.comments[1][0]['body'];self.assertIn(pkg['package_digest'],body);self.assertIn('adwf/aiwork-001',body);self.assertNotIn(pkg['goal'],body);self.assertNotIn('acceptance_criteria',body)
 
     def test_agent_result_is_package_bound_and_canonicalized_low_trust(self):
         pkg=compile_work_package(state(),memory())
-        request={'idempotency_key':'k'*64,'run_id':'run-12345678','phase':'EXECUTE','work_package':pkg,'work_package_digest':pkg['package_digest']}
+        request={'idempotency_key':'k'*64,'run_id':'run-12345678','phase':'EXECUTE','work_branch':'adwf/aiwork-001','work_package':pkg,'work_package_digest':pkg['package_digest']}
         claim={'schema_version':3,'idempotency_key':'k'*64,'run_id':'run-12345678','phase':'EXECUTE','package_id':pkg['package_id'],'package_digest':pkg['package_digest'],'base_sha':BASE,
                'outcome':'PASS','subject_sha':HEAD,'branch':'adwf/aiwork-001','changed_paths':['src/app.py'],'verification_claims':['tests claimed PASS'],'evidence_claims':['changed_paths','verification_claims'],'reason_codes':[],'summary_ru':'Готово'}
         result=validate_agent_result(claim,request=request);self.assertEqual(result['outcome'],'PASS');self.assertEqual(result['evidence_refs'],[])
         self.assertEqual(result['metadata']['source'],'LOW_TRUST_AGENT_RESULT');self.assertEqual(result['metadata']['ai_work_result']['package_digest'],pkg['package_digest'])
         bad=dict(claim);bad['base_sha']='c'*40
         with self.assertRaisesRegex(ValueError,'PACKAGE_BINDING_MISMATCH'):validate_agent_result(bad,request=request)
+        wrong_branch=dict(claim);wrong_branch['branch']='adwf/other-work'
+        with self.assertRaisesRegex(ValueError,'AGENT_BRANCH_BINDING_MISMATCH'):validate_agent_result(wrong_branch,request=request)
 
     def test_authoritative_state_can_narrow_surfaces_and_evidence(self):
         narrowed=state(allowed_write_surfaces=['src/**'],forbidden_write_surfaces=['src/private/**'],required_evidence=['changed_paths','verification_claims','review_claim'])

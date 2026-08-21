@@ -38,7 +38,7 @@ class ActionEnvelopeStore:
         key=_key(state['run_id'],state['phase'],int(state['revision']));path=self.request_path(key)
         if not path.exists():
             payload={'schema_version':3,'idempotency_key':key,'run_id':state['run_id'],'revision':state['revision'],'brief_id':state['roadmap_id'],'phase':state['phase'],'capability':ACTION_BY_PHASE[state['phase']],
-              'subject_sha':state.get('subject_sha'),'delivery_sha':state.get('delivery_sha'),'preview_digest':state.get('preview_digest'),'risk':state['risk'],'work_type':state['work_type'],'monetary_budget_usd':0,'created_at':_now()}
+              'subject_sha':state.get('subject_sha'),'delivery_sha':state.get('delivery_sha'),'work_branch':state.get('work_branch'),'preview_digest':state.get('preview_digest'),'risk':state['risk'],'work_type':state['work_type'],'monetary_budget_usd':0,'created_at':_now()}
             if state['phase'] in CREATIVE_PHASES:
                 memory=WorkMemoryStore(self.root).load()
                 package=compile_work_package(state,memory)
