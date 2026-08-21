@@ -1,0 +1,327 @@
+sha)) is None:
++        raise ValueError("LEASE_SHA_INVALID")
++    if current["max_parallel_writers"] != policy_max_parallel_writers:
++        raise ValueError("LEASE_POLICY_CEILING_MISMATCH")
++    if isinstance(policy_max_parallel_writers, bool) or not isinstance(policy_max_parallel_writers, int) or not 1 <= policy_max_parallel_writers <= 3:
++        raise ValueError("LEASE_POLICY_CEILING_INVALID")
++    canonical_resources = require_canonical_conflict_resources(resources)
++    active = [lease for lease in current["leases"] if lease["status"] == "ACTIVE"]
++    if current["observed_main_sha"] != observed_main_sha and active:
++        raise ValueError("LEASE_RECONCILIATION_REQUIRED")
++    if any(_registry_lease_freshness_errors(lease, now) for lease in active):
++        raise ValueError("LEASE_RECONCILIATION_REQUIRED")
++    if len(active) >= policy_max_parallel_writers:
++        raise ValueError("ACTIVE_WRITER_EXISTS")
++    for lease in active:
++        if lease["issue_id"] == issue_id:
++            raise ValueError("ISSUE_ALREADY_LEASED")
++        if lease["roadmap_id"] == roadmap_id:
++            raise ValueError("ROADMAP_ALREADY_LEASED")
++        if lease["branch"] == branch:
++            raise ValueError("BRANCH_ALREADY_LEASED")
++        if conflicting_resource_keys(canonical_resources, lease["resources"]):
++            raise ValueError("CONFLICT_RESOURCE_BUSY")
++    if not isinstance(issue_id, str) or re.fullmatch(r"[0-9]+", issue_id) is None:
++        raise ValueError("LEASE_ISSUE_ID_INVALID")
++    if not isinstance(roadmap_id, str) or _ROADMAP_ID_RE.fullmatch(roadmap_id) is None:
++        raise ValueError("LEASE_ROADMAP_ID_INVALID")
++    if not isinstance(worker_id, str) or _SAFE_ID_RE.fullmatch(worker_id) is None or not _valid_branch(branch):
++        raise ValueError("LEASE_IDENTITY_INVALID")
++    candidate_lease_id = lease_id or str(uuid.uuid4())
++    if _UUID_RE.fullmatch(candidate_lease_id) is None or any(item["lease_id"] == candidate_lease_id for item in current["leases"]):
++        raise ValueError("LEASE_ID_INVALID")
++    if len(current["leases"]) >= 200:
++        raise ValueError("LEASE_REGISTRY_RETENTION_REQUIRED")
++    ttl = _bounded_ttl_minutes(ttl_minutes)
++    expires = now + timedelta(minutes=ttl)
++    lease = {
++        "lease_id": candidate_lease_id,
++        "generation": current["revision"] + 1,
++        "issue_id": issue_id,
++        "roadmap_id": roadmap_id,
++        "worker_id": worker_id,
++        "base_sha": base_sha,
++        "branch": branch,
++        "resources": copy.deepcopy(canonical_resources),
++        "status": "ACTIVE",
++        "claimed_at": iso(now),
++        "heartbeat_at": iso(now),
++        "expires_at": iso(expires),
++        "released_at": None,
++        "provider_reconciled_at": None,
++        "provider_reconciliation_ref": None,
++    }
++    current["leases"].append(lease)
++    current["revision"] += 1
++    current["observed_main_sha"] = observed_main_sha
++    current["integrity_digest"] = _registry_digest(current)
++    findings = validate_lease_registry(current)
++    if findings:
++        raise ValueError("LEASE_REGISTRY_INVALID_AFTER_ACQUIRE:" + ",".join(findings))
++    return current, copy.deepcopy(lease)
++
++
++def heartbeat_registry_lease(
++    registry: dict[str, Any], *, expected_revision: int, lease_id: str, worker_id: str,
++    observed_main_sha: str, now: datetime | None = None, ttl_minutes: int = 120,
++) -> dict[str, Any]:
++    now = (now or utc_now()).astimezone(timezone.utc)
++    current = _validated_registry_copy(registry)
++    if current["revision"] != expected_revision:
++        raise ValueError("LEASE_REGISTRY_REVISION_CONFLICT")
++    matches = [lease for lease in current["leases"] if lease["lease_id"] == lease_id]
++    if len(matches) != 1 or matches[0]["status"] != "ACTIVE":
++        raise ValueError("LEASE_NOT_ACTIVE")
++    lease = matches[0]
++    if lease["worker_id"] != worker_id:
++        raise ValueError("LEASE_OWNER_MISMATCH")
++    if current["observed_main_sha"] != observed_main_sha:
++        raise ValueError("LEASE_RECONCILIATION_REQUIRED")
++    if _registry_lease_freshness_errors(lease, now):
++        raise ValueError("LEASE_RECONCILIATION_REQUIRED")
++    if _SHA40_RE.fullmatch(str(observed_main_sha)) is None:
++        raise ValueError("LEASE_SHA_INVALID")
++    ttl = _bounded_ttl_minutes(ttl_minutes)
++    lease["heartbeat_at"] = iso(now)
++    lease["expires_at"] = iso(now + timedelta(minutes=ttl))
++    current["observed_main_sha"] = observed_main_sha
++    current["revision"] += 1
++    current["integrity_digest"] = _registry_digest(current)
++    findings = validate_lease_registry(current)
++    if findings:
++        raise ValueError("LEASE_REGISTRY_INVALID_AFTER_HEARTBEAT:" + ",".join(findings))
++    return current
++
++
++def release_registry_lease(
++    registry: dict[str, Any], *, expected_revision: int, lease_id: str, worker_id: str,
++    observed_main_sha: str, provider_reconciled: bool, provider_reconciliation_ref: str,
++    now: datetime | None = None,
++) -> dict[str, Any]:
++    now = (now or utc_now()).astimezone(timezone.utc)
++    current = _validated_registry_copy(registry)
++    if current["revision"] != expected_revision:
++        raise ValueError("LEASE_REGISTRY_REVISION_CONFLICT")
++    if provider_reconciled is not True:
++        raise ValueError("LEASE_PROVIDER_RECONCILIATION_REQUIRED")
++    if not isinstance(provider_reconciliation_ref, str) or _SAFE_REF_RE.fullmatch(provider_reconciliation_ref) is None:
++        raise ValueError("LEASE_PROVIDER_RECONCILIATION_REF_INVALID")
++    if _SHA40_RE.fullmatch(str(observed_main_sha)) is None:
++        raise ValueError("LEASE_SHA_INVALID")
++    matches = [lease for lease in current["leases"] if lease["lease_id"] == lease_id]
++    if len(matches) != 1 or matches[0]["status"] != "ACTIVE":
++        raise ValueError("LEASE_NOT_ACTIVE")
++    lease = matches[0]
++    if lease["worker_id"] != worker_id:
++        raise ValueError("LEASE_OWNER_MISMATCH")
++    lease["status"] = "RELEASED"
++    lease["released_at"] = iso(now)
++    lease["provider_reconciled_at"] = iso(now)
++    lease["provider_reconciliation_ref"] = provider_reconciliation_ref.strip()
++    current["observed_main_sha"] = observed_main_sha
++    current["revision"] += 1
++    current["integrity_digest"] = _registry_digest(current)
++    findings = validate_lease_registry(current)
++    if findings:
++        raise ValueError("LEASE_REGISTRY_INVALID_AFTER_RELEASE:" + ",".join(findings))
++    return current
+diff --git a/.adwf/schemas/writer-lease-registry.schema.json b/.adwf/schemas/writer-lease-registry.schema.json
+new file mode 100644
+index 0000000..9886810
+--- /dev/null
++++ b/.adwf/schemas/writer-lease-registry.schema.json
+@@ -0,0 +1,188 @@
++{
++  "$schema": "https://json-schema.org/draft/2020-12/schema",
++  "title": "ADWF provider-durable writer lease registry v1",
++  "type": "object",
++  "additionalProperties": false,
++  "required": [
++    "$schema",
++    "schema_version",
++    "repository",
++    "revision",
++    "observed_main_sha",
++    "max_parallel_writers",
++    "leases",
++    "integrity_digest"
++  ],
++  "properties": {
++    "$schema": {
++      "const": ".adwf/schemas/writer-lease-registry.schema.json"
++    },
++    "schema_version": {
++      "const": 1
++    },
++    "repository": {
++      "type": "string",
++      "pattern": "^[^/\\s]+/[^/\\s]+$"
++    },
++    "revision": {
++      "type": "integer",
++      "minimum": 0
++    },
++    "observed_main_sha": {
++      "type": "string",
++      "pattern": "^[0-9a-f]{40}$"
++    },
++    "max_parallel_writers": {
++      "type": "integer",
++      "minimum": 1,
++      "maximum": 3
++    },
++    "leases": {
++      "type": "array",
++      "maxItems": 200,
++      "items": {
++        "type": "object",
++        "additionalProperties": false,
++        "required": [
++          "lease_id",
++          "generation",
++          "issue_id",
++          "roadmap_id",
++          "worker_id",
++          "base_sha",
++          "branch",
++          "resources",
++          "status",
++          "claimed_at",
++          "heartbeat_at",
++          "expires_at",
++          "released_at",
++          "provider_reconciled_at",
++          "provider_reconciliation_ref"
++        ],
++        "properties": {
++          "lease_id": {
++            "type": "string",
++            "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
++          },
++          "generation": {
++            "type": "integer",
++            "minimum": 1
++          },
++          "issue_id": {
++            "type": "string",
++            "minLength": 1,
++            "maxLength": 240,
++            "pattern": "^[0-9]+$"
++          },
++          "roadmap_id": {
++            "type": "string",
++            "minLength": 1,
++            "maxLength": 240,
++            "pattern": "^[A-Z][A-Z0-9_]*-[0-9]+$"
++          },
++          "worker_id": {
++            "type": "string",
++            "minLength": 1,
++            "maxLength": 240,
++            "pattern": "^[A-Za-z0-9_.:@+\\-/#]+$"
++          },
++          "base_sha": {
++            "type": "string",
++            "pattern": "^[0-9a-f]{40}$"
++          },
++          "branch": {
++            "type": "string",
++            "minLength": 1,
++            "maxLength": 240,
++            "pattern": "^[A-Za-z0-9][A-Za-z0-9._/+\\-]*$"
++          },
++          "resources": {
++            "type": "array",
++            "minItems": 1,
++            "uniqueItems": true,
++            "items": {
++              "type": "object",
++              "additionalProperties": false,
++              "required": [
++                "kind",
++                "scope",
++                "shared",
++                "global"
++              ],
++              "properties": {
++                "kind": {
++                  "enum": [
++                    "source",
++                    "projection",
++                    "runtime",
++                    "data",
++                    "provider",
++                    "release",
++                    "governance"
++                  ]
++                },
++                "scope": {
++                  "type": "string",
++                  "minLength": 1,
++                  "maxLength": 240,
++                  "pattern": "^[A-Za-z0-9_.:@+\\-]+(?:/[A-Za-z0-9_.:@+\\-]+)*$"
++                },
++                "shared": {
++                  "type": "boolean"
++                },
++                "global": {
++                  "type": "boolean"
++                }
++              }
++            }
++          },
++          "status": {
++            "enum": [
++              "ACTIVE",
++              "RELEASED"
++            ]
++          },
++          "claimed_at": {
++            "type": "string",
++            "format": "date-time"
++          },
++          "heartbeat_at": {
++            "type": "string",
++            "format": "date-time"
++          },
++          "expires_at": {
++            "type": "string",
++            "format": "date-time"
++          },
++          "released_at": {
++            "type": [
++              "string",
++              "null"
++            ],
++            "format": "date-time"
++          },
++          "provider_reconciled_at": {
++            "type": [
++              "string",
++              "null"
++            ],
++            "format": "date-time"
++          },
++          "provider_reconciliation_ref": {
++            "type": [
++              "string",
++              "null"
++            ],
++            "maxLength": 500,
++            "pattern": "^[A-Za-z0-9_.:@+\\-/#]+$"
++          }
++        }
++      }
++    },
++    "integrity_digest": {
++      "type": "string",
++      "pattern": "^[0-9a-f]{64}$"
++    }
++  }
++}
+diff --git a/.adwf/scripts/validate_framework.py b/.adwf/scripts/validate_framework.py
+index 528d40d..3f94e88 100644
+--- a/.adwf/scripts/validate_framework.py
++++ b/.adwf/scripts/validate_framework.py
+@@ -43,7 +43,7 @@ def main() -> int:
+         ".adwf/scripts/publish_agent_request.py", ".adwf/scripts/consume_agent_result.py", ".adwf/
