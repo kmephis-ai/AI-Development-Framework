@@ -1,0 +1,173 @@
+name: ADWF ORCH_RESUME-001 Materializer v2
+
+on:
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: write
+
+env:
+  SOURCE_MAIN: fba872d828bc3a6fe5cc404db596393577cd2672
+  TARGET_OLD_HEAD: fba872d828bc3a6fe5cc404db596393577cd2672
+  TARGET_BRANCH: agent/ORCH_RESUME-001-acquire-resume-yield
+  HELPER_BRANCH: helper/ORCH_RESUME-001-materializer-20260821-a1
+
+jobs:
+  verify-publish-v2:
+    if: github.event.pull_request.head.ref == 'helper/ORCH_RESUME-001-materializer-20260821-a1'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - name: Checkout exact BASE
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd
+        with:
+          ref: ${{ env.SOURCE_MAIN }}
+          fetch-depth: 0
+
+      - name: Exact provider CAS before implementation
+        shell: bash
+        run: |
+          set -euo pipefail
+          git fetch origin main "$TARGET_BRANCH" "$HELPER_BRANCH"
+          test "$(git rev-parse refs/remotes/origin/main)" = "$SOURCE_MAIN"
+          test "$(git rev-parse refs/remotes/origin/$TARGET_BRANCH)" = "$TARGET_OLD_HEAD"
+          test "$(git rev-parse HEAD)" = "$SOURCE_MAIN"
+
+      - name: Reuse exact verified implementation payload
+        shell: bash
+        run: |
+          set -euo pipefail
+          git show "refs/remotes/origin/$HELPER_BRANCH:.github/workflows/adwf-orch-resume-materializer.yml" > /tmp/v1.yml
+          python - <<'PY'
+          from pathlib import Path
+
+          lines = Path('/tmp/v1.yml').read_text(encoding='utf-8').splitlines()
+
+          def extract(command):
+              start = next(i for i, line in enumerate(lines) if line.strip() == command)
+              out = []
+              for line in lines[start + 1:]:
+                  if line.strip() == 'PYFILE':
+                      break
+                  out.append(line[10:] if line.startswith('          ') else line)
+              else:
+                  raise SystemExit('PAYLOAD_TERMINATOR_MISSING:' + command)
+              return '\n'.join(out) + '\n'
+
+          Path('.adwf/lib/orch_resume.py').write_text(
+              extract("cat > .adwf/lib/orch_resume.py <<'PYFILE'"), encoding='utf-8'
+          )
+          Path('.adwf/tests/test_orch_resume.py').write_text(
+              extract("cat > .adwf/tests/test_orch_resume.py <<'PYFILE'"), encoding='utf-8'
+          )
+          PY
+          git diff --check
+          python -m py_compile .adwf/lib/orch_resume.py .adwf/tests/test_orch_resume.py
+          python .adwf/tests/test_orch_resume.py -v
+
+      - name: Existing resume substrate regressions
+        shell: bash
+        run: |
+          set -euo pipefail
+          python .adwf/tests/test_autonomous_execution_state.py -v
+          python .adwf/tests/test_session_continuity_persistence.py -v
+          python .adwf/tests/test_orch_provider_leases.py -v
+          python .adwf/tests/test_leases.py -v
+          python .adwf/tests/test_orchestration.py -v
+          python .adwf/tests/test_durable_orchestrator.py -v
+          python .adwf/tests/test_v16_remediation.py -v
+
+      - name: Regenerate deterministic projections
+        shell: bash
+        run: |
+          set -euo pipefail
+          python .adwf/scripts/docs_freshness.py --write --reviewed-at 2026-08-13T00:00:00Z --valid-until 2026-11-13T00:00:00Z
+          python .adwf/scripts/generate_manifest.py
+
+      - name: Structural and integrity verification
+        shell: bash
+        run: |
+          set -euo pipefail
+          python -m py_compile .adwf/lib/orch_resume.py .adwf/tests/test_orch_resume.py
+          python .adwf/scripts/validate_ci.py
+          python .adwf/scripts/validate_framework.py
+          python .adwf/scripts/validate_pipeline_ir.py
+          python .adwf/scripts/docs_freshness.py
+          python .adwf/scripts/generate_manifest.py --check
+          python .adwf/scripts/validate_docs.py
+          python .adwf/scripts/validate_managed_surface.py
+          python .adwf/adwf.py doctor --scope package_integrity
+          python .adwf/adwf.py doctor --scope config_health
+
+      - name: Full ADWF self-test
+        shell: bash
+        run: |
+          set -euo pipefail
+          python .adwf/adwf.py self-test
+
+      - name: Final bounded diff and exact CAS
+        shell: bash
+        run: |
+          set -euo pipefail
+          # Intent-to-add makes new files visible to git diff without publishing them.
+          git add -N -- .adwf/lib/orch_resume.py .adwf/tests/test_orch_resume.py
+          git diff --check
+          git diff --name-only "$SOURCE_MAIN" | sort > /tmp/actual-final
+          python - <<'PY'
+          from pathlib import Path
+          actual = set(Path('/tmp/actual-final').read_text(encoding='utf-8').splitlines())
+          allowed = {
+              '.adwf/docs-registry.json',
+              '.adwf/lib/orch_resume.py',
+              '.adwf/tests/test_orch_resume.py',
+              'MANIFEST.json',
+              'SHA256SUMS.txt',
+          }
+          required = {'.adwf/lib/orch_resume.py', '.adwf/tests/test_orch_resume.py'}
+          unexpected = sorted(actual - allowed)
+          missing = sorted(required - actual)
+          if unexpected:
+              raise SystemExit('UNEXPECTED_FINAL_PATHS:' + ','.join(unexpected))
+          if missing:
+              raise SystemExit('REQUIRED_FINAL_PATHS_MISSING:' + ','.join(missing))
+          print('FINAL_PATHS=' + ','.join(sorted(actual)))
+          PY
+          git fetch origin main "$TARGET_BRANCH"
+          test "$(git rev-parse refs/remotes/origin/main)" = "$SOURCE_MAIN"
+          test "$(git rev-parse refs/remotes/origin/$TARGET_BRANCH)" = "$TARGET_OLD_HEAD"
+
+      - name: Publish one clean candidate commit
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name 'ADWF Provider Materializer'
+          git config user.email 'adwf-materializer@users.noreply.github.com'
+          git add -- .adwf/lib/orch_resume.py .adwf/tests/test_orch_resume.py .adwf/docs-registry.json MANIFEST.json SHA256SUMS.txt
+          git diff --cached --name-only | sort > /tmp/staged
+          python - <<'PY'
+          from pathlib import Path
+          staged = set(Path('/tmp/staged').read_text(encoding='utf-8').splitlines())
+          allowed = {
+              '.adwf/docs-registry.json',
+              '.adwf/lib/orch_resume.py',
+              '.adwf/tests/test_orch_resume.py',
+              'MANIFEST.json',
+              'SHA256SUMS.txt',
+          }
+          required = {'.adwf/lib/orch_resume.py', '.adwf/tests/test_orch_resume.py'}
+          if staged - allowed or required - staged:
+              raise SystemExit('STAGED_PATH_CONTRACT_VIOLATION:' + ','.join(sorted(staged)))
+          PY
+          git commit -m '[ORCH_RESUME-001] Coordinate executor-neutral resume decisions'
+          NEW_HEAD="$(git rev-parse HEAD)"
+          NEW_TREE="$(git rev-parse HEAD^{tree})"
+          echo "NEW_HEAD=$NEW_HEAD"
+          echo "NEW_TREE=$NEW_TREE"
+          git fetch origin main "$TARGET_BRANCH"
+          test "$(git rev-parse refs/remotes/origin/main)" = "$SOURCE_MAIN"
+          test "$(git rev-parse refs/remotes/origin/$TARGET_BRANCH)" = "$TARGET_OLD_HEAD"
+          git push origin "HEAD:refs/heads/$TARGET_BRANCH"
+          REMOTE="$(git ls-remote origin refs/heads/$TARGET_BRANCH | awk '{print $1}')"
+          test "$REMOTE" = "$NEW_HEAD"
+          echo "PUBLISHED_HEAD=$REMOTE"
