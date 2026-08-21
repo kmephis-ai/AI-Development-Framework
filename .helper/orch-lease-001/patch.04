@@ -1,0 +1,268 @@
+scripts/github_metrics_collector.py", ".adwf/scripts/generate_pipeline.py",
+         ".adwf/scripts/publish_trusted_gate.py", ".adwf/scripts/run_preview.py", ".adwf/scripts/collect_preview_attestation.py", ".adwf/scripts/reference_delivery.py", ".adwf/scripts/release.py",
+         ".adwf/lib/action_executors.py", ".adwf/lib/trust_boundary.py", ".adwf/lib/github_provider.py", ".adwf/lib/github_readback.py",
+-        ".adwf/lib/github_runtime_store.py", ".adwf/lib/owner_authority.py", ".adwf/lib/owner_intent_service.py", ".adwf/lib/durable_projection.py",
++        ".adwf/lib/github_runtime_store.py", ".adwf/lib/github_lease_store.py", ".adwf/lib/lease_registry.py", ".adwf/lib/leases.py", ".adwf/schemas/writer-lease-registry.schema.json", ".adwf/lib/owner_authority.py", ".adwf/lib/owner_intent_service.py", ".adwf/lib/durable_projection.py",
+         ".adwf/lib/controller_wakeup.py", ".adwf/lib/pack_materializer.py", ".adwf/lib/project_packs.py", ".adwf/schemas/project-pack.schema.json", ".adwf/scripts/validate_project_packs.py", ".adwf/lib/performance_evidence.py", ".adwf/lib/delivery_adapters.py",
+         ".adwf/lib/release_transaction.py", ".adwf/lib/preview_engine.py", ".adwf/capability-traceability.json", ".adwf/scripts/validate_capabilities.py", ".adwf/roadmap.json",
+         ".adwf/lib/skill_layer.py", ".adwf/scripts/validate_skills.py", ".adwf/scripts/generate_skill_registry.py", ".adwf/scripts/eval_skills.py", ".adwf/scripts/vendor_skill.py",
+diff --git a/.adwf/tests/test_orch_provider_leases.py b/.adwf/tests/test_orch_provider_leases.py
+new file mode 100644
+index 0000000..1e63980
+--- /dev/null
++++ b/.adwf/tests/test_orch_provider_leases.py
+@@ -0,0 +1,573 @@
++import copy
++import hashlib
++import json
++import sys
++import unittest
++from datetime import datetime, timedelta, timezone
++from pathlib import Path
++
++ROOT = Path(__file__).resolve().parents[2]
++sys.path.insert(0, str(ROOT / ".adwf"))
++
++from lib.contracts import validate
++from lib.github_lease_store import (
++    GitHubLeaseStore,
++    LEASE_ANCHOR_PREFIX,
++    _build_event,
++    _canonical_text,
++    _tag_name,
++)
++from lib.github_rulesets import runtime_anchor_ruleset_payload
++from lib.lease_registry import (
++    acquire_registry_lease,
++    canonical_conflict_resources,
++    conflicting_resource_keys,
++    empty_lease_registry,
++    release_registry_lease,
++    validate_lease_registry,
++)
++from lib.provider_contracts import ProviderContractError
++
++MAIN = "a" * 40
++OTHER_MAIN = "b" * 40
++BASE = "c" * 40
++
++
++def resource(kind="source", scope="repo/src", *, shared=False, global_resource=False):
++    return {"kind": kind, "scope": scope, "shared": shared, "global": global_resource}
++
++
++def resources(*items):
++    return canonical_conflict_resources(list(items))
++
++
++def reseal_registry(value):
++    payload = copy.deepcopy(value)
++    payload.pop("integrity_digest", None)
++    value["integrity_digest"] = hashlib.sha256(
++        json.dumps(payload, ensure_ascii=False, sort_keys=True, separators=(",", ":")).encode()
++    ).hexdigest()
++    return value
++
++
++class FakeGitHubClient:
++    def __init__(self, main_sha=MAIN):
++        self.repo = "example/repo"
++        self.main_sha = main_sha
++        self.tags = {}
++        self.tag_objects = {}
++        self.next_object = 1000
++        self.ruleset_verified = True
++        self.before_create_ref = None
++        self.after_create_ref = None
++
++    def repo_info(self):
++        return {"default_branch": "main"}
++
++    def branch(self, name):
++        if name != "main":
++            raise ProviderContractError("PROVIDER_HTTP_404")
++        return {"commit": {"sha": self.main_sha}}
++
++    def rulesets(self):
++        if not self.ruleset_verified:
++            return []
++        return [{"id": 91, **runtime_anchor_ruleset_payload()}]
++
++    def matching_tag_refs(self, prefix):
++        return [copy.deepcopy(value) for key, value in sorted(self.tags.items()) if key.startswith(prefix)]
++
++    def create_tag_object(self, tag, target, message):
++        self.next_object += 1
++        sha = f"{self.next_object:040x}"
++        item = {
++            "sha": sha,
++            "tag": tag,
++            "message": message,
++            "object": {"sha": target, "type": "commit"},
++        }
++        self.tag_objects[sha] = copy.deepcopy(item)
++        return copy.deepcopy(item)
++
++    def create_tag_ref(self, tag, sha):
++        if self.before_create_ref is not None:
++            callback, self.before_create_ref = self.before_create_ref, None
++            callback(self, tag, sha)
++        if tag in self.tags:
++            raise ProviderContractError("PROVIDER_HTTP_422")
++        item = {"ref": "refs/tags/" + tag, "object": {"sha": sha}}
++        self.tags[tag] = copy.deepcopy(item)
++        if self.after_create_ref is not None:
++            callback, self.after_create_ref = self.after_create_ref, None
++            callback(self, tag, sha)
++        return copy.deepcopy(item)
++
++    def tag_ref(self, tag):
++        if tag not in self.tags:
++            raise ProviderContractError("PROVIDER_HTTP_404")
++        return copy.deepcopy(self.tags[tag])
++
++    def tag_object(self, sha):
++        if sha not in self.tag_objects:
++            raise ProviderContractError("PROVIDER_HTTP_404")
++        return copy.deepcopy(self.tag_objects[sha])
++
++    def install_event(self, registry, previous_tag_object_sha=None):
++        event = _build_event(registry, previous_tag_object_sha)
++        name = _tag_name(registry["revision"])
++        obj = self.create_tag_object(name, registry["observed_main_sha"], _canonical_text(event))
++        if name in self.tags:
++            raise AssertionError("duplicate fixture tag")
++        self.tags[name] = {"ref": "refs/tags/" + name, "object": {"sha": obj["sha"]}}
++        return obj["sha"]
++
++
++class TypedConflictResourceTests(unittest.TestCase):
++    def test_exact_parent_child_and_shared_projection_overlap(self):
++        self.assertEqual(
++            conflicting_resource_keys(resources(resource(scope="repo/src")), resources(resource(scope="repo/src/app.py"))),
++            ["source:repo/src"],
++        )
++        self.assertEqual(
++            conflicting_resource_keys(
++                resources(resource("projection", "canonical/package-integrity", shared=True)),
++                resources(resource("projection", "canonical/package-integrity", shared=True)),
++            ),
++            ["projection:canonical/package-integrity"],
++        )
++
++    def test_runtime_provider_and_release_targets_conflict_semantically(self):
++        for kind, scope in (
++            ("runtime", "consumer/prod"),
++            ("provider", "github/repo/issues"),
++            ("release", "framework/v2"),
++        ):
++            self.assertEqual(
++                conflicting_resource_keys(resources(resource(kind, scope)), resources(resource(kind, scope + "/child"))),
++                [f"{kind}:{scope}"],
++            )
++
++    def test_semantically_different_resources_can_be_disjoint(self):
++        self.assertEqual(
++            conflicting_resource_keys(resources(resource("source", "repo/src/a")), resources(resource("runtime", "consumer/prod"))),
++            [],
++        )
++        self.assertEqual(
++            conflicting_resource_keys(resources(resource("source", "repo/src/a")), resources(resource("source", "repo/docs"))),
++            [],
++        )
++
++    def test_global_governance_conflicts_with_everything(self):
++        global_governance = resources(resource("governance", "global", shared=True, global_resource=True))
++        self.assertEqual(
++            conflicting_resource_keys(global_governance, resources(resource("data", "consumer/fin-truth"))),
++            ["global:global"],
++        )
++        with self.assertRaisesRegex(ValueError, "GLOBAL_MUST_BE_SHARED"):
++            canonical_conflict_resources([resource("governance", "global", global_resource=True)])
++
++    def test_unknown_ambiguous_duplicate_and_noncanonical_resources_fail_closed(self):
++        with self.assertRaisesRegex(ValueError, "KIND_INVALID"):
++            canonical_conflict_resources([resource("mystery", "repo/src")])
++        with self.assertRaisesRegex(ValueError, "SCOPE_INVALID|SCOPE_AMBIGUOUS"):
++            canonical_conflict_resources([resource(scope="repo/../secret")])
++        with self.assertRaisesRegex(ValueError, "DUPLICATE"):
++            canonical_conflict_resources([resource(), resource()])
++        unsorted = [resource("source", "repo/src"), resource("projection", "canonical/x", shared=True)]
++        registry = empty_lease_registry("example/repo", MAIN)
++        with self.assertRaisesRegex(ValueError, "NOT_CANONICAL"):
++            acquire_registry_lease(
++                registry,
++                expected_revision=0,
++                observed_main_sha=MAIN,
++                policy_max_parallel_writers=1,
++                issue_id="1",
++                roadmap_id="ORCH_LEASE-001",
++                worker_id="worker-a",
++                base_sha=BASE,
++                branch="agent/a",
++                resources=unsorted,
++                lease_id="11111111-1111-4111-8111-111111111111",
++                now=datetime(2026, 8, 21, 4, tzinfo=timezone.utc),
++            )
++
++
++class LeaseRegistryTests(unittest.TestCase):
++    def setUp(self):
++        self.now = datetime(2026, 8, 21, 4, tzinfo=timezone.utc)
++
++    def acquire(self, registry, *, resource_list=None, lease_id="11111111-1111-4111-8111-111111111111", ceiling=1):
++        return acquire_registry_lease(
++            registry,
++            expected_revision=registry["revision"],
++            observed_main_sha=MAIN,
++            policy_max_parallel_writers=ceiling,
++            issue_id="236",
++            roadmap_id="ORCH_LEASE-001",
++            worker_id="worker-a",
++            base_sha=BASE,
++            branch="agent/orch-lease",
++            resources=resource_list or resources(resource("source", "repo/lib/leases.py")),
++            lease_id=lease_id,
++            now=self.now,
++            ttl_minutes=30,
++        )
++
++    def test_empty_registry_is_schema_valid_and_integrity_bound(self):
++        registry = empty_lease_registry("example/repo", MAIN)
++        self.assertEqual(validate_lease_registry(registry), [])
++        schema = json.loads((ROOT / ".adwf/schemas/writer-lease-registry.schema.json").read_text())
++        self.assertEqual(validate(registry, schema), [])
++        tampered = dict(registry)
++        tampered["revision"] = 9
++        self.assertIn("LEASE_REGISTRY_INTEGRITY", validate_lease_registry(tampered))
++
++    def test_singleton_policy_blocks_even_disjoint_second_resource(self):
++        registry = empty_lease_registry("example/repo", MAIN, max_parallel_writers=1)
++        registry, _ = self.acquire(registry)
++        with self.assertRaisesRegex(ValueError, "ACTIVE_WRITER_EXISTS"):
++            acquire_registry_lease(
++                registry,
++                expected_revision=registry["revision"],
++                observed_main_sha=MAIN,
++                policy_max_parallel_writers=1,
++                issue_id="237",
++                roadmap_id="OTHER-001",
++                worker_id="worker-b",
++                base_sha=BASE,
++                branch="agent/other",
++                resources=resources(resource("source", "repo/docs")),
++                lease_id="22222222-2222-4222-8222-222222222222",
++                now=self.now + timedelta(minutes=1),
++            )
++
++    def test_future_ceiling_model_still_blocks_overlap(self):
++        registry = empty_lease_registry("example/repo", MAIN, max_parallel_writers=2)
++        registry, _ = self.acquire(registry, ceiling=2)
++        with self.assertRaisesRegex(ValueError, "CONFLICT_RESOURCE_BUSY"):
++            acquire_registry_lease(
++                registry,
++                expected_revision=registry["revision"],
++                observed_main_sha=MAIN,
++                policy_max_parallel_writers=2,
++                issue_id="237",
++
