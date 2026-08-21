@@ -1,0 +1,58 @@
+name: ADWF Local Git Mirror Bootstrap
+
+on:
+  push:
+    branches:
+      - agent/local-mirror-ORCH_AUTHORITY_BRIDGE-001-20260821-a1
+
+permissions:
+  contents: read
+
+env:
+  SOURCE_SHA: 5348021bc540ab33f4c42dc58d3ad629ea5abf1c
+  SOURCE_BRANCH: main
+  MIRROR_ARTIFACT_NAME: adwf-local-mirror-orch-authority-bridge-001-20260821-a1
+
+jobs:
+  build-bundle:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Build exact-source bundle
+        shell: bash
+        run: |
+          set -euo pipefail
+          git cat-file -e "${SOURCE_SHA}^{commit}"
+          git branch -f adwf-source "${SOURCE_SHA}"
+          mkdir -p mirror-artifact
+          git bundle create mirror-artifact/repository.bundle refs/heads/adwf-source --tags
+          git bundle verify mirror-artifact/repository.bundle
+          BUNDLE_SHA256="$(sha256sum mirror-artifact/repository.bundle | awk '{print $1}')"
+          BUNDLE_BYTES="$(wc -c < mirror-artifact/repository.bundle | tr -d ' ')"
+          printf '%s  %s\n' "${BUNDLE_SHA256}" "repository.bundle" > mirror-artifact/SHA256SUMS.txt
+          cat > mirror-artifact/manifest.json <<JSON
+          {
+            "schema_version": 1,
+            "source_repository": "${GITHUB_REPOSITORY}",
+            "source_branch": "${SOURCE_BRANCH}",
+            "source_sha": "${SOURCE_SHA}",
+            "transport_sha": "${GITHUB_SHA}",
+            "bundle_sha256": "${BUNDLE_SHA256}",
+            "bundle_bytes": ${BUNDLE_BYTES},
+            "bundle_ref": "refs/heads/adwf-source"
+          }
+          JSON
+
+      - name: Upload bundle artifact
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: ${{ env.MIRROR_ARTIFACT_NAME }}
+          path: mirror-artifact/
+          if-no-files-found: error
+          retention-days: 1
+          compression-level: 0
