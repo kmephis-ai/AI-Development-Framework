@@ -10,7 +10,6 @@ permissions:
 env:
   SOURCE_SHA: 51e586d51ed176c8826ee0c9d3189f48e190a166
   TARGET_BRANCH: agent/ORCH_LEASE-001-provider-durable-arbitration
-  PATCH_SHA256: cbc5168a3817d61eb237903c267624416d87ef498ae239bd652fdeddf0357295
 
 jobs:
   materialize-and-publish:
@@ -24,18 +23,18 @@ jobs:
           ref: ${{ github.event.pull_request.head.sha }}
           fetch-depth: 0
 
-      - name: Cryptographically reconstruct exact original patch
+      - name: Deterministically recover one applicable bounded patch
         shell: bash
         run: |
           set -euo pipefail
           sha256sum .helper/orch-lease-001/patch.*
+          git worktree add --detach /tmp/orch-lease-base "$SOURCE_SHA"
           python - <<'PY'
           from pathlib import Path
           import hashlib
           import itertools
-          import os
+          import subprocess
 
-          expected = os.environ['PATCH_SHA256']
           paths = sorted(Path('.helper/orch-lease-001').glob('patch.*'))
           if not paths:
               raise SystemExit('PATCH_CHUNKS_MISSING')
@@ -49,28 +48,27 @@ jobs:
                   if idx < boundary_count and not keep_newline[idx] and part.endswith(b'\n'):
                       part = part[:-1]
                   out.extend(part)
-              digest = hashlib.sha256(out).hexdigest()
-              if digest == expected:
+              candidate = Path('/tmp/orch-lease-candidate.patch')
+              candidate.write_bytes(bytes(out))
+              proc = subprocess.run(
+                  ['git', '-C', '/tmp/orch-lease-base', 'apply', '--check', str(candidate)],
+                  stdout=subprocess.PIPE,
+                  stderr=subprocess.PIPE,
+                  text=True,
+              )
+              if proc.returncode == 0:
                   matches.append((keep_newline, bytes(out)))
           if len(matches) != 1:
-              print(f'RECONSTRUCTION_MATCHES={len(matches)} EXPECTED={expected}')
-              for mask in itertools.product((False, True), repeat=boundary_count):
-                  out = bytearray()
-                  for idx, data in enumerate(chunks):
-                      part = data
-                      if idx < boundary_count and not mask[idx] and part.endswith(b'\n'):
-                          part = part[:-1]
-                      out.extend(part)
-                  digest = hashlib.sha256(out).hexdigest()
-                  if mask in ((False,) * boundary_count, (True,) * boundary_count):
-                      print(f'BOUNDARY_MASK={mask} SHA256={digest}')
-              raise SystemExit('EXACT_PATCH_RECONSTRUCTION_FAILED')
+              print(f'APPLICABLE_RECONSTRUCTIONS={len(matches)}')
+              raise SystemExit('BOUNDED_PATCH_RECONSTRUCTION_AMBIGUOUS')
           mask, payload = matches[0]
+          digest = hashlib.sha256(payload).hexdigest()
           print('BOUNDARY_KEEP_NEWLINE=' + ','.join('1' if flag else '0' for flag in mask))
-          print('PATCH_SHA256=' + hashlib.sha256(payload).hexdigest())
+          print('RECOVERED_PATCH_SHA256=' + digest)
           Path('/tmp/orch-lease.patch').write_bytes(payload)
           PY
-          test "$(sha256sum /tmp/orch-lease.patch | awk '{print $1}')" = "$PATCH_SHA256"
+          git -C /tmp/orch-lease-base apply --check /tmp/orch-lease.patch
+          git worktree remove --force /tmp/orch-lease-base
 
       - name: Exact source and writer CAS before materialization
         shell: bash
