@@ -1,0 +1,90 @@
+name: ADWF ORCH_RESUME-001 Ruleset Readback
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+
+permissions:
+  contents: read
+  metadata: read
+
+jobs:
+  readback:
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Read and verify live rulesets
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPOSITORY: ${{ github.repository }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          import json, os, urllib.request
+
+          repo = os.environ['REPOSITORY']
+          headers = {
+              'Authorization': f"Bearer {os.environ['GH_TOKEN']}",
+              'Accept': 'application/vnd.github+json',
+              'X-GitHub-Api-Version': '2022-11-28',
+          }
+
+          def get(path):
+              req = urllib.request.Request('https://api.github.com' + path, headers=headers)
+              with urllib.request.urlopen(req, timeout=20) as response:
+                  return json.load(response)
+
+          rows = get(f'/repos/{repo}/rulesets')
+          selected = {row.get('name'): row for row in rows if row.get('name') in {
+              'ADWF protected main', 'ADWF immutable runtime anchors'
+          }}
+          if set(selected) != {'ADWF protected main', 'ADWF immutable runtime anchors'}:
+              raise SystemExit('REQUIRED_RULESETS_MISSING:' + json.dumps(selected, sort_keys=True))
+
+          details = {}
+          for name, row in selected.items():
+              detail = get(f"/repos/{repo}/rulesets/{row['id']}")
+              details[name] = detail
+              if detail.get('enforcement') != 'active':
+                  raise SystemExit(f'RULESET_NOT_ACTIVE:{name}')
+              if detail.get('bypass_actors') not in ([], None):
+                  raise SystemExit(f'RULESET_BYPASS_ACTORS:{name}')
+              if detail.get('current_user_can_bypass') not in (None, 'never', False):
+                  raise SystemExit(f'RULESET_USER_BYPASS:{name}:{detail.get("current_user_can_bypass")}')
+
+          protected = details['ADWF protected main']
+          required = []
+          for rule in protected.get('rules') or []:
+              if rule.get('type') == 'required_status_checks':
+                  required = ((rule.get('parameters') or {}).get('required_status_checks') or [])
+          normalized = sorted(
+              (item.get('context'), item.get('integration_id'))
+              for item in required
+          )
+          expected = sorted([
+              ('fast-feedback', 15368),
+              ('adwf/governance-gate', 15368),
+              ('adwf/trusted-gate', 15368),
+          ])
+          if normalized != expected:
+              raise SystemExit('REQUIRED_CHECKS_MISMATCH:' + json.dumps(normalized))
+
+          anchors = details['ADWF immutable runtime anchors']
+          anchor_rule_types = sorted(rule.get('type') for rule in (anchors.get('rules') or []))
+          for needed in ('deletion', 'update'):
+              if needed not in anchor_rule_types:
+                  raise SystemExit(f'ANCHOR_RULE_MISSING:{needed}')
+
+          print('RULESET_READBACK=' + json.dumps({
+              name: {
+                  'id': detail.get('id'),
+                  'name': detail.get('name'),
+                  'enforcement': detail.get('enforcement'),
+                  'bypass_actors': detail.get('bypass_actors'),
+                  'current_user_can_bypass': detail.get('current_user_can_bypass'),
+                  'rules': detail.get('rules'),
+              }
+              for name, detail in details.items()
+          }, sort_keys=True))
+          print('RULESET_READBACK=PASS')
+          PY
