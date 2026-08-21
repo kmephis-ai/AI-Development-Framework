@@ -1,0 +1,97 @@
+name: ADWF ORCH_LEASE-001 Adversarial Review
+
+on:
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  adversarial-review:
+    if: github.event.pull_request.head.ref == 'helper/ORCH_LEASE-001-adversarial-review-20260821-a1'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - name: Checkout exact candidate
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd
+        with:
+          ref: be127aef88f0d7ce98b9cade277ef7b9b4eb65c0
+          fetch-depth: 1
+
+      - name: Run additional fail-closed adversarial cases
+        shell: bash
+        run: |
+          set -euo pipefail
+          PYTHONPATH=.adwf python - <<'PY'
+          from datetime import datetime, timezone
+          from lib.github_lease_store import GitHubLeaseStore
+          from lib.github_rulesets import runtime_anchor_ruleset_payload
+          from lib.lease_registry import canonical_conflict_resources
+          from lib.provider_contracts import ProviderContractError
+
+          MAIN = 'a' * 40
+          BASE = 'b' * 40
+
+          semantic_duplicate = [
+              {'kind': 'source', 'scope': 'repo/src', 'shared': False, 'global': False},
+              {'kind': 'source', 'scope': 'repo/src', 'shared': True, 'global': False},
+          ]
+          try:
+              canonical_conflict_resources(semantic_duplicate)
+          except ValueError:
+              print('SEMANTIC_DUPLICATE=BLOCKED')
+          else:
+              raise SystemExit('SEMANTIC_DUPLICATE_ACCEPTED')
+
+          class NoWinner422Client:
+              def __init__(self):
+                  self.repo = 'example/repo'
+                  self.main_sha = MAIN
+                  self.next_object = 1000
+                  self.objects = {}
+              def repo_info(self):
+                  return {'default_branch': 'main'}
+              def branch(self, name):
+                  return {'commit': {'sha': self.main_sha}}
+              def rulesets(self):
+                  return [{'id': 91, **runtime_anchor_ruleset_payload()}]
+              def matching_tag_refs(self, prefix):
+                  return []
+              def create_tag_object(self, tag, target, message):
+                  self.next_object += 1
+                  sha = f'{self.next_object:040x}'
+                  obj = {'sha': sha, 'tag': tag, 'message': message, 'object': {'sha': target, 'type': 'commit'}}
+                  self.objects[sha] = obj
+                  return obj
+              def create_tag_ref(self, tag, sha):
+                  raise ProviderContractError('PROVIDER_HTTP_422')
+              def tag_ref(self, tag):
+                  raise ProviderContractError('PROVIDER_HTTP_404')
+              def tag_object(self, sha):
+                  return self.objects[sha]
+
+          store = GitHubLeaseStore(NoWinner422Client())
+          try:
+              store.acquire(
+                  expected_main_sha=MAIN,
+                  policy_max_parallel_writers=1,
+                  issue_id='236',
+                  roadmap_id='ORCH_LEASE-001',
+                  worker_id='worker-a',
+                  base_sha=BASE,
+                  branch='agent/orch-lease',
+                  resources=[{'kind': 'source', 'scope': 'repo/src', 'shared': False, 'global': False}],
+                  lease_id='11111111-1111-4111-8111-111111111111',
+                  now=datetime(2026, 8, 21, 8, tzinfo=timezone.utc),
+              )
+          except Exception as exc:
+              text = str(exc)
+              print('NO_WINNER_422_RESULT=' + text)
+              if text.startswith('LEASE_PROVIDER_CAS_LOST:'):
+                  raise SystemExit('CAS_LOST_REPORTED_WITHOUT_WINNER')
+          else:
+              raise SystemExit('NO_WINNER_422_FALSE_PASS')
+
+          print('ADVERSARIAL_REVIEW=PASS')
+          PY
