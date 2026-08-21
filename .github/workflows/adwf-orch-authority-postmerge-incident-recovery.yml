@@ -1,0 +1,223 @@
+name: ORCH_AUTHORITY_BRIDGE-001 Postmerge Incident Recovery
+
+on:
+  pull_request:
+    types: [opened, reopened, synchronize]
+
+permissions:
+  contents: write
+  actions: read
+
+jobs:
+  reconcile:
+    if: github.event.pull_request.head.ref == 'helper/ORCH_AUTHORITY_BRIDGE-001-postmerge-incident-recovery-a1'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd
+        with:
+          ref: 29b95ceba823469005a0eef4e6d7d1c3b412814e
+          persist-credentials: false
+          fetch-depth: 1
+
+      - name: Verify postmerge evidence and provider-reconcile stale lease
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+          EXPECTED_MAIN: 29b95ceba823469005a0eef4e6d7d1c3b412814e
+          EXPECTED_TREE: 164707659e77f385a66793f9a7fff748349ebb19
+          EXPECTED_PARENT: 5348021bc540ab33f4c42dc58d3ad629ea5abf1c
+          EXPECTED_CANDIDATE: 972bd26ebd295fac343b10a8d23271b4dc8a7dde
+          OLD_LEASE_ID: ac575973-0210-40ac-9242-ddb0e1c58112
+          ISSUE_ID: '251'
+          ROADMAP_ID: ORCH_AUTHORITY_BRIDGE-001
+          LEASE_ID: 00b0e9f1-b767-46ac-a582-bb63fbbc2c16
+          EXPECTED_LEASE_ANCHOR: eb4e08b4e28cb776ed277fda2454acd00018c8d0
+          EXPECTED_REGISTRY_REVISION: '3'
+          WORKER_ID: adwf-runtime:orch-authority-bridge-001-bootstrap-a1
+          WORK_BRANCH: adwf/orch-authority-bridge-001-dae31fc6ccb7
+        shell: python
+        run: |
+          from pathlib import Path
+          from datetime import datetime, timedelta, timezone
+          import json, os, sys, time
+
+          root = Path.cwd()
+          sys.path.insert(0, str(root / '.adwf'))
+          from lib.evidence import parse_time
+          from lib.github_lease_store import GitHubLeaseStore
+          from lib.github_provider import GitHubClient
+          from lib.github_rulesets import verify_rulesets, verify_runtime_anchor_ruleset
+          from lib.strict_json import loads as strict_loads
+
+          repo = os.environ['GITHUB_REPOSITORY']
+          token = os.environ['GITHUB_TOKEN']
+          expected_main = os.environ['EXPECTED_MAIN']
+          expected_tree = os.environ['EXPECTED_TREE']
+          expected_parent = os.environ['EXPECTED_PARENT']
+          expected_candidate = os.environ['EXPECTED_CANDIDATE']
+          old_lease_id = os.environ['OLD_LEASE_ID']
+          issue_id = os.environ['ISSUE_ID']
+          roadmap_id = os.environ['ROADMAP_ID']
+          lease_id = os.environ['LEASE_ID']
+          expected_anchor = os.environ['EXPECTED_LEASE_ANCHOR']
+          expected_revision = int(os.environ['EXPECTED_REGISTRY_REVISION'])
+          worker_id = os.environ['WORKER_ID']
+          work_branch = os.environ['WORK_BRANCH']
+          resources = [{'kind':'provider','scope':'global','shared':True,'global':True}]
+
+          cfg = strict_loads((root / '.adwf/config.json').read_text(encoding='utf-8'))
+          policy = cfg.get('policy') or {}
+          orch = cfg.get('orchestration') or {}
+          cost = cfg.get('cost') or {}
+          if policy.get('fail_mode') != 'CLOSED' or policy.get('active_autonomy') != 'A2' or policy.get('max_autonomous_risk') != 'R1':
+              raise SystemExit('RECOVERY_POLICY_DRIFT')
+          if orch.get('max_parallel_writers') != 1 or orch.get('heartbeat_minutes') != 30 or orch.get('lease_ttl_minutes') != 120:
+              raise SystemExit('RECOVERY_ORCHESTRATION_POLICY_DRIFT')
+          if cost.get('mode') != 'FREE_ONLY' or cost.get('monetary_budget') != 0:
+              raise SystemExit('RECOVERY_COST_POLICY_DRIFT')
+
+          client = GitHubClient(repo, token)
+          store = GitHubLeaseStore(client)
+
+          main = str((client.branch('main').get('commit') or {}).get('sha') or '')
+          if main != expected_main:
+              raise SystemExit('RECOVERY_MAIN_DRIFT:' + main)
+          commit = client.get(f'/repos/{repo}/git/commits/{expected_main}')
+          tree = str((commit.get('tree') or {}).get('sha') or '')
+          parents = [str((x or {}).get('sha') or '') for x in (commit.get('parents') or [])]
+          if tree != expected_tree or parents != [expected_parent]:
+              raise SystemExit('RECOVERY_MERGE_IDENTITY_DRIFT')
+          merge_committer_at = parse_time(str((commit.get('committer') or {}).get('date') or ''))
+
+          writer_ref = client.git_ref(work_branch)
+          if str((writer_ref.get('object') or {}).get('sha') or '') != expected_candidate:
+              raise SystemExit('RECOVERY_WORK_BRANCH_DRIFT')
+
+          rulesets = client.rulesets()
+          protected = verify_rulesets(rulesets, expected_integration_id=15368)
+          anchors = verify_runtime_anchor_ruleset(rulesets)
+          if protected.get('readback_verified') is not True:
+              raise SystemExit('RECOVERY_PROTECTED_MAIN_RULESET_NOT_VERIFIED:' + ','.join(protected.get('reason_codes') or []))
+          if anchors.get('readback_verified') is not True:
+              raise SystemExit('RECOVERY_RUNTIME_ANCHOR_RULESET_NOT_VERIFIED:' + ','.join(anchors.get('reason_codes') or []))
+          named = {str(x.get('name') or ''): x for x in rulesets}
+          for name in ('ADWF protected main', 'ADWF immutable runtime anchors'):
+              rs = named.get(name) or {}
+              if rs.get('enforcement') != 'active' or (rs.get('bypass_actors') or []) != []:
+                  raise SystemExit('RECOVERY_RULESET_GOVERNANCE_DRIFT:' + name)
+              if rs.get('current_user_can_bypass') not in (None, 'never', False):
+                  raise SystemExit('RECOVERY_RULESET_BYPASS_DRIFT:' + name)
+          protected_named = named.get('ADWF protected main') or {}
+          required = []
+          strict = False
+          for rule in protected_named.get('rules') or []:
+              if rule.get('type') == 'required_status_checks':
+                  params = rule.get('parameters') or {}
+                  strict = params.get('strict_required_status_checks_policy') is True
+                  required = params.get('required_status_checks') or []
+          normalized = sorted((x.get('context'), x.get('integration_id')) for x in required)
+          expected_checks = sorted([
+              ('fast-feedback', 15368),
+              ('adwf/governance-gate', 15368),
+              ('adwf/trusted-gate', 15368),
+          ])
+          if not strict or normalized != expected_checks:
+              raise SystemExit('RECOVERY_REQUIRED_CHECK_RULESET_DRIFT:' + json.dumps(normalized))
+
+          wanted = {'ADWF Main', 'ADWF Platform Smoke'}
+          postmerge = {}
+          for attempt in range(7):
+              rows = client.recent_runs(limit=100)
+              candidates = {
+                  name: [r for r in rows if r.get('name') == name and r.get('head_sha') == expected_main and r.get('event') == 'push']
+                  for name in wanted
+              }
+              postmerge = {}
+              for name, matches in candidates.items():
+                  matches.sort(key=lambda r: str(r.get('created_at') or ''), reverse=True)
+                  if matches:
+                      r = matches[0]
+                      postmerge[name] = {
+                          'id': r.get('id'),
+                          'name': r.get('name'),
+                          'event': r.get('event'),
+                          'status': r.get('status'),
+                          'conclusion': r.get('conclusion'),
+                          'head_sha': r.get('head_sha'),
+                          'run_number': r.get('run_number'),
+                          'run_attempt': r.get('run_attempt'),
+                      }
+              if wanted.issubset(postmerge) and all(x.get('status') == 'completed' for x in postmerge.values()):
+                  break
+              time.sleep(5)
+          if set(postmerge) != wanted:
+              raise SystemExit('RECOVERY_POSTMERGE_RUNS_MISSING:' + json.dumps(postmerge, sort_keys=True))
+          if any(x.get('status') != 'completed' or x.get('conclusion') != 'success' for x in postmerge.values()):
+              raise SystemExit('RECOVERY_POSTMERGE_NOT_SUCCESS:' + json.dumps(postmerge, sort_keys=True))
+
+          registry, anchor = store.read(expected_main_sha=expected_main, policy_max_parallel_writers=1)
+          if registry.get('revision') != expected_revision or anchor != expected_anchor:
+              raise SystemExit('RECOVERY_REGISTRY_IDENTITY_DRIFT')
+          if registry.get('observed_main_sha') != expected_parent:
+              raise SystemExit('RECOVERY_REGISTRY_MAIN_OBSERVATION_DRIFT')
+          leases = registry.get('leases') or []
+          if len(leases) != 2:
+              raise SystemExit('RECOVERY_LEASE_HISTORY_CARDINALITY')
+          old = [x for x in leases if x.get('lease_id') == old_lease_id]
+          if len(old) != 1 or old[0].get('generation') != 1 or old[0].get('status') != 'RELEASED':
+              raise SystemExit('RECOVERY_OLD_LEASE_HISTORY_DRIFT')
+          active = [x for x in leases if x.get('status') == 'ACTIVE']
+          if len(active) != 1:
+              raise SystemExit('RECOVERY_ACTIVE_WRITER_CARDINALITY')
+          lease = active[0]
+          expected_lease = {
+              'lease_id': lease_id,
+              'generation': 3,
+              'issue_id': issue_id,
+              'roadmap_id': roadmap_id,
+              'worker_id': worker_id,
+              'base_sha': expected_parent,
+              'branch': work_branch,
+              'resources': resources,
+              'status': 'ACTIVE',
+          }
+          for key, value in expected_lease.items():
+              if lease.get(key) != value:
+                  raise SystemExit('RECOVERY_LEASE_BINDING_MISMATCH:' + key)
+          heartbeat = parse_time(str(lease.get('heartbeat_at')))
+          freshness_deadline = heartbeat + timedelta(minutes=int(orch['heartbeat_minutes']))
+          if merge_committer_at <= freshness_deadline:
+              raise SystemExit('RECOVERY_STALE_AUTHORITY_INCIDENT_NOT_PROVEN')
+          overrun_seconds = (merge_committer_at - freshness_deadline).total_seconds()
+          now = datetime.now(timezone.utc)
+          if heartbeat > now or (now - heartbeat).total_seconds() <= int(orch['heartbeat_minutes']) * 60:
+              raise SystemExit('RECOVERY_LEASE_NOT_STALE')
+
+          reconciliation_ref = 'github:commit:' + expected_main
+          released, release_anchor = store.release(
+              expected_main_sha=expected_main,
+              policy_max_parallel_writers=1,
+              lease_id=lease_id,
+              worker_id=worker_id,
+              provider_reconciled=True,
+              provider_reconciliation_ref=reconciliation_ref,
+          )
+          if released.get('revision') != expected_revision + 1 or released.get('observed_main_sha') != expected_main:
+              raise SystemExit('RECOVERY_RELEASE_REVISION_MISMATCH')
+
+          final, final_anchor = store.read(expected_main_sha=expected_main, policy_max_parallel_writers=1)
+          if final.get('revision') != expected_revision + 1 or final_anchor != release_anchor or final.get('observed_main_sha') != expected_main:
+              raise SystemExit('RECOVERY_RELEASE_READBACK_MISMATCH')
+          if any(x.get('status') == 'ACTIVE' for x in final.get('leases') or []):
+              raise SystemExit('RECOVERY_ACTIVE_WRITER_REMAINS')
+          target = [x for x in final.get('leases') or [] if x.get('lease_id') == lease_id]
+          if len(target) != 1 or target[0].get('status') != 'RELEASED' or target[0].get('provider_reconciliation_ref') != reconciliation_ref:
+              raise SystemExit('RECOVERY_TARGET_LEASE_NOT_RELEASED')
+
+          print('POSTMERGE_RUNS=' + json.dumps(postmerge, sort_keys=True))
+          print('STALE_AUTHORITY_OVERRUN_SECONDS=' + str(overrun_seconds))
+          print('LEASE_RECOVERY=PASS')
+          print('RELEASED_LEASE_ID=' + lease_id)
+          print('RELEASE_REGISTRY_REVISION=' + str(final['revision']))
+          print('RELEASE_ANCHOR=' + str(final_anchor))
+          print('ACTIVE_WRITERS=0')
