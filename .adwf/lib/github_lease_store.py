@@ -235,7 +235,12 @@ class GitHubLeaseStore:
             if str(exc) != "LEASE_PROVIDER_CAS_CONFLICT":
                 raise
             winner, winner_anchor = self.read(expected_main_sha=expected_main_sha, policy_max_parallel_writers=policy_max_parallel_writers)
-            suffix = f":anchor={winner_anchor}" if winner_anchor else ""
+            # 409/422 alone does not prove a competing winner. Only a provider
+            # readback that advanced beyond our observed revision may be
+            # classified as a lost CAS race.
+            if winner["revision"] <= expected_previous_revision or winner_anchor is None:
+                raise ValueError("LEASE_PROVIDER_CAS_CONFLICT_UNRESOLVED") from exc
+            suffix = f":anchor={winner_anchor}"
             raise ValueError("LEASE_PROVIDER_CAS_LOST:revision=" + str(winner["revision"]) + suffix) from exc
 
     def acquire(self, *, expected_main_sha: str, policy_max_parallel_writers: int, issue_id: str, roadmap_id: str, worker_id: str, base_sha: str, branch: str, resources: list[dict[str, Any]], now=None, ttl_minutes: int = 120, lease_id: str | None = None) -> tuple[dict[str, Any], dict[str, Any], str]:

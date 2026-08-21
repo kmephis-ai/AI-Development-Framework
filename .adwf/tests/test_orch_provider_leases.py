@@ -191,6 +191,13 @@ class TypedConflictResourceTests(unittest.TestCase):
                 now=datetime(2026, 8, 21, 4, tzinfo=timezone.utc),
             )
 
+    def test_same_semantic_resource_with_contradictory_flags_is_duplicate(self):
+        with self.assertRaisesRegex(ValueError, "CONFLICT_RESOURCE_DUPLICATE"):
+            canonical_conflict_resources([
+                resource("source", "repo/src", shared=False),
+                resource("source", "repo/src", shared=True),
+            ])
+
 
 class LeaseRegistryTests(unittest.TestCase):
     def setUp(self):
@@ -444,6 +451,21 @@ class GitHubLeaseStoreTests(unittest.TestCase):
         active = [lease for lease in observed["leases"] if lease["status"] == "ACTIVE"]
         self.assertEqual([lease["lease_id"] for lease in active], [winner_lease["lease_id"]])
         self.assertEqual(len(self.client.tags), 1)
+
+    def test_422_without_provider_winner_is_unresolved_not_cas_lost(self):
+        client = FakeGitHubClient()
+        def reject_ref(_tag, _sha):
+            raise ProviderContractError("PROVIDER_HTTP_422")
+        client.create_tag_ref = reject_ref
+        store = GitHubLeaseStore(client)
+        with self.assertRaisesRegex(ValueError, "LEASE_PROVIDER_CAS_CONFLICT_UNRESOLVED"):
+            store.acquire(
+                expected_main_sha=MAIN, policy_max_parallel_writers=1, issue_id="236",
+                roadmap_id="ORCH_LEASE-001", worker_id="worker-a", base_sha=BASE,
+                branch="agent/orch-lease", resources=resources(resource("source", "repo/src")),
+                lease_id="11111111-1111-4111-8111-111111111111", now=self.now, ttl_minutes=30,
+            )
+        self.assertEqual(client.tags, {})
 
     def test_provider_ref_substitution_blocks_readback(self):
         def substitute(client, tag, _sha):

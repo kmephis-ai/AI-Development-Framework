@@ -69,7 +69,9 @@ def canonical_conflict_resources(resources: Any) -> list[dict[str, Any]]:
     if not isinstance(resources, list) or not resources:
         raise ValueError("CONFLICT_RESOURCES_REQUIRED")
     validated = [_validate_conflict_resource(item) for item in resources]
-    keys = [(item["kind"], item["scope"], item["shared"], item["global"]) for item in validated]
+    # Semantic identity is kind+scope. Flags describe authority semantics and
+    # may not create two contradictory declarations of the same resource.
+    keys = [(item["kind"], item["scope"]) for item in validated]
     if len(keys) != len(set(keys)):
         raise ValueError("CONFLICT_RESOURCE_DUPLICATE")
     return sorted(validated, key=lambda item: (item["kind"], item["scope"], item["shared"], item["global"]))
