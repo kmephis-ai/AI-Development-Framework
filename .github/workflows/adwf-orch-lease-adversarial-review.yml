@@ -32,6 +32,7 @@ jobs:
 
           MAIN = 'a' * 40
           BASE = 'b' * 40
+          gaps = []
 
           semantic_duplicate = [
               {'kind': 'source', 'scope': 'repo/src', 'shared': False, 'global': False},
@@ -42,7 +43,8 @@ jobs:
           except ValueError:
               print('SEMANTIC_DUPLICATE=BLOCKED')
           else:
-              raise SystemExit('SEMANTIC_DUPLICATE_ACCEPTED')
+              print('SEMANTIC_DUPLICATE=ACCEPTED')
+              gaps.append('SEMANTIC_DUPLICATE_ACCEPTED')
 
           class NoWinner422Client:
               def __init__(self):
@@ -89,9 +91,11 @@ jobs:
               text = str(exc)
               print('NO_WINNER_422_RESULT=' + text)
               if text.startswith('LEASE_PROVIDER_CAS_LOST:'):
-                  raise SystemExit('CAS_LOST_REPORTED_WITHOUT_WINNER')
+                  gaps.append('CAS_LOST_REPORTED_WITHOUT_WINNER')
           else:
-              raise SystemExit('NO_WINNER_422_FALSE_PASS')
+              gaps.append('NO_WINNER_422_FALSE_PASS')
 
+          if gaps:
+              raise SystemExit('ADVERSARIAL_GAPS=' + ','.join(gaps))
           print('ADVERSARIAL_REVIEW=PASS')
           PY
