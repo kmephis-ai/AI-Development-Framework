@@ -31,6 +31,8 @@ jobs:
           sha256sum .helper/orch-lease-001/patch.*
           python - <<'PY'
           from pathlib import Path
+          import re
+
           chunks = sorted(Path('.helper/orch-lease-001').glob('patch.*'))
           if not chunks:
               raise SystemExit('PATCH_CHUNKS_MISSING')
@@ -40,12 +42,40 @@ jobs:
               if idx < len(chunks) - 1 and data.endswith(b'\n'):
                   data = data[:-1]
               out.extend(data)
-          Path('/tmp/orch-lease.patch').write_bytes(out)
+          raw = bytes(out)
+          Path('/tmp/orch-lease.raw.patch').write_bytes(raw)
+
+          text = raw.decode('utf-8')
+          marker = 'diff --git a/.adwf/lib/github_lease_store.py b/.adwf/lib/github_lease_store.py\n'
+          start = text.find(marker)
+          if start < 0:
+              raise SystemExit('LEASE_STORE_PATCH_SECTION_MISSING')
+          section_end = text.find('\ndiff --git ', start + len(marker))
+          if section_end < 0:
+              raise SystemExit('LEASE_STORE_PATCH_SECTION_UNTERMINATED')
+          section = text[start:section_end + 1]
+          match = re.search(r'^@@ -0,0 \+1,(\d+) @@$', section, re.MULTILINE)
+          if not match:
+              raise SystemExit('LEASE_STORE_NEW_FILE_HUNK_HEADER_MISSING')
+          body = section[match.end():]
+          if body.startswith('\n'):
+              body = body[1:]
+          added_lines = sum(1 for line in body.splitlines() if line.startswith('+') and not line.startswith('+++'))
+          declared = int(match.group(1))
+          echo = f'LEASE_STORE_HUNK_DECLARED={declared} ACTUAL={added_lines}'
+          print(echo)
+          if added_lines < declared:
+              raise SystemExit('LEASE_STORE_HUNK_COUNT_UNDERFLOW')
+          if added_lines != declared:
+              fixed_section = section[:match.start()] + f'@@ -0,0 +1,{added_lines} @@' + section[match.end():]
+              text = text[:start] + fixed_section + text[section_end + 1:]
+          Path('/tmp/orch-lease.patch').write_text(text, encoding='utf-8')
           PY
-          ACTUAL="$(sha256sum /tmp/orch-lease.patch | awk '{print $1}')"
-          echo "ACTUAL_PATCH_SHA256=$ACTUAL"
-          echo "EXPECTED_PATCH_SHA256=$PATCH_SHA256"
+          ACTUAL="$(sha256sum /tmp/orch-lease.raw.patch | awk '{print $1}')"
+          echo "ACTUAL_RAW_PATCH_SHA256=$ACTUAL"
+          echo "EXPECTED_RAW_PATCH_SHA256=$PATCH_SHA256"
           test "$ACTUAL" = "$PATCH_SHA256"
+          echo "NORMALIZED_PATCH_SHA256=$(sha256sum /tmp/orch-lease.patch | awk '{print $1}')"
 
       - name: Exact source and writer CAS before materialization
         shell: bash
