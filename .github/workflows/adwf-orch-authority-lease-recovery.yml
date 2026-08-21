@@ -1,0 +1,158 @@
+name: ORCH_AUTHORITY_BRIDGE-001 Lease Recovery
+
+on:
+  pull_request:
+    types: [opened, reopened, synchronize]
+
+permissions:
+  contents: write
+
+jobs:
+  recover-lease:
+    if: github.event.pull_request.head.ref == 'helper/ORCH_AUTHORITY_BRIDGE-001-lease-recovery-a1'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd
+        with:
+          ref: 5348021bc540ab33f4c42dc58d3ad629ea5abf1c
+          persist-credentials: false
+          fetch-depth: 1
+
+      - name: Reconcile stale lease and reacquire exact work authority
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+          EXPECTED_MAIN: 5348021bc540ab33f4c42dc58d3ad629ea5abf1c
+          ISSUE_ID: '251'
+          ROADMAP_ID: ORCH_AUTHORITY_BRIDGE-001
+          OLD_LEASE_ID: ac575973-0210-40ac-9242-ddb0e1c58112
+          OLD_ANCHOR: 9b27dd3e9cb56031fa0ad52f2e84a447729410fe
+          WORKER_ID: adwf-runtime:orch-authority-bridge-001-bootstrap-a1
+          WORK_BRANCH: adwf/orch-authority-bridge-001-dae31fc6ccb7
+        shell: python
+        run: |
+          from pathlib import Path
+          from datetime import datetime, timezone
+          import os, sys
+
+          root = Path.cwd()
+          sys.path.insert(0, str(root / '.adwf'))
+          from lib.github_lease_store import GitHubLeaseStore
+          from lib.github_provider import GitHubClient
+          from lib.strict_json import loads as strict_loads
+          from lib.evidence import parse_time
+          from lib.leases import DEFAULT_HEARTBEAT_TIMEOUT_MINUTES
+
+          repo = os.environ['GITHUB_REPOSITORY']
+          token = os.environ['GITHUB_TOKEN']
+          expected_main = os.environ['EXPECTED_MAIN']
+          issue_id = os.environ['ISSUE_ID']
+          roadmap_id = os.environ['ROADMAP_ID']
+          old_lease_id = os.environ['OLD_LEASE_ID']
+          old_anchor = os.environ['OLD_ANCHOR']
+          worker_id = os.environ['WORKER_ID']
+          branch = os.environ['WORK_BRANCH']
+
+          cfg = strict_loads((root / '.adwf/config.json').read_text(encoding='utf-8'))
+          orch = cfg.get('orchestration') or {}
+          if orch.get('max_parallel_writers') != 1:
+              raise SystemExit('RECOVERY_WRITER_CEILING_DRIFT')
+          ttl = orch.get('lease_ttl_minutes')
+          if not isinstance(ttl, int) or isinstance(ttl, bool) or not 1 <= ttl <= 240:
+              raise SystemExit('RECOVERY_TTL_POLICY_INVALID')
+
+          client = GitHubClient(repo, token)
+          store = GitHubLeaseStore(client)
+          resources = [{'kind':'provider','scope':'global','shared':True,'global':True}]
+
+          branch_readback = client.git_ref(branch)
+          branch_sha = str((branch_readback.get('object') or {}).get('sha') or '')
+          if branch_sha != expected_main:
+              raise SystemExit('RECOVERY_WORK_BRANCH_DRIFT')
+
+          registry, anchor = store.read(expected_main_sha=expected_main, policy_max_parallel_writers=1)
+          if registry.get('revision') != 1 or anchor != old_anchor:
+              raise SystemExit('RECOVERY_REGISTRY_IDENTITY_DRIFT')
+          active = [x for x in registry.get('leases') or [] if x.get('status') == 'ACTIVE']
+          if len(active) != 1:
+              raise SystemExit('RECOVERY_ACTIVE_WRITER_CARDINALITY')
+          lease = active[0]
+          expected = {
+              'lease_id': old_lease_id,
+              'issue_id': issue_id,
+              'roadmap_id': roadmap_id,
+              'worker_id': worker_id,
+              'base_sha': expected_main,
+              'branch': branch,
+              'resources': resources,
+          }
+          for key, value in expected.items():
+              if lease.get(key) != value:
+                  raise SystemExit('RECOVERY_OLD_LEASE_BINDING_MISMATCH:' + key)
+          heartbeat_at = parse_time(str(lease.get('heartbeat_at')))
+          now = datetime.now(timezone.utc)
+          if heartbeat_at > now:
+              raise SystemExit('RECOVERY_OLD_LEASE_HEARTBEAT_IN_FUTURE')
+          if (now - heartbeat_at).total_seconds() <= DEFAULT_HEARTBEAT_TIMEOUT_MINUTES * 60:
+              raise SystemExit('RECOVERY_OLD_LEASE_NOT_STALE')
+
+          released, release_anchor = store.release(
+              expected_main_sha=expected_main,
+              policy_max_parallel_writers=1,
+              lease_id=old_lease_id,
+              worker_id=worker_id,
+              provider_reconciled=True,
+              provider_reconciliation_ref='github:branch:' + branch + '@' + branch_sha,
+          )
+          if released.get('revision') != 2:
+              raise SystemExit('RECOVERY_RELEASE_REVISION_MISMATCH')
+
+          after_release, after_release_anchor = store.read(expected_main_sha=expected_main, policy_max_parallel_writers=1)
+          if after_release.get('revision') != 2 or after_release_anchor != release_anchor:
+              raise SystemExit('RECOVERY_RELEASE_READBACK_MISMATCH')
+          if any(x.get('status') == 'ACTIVE' for x in after_release.get('leases') or []):
+              raise SystemExit('RECOVERY_RELEASE_ACTIVE_WRITER_REMAINS')
+          old = [x for x in after_release.get('leases') or [] if x.get('lease_id') == old_lease_id]
+          if len(old) != 1 or old[0].get('status') != 'RELEASED':
+              raise SystemExit('RECOVERY_RELEASE_OLD_LEASE_NOT_TERMINAL')
+
+          persisted, new_lease, acquire_anchor = store.acquire(
+              expected_main_sha=expected_main,
+              policy_max_parallel_writers=1,
+              issue_id=issue_id,
+              roadmap_id=roadmap_id,
+              worker_id=worker_id,
+              base_sha=expected_main,
+              branch=branch,
+              resources=resources,
+              ttl_minutes=ttl,
+          )
+          if persisted.get('revision') != 3 or new_lease.get('generation') != 3:
+              raise SystemExit('RECOVERY_REACQUIRE_REVISION_MISMATCH')
+
+          final, final_anchor = store.read(expected_main_sha=expected_main, policy_max_parallel_writers=1)
+          active = [x for x in final.get('leases') or [] if x.get('status') == 'ACTIVE']
+          if final.get('revision') != 3 or final_anchor != acquire_anchor or len(active) != 1:
+              raise SystemExit('RECOVERY_REACQUIRE_READBACK_MISMATCH')
+          current = active[0]
+          expected_new = {
+              'lease_id': new_lease.get('lease_id'),
+              'issue_id': issue_id,
+              'roadmap_id': roadmap_id,
+              'worker_id': worker_id,
+              'base_sha': expected_main,
+              'branch': branch,
+              'resources': resources,
+              'status': 'ACTIVE',
+          }
+          for key, value in expected_new.items():
+              if current.get(key) != value:
+                  raise SystemExit('RECOVERY_NEW_LEASE_BINDING_MISMATCH:' + key)
+
+          print('LEASE_RECOVERY=PASS')
+          print('RELEASE_ANCHOR=' + str(release_anchor))
+          print('NEW_LEASE_ID=' + str(new_lease['lease_id']))
+          print('NEW_LEASE_GENERATION=' + str(new_lease['generation']))
+          print('NEW_REGISTRY_REVISION=' + str(final['revision']))
+          print('NEW_LEASE_ANCHOR=' + str(final_anchor))
+          print('WORK_BRANCH_SHA=' + branch_sha)
