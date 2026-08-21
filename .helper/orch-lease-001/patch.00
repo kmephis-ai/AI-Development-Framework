@@ -1,0 +1,461 @@
+diff --git a/.adwf/docs-registry.json b/.adwf/docs-registry.json
+index 2ff8017..b5ee1f9 100644
+--- a/.adwf/docs-registry.json
++++ b/.adwf/docs-registry.json
+@@ -11,7 +11,7 @@
+         ".github/workflows/**"
+       ],
+       "mode": "generated-status-block+manual",
+-      "source_digest": "6f4ec63eb1203b79e17fbd3f5b1f08635aeba5ffdff9c4578fd75aa6140cf3ff",
++      "source_digest": "01b5de198a1d3fcdb9a8a7f061a329db9092ac8db97880d76cbac2f9898a3b76",
+       "reviewed_at": "2026-08-13T00:00:00Z",
+       "valid_until": "2026-11-13T00:00:00Z"
+     },
+@@ -24,7 +24,7 @@
+         "skills/**"
+       ],
+       "mode": "manual-governance",
+-      "source_digest": "85579965a6e3222112ffb336d365596e632e390e239600de747c2d57cfcf819f",
++      "source_digest": "bf084e4769b0c10ae79fefb8802438a56279017b449727b496d9a784b477ab1c",
+       "reviewed_at": "2026-08-13T00:00:00Z",
+       "valid_until": "2026-11-13T00:00:00Z"
+     },
+@@ -37,7 +37,7 @@
+         ".adwf/scripts/**"
+       ],
+       "mode": "architecture",
+-      "source_digest": "670ae183e9ace1a3ac54e1e0e2b2f5b366de933fe6c5a74cc5b9e6701de1d10e",
++      "source_digest": "53da6aafbec9e41f69a8654357c472fd26390b056039193de14152323e9f41cc",
+       "reviewed_at": "2026-08-13T00:00:00Z",
+       "valid_until": "2026-11-13T00:00:00Z"
+     },
+@@ -65,7 +65,7 @@
+         ".adwf/scripts/validate_capabilities.py"
+       ],
+       "mode": "implementation-certification",
+-      "source_digest": "d9cdb2fc8abac3e3e654a4690f0fa900cc07a7478d10a9156f4bc9d7d81004dc",
++      "source_digest": "b8ca1f020638db7de81f9fd90342669e80e06f452f6e2066b81652053afc3d94",
+       "reviewed_at": "2026-08-13T00:00:00Z",
+       "valid_until": "2026-11-13T00:00:00Z"
+     },
+diff --git a/.adwf/lib/github_lease_store.py b/.adwf/lib/github_lease_store.py
+new file mode 100644
+index 0000000..66d1f37
+--- /dev/null
++++ b/.adwf/lib/github_lease_store.py
+@@ -0,0 +1,388 @@
++"""GitHub-backed immutable CAS stream for ORCH writer lease arbitration.
++
++The lease registry is persisted as an append-only sequence of annotated Git tags
++under the existing protected ``adwf-runtime-anchor-*`` namespace.  Each revision
++uses one deterministic tag name, so competing executors racing from the same
++registry revision can create at most one authoritative next ref.  Tag update and
++deletion protection is verified from the provider before every authoritative read
++or write.
++
++This store is arbitration state only. Roadmap/Issue contracts remain work
++authority, and fresh GitHub facts + Effective Policy remain mandatory before
++mutation.
++"""
++from __future__ import annotations
++
++from dataclasses import dataclass
++from typing import Any
++import copy
++import hashlib
++import json
++import re
++
++from .github_provider import GitHubClient
++from .github_rulesets import verify_runtime_anchor_ruleset
++from .lease_registry import (
++    acquire_registry_lease,
++    empty_lease_registry,
++    heartbeat_registry_lease,
++    release_registry_lease,
++    validate_lease_registry,
++)
++from .provider_contracts import ProviderContractError
++from .strict_json import loads as strict_loads
++
++LEASE_ANCHOR_PREFIX = "adwf-runtime-anchor-lease-v1-"
++LEASE_ANCHOR_ROLE = "ADWF_ORCH_LEASE_REGISTRY_V1"
++LEASE_ANCHOR_EVENT_VERSION = 1
++_TAG_RE = re.compile(r"^" + re.escape(LEASE_ANCHOR_PREFIX) + r"([0-9]{9})$")
++_SHA40_RE = re.compile(r"^[0-9a-f]{40}$")
++_SHA256_RE = re.compile(r"^[0-9a-f]{64}$")
++
++
++def _canonical_bytes(value: Any) -> bytes:
++    return json.dumps(value, ensure_ascii=False, sort_keys=True, separators=(",", ":")).encode("utf-8")
++
++
++def _canonical_text(value: Any) -> str:
++    return _canonical_bytes(value).decode("utf-8")
++
++
++def _event_digest(value: dict[str, Any]) -> str:
++    payload = copy.deepcopy(value)
++    payload.pop("event_digest", None)
++    return hashlib.sha256(_canonical_bytes(payload)).hexdigest()
++
++
++def _tag_name(revision: int) -> str:
++    if isinstance(revision, bool) or not isinstance(revision, int) or not 1 <= revision <= 999_999_999:
++        raise ValueError("LEASE_PROVIDER_REVISION_INVALID")
++    return f"{LEASE_ANCHOR_PREFIX}{revision:09d}"
++
++
++def _build_event(registry: dict[str, Any], previous_tag_object_sha: str | None) -> dict[str, Any]:
++    findings = validate_lease_registry(registry)
++    if findings:
++        raise ValueError("LEASE_PROVIDER_STATE_INVALID:" + ",".join(findings))
++    revision = registry["revision"]
++    if revision < 1:
++        raise ValueError("LEASE_PROVIDER_REVISION_INVALID")
++    if previous_tag_object_sha is not None and _SHA40_RE.fullmatch(previous_tag_object_sha) is None:
++        raise ValueError("LEASE_PROVIDER_PREVIOUS_ANCHOR_INVALID")
++    event = {
++        "schema_version": LEASE_ANCHOR_EVENT_VERSION,
++        "role": LEASE_ANCHOR_ROLE,
++        "revision": revision,
++        "previous_tag_object_sha": previous_tag_object_sha,
++        "registry": copy.deepcopy(registry),
++        "event_digest": "",
++    }
++    event["event_digest"] = _event_digest(event)
++    return event
++
++
++def _parse_event(message: str) -> dict[str, Any]:
++    try:
++        value = strict_loads(message)
++    except (json.JSONDecodeError, ValueError) as exc:
++        raise ValueError("LEASE_PROVIDER_EVENT_JSON_INVALID") from exc
++    required = {
++        "schema_version", "role", "revision", "previous_tag_object_sha",
++        "registry", "event_digest",
++    }
++    if not isinstance(value, dict) or set(value) != required:
++        raise ValueError("LEASE_PROVIDER_EVENT_FIELDS_INVALID")
++    if value.get("schema_version") != LEASE_ANCHOR_EVENT_VERSION or value.get("role") != LEASE_ANCHOR_ROLE:
++        raise ValueError("LEASE_PROVIDER_EVENT_IDENTITY_INVALID")
++    revision = value.get("revision")
++    if isinstance(revision, bool) or not isinstance(revision, int) or revision < 1:
++        raise ValueError("LEASE_PROVIDER_EVENT_REVISION_INVALID")
++    previous = value.get("previous_tag_object_sha")
++    if previous is not None and (not isinstance(previous, str) or _SHA40_RE.fullmatch(previous) is None):
++        raise ValueError("LEASE_PROVIDER_EVENT_PREVIOUS_INVALID")
++    digest = value.get("event_digest")
++    if not isinstance(digest, str) or _SHA256_RE.fullmatch(digest) is None or digest != _event_digest(value):
++        raise ValueError("LEASE_PROVIDER_EVENT_INTEGRITY")
++    registry = value.get("registry")
++    findings = validate_lease_registry(registry)
++    if findings:
++        raise ValueError("LEASE_PROVIDER_STATE_INVALID:" + ",".join(findings))
++    if registry.get("revision") != revision:
++        raise ValueError("LEASE_PROVIDER_EVENT_REGISTRY_REVISION_MISMATCH")
++    if _canonical_text(value) != message:
++        raise ValueError("LEASE_PROVIDER_EVENT_NOT_CANONICAL")
++    return value
++
++
++@dataclass
++class GitHubLeaseStore:
++    client: GitHubClient
++    anchor_prefix: str = LEASE_ANCHOR_PREFIX
++
++    def __post_init__(self) -> None:
++        if self.anchor_prefix != LEASE_ANCHOR_PREFIX:
++            raise ValueError("LEASE_PROVIDER_ANCHOR_PREFIX_INVALID")
++
++    def _default_branch_and_main(self) -> tuple[str, str]:
++        info = self.client.repo_info()
++        default = str(info.get("default_branch") or "")
++        if not default:
++            raise ValueError("LEASE_PROVIDER_DEFAULT_BRANCH_MISSING")
++        branch = self.client.branch(default)
++        sha = str((branch.get("commit") or {}).get("sha") or "")
++        if _SHA40_RE.fullmatch(sha) is None:
++            raise ValueError("LEASE_PROVIDER_MAIN_SHA_INVALID")
++        return default, sha
++
++    def _require_main(self, expected_main_sha: str) -> str:
++        if _SHA40_RE.fullmatch(str(expected_main_sha)) is None:
++            raise ValueError("LEASE_PROVIDER_EXPECTED_MAIN_SHA_INVALID")
++        _, current = self._default_branch_and_main()
++        if current != expected_main_sha:
++            raise ValueError("LEASE_PROVIDER_MAIN_SHA_DRIFT")
++        return current
++
++    def _require_anchor_ruleset(self) -> dict[str, Any]:
++        try:
++            verified = verify_runtime_anchor_ruleset(self.client.rulesets())
++        except Exception as exc:
++            raise ValueError("LEASE_PROVIDER_ANCHOR_RULESET_READBACK_FAILED") from exc
++        if verified.get("readback_verified") is not True:
++            reasons = ",".join(str(item) for item in verified.get("reason_codes") or [])
++            raise ValueError("LEASE_PROVIDER_ANCHOR_RULESET_NOT_VERIFIED:" + reasons)
++        return verified
++
++    def _matching_refs(self) -> list[tuple[int, str, dict[str, Any]]]:
++        rows = self.client.matching_tag_refs(self.anchor_prefix)
++        parsed: list[tuple[int, str, dict[str, Any]]] = []
++        seen: set[int] = set()
++        for ref in rows:
++            name = str(ref.get("ref") or "").split("refs/tags/", 1)[-1]
++            match = _TAG_RE.fullmatch(name)
++            if match is None:
++                raise ValueError("LEASE_PROVIDER_ANCHOR_NAME_INVALID:" + name[:120])
++            revision = int(match.group(1))
++            if revision in seen:
++                raise ValueError("LEASE_PROVIDER_ANCHOR_REVISION_DUPLICATE")
++            seen.add(revision)
++            parsed.append((revision, name, ref))
++        return sorted(parsed, key=lambda item: item[0])
++
++    def _read_anchor(self, revision: int, name: str, ref: dict[str, Any]) -> tuple[dict[str, Any], str, str]:
++        expected_name = _tag_name(revision)
++        if name != expected_name:
++            raise ValueError("LEASE_PROVIDER_ANCHOR_NAME_REVISION_MISMATCH")
++        tag_object_sha = str((ref.get("object") or {}).get("sha") or "")
++        if _SHA40_RE.fullmatch(tag_object_sha) is None:
++            raise ValueError("LEASE_PROVIDER_ANCHOR_REF_INVALID")
++        try:
++            obj = self.client.tag_object(tag_object_sha)
++        except Exception as exc:
++            raise ValueError("LEASE_PROVIDER_ANCHOR_OBJECT_UNAVAILABLE") from exc
++        if str(obj.get("sha") or "") != tag_object_sha:
++            raise ValueError("LEASE_PROVIDER_ANCHOR_OBJECT_SHA_MISMATCH")
++        if str(obj.get("tag") or "") != name:
++            raise ValueError("LEASE_PROVIDER_ANCHOR_OBJECT_TAG_MISMATCH")
++        target = obj.get("object") or {}
++        target_sha = str(target.get("sha") or "")
++        if _SHA40_RE.fullmatch(target_sha) is None or target.get("type") != "commit":
++            raise ValueError("LEASE_PROVIDER_ANCHOR_TARGET_INVALID")
++        message = obj.get("message")
++        if not isinstance(message, str):
++            raise ValueError("LEASE_PROVIDER_ANCHOR_MESSAGE_INVALID")
++        event = _parse_event(message)
++        if event["revision"] != revision:
++            raise ValueError("LEASE_PROVIDER_ANCHOR_EVENT_REVISION_MISMATCH")
++        registry = event["registry"]
++        if registry.get("repository") != self.client.repo:
++            raise ValueError("LEASE_PROVIDER_REPOSITORY_MISMATCH")
++        if registry.get("observed_main_sha") != target_sha:
++            raise ValueError("LEASE_PROVIDER_ANCHOR_MAIN_BINDING_MISMATCH")
++        return event, tag_object_sha, target_sha
++
++    def read(
++        self, *, expected_main_sha: str, policy_max_parallel_writers: int
++    ) -> tuple[dict[str, Any], str | None]:
++        self._require_main(expected_main_sha)
++        self._require_anchor_ruleset()
++        refs = self._matching_refs()
++        if not refs:
++            self._require_main(expected_main_sha)
++            return empty_lease_registry(
++                self.client.repo, expected_main_sha,
++                max_parallel_writers=policy_max_parallel_writers,
++            ), None
++        previous_object_sha: str | None = None
++        latest_registry: dict[str, Any] | None = None
++        for expected_revision, (revision, name, ref) in enumerate(refs, 1):
++            if revision != expected_revision:
++                raise ValueError(
++                    f"LEASE_PROVIDER_ANCHOR_SEQUENCE_GAP:expected={expected_revision}:actual={revision}"
++                )
++            event, object_sha, _ = self._read_anchor(revision, name, ref)
++            if event["previous_tag_object_sha"] != previous_object_sha:
++                raise ValueError("LEASE_PROVIDER_ANCHOR_CHAIN_INVALID")
++            previous_object_sha = object_sha
++            latest_registry = event["registry"]
++        assert latest_registry is not None
++        if latest_registry.get("max_parallel_writers") != policy_max_parallel_writers:
++            raise ValueError("LEASE_PROVIDER_POLICY_CEILING_MISMATCH")
++        self._require_main(expected_main_sha)
++        return copy.deepcopy(latest_registry), previous_object_sha
++
++    def _publish_cas(
++        self,
++        *,
++        current: dict[str, Any],
++        current_anchor_sha: str | None,
++        updated: dict[str, Any],
++        expected_main_sha: str,
++        policy_max_parallel_writers: int,
++    ) -> dict[str, Any]:
++        if updated.get("revision") != current.get("revision", -1) + 1:
++            raise ValueError("LEASE_PROVIDER_REVISION_NOT_NEXT")
++        if updated.get("max_parallel_writers") != policy_max_parallel_writers:
++            raise ValueError("LEASE_PROVIDER_POLICY_CEILING_MISMATCH")
++        findings = validate_lease_registry(updated)
++        if findings:
++            raise ValueError("LEASE_PROVIDER_STATE_INVALID:" + ",".join(findings))
++        self._require_main(expected_main_sha)
++        self._require_anchor_ruleset()
++        event = _build_event(updated, current_anchor_sha)
++        name = _tag_name(updated["revision"])
++        message = _canonical_text(event)
++        tag_obj = self.client.create_tag_object(name, updated["observed_main_sha"], message)
++        object_sha = str(tag_obj.get("sha") or "")
++        if _SHA40_RE.fullmatch(object_sha) is None:
++            raise ValueError("LEASE_PROVIDER_TAG_OBJECT_CREATE_FAILED")
++        try:
++            created = self.client.create_tag_ref(name, object_sha)
++        except ProviderContractError as exc:
++            if str(exc) not in {"PROVIDER_HTTP_409", "PROVIDER_HTTP_422"}:
++                raise
++            winner, _ = self.read(
++                expected_main_sha=expected_main_sha,
++                policy_max_parallel_writers=policy_max_parallel_writers,
++            )
++            raise ValueError(f"LEASE_PROVIDER_CAS_LOST:revision={winner['revision']}") from exc
++        created_sha = str((created.get("object") or {}).get("sha") or "")
++        if created_sha != object_sha:
++            raise ValueError("LEASE_PROVIDER_REF_CREATE_READBACK_MISMATCH")
++        # Fresh main readback after provider mutation: a concurrently advanced main
++        # must never be reported as successful authority. The immutable event stays
++        # visible and requires an explicit reconciliation transition.
++        self._require_main(expected_main_sha)
++        readback, readback_anchor = self.read(
++            expected_main_sha=expected_main_sha,
++            policy_max_parallel_writers=policy_max_parallel_writers,
++        )
++        if readback_anchor != object_sha or readback != updated:
++            raise ValueError("LEASE_PROVIDER_CAS_READBACK_MISMATCH")
++        return readback
++
++    def acquire(
++        self,
++        *,
++        expected_main_sha: str,
++        policy_max_parallel_writers: int,
++        issue_id: str,
++        roadmap_id: str,
++        worker_id: str,
++        base_sha: str,
++        branch: str,
++        resources: list[dict[str, Any]],
++        now: str,
++        ttl_minutes: int = 120,
++    ) -> dict[str, Any]:
++        current, anchor = self.read(
++            expected_main_sha=expected_main_sha,
++            policy_max_parallel_writers=policy_max_parallel_writers,
++        )
++        updated = acquire_registry_lease(
++            current,
++            expected_revision=current["revision"],
++            current_main_sha=expected_main_sha,
++            policy_max_parallel_writers=policy_max_parallel_writers,
++            issue_id=issue_id,
++            roadmap_id=roadmap_id,
++            worker_id=worker_id,
++            base_sha=base_sha,
++            branch=branch,
++            resources=resources,
++            now=now,
++            ttl_minutes=ttl_minutes,
++        )
++        return self._publish_cas(
++            current=current,
++            current_anchor_sha=anchor,
++            updated=updated,
++            expected_main_sha=expected_main_sha,
++            policy_max_parallel_writers=policy_max_parallel_writers,
++        )
++
++    def heartbeat(
++        self,
++        *,
++        expected_main_sha: str,
++        policy_max_parallel_writers: int,
++        lease_id: str,
++        worker_id: str,
++        now: str,
++        ttl_minutes: int = 120,
++    ) -> dict[str, Any]:
++        current, anchor = self.read(
++            expected_main_sha=expected_main_sha,
++            policy_max_parallel_writers=policy_max_parallel_writers,
++        )
++        if current.get("observed_main_sha") != expected_main_sha:
++            raise ValueError("LEASE_PROVIDER_RECONCILIATION_REQUIRED")
++        updated = heartbeat_registry_lease(
++            current,
++            expected_revision=current["revision"],
++            lease_id=lease_id,
++            worker_id=worker_id,
++            current_main_sha=expected_main_sha,
++            now=now,
++            ttl_minutes=ttl_minutes,
++        )
++        return self._publish_cas(
++            current=current,
++            current_anchor_sha=anchor,
++            updated=updated,
++            expected_main_sha=expected_main_sha,
++            policy_max_parallel_writers=policy_max_parallel_writers,
++        )
++
++    def release(
++        self,
++        *,
++        expected_main_sha: str,
++        policy_max_parallel_writers: int,
++        lease_id: str,
++        worker_id: str,
++        now: str,
++        provider_reconciled: bool,
++        reconciliation_ref: str,
++    ) -> dict[str, Any]:
++        # Release may be the explicit reconciliation transition after main moved.
++        # Read the immutable stream against its current recorded main, then bind
++        # the new revision to the caller's freshly observed provider main.
++        self._require_main(expected_main_sha)
++        self._require_anchor_ruleset()
++        refs = self._matching_refs()
++        if not refs:
++            raise ValueError("LEASE_PROVIDER_RELEASE_WITHOUT_REGISTRY")
++        latest_revision, latest_name, latest_ref = refs[-1]
++        latest_event, latest_anchor, recorded_main = self._read_anchor(latest_revision, latest_name, latest_ref)
++        if len(refs) != latest_revision:
++            raise ValueError("LEASE_PROVIDER_ANCHOR_SEQUENCE_GAP")
++        # Full chain verification still uses read() when the main has not moved;
++        # after movement validate every immutable anchor here without pretending
++        # the old observed main is current authority.
++        previous: str | None = None
++        current: dict[str, Any] | None = None
++        for expected_revision, (revision, name, ref) in enumerate(refs, 1):
++            if revision != expected_revision:
++                raise ValueError("LEASE_PROVIDER_ANCHOR_SEQUENCE_GAP")
++            event, object_sha, _ = self._read_anchor(revision, name, ref)
++            if event["previous_tag_object_sha"] != previous:
++                raise ValueError("LEASE_PROVIDER_ANCHOR_CHAIN_INVALID")
++            previous = object_sha
++            current = event["registry"]
++        assert current is not None
++        if previous != latest_anchor or current != latest_event["registry"]:
++            raise ValueError("LEASE_PROVIDER_RELEASE_CHAIN_READBACK_MISMATCH")
++        if current.get("max_parallel_writers") != policy_max_parallel_writers:
++            raise ValueError("LEASE_PROVIDER_POLICY_CEILING_MISMATCH")
++        if current.get("observed_main_sha") != recorded_main:
++            raise ValueError("LEASE_PROVIDER_RECORDED_MAIN_MISMATCH")
++        updated = release_registry_lease(
++            current,
++            expected_revision=current["revision"],
++            lease_id=lease_id,
++            worker_id=worker_id,
++            current_main_sha=expected_main_sha,
++            now=now,
++            provider_reconciled=provider_reconciled,
++            reconciliation_ref=reconciliation_ref,
++        )
++        return self._publish_cas(
++            current=current,
++            current_anchor_sha=latest_anchor,
++            updated=updated,
++            expected_main_sha=expected_main_sha,
++            policy_max_parallel_writers=policy_max_parallel_writers,
++        )
