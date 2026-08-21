@@ -1,0 +1,85 @@
+name: ADWF ORCH_RESUME-001 Lease Release
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Checkout exact canonical merge
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd
+        with:
+          ref: 5348021bc540ab33f4c42dc58d3ad629ea5abf1c
+          persist-credentials: false
+      - name: Provider-reconciled release and readback
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPOSITORY: ${{ github.repository }}
+          TARGET_SHA: 5348021bc540ab33f4c42dc58d3ad629ea5abf1c
+          LEASE_ID: f8212bcf-0223-4fd4-93f0-366d41f40891
+          WORKER_ID: chatgpt-gpt5.6-sol
+          RECONCILIATION_REF: postmerge-readback/32482601235/5348021bc540ab33f4c42dc58d3ad629ea5abf1c
+        shell: bash
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          import os, sys
+          sys.path.insert(0, '.adwf')
+          from lib.github_provider import GitHubClient
+          from lib.github_lease_store import GitHubLeaseStore
+
+          repo = os.environ['REPOSITORY']
+          target = os.environ['TARGET_SHA']
+          lease_id = os.environ['LEASE_ID']
+          worker_id = os.environ['WORKER_ID']
+          reconciliation_ref = os.environ['RECONCILIATION_REF']
+
+          store = GitHubLeaseStore(GitHubClient(repo=repo, token=os.environ['GH_TOKEN']))
+          before, before_anchor = store.read(expected_main_sha=target, policy_max_parallel_writers=1)
+          matches = [x for x in before['leases'] if x['lease_id'] == lease_id]
+          if len(matches) != 1:
+              raise SystemExit('TARGET_LEASE_NOT_UNIQUE')
+          lease = matches[0]
+          expected = {
+              'status': 'ACTIVE',
+              'worker_id': worker_id,
+              'issue_id': '245',
+              'roadmap_id': 'ORCH_RESUME-001',
+              'branch': 'agent/ORCH_RESUME-001-acquire-resume-yield',
+          }
+          for key, value in expected.items():
+              if lease.get(key) != value:
+                  raise SystemExit(f'TARGET_LEASE_IDENTITY_MISMATCH:{key}:{lease.get(key)}:{value}')
+
+          persisted, release_anchor = store.release(
+              expected_main_sha=target,
+              policy_max_parallel_writers=1,
+              lease_id=lease_id,
+              worker_id=worker_id,
+              provider_reconciled=True,
+              provider_reconciliation_ref=reconciliation_ref,
+          )
+          after, read_anchor = store.read(expected_main_sha=target, policy_max_parallel_writers=1)
+          if read_anchor != release_anchor or after != persisted:
+              raise SystemExit('RELEASE_READBACK_MISMATCH')
+          released = [x for x in after['leases'] if x['lease_id'] == lease_id]
+          if len(released) != 1 or released[0].get('status') != 'RELEASED':
+              raise SystemExit('LEASE_NOT_RELEASED')
+          if released[0].get('provider_reconciliation_ref') != reconciliation_ref:
+              raise SystemExit('RECONCILIATION_REF_MISMATCH')
+          active = [x for x in after['leases'] if x.get('status') == 'ACTIVE']
+          if active:
+              raise SystemExit('ACTIVE_WRITER_REMAINS:' + ','.join(x.get('lease_id','?') for x in active))
+          print(f'LEASE_RELEASED={lease_id}')
+          print(f'BEFORE_REVISION={before["revision"]}')
+          print(f'AFTER_REVISION={after["revision"]}')
+          print(f'BEFORE_ANCHOR={before_anchor}')
+          print(f'RELEASE_ANCHOR={release_anchor}')
+          print('ACTIVE_WRITERS=0')
+          print('LEASE_RELEASE_READBACK=PASS')
+          PY
