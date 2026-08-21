@@ -1,0 +1,281 @@
+name: RUNTIME_LEDGER_STALE-001 Terminal Recovery
+
+on:
+  push:
+    branches:
+      - helper/RUNTIME_LEDGER_STALE-001-terminal-recovery-a1
+
+permissions:
+  contents: write
+  issues: write
+
+concurrency:
+  group: adwf-control-${{ github.repository }}
+  cancel-in-progress: false
+
+jobs:
+  reconcile:
+    if: github.ref == 'refs/heads/helper/RUNTIME_LEDGER_STALE-001-terminal-recovery-a1'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd
+        with:
+          ref: 29b95ceba823469005a0eef4e6d7d1c3b412814e
+          persist-credentials: false
+          fetch-depth: 1
+
+      - name: Guard stale control and terminalize Runtime Ledger
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+          EXPECTED_MAIN: 29b95ceba823469005a0eef4e6d7d1c3b412814e
+          EXPECTED_TREE: 164707659e77f385a66793f9a7fff748349ebb19
+          EXPECTED_PARENT: 5348021bc540ab33f4c42dc58d3ad629ea5abf1c
+          EXPECTED_RUNTIME_LEDGER_ISSUE: '3'
+          EXPECTED_RUNTIME_COMMENT_ID: '5323578406'
+          EXPECTED_RUNTIME_EVENT_HASH: 611cbcec83b883b764308ed5bc3c5e9d3a662d2696a199490df9ea60ea0ecf95
+          EXPECTED_RUNTIME_STATE_DIGEST: a71448ad4fe242bc1bafbd4754cc0a5fdf13e14ac8f4d28d12f5f65d2d97011b
+          EXPECTED_STALE_RUN_ID: session-selfhost-proof-001-a
+          EXPECTED_STALE_ROADMAP_ID: SESSION_SELFHOST_PROOF-001
+          EXPECTED_STALE_ISSUE_ID: '149'
+          RECOVERY_ISSUE_ID: '259'
+          RECOVERY_ROADMAP_ID: RUNTIME_LEDGER_STALE-001
+          RECOVERY_LEASE_ID: 4889e6c9-d4d5-4506-88ec-ce8960a6bd27
+          RECOVERY_WORKER_ID: adwf-runtime:runtime-ledger-stale-001-recovery-a1
+          RECOVERY_BRANCH: adwf/runtime-ledger-stale-001-recovery-a1
+          EXPECTED_LEASE_REVISION: '4'
+          EXPECTED_LEASE_ANCHOR: f7d2bf5b62bd7a37b9faca0d72a3d3bf5691fb51
+        shell: python
+        run: |
+          from copy import deepcopy
+          from datetime import datetime, timezone
+          from pathlib import Path
+          import json, os, sys
+
+          root = Path.cwd()
+          sys.path.insert(0, str(root / '.adwf'))
+          from lib.durable_orchestrator import validate_journal
+          from lib.github_lease_store import GitHubLeaseStore
+          from lib.github_provider import GitHubClient
+          from lib.github_rulesets import verify_rulesets, verify_runtime_anchor_ruleset
+          from lib.github_runtime_store import GitHubRuntimeStore
+          from lib.strict_json import loads as strict_loads
+
+          repo = os.environ['GITHUB_REPOSITORY']
+          token = os.environ['GITHUB_TOKEN']
+          expected_main = os.environ['EXPECTED_MAIN']
+          expected_tree = os.environ['EXPECTED_TREE']
+          expected_parent = os.environ['EXPECTED_PARENT']
+          ledger_issue_id = int(os.environ['EXPECTED_RUNTIME_LEDGER_ISSUE'])
+          runtime_comment_id = os.environ['EXPECTED_RUNTIME_COMMENT_ID']
+          runtime_event_hash = os.environ['EXPECTED_RUNTIME_EVENT_HASH']
+          runtime_state_digest = os.environ['EXPECTED_RUNTIME_STATE_DIGEST']
+          stale_run_id = os.environ['EXPECTED_STALE_RUN_ID']
+          stale_roadmap_id = os.environ['EXPECTED_STALE_ROADMAP_ID']
+          stale_issue_id = os.environ['EXPECTED_STALE_ISSUE_ID']
+          recovery_issue_id = os.environ['RECOVERY_ISSUE_ID']
+          recovery_roadmap_id = os.environ['RECOVERY_ROADMAP_ID']
+          recovery_lease_id = os.environ['RECOVERY_LEASE_ID']
+          recovery_worker_id = os.environ['RECOVERY_WORKER_ID']
+          recovery_branch = os.environ['RECOVERY_BRANCH']
+          expected_lease_revision = int(os.environ['EXPECTED_LEASE_REVISION'])
+          expected_lease_anchor = os.environ['EXPECTED_LEASE_ANCHOR']
+          resources = [{'kind':'provider','scope':'global','shared':True,'global':True}]
+
+          cfg = strict_loads((root / '.adwf/config.json').read_text(encoding='utf-8'))
+          policy = cfg.get('policy') or {}
+          orch = cfg.get('orchestration') or {}
+          cost = cfg.get('cost') or {}
+          if policy.get('fail_mode') != 'CLOSED' or policy.get('active_autonomy') != 'A2' or policy.get('max_autonomous_risk') != 'R1':
+              raise SystemExit('LEDGER_RECOVERY_POLICY_DRIFT')
+          if orch.get('max_parallel_writers') != 1 or orch.get('heartbeat_minutes') != 30 or orch.get('lease_ttl_minutes') != 120:
+              raise SystemExit('LEDGER_RECOVERY_ORCHESTRATION_POLICY_DRIFT')
+          if cost.get('mode') != 'FREE_ONLY' or cost.get('monetary_budget') != 0:
+              raise SystemExit('LEDGER_RECOVERY_COST_POLICY_DRIFT')
+
+          client = GitHubClient(repo, token)
+          lease_store = GitHubLeaseStore(client)
+          runtime_store = GitHubRuntimeStore(client)
+
+          main = str((client.branch('main').get('commit') or {}).get('sha') or '')
+          if main != expected_main:
+              raise SystemExit('LEDGER_RECOVERY_MAIN_DRIFT:' + main)
+          commit = client.get(f'/repos/{repo}/git/commits/{expected_main}')
+          tree = str((commit.get('tree') or {}).get('sha') or '')
+          parents = [str((x or {}).get('sha') or '') for x in (commit.get('parents') or [])]
+          if tree != expected_tree or parents != [expected_parent]:
+              raise SystemExit('LEDGER_RECOVERY_MAIN_IDENTITY_DRIFT')
+
+          rulesets = client.rulesets()
+          protected = verify_rulesets(rulesets, expected_integration_id=15368)
+          anchors = verify_runtime_anchor_ruleset(rulesets)
+          if protected.get('readback_verified') is not True:
+              raise SystemExit('LEDGER_RECOVERY_PROTECTED_MAIN_RULESET_NOT_VERIFIED:' + ','.join(protected.get('reason_codes') or []))
+          if anchors.get('readback_verified') is not True:
+              raise SystemExit('LEDGER_RECOVERY_RUNTIME_ANCHOR_RULESET_NOT_VERIFIED:' + ','.join(anchors.get('reason_codes') or []))
+          named = {str(x.get('name') or ''): x for x in rulesets}
+          for name in ('ADWF protected main', 'ADWF immutable runtime anchors'):
+              rs = named.get(name) or {}
+              if rs.get('enforcement') != 'active' or (rs.get('bypass_actors') or []) != []:
+                  raise SystemExit('LEDGER_RECOVERY_RULESET_GOVERNANCE_DRIFT:' + name)
+              if rs.get('current_user_can_bypass') not in (None, 'never', False):
+                  raise SystemExit('LEDGER_RECOVERY_RULESET_BYPASS_DRIFT:' + name)
+          protected_named = named.get('ADWF protected main') or {}
+          required = []
+          strict = False
+          for rule in protected_named.get('rules') or []:
+              if rule.get('type') == 'required_status_checks':
+                  params = rule.get('parameters') or {}
+                  strict = params.get('strict_required_status_checks_policy') is True
+                  required = params.get('required_status_checks') or []
+          normalized = sorted((x.get('context'), x.get('integration_id')) for x in required)
+          expected_checks = sorted([
+              ('fast-feedback', 15368),
+              ('adwf/governance-gate', 15368),
+              ('adwf/trusted-gate', 15368),
+          ])
+          if not strict or normalized != expected_checks:
+              raise SystemExit('LEDGER_RECOVERY_REQUIRED_CHECK_RULESET_DRIFT:' + json.dumps(normalized))
+
+          stale_issue = client.get(f'/repos/{repo}/issues/{stale_issue_id}')
+          if stale_issue.get('state') != 'closed' or int(stale_issue.get('number') or 0) != int(stale_issue_id):
+              raise SystemExit('LEDGER_RECOVERY_STALE_ISSUE_NOT_TERMINAL')
+          recovery_issue = client.get(f'/repos/{repo}/issues/{recovery_issue_id}')
+          if recovery_issue.get('state') != 'open' or int(recovery_issue.get('number') or 0) != int(recovery_issue_id):
+              raise SystemExit('LEDGER_RECOVERY_RECOVERY_ISSUE_DRIFT')
+          if '[P0][RUNTIME_LEDGER_STALE-001]' not in str(recovery_issue.get('title') or ''):
+              raise SystemExit('LEDGER_RECOVERY_RECOVERY_ISSUE_IDENTITY_DRIFT')
+
+          lease_registry, lease_anchor = lease_store.read(
+              expected_main_sha=expected_main,
+              policy_max_parallel_writers=1,
+          )
+          if lease_registry.get('revision') != expected_lease_revision or lease_anchor != expected_lease_anchor:
+              raise SystemExit('LEDGER_RECOVERY_LEASE_BASELINE_DRIFT')
+          if lease_registry.get('observed_main_sha') != expected_main:
+              raise SystemExit('LEDGER_RECOVERY_LEASE_MAIN_DRIFT')
+          if any(x.get('status') == 'ACTIVE' for x in lease_registry.get('leases') or []):
+              raise SystemExit('LEDGER_RECOVERY_ACTIVE_WRITER_ALREADY_EXISTS')
+
+          ledger_issue, events = runtime_store.read()
+          if int((ledger_issue or {}).get('number') or 0) != ledger_issue_id or len(events) != 1:
+              raise SystemExit('LEDGER_RECOVERY_RUNTIME_LEDGER_CARDINALITY_DRIFT')
+          event = events[0]
+          state = event.get('state') or {}
+          if str(event.get('provider_object_id') or '') != runtime_comment_id:
+              raise SystemExit('LEDGER_RECOVERY_RUNTIME_COMMENT_DRIFT')
+          if event.get('event_hash') != runtime_event_hash or event.get('state_digest') != runtime_state_digest or event.get('sequence') != 1:
+              raise SystemExit('LEDGER_RECOVERY_RUNTIME_EVENT_IDENTITY_DRIFT')
+          expected_state = {
+              'run_id': stale_run_id,
+              'roadmap_id': stale_roadmap_id,
+              'issue_id': stale_issue_id,
+              'status': 'RUNNING',
+              'phase': 'RECONCILE',
+              'revision': 0,
+          }
+          for key, value in expected_state.items():
+              if state.get(key) != value:
+                  raise SystemExit('LEDGER_RECOVERY_STALE_STATE_DRIFT:' + key)
+          if state.get('subject_sha') is not None or state.get('work_branch') is not None or state.get('events') != []:
+              raise SystemExit('LEDGER_RECOVERY_STALE_STATE_SHAPE_DRIFT')
+          if validate_journal(state):
+              raise SystemExit('LEDGER_RECOVERY_STALE_STATE_INVALID')
+
+          guarded, guard_lease, guard_anchor = lease_store.acquire(
+              expected_main_sha=expected_main,
+              policy_max_parallel_writers=1,
+              issue_id=recovery_issue_id,
+              roadmap_id=recovery_roadmap_id,
+              worker_id=recovery_worker_id,
+              base_sha=expected_main,
+              branch=recovery_branch,
+              resources=resources,
+              ttl_minutes=int(orch['lease_ttl_minutes']),
+              lease_id=recovery_lease_id,
+          )
+          if guarded.get('revision') != expected_lease_revision + 1 or guard_lease.get('generation') != expected_lease_revision + 1:
+              raise SystemExit('LEDGER_RECOVERY_GUARD_LEASE_REVISION_MISMATCH')
+          if guard_lease.get('lease_id') != recovery_lease_id or guard_lease.get('status') != 'ACTIVE':
+              raise SystemExit('LEDGER_RECOVERY_GUARD_LEASE_IDENTITY_MISMATCH')
+
+          terminal = deepcopy(state)
+          terminal['status'] = 'COMPLETE'
+          terminal['blockers'] = []
+          terminal['revision'] = int(state['revision']) + 1
+          terminal['updated_at'] = datetime.now(timezone.utc).isoformat().replace('+00:00', 'Z')
+          terminal['last_failed_phase'] = None
+          terminal_errors = validate_journal(terminal)
+          if terminal_errors:
+              raise SystemExit('LEDGER_RECOVERY_TERMINAL_STATE_INVALID:' + ','.join(terminal_errors))
+
+          appended = runtime_store.append(terminal)
+          if appended.get('status') != 'APPENDED' or int(appended.get('issue_number') or 0) != ledger_issue_id:
+              raise SystemExit('LEDGER_RECOVERY_TERMINAL_APPEND_FAILED')
+          appended_event = appended.get('event') or {}
+          if appended_event.get('sequence') != 2 or appended_event.get('state', {}).get('status') != 'COMPLETE':
+              raise SystemExit('LEDGER_RECOVERY_TERMINAL_APPEND_IDENTITY_MISMATCH')
+          external_anchor = appended.get('external_anchor') or {}
+          if external_anchor.get('ruleset_verified') is not True or not external_anchor.get('tag') or not external_anchor.get('tag_object_sha'):
+              raise SystemExit('LEDGER_RECOVERY_TERMINAL_ANCHOR_MISSING')
+
+          ledger_issue_after, events_after = runtime_store.read()
+          if int((ledger_issue_after or {}).get('number') or 0) != ledger_issue_id or len(events_after) != 2:
+              raise SystemExit('LEDGER_RECOVERY_TERMINAL_READBACK_CARDINALITY')
+          latest = events_after[-1]
+          if latest.get('event_hash') != appended_event.get('event_hash') or latest.get('state', {}).get('status') != 'COMPLETE':
+              raise SystemExit('LEDGER_RECOVERY_TERMINAL_READBACK_MISMATCH')
+          if latest.get('state', {}).get('run_id') != stale_run_id or latest.get('state', {}).get('revision') != 1:
+              raise SystemExit('LEDGER_RECOVERY_TERMINAL_RUN_BINDING_MISMATCH')
+
+          guarded_readback, guarded_anchor_readback = lease_store.read(
+              expected_main_sha=expected_main,
+              policy_max_parallel_writers=1,
+          )
+          active = [x for x in guarded_readback.get('leases') or [] if x.get('status') == 'ACTIVE']
+          if guarded_readback.get('revision') != expected_lease_revision + 1 or guarded_anchor_readback != guard_anchor:
+              raise SystemExit('LEDGER_RECOVERY_GUARD_READBACK_REVISION_MISMATCH')
+          if len(active) != 1 or active[0].get('lease_id') != recovery_lease_id:
+              raise SystemExit('LEDGER_RECOVERY_GUARD_READBACK_CARDINALITY')
+
+          reconciliation_ref = 'github:runtime-ledger:issue:3:event:' + str(latest['event_hash'])
+          released, release_anchor = lease_store.release(
+              expected_main_sha=expected_main,
+              policy_max_parallel_writers=1,
+              lease_id=recovery_lease_id,
+              worker_id=recovery_worker_id,
+              provider_reconciled=True,
+              provider_reconciliation_ref=reconciliation_ref,
+          )
+          if released.get('revision') != expected_lease_revision + 2 or released.get('observed_main_sha') != expected_main:
+              raise SystemExit('LEDGER_RECOVERY_RELEASE_REVISION_MISMATCH')
+
+          final_registry, final_lease_anchor = lease_store.read(
+              expected_main_sha=expected_main,
+              policy_max_parallel_writers=1,
+          )
+          if final_registry.get('revision') != expected_lease_revision + 2 or final_lease_anchor != release_anchor:
+              raise SystemExit('LEDGER_RECOVERY_FINAL_LEASE_READBACK_MISMATCH')
+          if any(x.get('status') == 'ACTIVE' for x in final_registry.get('leases') or []):
+              raise SystemExit('LEDGER_RECOVERY_ACTIVE_WRITER_REMAINS')
+          target = [x for x in final_registry.get('leases') or [] if x.get('lease_id') == recovery_lease_id]
+          if len(target) != 1 or target[0].get('status') != 'RELEASED' or target[0].get('provider_reconciliation_ref') != reconciliation_ref:
+              raise SystemExit('LEDGER_RECOVERY_GUARD_NOT_RELEASED')
+
+          ledger_issue_final, events_final = runtime_store.read()
+          if int((ledger_issue_final or {}).get('number') or 0) != ledger_issue_id or len(events_final) != 2:
+              raise SystemExit('LEDGER_RECOVERY_FINAL_LEDGER_CARDINALITY')
+          if events_final[-1].get('event_hash') != latest.get('event_hash') or events_final[-1].get('state', {}).get('status') != 'COMPLETE':
+              raise SystemExit('LEDGER_RECOVERY_FINAL_LEDGER_NOT_TERMINAL')
+          final_main = str((client.branch('main').get('commit') or {}).get('sha') or '')
+          if final_main != expected_main:
+              raise SystemExit('LEDGER_RECOVERY_FINAL_MAIN_DRIFT')
+
+          print('RUNTIME_LEDGER_RECOVERY=PASS')
+          print('RUNTIME_LEDGER_SEQUENCE=2')
+          print('RUNTIME_LEDGER_EVENT_HASH=' + str(latest['event_hash']))
+          print('RUNTIME_LEDGER_ANCHOR=' + str(external_anchor['tag_object_sha']))
+          print('RECOVERY_GUARD_LEASE_ID=' + recovery_lease_id)
+          print('FINAL_LEASE_REGISTRY_REVISION=' + str(final_registry['revision']))
+          print('FINAL_LEASE_ANCHOR=' + str(final_lease_anchor))
+          print('ACTIVE_WRITERS=0')
