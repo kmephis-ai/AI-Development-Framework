@@ -22,6 +22,7 @@ from .session_continuity import reconcile_checkpoint,validate_checkpoint
 
 TITLE='[ADWF] Runtime Ledger';PREFIX='<!-- ADWF-RUNTIME-EVENT v3 -->\n```json\n';SUFFIX='\n```';ANCHOR_PREFIX='adwf-runtime-anchor-'
 ROOT_ANCHOR=ANCHOR_PREFIX+'ledger-root-v1';ROOT_ROLE='ADWF_RUNTIME_LEDGER_ROOT_V1'
+NON_LEDGER_ANCHOR_PREFIXES=(ANCHOR_PREFIX+'lease-v1-',)
 def _now()->str:return datetime.now(timezone.utc).isoformat().replace('+00:00','Z')
 def _canonical(v:Any)->bytes:return json.dumps(v,sort_keys=True,separators=(',',':'),ensure_ascii=False).encode()
 def _hash(v:Any)->str:return hashlib.sha256(_canonical(v)).hexdigest()
@@ -178,7 +179,7 @@ class GitHubRuntimeStore:
         refs=self.client.matching_tag_refs(ANCHOR_PREFIX);out={}
         for ref in refs:
             name=str(ref.get('ref') or '').split('refs/tags/',1)[-1]
-            if name.startswith(ANCHOR_PREFIX) and name!=ROOT_ANCHOR:out[name]=ref
+            if name.startswith(ANCHOR_PREFIX) and name!=ROOT_ANCHOR and not any(name.startswith(prefix) for prefix in NON_LEDGER_ANCHOR_PREFIXES):out[name]=ref
         return out
 
     def _verify_tag_anchors(self,events:list[dict[str,Any]])->list[str]:

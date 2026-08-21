@@ -286,6 +286,17 @@ class SessionContinuityPersistenceTests(unittest.TestCase):
         self.assertIn(ROOT_ANCHOR, fake.tags)
         self.assertEqual(store._verify_tag_anchors(events), [])
 
+    def test_orch_lease_anchor_subnamespace_is_not_runtime_ledger_orphan(self):
+        fake = FakeRuntimeGitHub()
+        store = GitHubRuntimeStore(fake)
+        store.append(runtime_state(), session_checkpoint=checkpoint())
+        lease_name = 'adwf-runtime-anchor-lease-v1-000000001'
+        fake.tags[lease_name] = {'ref': 'refs/tags/' + lease_name, 'object': {'sha': 'f' * 40}}
+        issue, events = store.read()
+        self.assertEqual(issue['number'], 1)
+        self.assertEqual(len(events), 1)
+        self.assertEqual(store._verify_tag_anchors(events), [])
+
     def test_invalid_or_private_checkpoint_is_rejected_before_provider_write(self):
         fake = FakeRuntimeGitHub()
         store = GitHubRuntimeStore(fake)
