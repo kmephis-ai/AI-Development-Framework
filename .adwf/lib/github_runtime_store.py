@@ -253,7 +253,14 @@ class GitHubRuntimeStore:
     def restore_latest(self,root:str|Path)->dict[str,Any]|None:
         _,events=self.read()
         if not events:return None
-        state=events[-1]['state'];target=Path(root).resolve()/'.adwf-runtime'/'orchestration'/f"{state['run_id']}.json";target.parent.mkdir(parents=True,exist_ok=True)
+        state=copy.deepcopy(events[-1]['state'])
+        issue_id=str(state.get('issue_id') or '')
+        if state.get('status') in {'RUNNING','RETRY_WAIT','RECOVERY','HUMAN_REQUIRED'} and issue_id.isdigit():
+            try:work_item=self.client.get(f"/repos/{self.client.repo}/issues/{int(issue_id)}")
+            except ProviderContractError as exc:raise ValueError('REMOTE_RUNTIME_WORK_ITEM_READBACK_FAILED') from exc
+            if work_item.get('state')!='open':
+                state['status']='BLOCKED';state['blockers']=['REMOTE_RUNTIME_WORK_ITEM_PROVIDER_TERMINAL'];state['revision']=int(state.get('revision') or 0)+1;state['updated_at']=_now()
+        target=Path(root).resolve()/'.adwf-runtime'/'orchestration'/f"{state['run_id']}.json";target.parent.mkdir(parents=True,exist_ok=True)
         fd,tmp=tempfile.mkstemp(prefix=target.name+'.',dir=target.parent)
         try:
             with os.fdopen(fd,'w',encoding='utf-8') as h:json.dump(state,h,ensure_ascii=False,indent=2);h.write('\n');h.flush();os.fsync(h.fileno())
