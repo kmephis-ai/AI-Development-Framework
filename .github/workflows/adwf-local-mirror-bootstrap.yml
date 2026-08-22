@@ -51,12 +51,24 @@ jobs:
           }
           JSON
 
-      - name: Publish chunks on disposable branch
+      - name: Generate exact-source deterministic package projections
+        shell: bash
+        run: |
+          set -euo pipefail
+          rm -rf /tmp/adwf-source-worktree
+          git worktree add --detach /tmp/adwf-source-worktree "${SOURCE_SHA}"
+          python /tmp/adwf-source-worktree/.adwf/scripts/generate_manifest.py --root /tmp/adwf-source-worktree
+          mkdir -p mirror/generated
+          cp /tmp/adwf-source-worktree/MANIFEST.json mirror/generated/MANIFEST.json
+          cp /tmp/adwf-source-worktree/SHA256SUMS.txt mirror/generated/SHA256SUMS.txt
+          git worktree remove --force /tmp/adwf-source-worktree
+
+      - name: Publish chunks and generated projections on disposable branch
         shell: bash
         run: |
           set -euo pipefail
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add mirror
-          git commit -m "chore: publish local mirror fallback chunks [mirror-output]"
+          git commit -m "chore: publish local mirror fallback chunks and generated projections [mirror-output]"
           git push origin HEAD:${GITHUB_REF_NAME}
