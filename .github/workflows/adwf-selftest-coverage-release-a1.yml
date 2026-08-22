@@ -1,0 +1,120 @@
+name: SELFTEST_COVERAGE-001 Terminal Release a1
+on:
+  push:
+    branches: [helper/SELFTEST_COVERAGE-001-release-a1]
+    paths: [.adwf-release-trigger-selftest-coverage-001-a1]
+permissions:
+  contents: write
+  actions: read
+  issues: read
+  pull-requests: read
+concurrency:
+  group: adwf-control-${{ github.repository }}
+  cancel-in-progress: false
+jobs:
+  release-source-lease:
+    if: github.ref == 'refs/heads/helper/SELFTEST_COVERAGE-001-release-a1'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd
+        with:
+          ref: ${{ github.event.repository.default_branch }}
+          persist-credentials: false
+          fetch-depth: 2
+      - uses: actions/setup-python@a309ff8b426b58ec0e2a45f0f869d46889d02405
+        with:
+          python-version: "3.12.10"
+      - name: Verify exact post-merge evidence and release lease
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        shell: python
+        run: |
+          from pathlib import Path
+          import base64,hashlib,os,re,sys
+          root=Path.cwd();sys.path.insert(0,str(root/".adwf"))
+          from lib.github_lease_store import GitHubLeaseStore
+          from lib.github_provider import GitHubClient
+          from lib.github_rulesets import verify_rulesets,verify_runtime_anchor_ruleset
+          from lib.strict_json import loads as strict_loads
+
+          repo=os.environ["GITHUB_REPOSITORY"]; token=os.environ["GITHUB_TOKEN"]
+          main="0c20ee50ac50e36422c93a32fca151b411bc8b95"
+          parent="053cfd028fef0a41f4e3177c2290a20ff83a9685"
+          tree="7519abf534e994855f8773150d3fbef83c997e21"
+          source_head="9bc6c12311016c7bc69ad844629bbcc905389181"
+          lease_id="bdef8ea1-d737-42c8-8841-9eb562a03fcf"
+          worker="adwf-runtime:selftest-coverage-001-source-a1"
+          source_branch="adwf/selftest-coverage-001-a1"
+          trigger_path=".adwf-release-trigger-selftest-coverage-001-a1"
+          trigger_blob="dff0f7f95ba3ea418e3970b48fe32ab891685157"
+          trigger_sha256="471704206fa375ab27720fed6f9d982b88a1c9b2118a4764061499e9d6069244"
+          client=GitHubClient(repo,token);store=GitHubLeaseStore(client)
+
+          def current_main():
+              value=str((client.branch("main").get("commit") or {}).get("sha") or "")
+              if re.fullmatch(r"[0-9a-f]{40}",value) is None: raise SystemExit("RELEASE_MAIN_INVALID")
+              return value
+          def rules_ok():
+              rows=client.rulesets()
+              if verify_rulesets(rows,expected_integration_id=15368).get("readback_verified") is not True: raise SystemExit("RELEASE_MAIN_RULESET_NOT_VERIFIED")
+              if verify_runtime_anchor_ruleset(rows).get("readback_verified") is not True: raise SystemExit("RELEASE_ANCHOR_RULESET_NOT_VERIFIED")
+              named={str(x.get("name") or ""):x for x in rows}
+              for name in ("ADWF protected main","ADWF immutable runtime anchors"):
+                  rs=named.get(name) or {}
+                  if rs.get("enforcement")!="active" or (rs.get("bypass_actors") or [])!=[]: raise SystemExit("RELEASE_RULESET_DRIFT:"+name)
+                  if rs.get("current_user_can_bypass") not in (None,"never",False): raise SystemExit("RELEASE_BYPASS_DRIFT:"+name)
+          def exact_run(name):
+              rows=[r for r in client.recent_runs(limit=100) if r.get("name")==name and r.get("head_sha")==main and r.get("head_branch")=="main" and r.get("event")=="push"]
+              if len(rows)!=1: raise SystemExit("RELEASE_RUN_IDENTITY_MISMATCH:"+name+":"+str(len(rows)))
+              if rows[0].get("status")!="completed" or rows[0].get("conclusion")!="success": raise SystemExit("RELEASE_RUN_NOT_SUCCESS:"+name)
+              return rows[0]
+
+          if current_main()!=main: raise SystemExit("RELEASE_MAIN_DRIFT")
+          cfg=strict_loads((root/".adwf/config.json").read_text(encoding="utf-8")); ep=strict_loads((root/".adwf/effective-policy.json").read_text(encoding="utf-8"))
+          p=cfg.get("policy") or {}; o=cfg.get("orchestration") or {}; c=cfg.get("cost") or {}; rules=(ep.get("rules") or {})
+          if p.get("fail_mode")!="CLOSED" or ep.get("active_autonomy")!="A2" or ep.get("max_autonomous_risk")!="R1": raise SystemExit("RELEASE_POLICY_DRIFT")
+          if o.get("max_parallel_writers")!=1 or c.get("mode")!="FREE_ONLY" or c.get("monetary_budget")!=0 or ep.get("hard_budget_usd")!=0: raise SystemExit("RELEASE_GOVERNANCE_DRIFT")
+          if (rules.get("action_min_autonomy") or {}).get("cleanup")!="A2": raise SystemExit("RELEASE_CLEANUP_AUTHORITY_DRIFT")
+          rules_ok()
+
+          trigger=client.get(f"/repos/{repo}/contents/{trigger_path}?ref={os.environ['GITHUB_SHA']}")
+          raw=base64.b64decode(str(trigger.get("content") or ""))
+          if str(trigger.get("sha") or "")!=trigger_blob or hashlib.sha256(raw).hexdigest()!=trigger_sha256: raise SystemExit("RELEASE_TRIGGER_DRIFT")
+
+          commit=client.get(f"/repos/{repo}/git/commits/{main}"); parents=commit.get("parents") or []
+          if str((commit.get("tree") or {}).get("sha") or "")!=tree: raise SystemExit("RELEASE_MERGE_TREE_DRIFT")
+          if len(parents)!=1 or str(parents[0].get("sha") or "")!=parent: raise SystemExit("RELEASE_MERGE_PARENT_DRIFT")
+          if (commit.get("verification") or {}).get("verified") is not True: raise SystemExit("RELEASE_MERGE_NOT_VERIFIED")
+          pr=client.pull(267)
+          if pr.get("state")!="closed" or not pr.get("merged_at") or str(pr.get("merge_commit_sha") or "")!=main: raise SystemExit("RELEASE_PR_NOT_MERGED")
+          if str((pr.get("head") or {}).get("sha") or "")!=source_head or str((pr.get("base") or {}).get("sha") or "")!=parent: raise SystemExit("RELEASE_PR_IDENTITY_DRIFT")
+          issue=client.get(f"/repos/{repo}/issues/253")
+          if issue.get("state")!="closed" or issue.get("state_reason")!="completed": raise SystemExit("RELEASE_ISSUE_NOT_COMPLETED")
+          if [p for p in client.pulls() if p.get("state")=="open"]: raise SystemExit("RELEASE_OPEN_PR_CONFLICT")
+
+          main_run=exact_run("ADWF Main"); jobs=client.jobs(int(main_run["id"])); canonical=[j for j in jobs if j.get("name")=="canonical-verification"]
+          if len(canonical)!=1 or canonical[0].get("status")!="completed" or canonical[0].get("conclusion")!="success": raise SystemExit("RELEASE_MAIN_JOB_NOT_SUCCESS")
+          smoke_run=exact_run("ADWF Platform Smoke"); smoke=client.jobs(int(smoke_run["id"])); required={"smoke (ubuntu-24.04)","smoke (windows-2022)"}
+          passed={str(j.get("name") or "") for j in smoke if j.get("status")=="completed" and j.get("conclusion")=="success"}
+          if not required.issubset(passed): raise SystemExit("RELEASE_PLATFORM_SMOKE_NOT_SUCCESS")
+
+          registry,_=store.read(expected_main_sha=main,policy_max_parallel_writers=1)
+          if registry.get("revision")!=21: raise SystemExit("RELEASE_REVISION_DRIFT")
+          active=[x for x in registry.get("leases") or [] if x.get("status")=="ACTIVE"]
+          if len(active)!=1: raise SystemExit("RELEASE_ACTIVE_WRITER_COUNT_MISMATCH")
+          target=active[0]; expected={"lease_id":lease_id,"issue_id":"253","roadmap_id":"SELFTEST_COVERAGE-001","worker_id":worker,"branch":source_branch,"base_sha":parent}
+          for key,value in expected.items():
+              if str(target.get(key) or "")!=value: raise SystemExit("RELEASE_LEASE_IDENTITY_DRIFT:"+key)
+
+          ref="github:commit:"+main
+          released,anchor=store.release(expected_main_sha=main,policy_max_parallel_writers=1,lease_id=lease_id,worker_id=worker,provider_reconciled=True,provider_reconciliation_ref=ref)
+          final,read_anchor=store.read(expected_main_sha=main,policy_max_parallel_writers=1)
+          if released.get("revision")!=22 or final.get("revision")!=22 or read_anchor!=anchor: raise SystemExit("RELEASE_REVISION22_READBACK_MISMATCH")
+          if [x for x in final.get("leases") or [] if x.get("status")=="ACTIVE"]: raise SystemExit("RELEASE_ACTIVE_WRITER_REMAINS")
+          matches=[x for x in final.get("leases") or [] if x.get("lease_id")==lease_id]
+          if len(matches)!=1 or matches[0].get("status")!="RELEASED" or matches[0].get("provider_reconciliation_ref")!=ref: raise SystemExit("RELEASE_TARGET_READBACK_MISMATCH")
+          if current_main()!=main: raise SystemExit("RELEASE_FINAL_MAIN_DRIFT")
+          rules_ok()
+          print("SELFTEST_COVERAGE_TERMINAL_RELEASE=PASS")
+          print("MAIN_SHA="+main);print("ADWF_MAIN_RUN_ID="+str(main_run["id"]));print("PLATFORM_SMOKE_RUN_ID="+str(smoke_run["id"]));print("LEASE_REVISION=22");print("LEASE_ID="+lease_id);print("LEASE_ANCHOR="+anchor)
