@@ -1,0 +1,391 @@
+name: GOV-030 Source Authority
+
+on:
+  push:
+    branches:
+      - helper/GOV-030-source-authority-a1
+
+permissions:
+  contents: write
+  actions: read
+  checks: read
+  issues: read
+  pull-requests: read
+  statuses: read
+
+concurrency:
+  group: adwf-control-${{ github.repository }}
+  cancel-in-progress: false
+
+jobs:
+  source-authority:
+    if: github.ref == 'refs/heads/helper/GOV-030-source-authority-a1'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd
+        with:
+          ref: ${{ github.event.repository.default_branch }}
+          persist-credentials: false
+          fetch-depth: 1
+
+      - name: Acquire, maintain, or release exact source authority
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+          EXPECTED_BASE_MAIN: 29b95ceba823469005a0eef4e6d7d1c3b412814e
+          EXPECTED_BASE_TREE: 164707659e77f385a66793f9a7fff748349ebb19
+          EXPECTED_BASE_PARENT: 5348021bc540ab33f4c42dc58d3ad629ea5abf1c
+          EXPECTED_INITIAL_LEASE_REVISION: '11'
+          EXPECTED_TERMINAL_LEDGER_ISSUE: '3'
+          EXPECTED_TERMINAL_LEDGER_EVENT_HASH: b0d811c300dcadfd147e251f161c20b2ff79b8393c6a1e4f086b0ad5a0745187
+          EXPECTED_TERMINAL_LEDGER_STATE_DIGEST: 22b3bac5ffa00aabf8ce31b8f43d4973d8103a240bac87429596dd980b4b7dc4
+          EXPECTED_TERMINAL_RUN_ID: session-selfhost-proof-001-a
+          RECOVERY_GUARD_LEASE_ID: 4889e6c9-d4d5-4506-88ec-ce8960a6bd27
+          SOURCE_ISSUE_ID: '262'
+          SOURCE_ROADMAP_ID: GOV-030
+          SOURCE_RUN_ID: gov-030-source-a1
+          SOURCE_LEASE_ID: 645158df-770c-4096-acf3-9319cf6b5364
+          SOURCE_WORKER_ID: adwf-runtime:gov-030-source-a1
+          SOURCE_BRANCH: agent/GOV-030-runtime-ledger-stale-a1
+          EXPECTED_CANDIDATE_TREE: 354745d83e65d99f5d5af04e6c20125b691451da
+          HEARTBEAT_MINUTES: '30'
+          HEARTBEAT_REFRESH_AFTER_MINUTES: '15'
+        shell: python
+        run: |
+          from datetime import datetime, timezone
+          from pathlib import Path
+          import json, os, re, subprocess, sys
+
+          root = Path.cwd()
+          sys.path.insert(0, str(root / '.adwf'))
+          from lib.assurance_builder import build_assurance_snapshot
+          from lib.cost_guard import evaluate_provider
+          from lib.evidence import parse_time
+          from lib.health import doctor
+          from lib.github_lease_store import GitHubLeaseStore
+          from lib.github_provider import GitHubClient
+          from lib.github_rulesets import verify_rulesets as verify_protected_rulesets, verify_runtime_anchor_ruleset
+          from lib.github_runtime_store import GitHubRuntimeStore
+          from lib.policy_runtime import evaluate_with_effective_policy
+          from lib.provider_contracts import ProviderContractError
+          from lib.strict_json import loads as strict_loads
+          from lib.trusted_context import compile_trusted_context
+
+          repo = os.environ['GITHUB_REPOSITORY']
+          token = os.environ['GITHUB_TOKEN']
+          base_main = os.environ['EXPECTED_BASE_MAIN']
+          base_tree = os.environ['EXPECTED_BASE_TREE']
+          base_parent = os.environ['EXPECTED_BASE_PARENT']
+          initial_revision = int(os.environ['EXPECTED_INITIAL_LEASE_REVISION'])
+          ledger_issue_id = int(os.environ['EXPECTED_TERMINAL_LEDGER_ISSUE'])
+          terminal_event_hash = os.environ['EXPECTED_TERMINAL_LEDGER_EVENT_HASH']
+          terminal_state_digest = os.environ['EXPECTED_TERMINAL_LEDGER_STATE_DIGEST']
+          terminal_run_id = os.environ['EXPECTED_TERMINAL_RUN_ID']
+          recovery_guard_lease_id = os.environ['RECOVERY_GUARD_LEASE_ID']
+          issue_id = os.environ['SOURCE_ISSUE_ID']
+          roadmap_id = os.environ['SOURCE_ROADMAP_ID']
+          run_id = os.environ['SOURCE_RUN_ID']
+          lease_id = os.environ['SOURCE_LEASE_ID']
+          worker_id = os.environ['SOURCE_WORKER_ID']
+          source_branch = os.environ['SOURCE_BRANCH']
+          candidate_tree = os.environ['EXPECTED_CANDIDATE_TREE']
+          heartbeat_minutes = int(os.environ['HEARTBEAT_MINUTES'])
+          heartbeat_refresh_after = int(os.environ['HEARTBEAT_REFRESH_AFTER_MINUTES'])
+          resources = [{'kind':'provider','scope':'global','shared':True,'global':True}]
+
+          if not re.fullmatch(r'[0-9a-f]{40}', base_main) or not re.fullmatch(r'[0-9a-f]{40}', candidate_tree):
+              raise SystemExit('SOURCE_AUTHORITY_SHA_CONFIGURATION_INVALID')
+          if heartbeat_minutes != 30 or heartbeat_refresh_after != 15:
+              raise SystemExit('SOURCE_AUTHORITY_HEARTBEAT_CONFIGURATION_DRIFT')
+
+          cfg = strict_loads((root / '.adwf/config.json').read_text(encoding='utf-8'))
+          policy = cfg.get('policy') or {}
+          orch = cfg.get('orchestration') or {}
+          cost = cfg.get('cost') or {}
+          if policy.get('fail_mode') != 'CLOSED' or policy.get('active_autonomy') != 'A2' or policy.get('max_autonomous_risk') != 'R1':
+              raise SystemExit('SOURCE_AUTHORITY_POLICY_DRIFT')
+          if orch.get('max_parallel_writers') != 1 or orch.get('heartbeat_minutes') != heartbeat_minutes or orch.get('lease_ttl_minutes') != 120:
+              raise SystemExit('SOURCE_AUTHORITY_ORCHESTRATION_POLICY_DRIFT')
+          if cost.get('mode') != 'FREE_ONLY' or cost.get('monetary_budget') != 0:
+              raise SystemExit('SOURCE_AUTHORITY_COST_POLICY_DRIFT')
+
+          client = GitHubClient(repo, token)
+          lease_store = GitHubLeaseStore(client)
+          runtime_store = GitHubRuntimeStore(client)
+
+          def current_main():
+              value = str((client.branch('main').get('commit') or {}).get('sha') or '')
+              if not re.fullmatch(r'[0-9a-f]{40}', value):
+                  raise SystemExit('SOURCE_AUTHORITY_MAIN_SHA_INVALID')
+              return value
+
+          def authorize(action, subject_sha):
+              if action not in {'claim', 'cleanup'}:
+                  raise SystemExit('SOURCE_AUTHORITY_ACTION_NOT_ALLOWED:' + action)
+              if current_main() != subject_sha:
+                  raise SystemExit('SOURCE_AUTHORITY_AUTH_SUBJECT_MAIN_DRIFT')
+              repository = client.repo_info()
+              if repository.get('private') is not False or str(repository.get('default_branch') or '') != 'main':
+                  raise SystemExit('SOURCE_AUTHORITY_REPOSITORY_PROFILE_DRIFT')
+              verify_live_rulesets()
+              if current_main() != subject_sha:
+                  raise SystemExit('SOURCE_AUTHORITY_AUTH_POST_RULESET_MAIN_DRIFT')
+
+              provider_registry = strict_loads((root / '.adwf/providers.json').read_text(encoding='utf-8'))
+              capability = str(cost.get('default_ci_capability') or '')
+              cost_decision = evaluate_provider(
+                  provider_registry,
+                  {
+                      'provider': capability,
+                      'mandatory_ci': True,
+                      'automated': True,
+                      'projected_cost': 0,
+                      'projected_units': 0,
+                      'repository_visibility': 'PUBLIC',
+                      'runner_class': 'standard',
+                  },
+                  canonical_provider='github',
+              )
+              if cost_decision.get('result') != 'ALLOW' or float(cost_decision.get('projected_cost_usd') or 0) != 0:
+                  raise SystemExit('SOURCE_AUTHORITY_PROVIDER_COST_NOT_VERIFIED:' + ','.join(cost_decision.get('reason_codes') or []))
+
+              health_now = doctor(root)
+              categories = health_now.get('categories') or {}
+              health_map = {
+                  'package_integrity': str((categories.get('package_integrity') or {}).get('status') or 'NOT_VERIFIED'),
+                  'config_health': str((categories.get('config_health') or {}).get('status') or 'NOT_VERIFIED'),
+                  'control_plane_health': 'HEALTHY',
+                  'product_health': 'NOT_VERIFIED',
+              }
+              purpose_readback = {
+                  'provider': 'github',
+                  'subject_sha': subject_sha,
+                  'repository_visibility': 'PUBLIC',
+                  'runner': 'NOT_VERIFIED',
+                  'larger_runner': False,
+                  'facts_readback_verified': True,
+                  'readback_verified': True,
+                  'purpose': 'SOURCE_AUTHORITY_' + action.upper(),
+              }
+              assurance = build_assurance_snapshot(
+                  root,
+                  subject_sha=subject_sha,
+                  health=health_map,
+                  gates={},
+                  required_gates=[],
+                  evidence_records=[],
+                  evidence_refs=[],
+                  provider_readback=purpose_readback,
+                  cost=cost_decision,
+                  ttl_minutes=5,
+              )
+              context = compile_trusted_context(
+                  root,
+                  action=action,
+                  risk='R1',
+                  work_type='recovery',
+                  request={'request_id': f'{run_id}:{action}:{subject_sha}', 'subject_sha': subject_sha, 'preview_digest': None},
+                  assurance_snapshot=assurance,
+                  provider_readback=purpose_readback,
+              )
+              decision = evaluate_with_effective_policy(root, context)
+              if decision.result != 'ALLOW':
+                  raise SystemExit('SOURCE_AUTHORITY_POLICY_NOT_ALLOW:' + decision.result + ':' + ','.join(decision.reason_codes))
+              if current_main() != subject_sha:
+                  raise SystemExit('SOURCE_AUTHORITY_AUTH_FINAL_MAIN_DRIFT')
+              print('POLICY_' + action.upper() + '=ALLOW')
+
+          def verify_live_rulesets():
+              rows = client.rulesets()
+              protected = verify_protected_rulesets(rows, expected_integration_id=15368)
+              anchors = verify_runtime_anchor_ruleset(rows)
+              if protected.get('readback_verified') is not True:
+                  raise SystemExit('SOURCE_AUTHORITY_PROTECTED_MAIN_RULESET_NOT_VERIFIED:' + ','.join(protected.get('reason_codes') or []))
+              if anchors.get('readback_verified') is not True:
+                  raise SystemExit('SOURCE_AUTHORITY_RUNTIME_ANCHOR_RULESET_NOT_VERIFIED:' + ','.join(anchors.get('reason_codes') or []))
+              named = {str(x.get('name') or ''): x for x in rows}
+              for name in ('ADWF protected main', 'ADWF immutable runtime anchors'):
+                  rs = named.get(name) or {}
+                  if rs.get('enforcement') != 'active' or (rs.get('bypass_actors') or []) != []:
+                      raise SystemExit('SOURCE_AUTHORITY_RULESET_GOVERNANCE_DRIFT:' + name)
+                  if rs.get('current_user_can_bypass') not in (None, 'never', False):
+                      raise SystemExit('SOURCE_AUTHORITY_RULESET_BYPASS_DRIFT:' + name)
+              protected_named = named.get('ADWF protected main') or {}
+              required = []
+              strict = False
+              for rule in protected_named.get('rules') or []:
+                  if rule.get('type') == 'required_status_checks':
+                      params = rule.get('parameters') or {}
+                      strict = params.get('strict_required_status_checks_policy') is True
+                      required = params.get('required_status_checks') or []
+              normalized = sorted((x.get('context'), x.get('integration_id')) for x in required)
+              expected = sorted([
+                  ('fast-feedback', 15368),
+                  ('adwf/governance-gate', 15368),
+                  ('adwf/trusted-gate', 15368),
+              ])
+              if not strict or normalized != expected:
+                  raise SystemExit('SOURCE_AUTHORITY_REQUIRED_CHECK_RULESET_DRIFT:' + json.dumps(normalized))
+              return rows
+
+          base_commit = client.get(f'/repos/{repo}/git/commits/{base_main}')
+          if str((base_commit.get('tree') or {}).get('sha') or '') != base_tree:
+              raise SystemExit('SOURCE_AUTHORITY_BASE_TREE_DRIFT')
+          base_parents = [str((x or {}).get('sha') or '') for x in (base_commit.get('parents') or [])]
+          if base_parents != [base_parent]:
+              raise SystemExit('SOURCE_AUTHORITY_BASE_PARENT_DRIFT')
+          issue = client.get(f'/repos/{repo}/issues/{issue_id}')
+          if issue.get('state') != 'open' or '[GOV-030][P0]' not in str(issue.get('title') or ''):
+              raise SystemExit('SOURCE_AUTHORITY_ISSUE_DRIFT')
+          ledger_issue, ledger_events = runtime_store.read()
+          if int((ledger_issue or {}).get('number') or 0) != ledger_issue_id or len(ledger_events) != 2:
+              raise SystemExit('SOURCE_AUTHORITY_LEDGER_CARDINALITY_DRIFT')
+          terminal = ledger_events[-1]
+          if terminal.get('event_hash') != terminal_event_hash or terminal.get('state_digest') != terminal_state_digest:
+              raise SystemExit('SOURCE_AUTHORITY_LEDGER_TERMINAL_IDENTITY_DRIFT')
+          terminal_state = terminal.get('state') or {}
+          if terminal.get('sequence') != 2 or terminal_state.get('run_id') != terminal_run_id or terminal_state.get('status') != 'COMPLETE' or terminal_state.get('revision') != 1:
+              raise SystemExit('SOURCE_AUTHORITY_LEDGER_NOT_TERMINAL')
+          verify_live_rulesets()
+
+          main_sha = current_main()
+          registry, registry_anchor = lease_store.read(expected_main_sha=main_sha, policy_max_parallel_writers=1)
+          active = [x for x in registry.get('leases') or [] if x.get('status') == 'ACTIVE']
+          exact = [x for x in active if x.get('lease_id') == lease_id]
+
+          if not active:
+              if registry.get('revision') != initial_revision or main_sha != base_main:
+                  raise SystemExit('SOURCE_AUTHORITY_ACQUIRE_BASELINE_DRIFT')
+              guard = [x for x in registry.get('leases') or [] if x.get('lease_id') == recovery_guard_lease_id]
+              if len(guard) != 1 or guard[0].get('status') != 'RELEASED' or guard[0].get('provider_reconciliation_ref') != 'github:runtime-ledger:issue:3:event:' + terminal_event_hash:
+                  raise SystemExit('SOURCE_AUTHORITY_RECOVERY_GUARD_EVIDENCE_MISSING')
+              open_pulls = [p for p in client.pulls() if p.get('state') == 'open']
+              if open_pulls:
+                  raise SystemExit('SOURCE_AUTHORITY_OPEN_PR_CONFLICT')
+              try:
+                  client.git_ref(source_branch)
+                  raise SystemExit('SOURCE_AUTHORITY_SOURCE_BRANCH_ALREADY_EXISTS')
+              except ProviderContractError as exc:
+                  if str(exc) != 'PROVIDER_HTTP_404':
+                      raise
+              authorize('claim', base_main)
+              persisted, lease, new_anchor = lease_store.acquire(
+                  expected_main_sha=base_main,
+                  policy_max_parallel_writers=1,
+                  issue_id=issue_id,
+                  roadmap_id=roadmap_id,
+                  worker_id=worker_id,
+                  base_sha=base_main,
+                  branch=source_branch,
+                  resources=resources,
+                  ttl_minutes=120,
+                  lease_id=lease_id,
+              )
+              if persisted.get('revision') != initial_revision + 1 or lease.get('generation') != initial_revision + 1:
+                  raise SystemExit('SOURCE_AUTHORITY_ACQUIRE_REVISION_MISMATCH')
+              readback, read_anchor = lease_store.read(expected_main_sha=base_main, policy_max_parallel_writers=1)
+              read_active = [x for x in readback.get('leases') or [] if x.get('status') == 'ACTIVE']
+              if len(read_active) != 1 or read_active[0].get('lease_id') != lease_id or read_anchor != new_anchor:
+                  raise SystemExit('SOURCE_AUTHORITY_ACQUIRE_READBACK_MISMATCH')
+              raise SystemExit(0)
+
+          if len(active) != 1 or len(exact) != 1:
+              raise SystemExit('SOURCE_AUTHORITY_ACTIVE_LEASE_CONFLICT')
+          lease = exact[0]
+          if lease.get('issue_id') != issue_id or lease.get('roadmap_id') != roadmap_id or lease.get('worker_id') != worker_id or lease.get('base_sha') != base_main or lease.get('branch') != source_branch or lease.get('resources') != resources:
+              raise SystemExit('SOURCE_AUTHORITY_ACTIVE_LEASE_IDENTITY_DRIFT')
+
+          if main_sha == base_main:
+              now = datetime.now(timezone.utc)
+              heartbeat_at = parse_time(str(lease.get('heartbeat_at')))
+              expires_at = parse_time(str(lease.get('expires_at')))
+              age_seconds = (now - heartbeat_at).total_seconds()
+              if heartbeat_at > now or expires_at <= now or age_seconds > heartbeat_minutes * 60:
+                  raise SystemExit('SOURCE_AUTHORITY_LEASE_RECONCILIATION_REQUIRED')
+              authorize('claim', base_main)
+              if age_seconds < heartbeat_refresh_after * 60:
+                  raise SystemExit(0)
+              persisted, new_anchor = lease_store.heartbeat(
+                  expected_main_sha=base_main,
+                  policy_max_parallel_writers=1,
+                  lease_id=lease_id,
+                  worker_id=worker_id,
+                  ttl_minutes=120,
+              )
+              check, check_anchor = lease_store.read(expected_main_sha=base_main, policy_max_parallel_writers=1)
+              refreshed = [x for x in check.get('leases') or [] if x.get('status') == 'ACTIVE' and x.get('lease_id') == lease_id]
+              if persisted.get('revision') != registry.get('revision') + 1 or len(refreshed) != 1 or check_anchor != new_anchor:
+                  raise SystemExit('SOURCE_AUTHORITY_HEARTBEAT_READBACK_MISMATCH')
+              raise SystemExit(0)
+
+          source_prs = []
+          for pr in client.pulls():
+              head = pr.get('head') or {}
+              if head.get('ref') == source_branch:
+                  source_prs.append(pr)
+          if len(source_prs) != 1:
+              raise SystemExit('SOURCE_AUTHORITY_RELEASE_PR_CARDINALITY')
+          pr = source_prs[0]
+          base = pr.get('base') or {}
+          if pr.get('state') != 'closed' or not pr.get('merged_at') or base.get('ref') != 'main':
+              raise SystemExit('SOURCE_AUTHORITY_MAIN_DRIFT_WITHOUT_MERGE')
+          if str(base.get('sha') or '') != base_main:
+              raise SystemExit('SOURCE_AUTHORITY_PR_BASE_SHA_MISMATCH')
+          expected_paths = sorted([
+              '.adwf/docs-registry.json',
+              '.adwf/lib/action_executors.py',
+              '.adwf/lib/github_runtime_store.py',
+              '.adwf/scripts/github_runtime_sync.py',
+              '.adwf/tests/test_runtime_ledger_stale_reconciliation.py',
+              'MANIFEST.json',
+              'SHA256SUMS.txt',
+          ])
+          actual_paths = sorted(str(x.get('filename') or '') for x in client.pull_files(int(pr['number'])))
+          if actual_paths != expected_paths:
+              raise SystemExit('SOURCE_AUTHORITY_PR_SCOPE_MISMATCH:' + json.dumps(actual_paths))
+          merge_sha = str(pr.get('merge_commit_sha') or '')
+          head_sha = str((pr.get('head') or {}).get('sha') or '')
+          if merge_sha != main_sha or not re.fullmatch(r'[0-9a-f]{40}', head_sha):
+              raise SystemExit('SOURCE_AUTHORITY_MERGE_IDENTITY_MISMATCH')
+          head_commit = client.get(f'/repos/{repo}/git/commits/{head_sha}')
+          if str((head_commit.get('tree') or {}).get('sha') or '') != candidate_tree:
+              raise SystemExit('SOURCE_AUTHORITY_CANDIDATE_TREE_MISMATCH')
+          merge_commit = client.get(f'/repos/{repo}/git/commits/{merge_sha}')
+          if str((merge_commit.get('tree') or {}).get('sha') or '') != candidate_tree:
+              raise SystemExit('SOURCE_AUTHORITY_DELIVERY_TREE_MISMATCH')
+          merge_parents = [str((x or {}).get('sha') or '') for x in (merge_commit.get('parents') or [])]
+          if merge_parents != [base_main]:
+              raise SystemExit('SOURCE_AUTHORITY_DELIVERY_PARENT_MISMATCH')
+
+          postmerge = {}
+          for run in client.recent_runs(limit=100):
+              if run.get('head_sha') != merge_sha or run.get('status') != 'completed' or run.get('conclusion') != 'success':
+                  continue
+              name = str(run.get('name') or '')
+              if name in {'ADWF Main', 'ADWF Platform Smoke'}:
+                  postmerge.setdefault(name, run)
+          missing = sorted({'ADWF Main', 'ADWF Platform Smoke'} - set(postmerge))
+          if missing:
+              raise SystemExit(3)
+
+          authorize('cleanup', merge_sha)
+          reconciliation_ref = 'github:commit:' + merge_sha
+          released, release_anchor = lease_store.release(
+              expected_main_sha=merge_sha,
+              policy_max_parallel_writers=1,
+              lease_id=lease_id,
+              worker_id=worker_id,
+              provider_reconciled=True,
+              provider_reconciliation_ref=reconciliation_ref,
+          )
+          final_registry, final_anchor = lease_store.read(expected_main_sha=merge_sha, policy_max_parallel_writers=1)
+          if released.get('revision') != registry.get('revision') + 1 or final_anchor != release_anchor:
+              raise SystemExit('SOURCE_AUTHORITY_RELEASE_REVISION_MISMATCH')
+          if any(x.get('status') == 'ACTIVE' for x in final_registry.get('leases') or []):
+              raise SystemExit('SOURCE_AUTHORITY_ACTIVE_WRITER_REMAINS')
+          target = [x for x in final_registry.get('leases') or [] if x.get('lease_id') == lease_id]
+          if len(target) != 1 or target[0].get('status') != 'RELEASED' or target[0].get('provider_reconciliation_ref') != reconciliation_ref:
+              raise SystemExit('SOURCE_AUTHORITY_RELEASE_READBACK_MISMATCH')
+          if current_main() != merge_sha:
+              raise SystemExit('SOURCE_AUTHORITY_FINAL_MAIN_DRIFT')
+
