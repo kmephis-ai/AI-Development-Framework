@@ -1,0 +1,12 @@
+{
+  "schema_version": 1,
+  "source_repository": "kmephis-ai/AI-Development-Framework",
+  "source_branch": "main",
+  "source_sha": "29b95ceba823469005a0eef4e6d7d1c3b412814e",
+  "transport_sha": "dcc08758eae26aaf7566e970320d9eed82fdeee2",
+  "bundle_sha256": "8da9e4dbf55b44d828b56f113efb266842923df70dab83cd8f49beebaa38f679",
+  "bundle_bytes": 1418751,
+  "chunk_bytes": 45000,
+  "parts": 43,
+  "bundle_ref": "refs/heads/adwf-source"
+}
