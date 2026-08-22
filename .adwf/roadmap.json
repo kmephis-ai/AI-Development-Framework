@@ -2,13 +2,62 @@
   "schema_version": 1,
   "goals": [
     {
+      "id": "AUTONOMOUS-EXECUTION",
+      "title_ru": "Автономная разработка ADWF — текущий приоритет",
+      "tasks": [
+        {
+          "roadmap_id": "SELFTEST_COVERAGE-001",
+          "title_ru": "Полное покрытие канонического self-test без молча пропущенных тестов",
+          "dependencies": [
+            "TRACE-001"
+          ],
+          "product_impact": false
+        },
+        {
+          "roadmap_id": "OPENHANDS-001",
+          "title_ru": "OpenHands — первый реальный Creative Executor через универсальный контракт",
+          "dependencies": [
+            "SELFTEST_COVERAGE-001",
+            "AGENTQUAL-001"
+          ],
+          "product_impact": false
+        },
+        {
+          "roadmap_id": "EXECNODE-001",
+          "title_ru": "Постоянный ADWF Execution Node Runner + измерение process tax",
+          "dependencies": [
+            "OPENHANDS-001"
+          ],
+          "product_impact": false
+        },
+        {
+          "roadmap_id": "ORCH-001",
+          "title_ru": "Durable autonomous development orchestration + Human-by-Exception",
+          "dependencies": [
+            "EXECNODE-001"
+          ],
+          "product_impact": false
+        },
+        {
+          "roadmap_id": "RUNTIME-001",
+          "title_ru": "12–24h работа без владельца + restart/resume proof",
+          "dependencies": [
+            "ORCH-001"
+          ],
+          "product_impact": false
+        }
+      ]
+    },
+    {
       "id": "EXECUTIVE-AUTOPILOT",
       "title_ru": "Executive Autopilot",
       "tasks": [
         {
           "roadmap_id": "CEO-001",
           "title_ru": "Нулевой технический контроль владельца",
-          "dependencies": [],
+          "dependencies": [
+            "RUNTIME-001"
+          ],
           "product_impact": true
         },
         {
@@ -18,20 +67,12 @@
             "CEO-001"
           ],
           "product_impact": true
-        },
-        {
-          "roadmap_id": "RUNTIME-001",
-          "title_ru": "Возобновляемая многодневная работа",
-          "dependencies": [
-            "CEO-001"
-          ],
-          "product_impact": false
         }
       ]
     },
     {
       "id": "FOUNDATION-ENGINEERING-OS",
-      "title_ru": "Engineering OS Foundation — critical path",
+      "title_ru": "Engineering OS Foundation — preserved/deferred capability chain",
       "tasks": [
         {
           "roadmap_id": "FND-001",
@@ -83,7 +124,7 @@
           "roadmap_id": "LIFECYCLE-001",
           "title_ru": "Managed Surface Contract v1 — project must outlive framework",
           "dependencies": [
-            "TRACE-001"
+            "RUNTIME-001"
           ],
           "product_impact": false
         },
@@ -219,7 +260,7 @@
           "roadmap_id": "AGENTQUAL-001",
           "title_ru": "Replaceable Creative Agent Qualification Contract + Reference Adapter v1",
           "dependencies": [
-            "EDGEREF-001"
+            "TRACE-001"
           ],
           "product_impact": false
         },
@@ -304,18 +345,10 @@
           "product_impact": false
         },
         {
-          "roadmap_id": "ORCH-001",
-          "title_ru": "Durable autonomous development orchestration + Human-by-Exception",
-          "dependencies": [
-            "DELIVERY_SHA_IDENTITY-001"
-          ],
-          "product_impact": false
-        },
-        {
           "roadmap_id": "MULTIWRITER-001",
           "title_ru": "Conflict-domain safe multi-writer orchestration",
           "dependencies": [
-            "ORCH-001"
+            "RUNTIME-001"
           ],
           "product_impact": false
         },
