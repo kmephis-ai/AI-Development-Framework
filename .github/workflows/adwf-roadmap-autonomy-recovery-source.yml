@@ -132,7 +132,7 @@ jobs:
                   request={"request_id":"roadmap-autonomy-001:" + action + ":" + expected_main,
                            "subject_sha":expected_main,"preview_digest":None},
                   assurance_snapshot=assurance,
-                  provider_readback=assurance["provider_readback"],
+                  provider_readback=assurance["provider"],
               )
               decision = evaluate_with_effective_policy(root, context)
               if decision.result != "ALLOW":
