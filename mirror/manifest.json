@@ -3,9 +3,9 @@
   "source_repository": "kmephis-ai/AI-Development-Framework",
   "source_branch": "adwf/roadmap-autonomy-001-a1",
   "source_sha": "c93a7866b0155bbfe21a4355ceb8fac892dea425",
-  "transport_sha": "441ddac55548842d219d0e6698630b7c7de7825f",
-  "bundle_sha256": "563d497a0c45254975a5c8c6602d911239a32a075032e0ba22a16631b8ed61a7",
-  "bundle_bytes": 1537854,
+  "transport_sha": "1de349cff76b46cb3d753a4c2c70bf730853e939",
+  "bundle_sha256": "0ce0c27442608e78d67234c58c2248869f72f1def7b6dfe4b0c5701e44dc68f4",
+  "bundle_bytes": 1537803,
   "chunk_bytes": 45000,
   "parts": 46,
   "bundle_ref": "refs/heads/adwf-source"
