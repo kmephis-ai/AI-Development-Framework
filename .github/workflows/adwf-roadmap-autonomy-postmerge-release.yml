@@ -1,0 +1,293 @@
+name: ROADMAP_AUTONOMY-001 Postmerge Verify + Lease Release
+
+on:
+  push:
+    branches:
+      - helper/ROADMAP_AUTONOMY-001-postmerge-release-a1
+    paths:
+      - .adwf-postmerge-release-trigger-roadmap-autonomy-001-a1
+
+permissions:
+  contents: write
+  actions: read
+  checks: read
+  pull-requests: read
+  issues: read
+  statuses: read
+
+concurrency:
+  group: adwf-control-${{ github.repository }}
+  cancel-in-progress: false
+
+jobs:
+  verify-and-release:
+    if: github.ref == 'refs/heads/helper/ROADMAP_AUTONOMY-001-postmerge-release-a1'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd
+        with:
+          ref: ${{ github.event.repository.default_branch }}
+          persist-credentials: false
+          fetch-depth: 2
+      - uses: actions/setup-python@a309ff8b426b58ec0e2a45f0f869d46889d02405
+        with:
+          python-version: "3.12.10"
+      - name: Verify exact postmerge evidence and release source lease
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        shell: python
+        run: |
+          from pathlib import Path
+          import base64, hashlib, os, re, sys
+          root = Path.cwd()
+          sys.path.insert(0, str(root / ".adwf"))
+
+          from lib.assurance_builder import build_assurance_snapshot
+          from lib.cost_guard import evaluate_provider
+          from lib.github_lease_store import GitHubLeaseStore
+          from lib.github_provider import GitHubClient
+          from lib.github_rulesets import verify_rulesets, verify_runtime_anchor_ruleset
+          from lib.health import doctor
+          from lib.policy_runtime import evaluate_with_effective_policy
+          from lib.strict_json import loads as strict_loads
+          from lib.trusted_context import compile_trusted_context
+
+          repo = os.environ["GITHUB_REPOSITORY"]
+          token = os.environ["GITHUB_TOKEN"]
+
+          expected_main = "053cfd028fef0a41f4e3177c2290a20ff83a9685"
+          expected_parent = "d61d5f83ec5afdfedfe628c7d385907a5ec90203"
+          expected_tree = "d48ae7683a6a5b993931eea06f06eed49e369e79"
+          expected_candidate = "f663cabe342d42c6b8a209e8001f086d1dc3eea4"
+          expected_revision = 19
+          expected_release_revision = 20
+          pr_number = 266
+          issue_id = "265"
+          roadmap_id = "ROADMAP_AUTONOMY-001"
+          lease_id = "66d7dc09-6ad8-40d7-8d62-a9d90f5891b2"
+          worker_id = "adwf-runtime:roadmap-autonomy-001-source-a1"
+          source_branch = "adwf/roadmap-autonomy-001-a1"
+          trigger_path = ".adwf-postmerge-release-trigger-roadmap-autonomy-001-a1"
+          trigger_blob = "33f43d6467865f6572594aee8fb1ae4961ea9a2a"
+          trigger_sha256 = "eb9a2425159b7b10b4f85c309172a50edf49b08acf2f9c4a01c177c2c7adca0b"
+          expected_paths = {
+              ".adwf/roadmap.json",
+              ".adwf/docs-registry.json",
+              "MANIFEST.json",
+              "SHA256SUMS.txt",
+          }
+
+          cfg = strict_loads((root / ".adwf/config.json").read_text(encoding="utf-8"))
+          policy = cfg.get("policy") or {}
+          orch = cfg.get("orchestration") or {}
+          cost = cfg.get("cost") or {}
+          if policy.get("fail_mode") != "CLOSED" or policy.get("active_autonomy") != "A2" or policy.get("max_autonomous_risk") != "R1":
+              raise SystemExit("POSTMERGE_POLICY_DRIFT")
+          if orch.get("max_parallel_writers") != 1 or cost.get("mode") != "FREE_ONLY" or cost.get("monetary_budget") != 0:
+              raise SystemExit("POSTMERGE_GOVERNANCE_DRIFT")
+
+          client = GitHubClient(repo, token)
+          store = GitHubLeaseStore(client)
+
+          def current_main():
+              value = str((client.branch("main").get("commit") or {}).get("sha") or "")
+              if re.fullmatch(r"[0-9a-f]{40}", value) is None:
+                  raise SystemExit("POSTMERGE_MAIN_INVALID")
+              return value
+
+          def verify_rules():
+              rows = client.rulesets()
+              if verify_rulesets(rows, expected_integration_id=15368).get("readback_verified") is not True:
+                  raise SystemExit("POSTMERGE_MAIN_RULESET_NOT_VERIFIED")
+              if verify_runtime_anchor_ruleset(rows).get("readback_verified") is not True:
+                  raise SystemExit("POSTMERGE_ANCHOR_RULESET_NOT_VERIFIED")
+              named = {str(x.get("name") or ""): x for x in rows}
+              for name in ("ADWF protected main", "ADWF immutable runtime anchors"):
+                  rs = named.get(name) or {}
+                  if rs.get("enforcement") != "active" or (rs.get("bypass_actors") or []) != []:
+                      raise SystemExit("POSTMERGE_RULESET_DRIFT:" + name)
+                  if rs.get("current_user_can_bypass") not in (None, "never", False):
+                      raise SystemExit("POSTMERGE_BYPASS_DRIFT:" + name)
+
+          def authorize_cleanup(evidence_refs):
+              provider_registry = strict_loads((root / ".adwf/providers.json").read_text(encoding="utf-8"))
+              capability = str(cost.get("default_ci_capability") or "")
+              cost_decision = evaluate_provider(
+                  provider_registry,
+                  {
+                      "provider": capability,
+                      "mandatory_ci": True,
+                      "automated": True,
+                      "projected_cost": 0,
+                      "projected_units": 0,
+                      "repository_visibility": "PUBLIC",
+                      "runner_class": "standard",
+                  },
+                  canonical_provider="github",
+              )
+              if cost_decision.get("result") != "ALLOW" or float(cost_decision.get("projected_cost_usd") or 0) != 0:
+                  raise SystemExit("POSTMERGE_COST_NOT_ALLOWED")
+              categories = (doctor(root).get("categories") or {})
+              assurance = build_assurance_snapshot(
+                  root,
+                  subject_sha=expected_main,
+                  health={
+                      "package_integrity": str((categories.get("package_integrity") or {}).get("status") or "NOT_VERIFIED"),
+                      "config_health": str((categories.get("config_health") or {}).get("status") or "NOT_VERIFIED"),
+                      "control_plane_health": "HEALTHY",
+                      "product_health": "NOT_VERIFIED",
+                  },
+                  gates={},
+                  required_gates=[],
+                  evidence_records=[],
+                  evidence_refs=evidence_refs,
+                  provider_readback={
+                      "provider": "github",
+                      "subject_sha": expected_main,
+                      "repository_visibility": "PUBLIC",
+                      "runner": "NOT_VERIFIED",
+                      "larger_runner": False,
+                      "facts_readback_verified": True,
+                      "readback_verified": True,
+                      "purpose": "ROADMAP_AUTONOMY_POSTMERGE_RELEASE",
+                  },
+                  cost=cost_decision,
+                  ttl_minutes=5,
+              )
+              context = compile_trusted_context(
+                  root,
+                  action="cleanup",
+                  risk="R1",
+                  work_type="recovery",
+                  request={
+                      "request_id": "roadmap-autonomy-001:postmerge-release:" + expected_main,
+                      "subject_sha": expected_main,
+                      "preview_digest": None,
+                  },
+                  assurance_snapshot=assurance,
+                  provider_readback=assurance["provider"],
+              )
+              decision = evaluate_with_effective_policy(root, context)
+              if decision.result != "ALLOW":
+                  raise SystemExit("POSTMERGE_CLEANUP_POLICY_NOT_ALLOW:" + decision.result + ":" + ",".join(decision.reason_codes))
+
+          if current_main() != expected_main:
+              raise SystemExit("POSTMERGE_MAIN_DRIFT")
+          verify_rules()
+
+          trigger = client.get(f"/repos/{repo}/contents/{trigger_path}?ref={os.environ['GITHUB_SHA']}")
+          if str(trigger.get("sha") or "") != trigger_blob:
+              raise SystemExit("POSTMERGE_TRIGGER_BLOB_DRIFT")
+          if hashlib.sha256(base64.b64decode(str(trigger.get("content") or ""))).hexdigest() != trigger_sha256:
+              raise SystemExit("POSTMERGE_TRIGGER_DIGEST_DRIFT")
+
+          pr = client.pull(pr_number)
+          if pr.get("state") != "closed" or not pr.get("merged_at"):
+              raise SystemExit("POSTMERGE_PR_NOT_MERGED")
+          if str((pr.get("head") or {}).get("sha") or "") != expected_candidate:
+              raise SystemExit("POSTMERGE_PR_HEAD_DRIFT")
+          if str(pr.get("merge_commit_sha") or "") != expected_main:
+              raise SystemExit("POSTMERGE_PR_MERGE_SHA_DRIFT")
+          actual_paths = {str(x.get("filename") or "") for x in client.pull_files(pr_number)}
+          if actual_paths != expected_paths:
+              raise SystemExit("POSTMERGE_PR_SCOPE_DRIFT:" + ",".join(sorted(actual_paths)))
+
+          commit = client.get(f"/repos/{repo}/commits/{expected_main}")
+          if str(commit.get("sha") or "") != expected_main:
+              raise SystemExit("POSTMERGE_COMMIT_READBACK_MISMATCH")
+          if str(((commit.get("commit") or {}).get("tree") or {}).get("sha") or "") != expected_tree:
+              raise SystemExit("POSTMERGE_TREE_MISMATCH")
+          parents = [str(x.get("sha") or "") for x in (commit.get("parents") or [])]
+          if parents != [expected_parent]:
+              raise SystemExit("POSTMERGE_PARENT_MISMATCH")
+          verification = (commit.get("commit") or {}).get("verification") or {}
+          if verification.get("verified") is not True or verification.get("reason") != "valid":
+              raise SystemExit("POSTMERGE_COMMIT_NOT_VERIFIED")
+
+          runs = [
+              x for x in client.recent_runs(limit=100)
+              if x.get("head_sha") == expected_main and x.get("event") == "push"
+          ]
+          selected = {}
+          for name in ("ADWF Main", "ADWF Platform Smoke"):
+              matches = [x for x in runs if x.get("name") == name]
+              if not matches:
+                  raise SystemExit("POSTMERGE_RUN_MISSING:" + name)
+              latest = max(matches, key=lambda x: int(x.get("id") or 0))
+              if latest.get("status") != "completed" or latest.get("conclusion") != "success":
+                  raise SystemExit("POSTMERGE_RUN_NOT_SUCCESS:" + name + ":" + str(latest.get("status")) + ":" + str(latest.get("conclusion")))
+              selected[name] = latest
+
+          main_jobs = client.jobs(int(selected["ADWF Main"]["id"]))
+          canonical = [x for x in main_jobs if x.get("name") == "canonical-verification"]
+          if len(canonical) != 1 or canonical[0].get("status") != "completed" or canonical[0].get("conclusion") != "success":
+              raise SystemExit("POSTMERGE_MAIN_JOB_NOT_SUCCESS")
+
+          smoke_jobs = client.jobs(int(selected["ADWF Platform Smoke"]["id"]))
+          expected_smoke = {"smoke (ubuntu-24.04)", "smoke (windows-2022)"}
+          smoke = {str(x.get("name") or ""): x for x in smoke_jobs if x.get("name") in expected_smoke}
+          if set(smoke) != expected_smoke:
+              raise SystemExit("POSTMERGE_SMOKE_JOBS_MISSING:" + ",".join(sorted(expected_smoke - set(smoke))))
+          for name, job in smoke.items():
+              if job.get("status") != "completed" or job.get("conclusion") != "success":
+                  raise SystemExit("POSTMERGE_SMOKE_JOB_NOT_SUCCESS:" + name)
+
+          evidence_refs = [
+              "github:commit:" + expected_main,
+              "github:actions-run:" + str(selected["ADWF Main"]["id"]),
+              "github:actions-run:" + str(selected["ADWF Platform Smoke"]["id"]),
+          ]
+          authorize_cleanup(evidence_refs)
+
+          registry, anchor19 = store.read(expected_main_sha=expected_main, policy_max_parallel_writers=1)
+          active = [x for x in registry.get("leases") or [] if x.get("status") == "ACTIVE"]
+          if registry.get("revision") != expected_revision:
+              raise SystemExit("POSTMERGE_LEASE_REVISION_DRIFT")
+          if len(active) != 1:
+              raise SystemExit("POSTMERGE_ACTIVE_WRITER_COUNT_DRIFT")
+          lease = active[0]
+          expected_lease = {
+              "lease_id": lease_id,
+              "issue_id": issue_id,
+              "roadmap_id": roadmap_id,
+              "worker_id": worker_id,
+              "branch": source_branch,
+              "base_sha": expected_parent,
+          }
+          for key, value in expected_lease.items():
+              if str(lease.get(key) or "") != value:
+                  raise SystemExit("POSTMERGE_LEASE_IDENTITY_DRIFT:" + key)
+
+          released, anchor20 = store.release(
+              expected_main_sha=expected_main,
+              policy_max_parallel_writers=1,
+              lease_id=lease_id,
+              worker_id=worker_id,
+              provider_reconciled=True,
+              provider_reconciliation_ref="github:commit:" + expected_main,
+          )
+          final, final_anchor = store.read(expected_main_sha=expected_main, policy_max_parallel_writers=1)
+          final_active = [x for x in final.get("leases") or [] if x.get("status") == "ACTIVE"]
+          target = [x for x in final.get("leases") or [] if x.get("lease_id") == lease_id]
+          if released.get("revision") != expected_release_revision or final.get("revision") != expected_release_revision:
+              raise SystemExit("POSTMERGE_RELEASE_REVISION_MISMATCH")
+          if final_active:
+              raise SystemExit("POSTMERGE_RELEASE_ACTIVE_WRITER_REMAINS")
+          if len(target) != 1 or target[0].get("status") != "RELEASED":
+              raise SystemExit("POSTMERGE_RELEASE_TARGET_NOT_TERMINAL")
+          if target[0].get("provider_reconciliation_ref") != "github:commit:" + expected_main:
+              raise SystemExit("POSTMERGE_RELEASE_RECONCILIATION_REF_MISMATCH")
+          if final_anchor != anchor20 or anchor20 == anchor19:
+              raise SystemExit("POSTMERGE_RELEASE_ANCHOR_READBACK_MISMATCH")
+          if current_main() != expected_main:
+              raise SystemExit("POSTMERGE_FINAL_MAIN_DRIFT")
+          verify_rules()
+
+          print("ROADMAP_AUTONOMY_POSTMERGE=PASS")
+          print("MAIN_SHA=" + expected_main)
+          print("ADWF_MAIN_RUN_ID=" + str(selected["ADWF Main"]["id"]))
+          print("PLATFORM_SMOKE_RUN_ID=" + str(selected["ADWF Platform Smoke"]["id"]))
+          print("LEASE_REVISION=20")
+          print("LEASE_STATUS=RELEASED")
+          print("ACTIVE_WRITERS=0")
