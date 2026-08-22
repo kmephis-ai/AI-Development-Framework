@@ -23,6 +23,12 @@
 
 ## Текущий baseline
 
-Последний принятый аудит: `ADWF-FOUNDATION-2026-08-15`.
+Последний принятый аудит: `MEGA-AUDIT-2026-08-22`.
 
-Ключевое решение: не переписывать ADWF и не наращивать Core бесконечно; завершать фундамент через Engineering Truth → Consumer Lifecycle → heterogeneous conformance → Human-by-Exception proof → `FOUNDATION_READY`.
+Ключевое решение: сохранить ценное governance/control-plane ядро ADWF, но временно остановить расширение архитектуры ради Truth & Safety Reset — автономность/continuity, достоверность evidence, снижение process tax и один реально доказуемый lifecycle важнее fleet, multi-writer, skill factory и большого UI.
+
+Consumer-задачи и другие существующие Roadmap items **не удаляются**: они остаются долгосрочной очередью за maturity gates. Ближайший технический P0 после canonical audit adoption — `SELFTEST_COVERAGE-001 / #253`.
+
+Пост-аудитный delta: finding P0-3 о terminal Runtime Ledger resurrection исправлен GOV-030 и защищённо вошёл в `main@4cd9e6eaa8b36ddc1ec4476c51b77671a6fc5275`. Остальные findings этого аудита не считаются автоматически исправленными.
+
+Предыдущий `ADWF-FOUNDATION-2026-08-15` остаётся историческим baseline и не удаляется. Mega Audit уточняет текущий порядок работ; live/provider facts по-прежнему требуют fresh readback в каждой новой транзакции.

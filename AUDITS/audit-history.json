@@ -61,6 +61,53 @@
         "three-class conformance lab",
         "machine FOUNDATION_READY gate"
       ]
+    },
+    {
+      "audit_id": "MEGA-AUDIT-2026-08-22",
+      "date": "2026-08-22",
+      "repository": "kmephis-ai/AI-Development-Framework",
+      "baseline_sha": "29b95ceba823469005a0eef4e6d7d1c3b412814e",
+      "mode": "INDEPENDENT_READ_ONLY",
+      "status": "ACCEPTED_AS_PLANNING_BASELINE",
+      "report_path": "AUDITS/ADWF_MEGA_AUDIT_2026-08-22.md",
+      "report_sha256": "7483101e899292856c44d2302225f386a5974100f515daee1b15da981db2d741",
+      "owner_decision": "Принять Mega Audit как Roadmap input: автономность и непрерывность ADWF — высший текущий приоритет; consumer-работы отложить, но не удалять; process tax измерять и снижать; не превращать ADWF в coding-agent product; сохранять FREE_ONLY, fail-closed и один writer.",
+      "headline": "Сначала восстановить Engineering Truth и безопасность evidence/authority, доказать устойчивый автономный lifecycle и снизить process tax; fleet, multi-writer, skill factory и большой UI остаются за maturity gates.",
+      "accepted_decisions": [
+        "Autonomy and continuity of ADWF development are the highest current priority.",
+        "Consumer implementation is deferred; existing Consumer and other Roadmap work is preserved rather than deleted.",
+        "ADWF remains a vendor-neutral governance/evidence/recovery control plane, not another Cursor/Codex/Claude Code analogue.",
+        "ADWF process tax is an explicit product objective and must be measured per actually completed capability.",
+        "New architecture layers are gated by demonstrated autonomy/continuity value and lower process tax.",
+        "UI is deferred except for a thin owner decision/status surface after underlying state becomes trustworthy."
+      ],
+      "truth_and_safety_priority": [
+        "SELFTEST_COVERAGE-001 / Issue #253",
+        "Raw owner-intent privacy at public provider sinks",
+        "Semantic Trusted Computing Base risk classification"
+      ],
+      "post_audit_delta": [
+        "P0-3 terminal Runtime Ledger resurrection was remediated by GOV-030 and protected-merged as main@4cd9e6eaa8b36ddc1ec4476c51b77671a6fc5275.",
+        "Other audit findings are not automatically remediated by GOV-030 or by canonicalizing this report."
+      ],
+      "deferred_not_deleted": [
+        "Consumer implementation",
+        "fleet expansion",
+        "multi-writer rollout",
+        "skill factory expansion",
+        "large owner UI"
+      ],
+      "process_tax_baseline": {
+        "source": "GOV-030 exact unchanged HEAD evidence",
+        "pr_workflow_wall_seconds": 320,
+        "trusted_controller_wall_seconds": 269,
+        "premerge_workflow_wall_seconds_total": 589,
+        "known_duplicate_full_check_causes": [
+          "draft-to-ready transition",
+          "owner-attestation metadata edit"
+        ]
+      },
+      "next_technical_p0_after_adoption": "SELFTEST_COVERAGE-001 / Issue #253"
     }
   ]
 }
