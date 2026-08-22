@@ -9,7 +9,7 @@ permissions:
   contents: write
 
 env:
-  SOURCE_SHA: c93a7866b0155bbfe21a4355ceb8fac892dea425
+  SOURCE_SHA: bfaefcc2bccf18ab7e080d4f840e6e4c3f3d311c
   SOURCE_BRANCH: adwf/roadmap-autonomy-001-a1
 
 jobs:
@@ -51,14 +51,28 @@ jobs:
           }
           JSON
 
-      - name: Generate exact-source deterministic package projections
+      - name: Refresh docs digests and deterministic package projections
         shell: bash
         run: |
           set -euo pipefail
           rm -rf /tmp/adwf-source-worktree
           git worktree add --detach /tmp/adwf-source-worktree "${SOURCE_SHA}"
+          python - <<'PY'
+          from pathlib import Path
+          import json, sys
+          root = Path('/tmp/adwf-source-worktree')
+          sys.path.insert(0, str(root / '.adwf'))
+          from lib.docs_freshness import source_digest
+          from lib.strict_json import loads as strict_loads
+          path = root / '.adwf/docs-registry.json'
+          registry = strict_loads(path.read_text(encoding='utf-8'))
+          for item in registry.get('documents', []):
+              item['source_digest'] = source_digest(root, item.get('watched', []))
+          path.write_text(json.dumps(registry, ensure_ascii=False, indent=2) + '\n', encoding='utf-8')
+          PY
           python /tmp/adwf-source-worktree/.adwf/scripts/generate_manifest.py --root /tmp/adwf-source-worktree
           mkdir -p mirror/generated
+          cp /tmp/adwf-source-worktree/.adwf/docs-registry.json mirror/generated/docs-registry.json
           cp /tmp/adwf-source-worktree/MANIFEST.json mirror/generated/MANIFEST.json
           cp /tmp/adwf-source-worktree/SHA256SUMS.txt mirror/generated/SHA256SUMS.txt
           git worktree remove --force /tmp/adwf-source-worktree
@@ -70,5 +84,5 @@ jobs:
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add mirror
-          git commit -m "chore: publish local mirror fallback chunks and generated projections [mirror-output]"
+          git commit -m "chore: publish refreshed docs and deterministic projections [mirror-output]"
           git push origin HEAD:${GITHUB_REF_NAME}
