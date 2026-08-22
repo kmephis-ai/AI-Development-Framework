@@ -14,6 +14,7 @@ import hashlib,json,os,re,subprocess,sys
 from .github_auth import detect_repository,discover_token
 from .github_provider import GitHubClient
 from .github_lease_store import GitHubLeaseStore
+from .provider_contracts import ProviderContractError
 from .evidence import parse_time
 from .strict_json import loads as strict_loads
 from .work_memory import WorkMemoryStore
@@ -70,6 +71,10 @@ def reconcile_executor(root:Path,state:dict[str,Any],key:str,envelope:dict[str,A
         if not issue_id:return ExecutorWait('NOT_VERIFIED','ISSUE_CREATE_READBACK_MISSING','reconcile')
         if memory:
             rev=memory['revision'];refs=memory.setdefault('references',{});refs.setdefault('issues',[]).append({'number':int(issue_id),'url':issue.get('html_url')});WorkMemoryStore(root).save(memory,expected_revision=rev)
+    elif issue_id.isdigit():
+        try:issue=client.get(f"/repos/{client.repo}/issues/{int(issue_id)}")
+        except ProviderContractError as exc:return ExecutorWait('NOT_VERIFIED','WORK_ITEM_PROVIDER_READBACK_FAILED','reconcile',{'issue_id':issue_id,'contract_error':str(exc)[:300]})
+        if issue.get('state')!='open':return ExecutorWait('NOT_VERIFIED','WORK_ITEM_PROVIDER_TERMINAL','reconcile',{'issue_id':issue_id,'issue_state':issue.get('state')})
     env={**os.environ,'GITHUB_REPOSITORY':client.repo,'GITHUB_TOKEN':client.token,'ADWF_SUBJECT_SHA':main_sha}
     proc=subprocess.run([sys.executable,str(root/'.adwf/scripts/github_reconcile.py'),'--apply','--subject-sha',main_sha],cwd=root,env=env,text=True,capture_output=True,check=False,timeout=120)
     if proc.returncode not in {0,1}:return ExecutorWait('NOT_VERIFIED','GITHUB_RECONCILIATION_FAILED','reconcile',{'stderr':proc.stderr[-300:]})
