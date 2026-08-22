@@ -1,0 +1,306 @@
+name: MEGA_AUDIT_ADOPTION-001 Source Authority
+
+on:
+  push:
+    branches:
+      - helper/MEGA_AUDIT_ADOPTION-001-source-authority-a4
+
+permissions:
+  contents: write
+  actions: read
+  checks: read
+  issues: read
+  pull-requests: read
+  statuses: read
+
+concurrency:
+  group: adwf-control-${{ github.repository }}
+  cancel-in-progress: false
+
+jobs:
+  source-authority:
+    if: github.ref == 'refs/heads/helper/MEGA_AUDIT_ADOPTION-001-source-authority-a4'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd
+        with:
+          ref: ${{ github.event.repository.default_branch }}
+          persist-credentials: false
+          fetch-depth: 1
+
+      - name: Acquire exact provider-durable audit-adoption source authority
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+          EXPECTED_BASE_MAIN: 4cd9e6eaa8b36ddc1ec4476c51b77671a6fc5275
+          EXPECTED_BASE_TREE: 354745d83e65d99f5d5af04e6c20125b691451da
+          EXPECTED_BASE_PARENT: 29b95ceba823469005a0eef4e6d7d1c3b412814e
+          EXPECTED_INITIAL_LEASE_REVISION: '14'
+          EXPECTED_TERMINAL_LEDGER_ISSUE: '3'
+          EXPECTED_TERMINAL_LEDGER_EVENT_HASH: b0d811c300dcadfd147e251f161c20b2ff79b8393c6a1e4f086b0ad5a0745187
+          EXPECTED_TERMINAL_LEDGER_STATE_DIGEST: 22b3bac5ffa00aabf8ce31b8f43d4973d8103a240bac87429596dd980b4b7dc4
+          EXPECTED_TERMINAL_RUN_ID: session-selfhost-proof-001-a
+          SOURCE_ISSUE_ID: '20'
+          SOURCE_ROADMAP_ID: MEGA_AUDIT_ADOPTION-001
+          SOURCE_RUN_ID: mega-audit-adoption-001-source-a4
+          SOURCE_LEASE_ID: 894b72a4-eba5-43bf-9713-ffcf602cdf82
+          SOURCE_WORKER_ID: adwf-runtime:mega-audit-adoption-001-source-a4
+          SOURCE_BRANCH: adwf/mega-audit-adoption-001-4829e3d594e9
+        shell: python
+        run: |
+          from pathlib import Path
+          import json, os, re, sys
+
+          root = Path.cwd()
+          sys.path.insert(0, str(root / '.adwf'))
+          from lib.assurance_builder import build_assurance_snapshot
+          from lib.cost_guard import evaluate_provider
+          from lib.github_lease_store import GitHubLeaseStore
+          from lib.github_provider import GitHubClient
+          from lib.github_rulesets import verify_rulesets as verify_protected_rulesets, verify_runtime_anchor_ruleset
+          from lib.github_runtime_store import GitHubRuntimeStore
+          from lib.health import doctor
+          from lib.policy_runtime import evaluate_with_effective_policy
+          from lib.provider_contracts import ProviderContractError
+          from lib.strict_json import loads as strict_loads
+          from lib.trusted_context import compile_trusted_context
+
+          repo = os.environ['GITHUB_REPOSITORY']
+          token = os.environ['GITHUB_TOKEN']
+          base_main = os.environ['EXPECTED_BASE_MAIN']
+          base_tree = os.environ['EXPECTED_BASE_TREE']
+          base_parent = os.environ['EXPECTED_BASE_PARENT']
+          initial_revision = int(os.environ['EXPECTED_INITIAL_LEASE_REVISION'])
+          ledger_issue_id = int(os.environ['EXPECTED_TERMINAL_LEDGER_ISSUE'])
+          terminal_event_hash = os.environ['EXPECTED_TERMINAL_LEDGER_EVENT_HASH']
+          terminal_state_digest = os.environ['EXPECTED_TERMINAL_LEDGER_STATE_DIGEST']
+          terminal_run_id = os.environ['EXPECTED_TERMINAL_RUN_ID']
+          issue_id = os.environ['SOURCE_ISSUE_ID']
+          roadmap_id = os.environ['SOURCE_ROADMAP_ID']
+          run_id = os.environ['SOURCE_RUN_ID']
+          lease_id = os.environ['SOURCE_LEASE_ID']
+          worker_id = os.environ['SOURCE_WORKER_ID']
+          source_branch = os.environ['SOURCE_BRANCH']
+          resources = [{'kind':'provider','scope':'global','shared':True,'global':True}]
+
+          for value in (base_main, base_tree, base_parent, terminal_event_hash, terminal_state_digest):
+              if not re.fullmatch(r'[0-9a-f]{40}|[0-9a-f]{64}', value):
+                  raise SystemExit('SOURCE_AUTHORITY_IDENTITY_CONFIGURATION_INVALID')
+
+          cfg = strict_loads((root / '.adwf/config.json').read_text(encoding='utf-8'))
+          policy = cfg.get('policy') or {}
+          orch = cfg.get('orchestration') or {}
+          cost = cfg.get('cost') or {}
+          if policy.get('fail_mode') != 'CLOSED' or policy.get('active_autonomy') != 'A2' or policy.get('max_autonomous_risk') != 'R1':
+              raise SystemExit('SOURCE_AUTHORITY_POLICY_DRIFT')
+          if orch.get('max_parallel_writers') != 1:
+              raise SystemExit('SOURCE_AUTHORITY_WRITER_CEILING_DRIFT')
+          ttl = orch.get('lease_ttl_minutes')
+          if not isinstance(ttl, int) or isinstance(ttl, bool) or not 1 <= ttl <= 240:
+              raise SystemExit('SOURCE_AUTHORITY_TTL_POLICY_INVALID')
+          if cost.get('mode') != 'FREE_ONLY' or cost.get('monetary_budget') != 0:
+              raise SystemExit('SOURCE_AUTHORITY_COST_POLICY_DRIFT')
+
+          client = GitHubClient(repo, token)
+          lease_store = GitHubLeaseStore(client)
+          runtime_store = GitHubRuntimeStore(client)
+
+          def current_main():
+              value = str((client.branch('main').get('commit') or {}).get('sha') or '')
+              if not re.fullmatch(r'[0-9a-f]{40}', value):
+                  raise SystemExit('SOURCE_AUTHORITY_MAIN_SHA_INVALID')
+              return value
+
+          def verify_live_rulesets():
+              rows = client.rulesets()
+              protected = verify_protected_rulesets(rows, expected_integration_id=15368)
+              anchors = verify_runtime_anchor_ruleset(rows)
+              if protected.get('readback_verified') is not True:
+                  raise SystemExit('SOURCE_AUTHORITY_PROTECTED_MAIN_RULESET_NOT_VERIFIED:' + ','.join(protected.get('reason_codes') or []))
+              if anchors.get('readback_verified') is not True:
+                  raise SystemExit('SOURCE_AUTHORITY_RUNTIME_ANCHOR_RULESET_NOT_VERIFIED:' + ','.join(anchors.get('reason_codes') or []))
+              named = {str(x.get('name') or ''): x for x in rows}
+              for name in ('ADWF protected main', 'ADWF immutable runtime anchors'):
+                  rs = named.get(name) or {}
+                  if rs.get('enforcement') != 'active' or (rs.get('bypass_actors') or []) != []:
+                      raise SystemExit('SOURCE_AUTHORITY_RULESET_GOVERNANCE_DRIFT:' + name)
+                  if rs.get('current_user_can_bypass') not in (None, 'never', False):
+                      raise SystemExit('SOURCE_AUTHORITY_RULESET_BYPASS_DRIFT:' + name)
+              protected_named = named.get('ADWF protected main') or {}
+              required = []
+              strict = False
+              for rule in protected_named.get('rules') or []:
+                  if rule.get('type') == 'required_status_checks':
+                      params = rule.get('parameters') or {}
+                      strict = params.get('strict_required_status_checks_policy') is True
+                      required = params.get('required_status_checks') or []
+              normalized = sorted((x.get('context'), x.get('integration_id')) for x in required)
+              expected = sorted([
+                  ('fast-feedback', 15368),
+                  ('adwf/governance-gate', 15368),
+                  ('adwf/trusted-gate', 15368),
+              ])
+              if not strict or normalized != expected:
+                  raise SystemExit('SOURCE_AUTHORITY_REQUIRED_CHECK_RULESET_DRIFT:' + json.dumps(normalized))
+
+          def authorize_claim(subject_sha):
+              if current_main() != subject_sha:
+                  raise SystemExit('SOURCE_AUTHORITY_AUTH_SUBJECT_MAIN_DRIFT')
+              repository = client.repo_info()
+              if repository.get('private') is not False or str(repository.get('default_branch') or '') != 'main':
+                  raise SystemExit('SOURCE_AUTHORITY_REPOSITORY_PROFILE_DRIFT')
+              verify_live_rulesets()
+              if current_main() != subject_sha:
+                  raise SystemExit('SOURCE_AUTHORITY_AUTH_POST_RULESET_MAIN_DRIFT')
+
+              provider_registry = strict_loads((root / '.adwf/providers.json').read_text(encoding='utf-8'))
+              capability = str(cost.get('default_ci_capability') or '')
+              cost_decision = evaluate_provider(
+                  provider_registry,
+                  {
+                      'provider': capability,
+                      'mandatory_ci': True,
+                      'automated': True,
+                      'projected_cost': 0,
+                      'projected_units': 0,
+                      'repository_visibility': 'PUBLIC',
+                      'runner_class': 'standard',
+                  },
+                  canonical_provider='github',
+              )
+              if cost_decision.get('result') != 'ALLOW' or float(cost_decision.get('projected_cost_usd') or 0) != 0:
+                  raise SystemExit('SOURCE_AUTHORITY_PROVIDER_COST_NOT_VERIFIED:' + ','.join(cost_decision.get('reason_codes') or []))
+
+              health_now = doctor(root)
+              categories = health_now.get('categories') or {}
+              health_map = {
+                  'package_integrity': str((categories.get('package_integrity') or {}).get('status') or 'NOT_VERIFIED'),
+                  'config_health': str((categories.get('config_health') or {}).get('status') or 'NOT_VERIFIED'),
+                  'control_plane_health': 'HEALTHY',
+                  'product_health': 'NOT_VERIFIED',
+              }
+              purpose_readback = {
+                  'provider': 'github',
+                  'subject_sha': subject_sha,
+                  'repository_visibility': 'PUBLIC',
+                  'runner': 'NOT_VERIFIED',
+                  'larger_runner': False,
+                  'facts_readback_verified': True,
+                  'readback_verified': True,
+                  'purpose': 'MEGA_AUDIT_SOURCE_AUTHORITY_CLAIM',
+              }
+              assurance = build_assurance_snapshot(
+                  root,
+                  subject_sha=subject_sha,
+                  health=health_map,
+                  gates={},
+                  required_gates=[],
+                  evidence_records=[],
+                  evidence_refs=[],
+                  provider_readback=purpose_readback,
+                  cost=cost_decision,
+                  ttl_minutes=5,
+              )
+              context = compile_trusted_context(
+                  root,
+                  action='claim',
+                  risk='R0',
+                  work_type='governance',
+                  request={'request_id': f'{run_id}:claim:{subject_sha}', 'subject_sha': subject_sha, 'preview_digest': None},
+                  assurance_snapshot=assurance,
+                  provider_readback=purpose_readback,
+              )
+              decision = evaluate_with_effective_policy(root, context)
+              if decision.result != 'ALLOW':
+                  raise SystemExit('SOURCE_AUTHORITY_POLICY_NOT_ALLOW:' + decision.result + ':' + ','.join(decision.reason_codes))
+              if current_main() != subject_sha:
+                  raise SystemExit('SOURCE_AUTHORITY_AUTH_FINAL_MAIN_DRIFT')
+              print('POLICY_CLAIM=ALLOW')
+
+          if current_main() != base_main:
+              raise SystemExit('SOURCE_AUTHORITY_BASE_MAIN_DRIFT')
+          base_commit = client.get(f'/repos/{repo}/git/commits/{base_main}')
+          if str((base_commit.get('tree') or {}).get('sha') or '') != base_tree:
+              raise SystemExit('SOURCE_AUTHORITY_BASE_TREE_DRIFT')
+          base_parents = [str((x or {}).get('sha') or '') for x in (base_commit.get('parents') or [])]
+          if base_parents != [base_parent]:
+              raise SystemExit('SOURCE_AUTHORITY_BASE_PARENT_DRIFT')
+
+          issue = client.get(f'/repos/{repo}/issues/{issue_id}')
+          if issue.get('state') != 'open' or 'Audit & Architecture Decision Ledger' not in str(issue.get('title') or ''):
+              raise SystemExit('SOURCE_AUTHORITY_ISSUE_DRIFT')
+
+          ledger_issue, ledger_events = runtime_store.read()
+          if int((ledger_issue or {}).get('number') or 0) != ledger_issue_id or len(ledger_events) != 2:
+              raise SystemExit('SOURCE_AUTHORITY_LEDGER_CARDINALITY_DRIFT')
+          terminal = ledger_events[-1]
+          if terminal.get('event_hash') != terminal_event_hash or terminal.get('state_digest') != terminal_state_digest:
+              raise SystemExit('SOURCE_AUTHORITY_LEDGER_TERMINAL_IDENTITY_DRIFT')
+          terminal_state = terminal.get('state') or {}
+          if terminal.get('sequence') != 2 or terminal_state.get('run_id') != terminal_run_id or terminal_state.get('status') != 'COMPLETE' or terminal_state.get('revision') != 1:
+              raise SystemExit('SOURCE_AUTHORITY_LEDGER_NOT_TERMINAL')
+
+          verify_live_rulesets()
+          open_pulls = [p for p in client.pulls() if p.get('state') == 'open']
+          if open_pulls:
+              raise SystemExit('SOURCE_AUTHORITY_OPEN_PR_CONFLICT')
+          try:
+              client.git_ref(source_branch)
+              raise SystemExit('SOURCE_AUTHORITY_SOURCE_BRANCH_ALREADY_EXISTS')
+          except ProviderContractError as exc:
+              if str(exc) != 'PROVIDER_HTTP_404':
+                  raise
+
+          registry, registry_anchor = lease_store.read(expected_main_sha=base_main, policy_max_parallel_writers=1)
+          active = [x for x in registry.get('leases') or [] if x.get('status') == 'ACTIVE']
+          if active:
+              raise SystemExit('SOURCE_AUTHORITY_ACTIVE_WRITER_PRESENT')
+          if registry.get('revision') != initial_revision:
+              raise SystemExit('SOURCE_AUTHORITY_LEASE_REVISION_DRIFT')
+          if not re.fullmatch(r'[0-9a-f]{40}', str(registry_anchor or '')):
+              raise SystemExit('SOURCE_AUTHORITY_LEASE_ANCHOR_NOT_VERIFIED')
+          print('LEASE_PREVIOUS_ANCHOR=' + str(registry_anchor))
+
+          authorize_claim(base_main)
+          persisted, lease, new_anchor = lease_store.acquire(
+              expected_main_sha=base_main,
+              policy_max_parallel_writers=1,
+              issue_id=issue_id,
+              roadmap_id=roadmap_id,
+              worker_id=worker_id,
+              base_sha=base_main,
+              branch=source_branch,
+              resources=resources,
+              ttl_minutes=ttl,
+              lease_id=lease_id,
+          )
+          if current_main() != base_main:
+              raise SystemExit('SOURCE_AUTHORITY_POST_ACQUIRE_MAIN_DRIFT')
+          if persisted.get('revision') != initial_revision + 1 or lease.get('generation') != initial_revision + 1:
+              raise SystemExit('SOURCE_AUTHORITY_ACQUIRE_REVISION_MISMATCH')
+
+          readback, read_anchor = lease_store.read(expected_main_sha=base_main, policy_max_parallel_writers=1)
+          read_active = [x for x in readback.get('leases') or [] if x.get('status') == 'ACTIVE']
+          if len(read_active) != 1 or read_active[0].get('lease_id') != lease_id:
+              raise SystemExit('SOURCE_AUTHORITY_ACQUIRE_READBACK_MISMATCH')
+          observed = read_active[0]
+          expected = {
+              'issue_id': issue_id,
+              'roadmap_id': roadmap_id,
+              'worker_id': worker_id,
+              'base_sha': base_main,
+              'branch': source_branch,
+              'resources': resources,
+          }
+          for key, value in expected.items():
+              if observed.get(key) != value:
+                  raise SystemExit('SOURCE_AUTHORITY_ACQUIRE_BINDING_MISMATCH:' + key)
+          if readback.get('revision') != initial_revision + 1 or read_anchor != new_anchor or not read_anchor or read_anchor == registry_anchor:
+              raise SystemExit('SOURCE_AUTHORITY_ACQUIRE_ANCHOR_READBACK_MISMATCH')
+
+          print('SOURCE_AUTHORITY_ACQUIRE=PASS')
+          print('LEASE_ID=' + lease_id)
+          print('LEASE_REGISTRY_REVISION=' + str(readback['revision']))
+          print('LEASE_ANCHOR=' + str(read_anchor))
+          print('SOURCE_BRANCH_EXPECTED=' + source_branch)
+          print('SOURCE_BRANCH_CREATED_BY_HELPER=false')
