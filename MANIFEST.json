@@ -3,8 +3,8 @@
   "version": "1.6.0",
   "schema_version": 3,
   "scope": "FRAMEWORK_OWNED_TRUST_BOUNDARY",
-  "file_count_excluding_manifests": 573,
-  "total_bytes_excluding_manifests": 3082848,
+  "file_count_excluding_manifests": 574,
+  "total_bytes_excluding_manifests": 3086728,
   "files": [
     ".adwf/SETUP_CHECKLIST.md",
     ".adwf/actions-lock.json",
@@ -408,6 +408,7 @@
     ".adwf/tests/test_remote_saga.py",
     ".adwf/tests/test_roadmap_truth.py",
     ".adwf/tests/test_runtime_ledger_stale_reconciliation.py",
+    ".adwf/tests/test_selftest_coverage.py",
     ".adwf/tests/test_session_consumer_proof.py",
     ".adwf/tests/test_session_continuity.py",
     ".adwf/tests/test_session_continuity_persistence.py",

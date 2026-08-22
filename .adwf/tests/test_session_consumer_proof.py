@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import sys
+import unittest
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -26,7 +27,7 @@ BINDING = {
 
 def checkpoint(*, main_sha: str = MAIN_A, head_sha: str = HEAD_A, lease: str | None = LEASE, domains: list[str] | None = None):
     return build_checkpoint(
-        checkpoint_id="cp-1",
+        checkpoint_id="session-proof-checkpoint-1",
         checkpoint_revision=1,
         project_identity="consumer/example",
         roadmap_id="SESSION_CONSUMER_PROOF-001",
@@ -43,116 +44,115 @@ def checkpoint(*, main_sha: str = MAIN_A, head_sha: str = HEAD_A, lease: str | N
     )
 
 
-def test_independent_executor_resumes_same_writer_without_duplicate() -> None:
-    proof = evaluate_handover_proof(
-        checkpoint=checkpoint(),
-        actual_main_sha=MAIN_A,
-        actual_head_sha=HEAD_A,
-        active_lease_identity=LEASE,
-        active_conflict_domains=DOMAINS,
-        session_continuity_binding=BINDING,
-        independent_executor=True,
-    )
-    assert proof["proof_state"] == "RESUME_CONTEXT_VERIFIED"
-    assert proof["resume_context_allowed"] is True
-    assert proof["provider_authority"] is False
-    assert proof["duplicate_writer_allowed"] is False
-    assert proof["same_writer_compatible"] is True
+class SessionConsumerProofTests(unittest.TestCase):
+    def test_independent_executor_resumes_same_writer_without_duplicate(self) -> None:
+        proof = evaluate_handover_proof(
+            checkpoint=checkpoint(),
+            actual_main_sha=MAIN_A,
+            actual_head_sha=HEAD_A,
+            active_lease_identity=LEASE,
+            active_conflict_domains=DOMAINS,
+            session_continuity_binding=BINDING,
+            independent_executor=True,
+        )
+        self.assertEqual(proof["proof_state"], "RESUME_CONTEXT_VERIFIED")
+        self.assertIs(proof["resume_context_allowed"], True)
+        self.assertIs(proof["provider_authority"], False)
+        self.assertIs(proof["duplicate_writer_allowed"], False)
+        self.assertIs(proof["same_writer_compatible"], True)
+
+    def test_stale_checkpoint_is_reconciled_from_fresh_provider_truth(self) -> None:
+        proof = evaluate_handover_proof(
+            checkpoint=checkpoint(),
+            actual_main_sha=MAIN_B,
+            actual_head_sha=HEAD_B,
+            active_lease_identity=LEASE,
+            active_conflict_domains=DOMAINS,
+            session_continuity_binding=BINDING,
+            independent_executor=True,
+        )
+        self.assertEqual(proof["proof_state"], "STALE_CHECKPOINT_RECONCILED")
+        self.assertIs(proof["checkpoint_stale"], True)
+        self.assertIs(proof["resume_context_allowed"], True)
+        self.assertIs(proof["duplicate_writer_allowed"], False)
+        self.assertEqual(proof["next_step"], "RESUME_SAME_WRITER_AFTER_POLICY_RECHECK")
+
+    def test_crash_after_mutation_does_not_require_duplicate_writer(self) -> None:
+        proof = evaluate_handover_proof(
+            checkpoint=checkpoint(),
+            actual_main_sha=MAIN_A,
+            actual_head_sha=HEAD_A,
+            active_lease_identity=LEASE,
+            active_conflict_domains=DOMAINS,
+            session_continuity_binding=BINDING,
+            independent_executor=True,
+            provider_mutation_discovered_after_checkpoint=True,
+        )
+        self.assertEqual(proof["proof_state"], "STALE_CHECKPOINT_RECONCILED")
+        self.assertIs(proof["provider_mutation_discovered_after_checkpoint"], True)
+        self.assertIs(proof["duplicate_writer_allowed"], False)
+
+    def test_changed_lease_fails_closed_and_never_authorizes_duplicate_writer(self) -> None:
+        proof = evaluate_handover_proof(
+            checkpoint=checkpoint(),
+            actual_main_sha=MAIN_A,
+            actual_head_sha=HEAD_A,
+            active_lease_identity="lease-002",
+            active_conflict_domains=DOMAINS,
+            session_continuity_binding=BINDING,
+            independent_executor=True,
+        )
+        self.assertEqual(proof["proof_state"], "LEASE_RECONCILIATION_REQUIRED")
+        self.assertIs(proof["resume_context_allowed"], False)
+        self.assertIs(proof["duplicate_writer_allowed"], False)
+        self.assertIs(proof["same_writer_compatible"], False)
+        self.assertEqual(proof["next_step"], "FRESH_AUTHORITY_RESOLUTION_REQUIRED")
+
+    def test_changed_conflict_domains_fail_closed_without_duplicate_writer(self) -> None:
+        proof = evaluate_handover_proof(
+            checkpoint=checkpoint(),
+            actual_main_sha=MAIN_A,
+            actual_head_sha=HEAD_A,
+            active_lease_identity=LEASE,
+            active_conflict_domains=["different-domain"],
+            session_continuity_binding=BINDING,
+            independent_executor=True,
+        )
+        self.assertEqual(proof["proof_state"], "CONFLICT_DOMAIN_RECONCILIATION_REQUIRED")
+        self.assertIs(proof["resume_context_allowed"], False)
+        self.assertIs(proof["duplicate_writer_allowed"], False)
+        self.assertIs(proof["same_writer_compatible"], False)
+
+    def test_consumer_binding_cannot_claim_provider_authority(self) -> None:
+        bad_binding = dict(BINDING)
+        bad_binding["provider_authority"] = True
+        proof = evaluate_handover_proof(
+            checkpoint=checkpoint(),
+            actual_main_sha=MAIN_A,
+            actual_head_sha=HEAD_A,
+            active_lease_identity=LEASE,
+            active_conflict_domains=DOMAINS,
+            session_continuity_binding=bad_binding,
+            independent_executor=True,
+        )
+        self.assertEqual(proof["proof_state"], "INVALID_CONSUMER_BINDING")
+        self.assertIs(proof["resume_context_allowed"], False)
+        self.assertIs(proof["duplicate_writer_allowed"], False)
+
+    def test_same_executor_does_not_satisfy_cross_session_proof(self) -> None:
+        proof = evaluate_handover_proof(
+            checkpoint=checkpoint(),
+            actual_main_sha=MAIN_A,
+            actual_head_sha=HEAD_A,
+            active_lease_identity=LEASE,
+            active_conflict_domains=DOMAINS,
+            session_continuity_binding=BINDING,
+            independent_executor=False,
+        )
+        self.assertEqual(proof["proof_state"], "NOT_INDEPENDENT_EXECUTOR")
+        self.assertIs(proof["resume_context_allowed"], False)
+        self.assertIs(proof["duplicate_writer_allowed"], False)
 
 
-def test_stale_checkpoint_is_reconciled_from_fresh_provider_truth() -> None:
-    proof = evaluate_handover_proof(
-        checkpoint=checkpoint(),
-        actual_main_sha=MAIN_B,
-        actual_head_sha=HEAD_B,
-        active_lease_identity=LEASE,
-        active_conflict_domains=DOMAINS,
-        session_continuity_binding=BINDING,
-        independent_executor=True,
-    )
-    assert proof["proof_state"] == "STALE_CHECKPOINT_RECONCILED"
-    assert proof["checkpoint_stale"] is True
-    assert proof["resume_context_allowed"] is True
-    assert proof["duplicate_writer_allowed"] is False
-    assert proof["next_step"] == "RESUME_SAME_WRITER_AFTER_POLICY_RECHECK"
-
-
-def test_crash_after_mutation_does_not_require_duplicate_writer() -> None:
-    proof = evaluate_handover_proof(
-        checkpoint=checkpoint(),
-        actual_main_sha=MAIN_A,
-        actual_head_sha=HEAD_A,
-        active_lease_identity=LEASE,
-        active_conflict_domains=DOMAINS,
-        session_continuity_binding=BINDING,
-        independent_executor=True,
-        provider_mutation_discovered_after_checkpoint=True,
-    )
-    assert proof["proof_state"] == "STALE_CHECKPOINT_RECONCILED"
-    assert proof["provider_mutation_discovered_after_checkpoint"] is True
-    assert proof["duplicate_writer_allowed"] is False
-
-
-def test_changed_lease_fails_closed_and_never_authorizes_duplicate_writer() -> None:
-    proof = evaluate_handover_proof(
-        checkpoint=checkpoint(),
-        actual_main_sha=MAIN_A,
-        actual_head_sha=HEAD_A,
-        active_lease_identity="lease-002",
-        active_conflict_domains=DOMAINS,
-        session_continuity_binding=BINDING,
-        independent_executor=True,
-    )
-    assert proof["proof_state"] == "LEASE_RECONCILIATION_REQUIRED"
-    assert proof["resume_context_allowed"] is False
-    assert proof["duplicate_writer_allowed"] is False
-    assert proof["same_writer_compatible"] is False
-    assert proof["next_step"] == "FRESH_AUTHORITY_RESOLUTION_REQUIRED"
-
-
-def test_changed_conflict_domains_fail_closed_without_duplicate_writer() -> None:
-    proof = evaluate_handover_proof(
-        checkpoint=checkpoint(),
-        actual_main_sha=MAIN_A,
-        actual_head_sha=HEAD_A,
-        active_lease_identity=LEASE,
-        active_conflict_domains=["different-domain"],
-        session_continuity_binding=BINDING,
-        independent_executor=True,
-    )
-    assert proof["proof_state"] == "CONFLICT_DOMAIN_RECONCILIATION_REQUIRED"
-    assert proof["resume_context_allowed"] is False
-    assert proof["duplicate_writer_allowed"] is False
-    assert proof["same_writer_compatible"] is False
-
-
-def test_consumer_binding_cannot_claim_provider_authority() -> None:
-    bad_binding = dict(BINDING)
-    bad_binding["provider_authority"] = True
-    proof = evaluate_handover_proof(
-        checkpoint=checkpoint(),
-        actual_main_sha=MAIN_A,
-        actual_head_sha=HEAD_A,
-        active_lease_identity=LEASE,
-        active_conflict_domains=DOMAINS,
-        session_continuity_binding=bad_binding,
-        independent_executor=True,
-    )
-    assert proof["proof_state"] == "INVALID_CONSUMER_BINDING"
-    assert proof["resume_context_allowed"] is False
-    assert proof["duplicate_writer_allowed"] is False
-
-
-def test_same_executor_does_not_satisfy_cross_session_proof() -> None:
-    proof = evaluate_handover_proof(
-        checkpoint=checkpoint(),
-        actual_main_sha=MAIN_A,
-        actual_head_sha=HEAD_A,
-        active_lease_identity=LEASE,
-        active_conflict_domains=DOMAINS,
-        session_continuity_binding=BINDING,
-        independent_executor=False,
-    )
-    assert proof["proof_state"] == "NOT_INDEPENDENT_EXECUTOR"
-    assert proof["resume_context_allowed"] is False
-    assert proof["duplicate_writer_allowed"] is False
+if __name__ == "__main__":
+    unittest.main()
