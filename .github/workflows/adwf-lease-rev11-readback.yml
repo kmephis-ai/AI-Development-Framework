@@ -1,0 +1,47 @@
+name: ADWF Lease Rev11 Readback
+
+on:
+  push:
+    branches:
+      - agent/lease-rev11-readback-20260822-a1
+
+permissions:
+  contents: write
+
+jobs:
+  readback:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd
+        with:
+          fetch-depth: 0
+
+      - name: Read exact immutable lease tag
+        shell: bash
+        env:
+          TAG_NAME: adwf-runtime-anchor-lease-v1-000000011
+          EXPECTED_MAIN: 29b95ceba823469005a0eef4e6d7d1c3b412814e
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD~0)" = "${GITHUB_SHA}"
+          test "$(git cat-file -t refs/tags/${TAG_NAME})" = "tag"
+          test "$(git rev-parse refs/tags/${TAG_NAME}^{})" = "${EXPECTED_MAIN}"
+          mkdir -p readback
+          {
+            echo "tag_name=${TAG_NAME}"
+            echo "tag_object_sha=$(git rev-parse refs/tags/${TAG_NAME})"
+            echo "peeled_target_sha=$(git rev-parse refs/tags/${TAG_NAME}^{})"
+            echo "---tag-object---"
+            git cat-file -p "refs/tags/${TAG_NAME}"
+          } > readback/lease-rev11.txt
+
+      - name: Publish readback on disposable branch
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add readback/lease-rev11.txt
+          git commit -m "chore: publish immutable lease rev11 readback"
+          git push origin HEAD:${GITHUB_REF_NAME}
