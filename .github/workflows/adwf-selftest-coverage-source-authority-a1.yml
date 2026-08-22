@@ -1,0 +1,245 @@
+name: SELFTEST_COVERAGE-001 Source Authority
+
+on:
+  push:
+    branches:
+      - helper/SELFTEST_COVERAGE-001-source-authority-a1
+    paths:
+      - .adwf-source-authority-trigger-selftest-coverage-001-a1
+
+permissions:
+  contents: write
+  issues: read
+  pull-requests: read
+
+concurrency:
+  group: adwf-control-${{ github.repository }}
+  cancel-in-progress: false
+
+jobs:
+  claim-source-authority:
+    if: github.ref == 'refs/heads/helper/SELFTEST_COVERAGE-001-source-authority-a1'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd
+        with:
+          ref: ${{ github.event.repository.default_branch }}
+          persist-credentials: false
+          fetch-depth: 2
+      - uses: actions/setup-python@a309ff8b426b58ec0e2a45f0f869d46889d02405
+        with:
+          python-version: "3.12.10"
+      - name: Claim exact SELFTEST_COVERAGE-001 source authority
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        shell: python
+        run: |
+          from pathlib import Path
+          import base64, hashlib, os, re, sys
+          root = Path.cwd()
+          sys.path.insert(0, str(root / ".adwf"))
+
+          from lib.assurance_builder import build_assurance_snapshot
+          from lib.cost_guard import evaluate_provider
+          from lib.github_lease_store import GitHubLeaseStore
+          from lib.github_provider import GitHubClient
+          from lib.github_rulesets import verify_rulesets, verify_runtime_anchor_ruleset
+          from lib.health import doctor
+          from lib.policy_runtime import evaluate_with_effective_policy
+          from lib.provider_contracts import ProviderContractError
+          from lib.strict_json import loads as strict_loads
+          from lib.trusted_context import compile_trusted_context
+
+          repo = os.environ["GITHUB_REPOSITORY"]
+          token = os.environ["GITHUB_TOKEN"]
+
+          expected_main = "053cfd028fef0a41f4e3177c2290a20ff83a9685"
+          expected_revision = 20
+          expected_next_revision = 21
+          issue_id = "253"
+          roadmap_id = "SELFTEST_COVERAGE-001"
+          lease_id = "bdef8ea1-d737-42c8-8841-9eb562a03fcf"
+          worker_id = "adwf-runtime:selftest-coverage-001-source-a1"
+          source_branch = "adwf/selftest-coverage-001-a1"
+          trigger_path = ".adwf-source-authority-trigger-selftest-coverage-001-a1"
+          trigger_blob = "fcda7b5ccd3eb063a4c8a417363e44795e104c14"
+          trigger_sha256 = "b12dbe80800cd6cdfc95ac08988a1e9725f8e2c5a2e06dbd4d29132c8924fefb"
+          resources = [{"kind": "provider", "scope": "global", "shared": True, "global": True}]
+
+          cfg = strict_loads((root / ".adwf/config.json").read_text(encoding="utf-8"))
+          policy = cfg.get("policy") or {}
+          orch = cfg.get("orchestration") or {}
+          cost = cfg.get("cost") or {}
+          if policy.get("fail_mode") != "CLOSED" or policy.get("active_autonomy") != "A2" or policy.get("max_autonomous_risk") != "R1":
+              raise SystemExit("SOURCE_AUTHORITY_POLICY_DRIFT")
+          if orch.get("max_parallel_writers") != 1 or cost.get("mode") != "FREE_ONLY" or cost.get("monetary_budget") != 0:
+              raise SystemExit("SOURCE_AUTHORITY_GOVERNANCE_DRIFT")
+          ttl_minutes = int(orch.get("lease_ttl_minutes") or 120)
+          if not 1 <= ttl_minutes <= 1440:
+              raise SystemExit("SOURCE_AUTHORITY_TTL_INVALID")
+
+          client = GitHubClient(repo, token)
+          store = GitHubLeaseStore(client)
+
+          def current_main():
+              value = str((client.branch("main").get("commit") or {}).get("sha") or "")
+              if re.fullmatch(r"[0-9a-f]{40}", value) is None:
+                  raise SystemExit("SOURCE_AUTHORITY_MAIN_INVALID")
+              return value
+
+          def verify_rules():
+              rows = client.rulesets()
+              if verify_rulesets(rows, expected_integration_id=15368).get("readback_verified") is not True:
+                  raise SystemExit("SOURCE_AUTHORITY_MAIN_RULESET_NOT_VERIFIED")
+              if verify_runtime_anchor_ruleset(rows).get("readback_verified") is not True:
+                  raise SystemExit("SOURCE_AUTHORITY_ANCHOR_RULESET_NOT_VERIFIED")
+              named = {str(x.get("name") or ""): x for x in rows}
+              for name in ("ADWF protected main", "ADWF immutable runtime anchors"):
+                  rs = named.get(name) or {}
+                  if rs.get("enforcement") != "active" or (rs.get("bypass_actors") or []) != []:
+                      raise SystemExit("SOURCE_AUTHORITY_RULESET_DRIFT:" + name)
+                  if rs.get("current_user_can_bypass") not in (None, "never", False):
+                      raise SystemExit("SOURCE_AUTHORITY_BYPASS_DRIFT:" + name)
+
+          def authorize_claim():
+              providers = strict_loads((root / ".adwf/providers.json").read_text(encoding="utf-8"))
+              capability = str(cost.get("default_ci_capability") or "")
+              cost_decision = evaluate_provider(
+                  providers,
+                  {
+                      "provider": capability,
+                      "mandatory_ci": True,
+                      "automated": True,
+                      "projected_cost": 0,
+                      "projected_units": 0,
+                      "repository_visibility": "PUBLIC",
+                      "runner_class": "standard",
+                  },
+                  canonical_provider="github",
+              )
+              if cost_decision.get("result") != "ALLOW" or float(cost_decision.get("projected_cost_usd") or 0) != 0:
+                  raise SystemExit("SOURCE_AUTHORITY_COST_NOT_ALLOWED")
+              categories = doctor(root).get("categories") or {}
+              assurance = build_assurance_snapshot(
+                  root,
+                  subject_sha=expected_main,
+                  health={
+                      "package_integrity": str((categories.get("package_integrity") or {}).get("status") or "NOT_VERIFIED"),
+                      "config_health": str((categories.get("config_health") or {}).get("status") or "NOT_VERIFIED"),
+                      "control_plane_health": "HEALTHY",
+                      "product_health": "NOT_VERIFIED",
+                  },
+                  gates={},
+                  required_gates=[],
+                  evidence_records=[],
+                  evidence_refs=[],
+                  provider_readback={
+                      "provider": "github",
+                      "subject_sha": expected_main,
+                      "repository_visibility": "PUBLIC",
+                      "runner": "NOT_VERIFIED",
+                      "larger_runner": False,
+                      "facts_readback_verified": True,
+                      "readback_verified": True,
+                      "purpose": "SELFTEST_COVERAGE_SOURCE_AUTHORITY",
+                  },
+                  cost=cost_decision,
+                  ttl_minutes=5,
+              )
+              context = compile_trusted_context(
+                  root,
+                  action="claim",
+                  risk="R1",
+                  work_type="recovery",
+                  request={
+                      "request_id": "selftest-coverage-001:source-authority:" + expected_main,
+                      "subject_sha": expected_main,
+                      "preview_digest": None,
+                  },
+                  assurance_snapshot=assurance,
+                  provider_readback=assurance["provider"],
+              )
+              decision = evaluate_with_effective_policy(root, context)
+              if decision.result != "ALLOW":
+                  raise SystemExit("SOURCE_AUTHORITY_POLICY_NOT_ALLOW:" + decision.result + ":" + ",".join(decision.reason_codes))
+
+          if current_main() != expected_main:
+              raise SystemExit("SOURCE_AUTHORITY_MAIN_DRIFT")
+          verify_rules()
+
+          trigger = client.get(f"/repos/{repo}/contents/{trigger_path}?ref={os.environ['GITHUB_SHA']}")
+          if str(trigger.get("sha") or "") != trigger_blob:
+              raise SystemExit("SOURCE_AUTHORITY_TRIGGER_BLOB_DRIFT")
+          if hashlib.sha256(base64.b64decode(str(trigger.get("content") or ""))).hexdigest() != trigger_sha256:
+              raise SystemExit("SOURCE_AUTHORITY_TRIGGER_DIGEST_DRIFT")
+
+          issue = client.get(f"/repos/{repo}/issues/{issue_id}")
+          if issue.get("state") != "open" or roadmap_id not in str(issue.get("title") or ""):
+              raise SystemExit("SOURCE_AUTHORITY_ISSUE_DRIFT")
+          if [p for p in client.pulls() if p.get("state") == "open"]:
+              raise SystemExit("SOURCE_AUTHORITY_OPEN_PR_CONFLICT")
+          try:
+              client.git_ref(source_branch)
+              raise SystemExit("SOURCE_AUTHORITY_SOURCE_BRANCH_EXISTS")
+          except ProviderContractError as exc:
+              if str(exc) != "PROVIDER_HTTP_404":
+                  raise
+
+          registry, anchor20 = store.read(
+              expected_main_sha=expected_main,
+              policy_max_parallel_writers=1,
+          )
+          if registry.get("revision") != expected_revision or registry.get("observed_main_sha") != expected_main:
+              raise SystemExit("SOURCE_AUTHORITY_REVISION_DRIFT")
+          if any(x.get("status") == "ACTIVE" for x in registry.get("leases") or []):
+              raise SystemExit("SOURCE_AUTHORITY_ACTIVE_WRITER_PRESENT")
+
+          authorize_claim()
+          state21, lease, anchor21 = store.acquire(
+              expected_main_sha=expected_main,
+              policy_max_parallel_writers=1,
+              issue_id=issue_id,
+              roadmap_id=roadmap_id,
+              worker_id=worker_id,
+              base_sha=expected_main,
+              branch=source_branch,
+              resources=resources,
+              ttl_minutes=ttl_minutes,
+              lease_id=lease_id,
+          )
+
+          final, final_anchor = store.read(
+              expected_main_sha=expected_main,
+              policy_max_parallel_writers=1,
+          )
+          active = [x for x in final.get("leases") or [] if x.get("status") == "ACTIVE"]
+          if state21.get("revision") != expected_next_revision or final.get("revision") != expected_next_revision:
+              raise SystemExit("SOURCE_AUTHORITY_REVISION21_MISMATCH")
+          if len(active) != 1:
+              raise SystemExit("SOURCE_AUTHORITY_ACTIVE_WRITER_COUNT_MISMATCH")
+          target = active[0]
+          expected_identity = {
+              "lease_id": lease_id,
+              "issue_id": issue_id,
+              "roadmap_id": roadmap_id,
+              "worker_id": worker_id,
+              "branch": source_branch,
+              "base_sha": expected_main,
+          }
+          for key, value in expected_identity.items():
+              if str(target.get(key) or "") != value:
+                  raise SystemExit("SOURCE_AUTHORITY_LEASE_IDENTITY_DRIFT:" + key)
+          if target.get("resources") != resources:
+              raise SystemExit("SOURCE_AUTHORITY_RESOURCE_DRIFT")
+          if final_anchor != anchor21 or anchor21 == anchor20:
+              raise SystemExit("SOURCE_AUTHORITY_ANCHOR_READBACK_MISMATCH")
+          if current_main() != expected_main:
+              raise SystemExit("SOURCE_AUTHORITY_FINAL_MAIN_DRIFT")
+          verify_rules()
+
+          print("SELFTEST_COVERAGE_SOURCE_AUTHORITY=PASS")
+          print("MAIN_SHA=" + expected_main)
+          print("LEASE_REVISION=21")
+          print("LEASE_ID=" + lease_id)
+          print("SOURCE_BRANCH=" + source_branch)
