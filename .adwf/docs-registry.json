@@ -11,7 +11,7 @@
         ".github/workflows/**"
       ],
       "mode": "generated-status-block+manual",
-      "source_digest": "cbcbd4a2bfd78e917f6b34a66bb47d4e67a793aa14a8eb8ef49dbf3bf4ad768c",
+      "source_digest": "a40db2f75fb8226be882228ebfb27d52a3d37a08b5fddc4ab8eb925927a79933",
       "reviewed_at": "2026-08-13T00:00:00Z",
       "valid_until": "2026-11-13T00:00:00Z"
     },
@@ -24,7 +24,7 @@
         "skills/**"
       ],
       "mode": "manual-governance",
-      "source_digest": "bb32a5e97e214f4e2654a0f9b82a542fadd13980b24bc63bdf75686b83e95ab9",
+      "source_digest": "4051916a13394f58ad274aff563b4582a93d2090343569015f994ebddf2ede84",
       "reviewed_at": "2026-08-13T00:00:00Z",
       "valid_until": "2026-11-13T00:00:00Z"
     },
@@ -37,7 +37,7 @@
         ".adwf/scripts/**"
       ],
       "mode": "architecture",
-      "source_digest": "53da6aafbec9e41f69a8654357c472fd26390b056039193de14152323e9f41cc",
+      "source_digest": "9403031342b29c4bbddc50eeeee45ef3b31792a6281b4df85d29e4c97d240dc7",
       "reviewed_at": "2026-08-13T00:00:00Z",
       "valid_until": "2026-11-13T00:00:00Z"
     },
@@ -65,7 +65,7 @@
         ".adwf/scripts/validate_capabilities.py"
       ],
       "mode": "implementation-certification",
-      "source_digest": "46172f3445e9837cce473f191152d315e299b216fc05b38d68f9c55bf3a6e5e0",
+      "source_digest": "76b393ea5dea79202b94c05e40bdfaebe6fe14b0abf62a03fd9ac7f2dcc827d4",
       "reviewed_at": "2026-08-13T00:00:00Z",
       "valid_until": "2026-11-13T00:00:00Z"
     },
@@ -137,7 +137,7 @@
         ".adwf/tests/test_ai_work_contracts.py"
       ],
       "mode": "governance",
-      "source_digest": "e72fccee43cc30bb2ab19f5ea12c26a1835600ef8e2ce52ea38bee94dc8e19a6",
+      "source_digest": "f7121448090cabd3c47508366287931031e9477e68d0fc5bd1a577bfda81f0fc",
       "reviewed_at": "2026-08-13T00:00:00Z",
       "valid_until": "2026-11-13T00:00:00Z"
     },
@@ -351,7 +351,7 @@
         ".adwf/decision-requirement-traceability.json"
       ],
       "mode": "governance-contract",
-      "source_digest": "7d4ea9b36eb41d4081cfa642d5ef3e8c6fe3afdc40bd80bc9930026bb5e48ddd",
+      "source_digest": "78a4e657aab215ccde454e847039d180646ab315e364b01df141c0eea0b89757",
       "reviewed_at": "2026-08-13T00:00:00Z",
       "valid_until": "2026-11-13T00:00:00Z"
     },
