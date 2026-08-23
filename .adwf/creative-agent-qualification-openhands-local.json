@@ -2,13 +2,13 @@
   "$schema": ".adwf/schemas/creative-agent-qualification-report.schema.json",
   "schema_version": 1,
   "adapter_id": "openhands-local",
-  "adapter_version": "1.0.0",
+  "adapter_version": "1.0.1",
   "adapter_kind": "EXTERNAL_COMMAND",
   "invocation_mode": "COMMAND",
   "qualification_profile_id": "CREATIVE_AGENT_COMMAND_V1",
   "qualification_profile_version": 1,
   "qualification_profile_digest": "426dee8fd5063bb8f408d6ec3ab26e7c67d9c4a2e8d91b09174cb407bd515af8",
-  "adapter_digest": "afeefcd7a4ee9b2d55cb22a42edb5135a43f503085bbb8620ac0970afb6ca89c",
+  "adapter_digest": "53c13bdeacbcf47c84f14dd69f0ea9e09dbd129f93bd5d98c69889285d01f842",
   "status": "PASS",
   "supported_phases": [
     "EXECUTE",
@@ -30,5 +30,5 @@
   "missing_result_fail_closed": true,
   "low_trust_result": true,
   "real_external_agent_verified": false,
-  "report_sha256": "9b0e9da3a0043d0cf778c3d13de53d6432c29405cc171b177ceae8c7f9078e09"
+  "report_sha256": "ab3e98d7bffcdb7d420967a87c9e263a2dd2874876674b74540288fd42698514"
 }

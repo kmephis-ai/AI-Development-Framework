@@ -38,7 +38,7 @@
     },
     {
       "id": "openhands-local",
-      "version": "1.0.0",
+      "version": "1.0.1",
       "kind": "EXTERNAL_COMMAND",
       "invocation_mode": "COMMAND",
       "supported_phases": [
@@ -48,7 +48,7 @@
       "command": {
         "runner": "PYTHON",
         "path": ".adwf/scripts/openhands_agent_adapter.py",
-        "sha256": "cd7951aaa7d7976ad6530831d01af8b40745ca146c00e5b179ab86140679e92e"
+        "sha256": "636ad8c77a7cc757ec51e5d53a7a0ca134e7c6bdd99fb0e1d283358971415836"
       },
       "authority": {
         "network": "DECLARED_EXTERNAL",
@@ -66,5 +66,5 @@
       "qualification_profile_digest": "426dee8fd5063bb8f408d6ec3ab26e7c67d9c4a2e8d91b09174cb407bd515af8"
     }
   ],
-  "registry_sha256": "1706ce73a5eacb38cba70c1f47ff7b678d0369c52035630e7da812c933dc1c6c"
+  "registry_sha256": "eed73114abc74d7cfef604b06b2b7d4d7e9ebc5d77e1f69e2e6976da6d8a232b"
 }
