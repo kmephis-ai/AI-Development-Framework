@@ -1,0 +1,255 @@
+name: OPENHANDS-001 Postmerge Release a1
+
+on:
+  push:
+    branches:
+      - helper/OPENHANDS-001-postmerge-release-a1
+    paths:
+      - .adwf-release-trigger-openhands-001-a1
+
+permissions:
+  contents: write
+  actions: read
+  issues: read
+  pull-requests: read
+
+concurrency:
+  group: adwf-control-${{ github.repository }}
+  cancel-in-progress: false
+
+env:
+  PYTHONDONTWRITEBYTECODE: "1"
+
+jobs:
+  verify-and-release:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - name: Checkout disposable support branch
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd
+        with:
+          persist-credentials: true
+          fetch-depth: 1
+          path: support
+      - name: Checkout exact merged main
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd
+        with:
+          ref: 7acae3307303d8fc38eaf314156ca9a50f2c1ce3
+          persist-credentials: false
+          fetch-depth: 2
+          path: trusted
+      - uses: actions/setup-python@a309ff8b426b58ec0e2a45f0f869d46889d02405
+        with:
+          python-version: "3.12.10"
+      - name: Verify exact postmerge evidence and release writer lease
+        working-directory: trusted
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        shell: python
+        run: |
+          from pathlib import Path
+          import json, os, re, sys, time
+
+          root = Path.cwd()
+          sys.path.insert(0, str(root / '.adwf'))
+          from lib.github_lease_store import GitHubLeaseStore
+          from lib.github_provider import GitHubClient
+          from lib.github_rulesets import verify_rulesets, verify_runtime_anchor_ruleset
+          from lib.strict_json import loads as strict_loads
+
+          repo = os.environ['GITHUB_REPOSITORY']
+          token = os.environ['GITHUB_TOKEN']
+          main = '7acae3307303d8fc38eaf314156ca9a50f2c1ce3'
+          parent = '0c20ee50ac50e36422c93a32fca151b411bc8b95'
+          tree = '4d727752ac7e4cfe471c31b0733cc4d65ef52dc9'
+          source_head = '949f3a484a0c35953143690bd159c2a2a04fd160'
+          source_branch = 'adwf/openhands-001-a1'
+          issue_id = '268'
+          roadmap_id = 'OPENHANDS-001'
+          worker = 'adwf-runtime:openhands-001-source-a1'
+          resources = [{'kind': 'provider', 'scope': 'global', 'shared': True, 'global': True}]
+
+          client = GitHubClient(repo, token)
+          store = GitHubLeaseStore(client)
+
+          def current_main():
+              value = str((client.branch('main').get('commit') or {}).get('sha') or '')
+              if re.fullmatch(r'[0-9a-f]{40}', value) is None:
+                  raise SystemExit('OPENHANDS_RELEASE_MAIN_INVALID')
+              return value
+
+          def rules_ok():
+              rows = client.rulesets()
+              if verify_rulesets(rows, expected_integration_id=15368).get('readback_verified') is not True:
+                  raise SystemExit('OPENHANDS_RELEASE_MAIN_RULESET_NOT_VERIFIED')
+              if verify_runtime_anchor_ruleset(rows).get('readback_verified') is not True:
+                  raise SystemExit('OPENHANDS_RELEASE_ANCHOR_RULESET_NOT_VERIFIED')
+              named = {str(item.get('name') or ''): item for item in rows}
+              for name in ('ADWF protected main', 'ADWF immutable runtime anchors'):
+                  ruleset = named.get(name) or {}
+                  if ruleset.get('enforcement') != 'active' or (ruleset.get('bypass_actors') or []) != []:
+                      raise SystemExit('OPENHANDS_RELEASE_RULESET_DRIFT:' + name)
+                  if ruleset.get('current_user_can_bypass') not in (None, 'never', False):
+                      raise SystemExit('OPENHANDS_RELEASE_BYPASS_DRIFT:' + name)
+
+          def wait_exact_run(name):
+              for _ in range(42):
+                  rows = [
+                      run for run in client.recent_runs(limit=100)
+                      if run.get('name') == name
+                      and run.get('head_sha') == main
+                      and run.get('head_branch') == 'main'
+                      and run.get('event') == 'push'
+                  ]
+                  if rows:
+                      rows.sort(key=lambda run: int(run.get('id') or 0), reverse=True)
+                      latest = rows[0]
+                      if latest.get('status') == 'completed':
+                          if latest.get('conclusion') != 'success':
+                              raise SystemExit('OPENHANDS_RELEASE_RUN_NOT_SUCCESS:' + name + ':' + str(latest.get('conclusion')))
+                          return latest
+                  time.sleep(10)
+              raise SystemExit('OPENHANDS_RELEASE_RUN_NOT_OBSERVED:' + name)
+
+          if current_main() != main:
+              raise SystemExit('OPENHANDS_RELEASE_MAIN_DRIFT')
+
+          cfg = strict_loads((root / '.adwf/config.json').read_text(encoding='utf-8'))
+          ep = strict_loads((root / '.adwf/effective-policy.json').read_text(encoding='utf-8'))
+          policy = cfg.get('policy') or {}
+          orch = cfg.get('orchestration') or {}
+          cost = cfg.get('cost') or {}
+          rules = ep.get('rules') or {}
+          if policy.get('fail_mode') != 'CLOSED' or ep.get('active_autonomy') != 'A2' or ep.get('max_autonomous_risk') != 'R1':
+              raise SystemExit('OPENHANDS_RELEASE_POLICY_DRIFT')
+          if orch.get('max_parallel_writers') != 1 or cost.get('mode') != 'FREE_ONLY' or cost.get('monetary_budget') != 0 or ep.get('hard_budget_usd') != 0:
+              raise SystemExit('OPENHANDS_RELEASE_GOVERNANCE_DRIFT')
+          if (rules.get('action_min_autonomy') or {}).get('cleanup') != 'A2':
+              raise SystemExit('OPENHANDS_RELEASE_CLEANUP_AUTHORITY_DRIFT')
+          rules_ok()
+
+          commit = client.get(f'/repos/{repo}/git/commits/{main}')
+          parents = commit.get('parents') or []
+          if str((commit.get('tree') or {}).get('sha') or '') != tree:
+              raise SystemExit('OPENHANDS_RELEASE_MERGE_TREE_DRIFT')
+          if len(parents) != 1 or str(parents[0].get('sha') or '') != parent:
+              raise SystemExit('OPENHANDS_RELEASE_MERGE_PARENT_DRIFT')
+          if (commit.get('verification') or {}).get('verified') is not True:
+              raise SystemExit('OPENHANDS_RELEASE_MERGE_NOT_VERIFIED')
+
+          pr = client.pull(270)
+          if pr.get('state') != 'closed' or not pr.get('merged_at') or str(pr.get('merge_commit_sha') or '') != main:
+              raise SystemExit('OPENHANDS_RELEASE_PR_NOT_MERGED')
+          if str((pr.get('head') or {}).get('sha') or '') != source_head or str((pr.get('base') or {}).get('sha') or '') != parent:
+              raise SystemExit('OPENHANDS_RELEASE_PR_IDENTITY_DRIFT')
+          if str((client.branch(source_branch).get('commit') or {}).get('sha') or '') != source_head:
+              raise SystemExit('OPENHANDS_RELEASE_SOURCE_BRANCH_DRIFT')
+
+          issue = client.get(f'/repos/{repo}/issues/{issue_id}')
+          body = str(issue.get('body') or '')
+          if issue.get('state') != 'open':
+              raise SystemExit('OPENHANDS_RELEASE_ISSUE_MUST_REMAIN_OPEN')
+          if 'real OpenHands execution evidence required separately before full Roadmap completion' not in body:
+              raise SystemExit('OPENHANDS_RELEASE_LIVE_BOUNDARY_MISSING')
+          if [pull for pull in client.pulls() if pull.get('state') == 'open']:
+              raise SystemExit('OPENHANDS_RELEASE_OPEN_PR_CONFLICT')
+
+          main_run = wait_exact_run('ADWF Main')
+          main_jobs = client.jobs(int(main_run['id']))
+          canonical = [job for job in main_jobs if job.get('name') == 'canonical-verification']
+          if len(canonical) != 1 or canonical[0].get('status') != 'completed' or canonical[0].get('conclusion') != 'success':
+              raise SystemExit('OPENHANDS_RELEASE_MAIN_JOB_NOT_SUCCESS')
+
+          smoke_run = wait_exact_run('ADWF Platform Smoke')
+          smoke_jobs = client.jobs(int(smoke_run['id']))
+          required_smoke = {'smoke (ubuntu-24.04)', 'smoke (windows-2022)'}
+          passed_smoke = {
+              str(job.get('name') or '') for job in smoke_jobs
+              if job.get('status') == 'completed' and job.get('conclusion') == 'success'
+          }
+          if not required_smoke.issubset(passed_smoke):
+              raise SystemExit('OPENHANDS_RELEASE_PLATFORM_SMOKE_NOT_SUCCESS')
+
+          registry, before_anchor = store.read(expected_main_sha=main, policy_max_parallel_writers=1)
+          active = [item for item in registry.get('leases') or [] if item.get('status') == 'ACTIVE']
+          if len(active) != 1:
+              raise SystemExit('OPENHANDS_RELEASE_ACTIVE_WRITER_COUNT_MISMATCH')
+          target = active[0]
+          expected_identity = {
+              'issue_id': issue_id,
+              'roadmap_id': roadmap_id,
+              'worker_id': worker,
+              'branch': source_branch,
+              'base_sha': parent,
+          }
+          for key, value in expected_identity.items():
+              if str(target.get(key) or '') != value:
+                  raise SystemExit('OPENHANDS_RELEASE_LEASE_IDENTITY_DRIFT:' + key)
+          if target.get('resources') != resources:
+              raise SystemExit('OPENHANDS_RELEASE_RESOURCE_DRIFT')
+
+          lease_id = str(target.get('lease_id') or '')
+          before_revision = int(registry.get('revision') or 0)
+          reconciliation_ref = 'github:commit:' + main
+          released, anchor = store.release(
+              expected_main_sha=main,
+              policy_max_parallel_writers=1,
+              lease_id=lease_id,
+              worker_id=worker,
+              provider_reconciled=True,
+              provider_reconciliation_ref=reconciliation_ref,
+          )
+          final, read_anchor = store.read(expected_main_sha=main, policy_max_parallel_writers=1)
+          after_revision = before_revision + 1
+          if released.get('revision') != after_revision or final.get('revision') != after_revision or read_anchor != anchor:
+              raise SystemExit('OPENHANDS_RELEASE_REVISION_READBACK_MISMATCH')
+          if [item for item in final.get('leases') or [] if item.get('status') == 'ACTIVE']:
+              raise SystemExit('OPENHANDS_RELEASE_ACTIVE_WRITER_REMAINS')
+          matches = [item for item in final.get('leases') or [] if item.get('lease_id') == lease_id]
+          if len(matches) != 1 or matches[0].get('status') != 'RELEASED' or matches[0].get('provider_reconciliation_ref') != reconciliation_ref:
+              raise SystemExit('OPENHANDS_RELEASE_TARGET_READBACK_MISMATCH')
+          if current_main() != main:
+              raise SystemExit('OPENHANDS_RELEASE_FINAL_MAIN_DRIFT')
+          rules_ok()
+
+          proof = {
+              'schema_version': 1,
+              'status': 'PASS',
+              'roadmap_id': roadmap_id,
+              'implementation_state': 'MERGED_POSTMERGE_VERIFIED',
+              'live_verification_state': 'NOT_VERIFIED',
+              'main_sha': main,
+              'main_tree_sha': tree,
+              'parent_sha': parent,
+              'source_head_sha': source_head,
+              'pr_number': 270,
+              'issue_number': 268,
+              'issue_state': 'open',
+              'adwf_main_run_id': int(main_run['id']),
+              'platform_smoke_run_id': int(smoke_run['id']),
+              'smoke_jobs_verified': sorted(required_smoke),
+              'lease_id': lease_id,
+              'lease_revision_before': before_revision,
+              'lease_revision_after': after_revision,
+              'lease_anchor_before': before_anchor,
+              'lease_anchor_after': anchor,
+              'provider_reconciliation_ref': reconciliation_ref,
+              'rulesets': 'VERIFIED_NO_BYPASS',
+              'cost_usd': 0,
+              'remaining_blocker': 'REAL_OPENHANDS_EXECUTION_EVIDENCE_REQUIRED',
+          }
+          support = Path(os.environ['GITHUB_WORKSPACE']) / 'support'
+          (support / 'openhands-postmerge-release-proof.json').write_text(
+              json.dumps(proof, ensure_ascii=False, sort_keys=True, indent=2) + '\n',
+              encoding='utf-8',
+          )
+          print(json.dumps(proof, ensure_ascii=False, sort_keys=True))
+      - name: Publish exact postmerge release proof
+        shell: bash
+        run: |
+          set -euo pipefail
+          git -C support config user.name "github-actions[bot]"
+          git -C support config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git -C support add openhands-postmerge-release-proof.json
+          git -C support commit -m "chore: publish OPENHANDS-001 postmerge release proof"
+          git -C support push origin HEAD:${GITHUB_REF_NAME}
