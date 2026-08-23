@@ -1,0 +1,25 @@
+{
+  "action": "RECONCILE_REACQUIRE",
+  "active_anchor": "ab2487ed4d6a6623a11ca9d75ea84f4d5e4e629b",
+  "active_expires_at": "2026-08-23T12:09:06.711854Z",
+  "active_heartbeat_at": "2026-08-23T10:09:06.711854Z",
+  "active_lease_id": "a241d6e8-c4b6-4e8a-a178-a8d04098e1da",
+  "active_revision": 27,
+  "cost_usd": 0,
+  "issue_id": "268",
+  "main_sha": "0c20ee50ac50e36422c93a32fca151b411bc8b95",
+  "old_freshness_findings": [
+    "LEASE_HEARTBEAT_STALE"
+  ],
+  "old_lease_id": "234beabb-3d15-446e-b9f9-8297f80e0089",
+  "old_revision": 25,
+  "policy": "ALLOW",
+  "release_anchor": "02ea593998e7447fe9aab6abf63973816ed75672",
+  "released_revision": 26,
+  "roadmap_id": "OPENHANDS-001",
+  "schema_version": 1,
+  "source_branch": "adwf/openhands-001-a1",
+  "source_sha": "81c5d51ee6f77c41cc9c5d2b4e65a341d1df7a6b",
+  "status": "PASS",
+  "worker_id": "adwf-runtime:openhands-001-source-a1"
+}
