@@ -8,7 +8,7 @@
   "qualification_profile_id": "CREATIVE_AGENT_COMMAND_V1",
   "qualification_profile_version": 1,
   "qualification_profile_digest": "426dee8fd5063bb8f408d6ec3ab26e7c67d9c4a2e8d91b09174cb407bd515af8",
-  "adapter_digest": "375f0ca13f3a989c37fda8acaf69e7c00c9861a1121a28005c7ff89861620451",
+  "adapter_digest": "afeefcd7a4ee9b2d55cb22a42edb5135a43f503085bbb8620ac0970afb6ca89c",
   "status": "PASS",
   "supported_phases": [
     "EXECUTE",
@@ -30,5 +30,5 @@
   "missing_result_fail_closed": true,
   "low_trust_result": true,
   "real_external_agent_verified": false,
-  "report_sha256": "4c43fc5c0abbb9c81c246536cbfc52b809cfc41bc2dd134921599bcc5df91e40"
+  "report_sha256": "9b0e9da3a0043d0cf778c3d13de53d6432c29405cc171b177ceae8c7f9078e09"
 }

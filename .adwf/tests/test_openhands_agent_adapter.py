@@ -79,12 +79,15 @@ def request_value(pkg):
     }
 
 
-def fake_openhands(cost: float):
+def fake_openhands(cost: float, *, target_path: str = "src/input.txt"):
     sdk = types.ModuleType("openhands.sdk")
-    tools = types.ModuleType("openhands.tools")
-    file_editor = types.ModuleType("openhands.tools.file_editor")
-    task_tracker = types.ModuleType("openhands.tools.task_tracker")
+    sdk_tool = types.ModuleType("openhands.sdk.tool")
     package_mod = types.ModuleType("openhands")
+    pydantic_mod = types.ModuleType("pydantic")
+    registry = {}
+
+    def Field(default=None, **kwargs):  # noqa: N802, ARG001
+        return default
 
     class Metrics:
         accumulated_cost = cost
@@ -94,9 +97,47 @@ def fake_openhands(cost: float):
             self.kwargs = kwargs
             self.metrics = Metrics()
 
+    class Action:
+        def __init__(self, **kwargs):
+            for key, value in kwargs.items():
+                setattr(self, key, value)
+
+    class Observation:
+        def __init__(self, *, text="", is_error=False, **kwargs):
+            self.text = text
+            self.is_error = is_error
+            for key, value in kwargs.items():
+                setattr(self, key, value)
+
+        @classmethod
+        def from_text(cls, *, text, is_error=False, **kwargs):
+            return cls(text=text, is_error=is_error, **kwargs)
+
+    class ToolExecutor:
+        def __class_getitem__(cls, item):  # noqa: ARG003
+            return cls
+
+    class ToolDefinition:
+        name = ""
+
+        def __class_getitem__(cls, item):  # noqa: ARG003
+            return cls
+
+        def __init_subclass__(cls, **kwargs):
+            super().__init_subclass__(**kwargs)
+            cls.name = "adwf_bounded_file"
+
+        def __init__(self, **kwargs):
+            for key, value in kwargs.items():
+                setattr(self, key, value)
+
     class Tool:
-        def __init__(self, name):
+        def __init__(self, name, params=None):
             self.name = name
+            self.params = dict(params or {})
+
+    def register_tool(name, definition):
+        registry[name] = definition
 
     class Agent:
         def __init__(self, llm, tools):
@@ -113,27 +154,34 @@ def fake_openhands(cost: float):
             self.message = message
 
         def run(self):
-            target = Path(self.workspace) / "src/input.txt"
-            target.write_text("after\n", encoding="utf-8")
+            self_agent_tool = self.agent.tools[0]
+            definition_cls = registry[self_agent_tool.name]
+            conv_state = types.SimpleNamespace(
+                workspace=types.SimpleNamespace(working_dir=self.workspace)
+            )
+            definition = definition_cls.create(conv_state, **self_agent_tool.params)[0]
+            action = definition.action_type(
+                operation="write", path=target_path, content="after\n"
+            )
+            observation = definition.executor(action)
+            if observation.is_error:
+                raise RuntimeError("FAKE_BOUNDED_TOOL_REJECTED:" + observation.text)
 
-    class FileEditorTool:
-        name = "file_editor"
-
-    class TaskTrackerTool:
-        name = "task_tracker"
-
+    pydantic_mod.Field = Field
     sdk.LLM = LLM
+    sdk.Action = Action
     sdk.Agent = Agent
     sdk.Conversation = Conversation
-    sdk.Tool = Tool
-    file_editor.FileEditorTool = FileEditorTool
-    task_tracker.TaskTrackerTool = TaskTrackerTool
+    sdk.Observation = Observation
+    sdk.ToolDefinition = ToolDefinition
+    sdk_tool.Tool = Tool
+    sdk_tool.ToolExecutor = ToolExecutor
+    sdk_tool.register_tool = register_tool
     return {
+        "pydantic": pydantic_mod,
         "openhands": package_mod,
         "openhands.sdk": sdk,
-        "openhands.tools": tools,
-        "openhands.tools.file_editor": file_editor,
-        "openhands.tools.task_tracker": task_tracker,
+        "openhands.sdk.tool": sdk_tool,
     }
 
 
@@ -200,7 +248,7 @@ class OpenHandsAdapterTests(unittest.TestCase):
             self.assertTrue(module.hard_forbidden(path), path)
         self.assertFalse(module.hard_forbidden("src/app.py"))
 
-    def _execute_case(self, cost: float, *, secret=False):
+    def _execute_case(self, cost: float, *, secret=False, target_path="src/input.txt"):
         module = load_wrapper()
         holder = tempfile.TemporaryDirectory()
         root = Path(holder.name)
@@ -224,7 +272,7 @@ class OpenHandsAdapterTests(unittest.TestCase):
         }
         if secret:
             env["GITHUB_TOKEN"] = "must-not-leak"
-        modules = fake_openhands(cost)
+        modules = fake_openhands(cost, target_path=target_path)
         with patch.dict(sys.modules, modules, clear=False):
             code = module.execute(root, request, result, env)
         return holder, root, base, result, code
@@ -267,6 +315,52 @@ class OpenHandsAdapterTests(unittest.TestCase):
             self.assertFalse(result_path.exists())
         finally:
             holder.cleanup()
+
+    def test_bounded_path_guard_rejects_absolute_traversal_windows_and_symlink_escape(self):
+        module = load_wrapper()
+        with tempfile.TemporaryDirectory() as tmp, tempfile.TemporaryDirectory() as outside_tmp:
+            workspace = Path(tmp)
+            (workspace / "src").mkdir()
+            outside = Path(outside_tmp)
+            for value in ("/tmp/x", "../x", "src/../x", "C:/temp/x", "src\\input.txt"):
+                with self.assertRaises(ValueError, msg=value):
+                    module._bounded_target(workspace, value)
+            link = workspace / "link"
+            try:
+                link.symlink_to(outside, target_is_directory=True)
+            except (OSError, NotImplementedError):
+                self.skipTest("symlink creation unavailable")
+            with self.assertRaisesRegex(ValueError, "SYMLINK"):
+                module._bounded_target(workspace, "link/escape.txt")
+
+    def test_bounded_write_rejects_package_escape_before_effect(self):
+        module = load_wrapper()
+        with tempfile.TemporaryDirectory() as tmp:
+            workspace = Path(tmp)
+            (workspace / "src").mkdir()
+            pkg = package("a" * 40)
+            with self.assertRaisesRegex(ValueError, "WRITE_SURFACE_FORBIDDEN"):
+                module._bounded_write(workspace, "README.md", "forbidden\n", pkg)
+            self.assertFalse((workspace / "README.md").exists())
+            with self.assertRaisesRegex(ValueError, "WRITE_SURFACE_FORBIDDEN"):
+                module._bounded_write(workspace, ".github/workflows/x.yml", "bad\n", pkg)
+            self.assertFalse((workspace / ".github/workflows/x.yml").exists())
+
+    def test_fake_sdk_absolute_host_path_is_rejected_before_host_effect(self):
+        with tempfile.TemporaryDirectory() as outside_tmp:
+            outside = Path(outside_tmp) / "escape.txt"
+            holder, root, base, result_path, code = self._execute_case(
+                0.0, target_path=str(outside)
+            )
+            try:
+                self.assertNotEqual(code, 0)
+                self.assertFalse(outside.exists())
+                head = subprocess.check_output(["git", "rev-parse", "HEAD"], cwd=root, text=True).strip()
+                self.assertEqual(head, base)
+                self.assertEqual((root / "src/input.txt").read_text(encoding="utf-8"), "before\n")
+                self.assertFalse(result_path.exists())
+            finally:
+                holder.cleanup()
 
 
 if __name__ == "__main__":

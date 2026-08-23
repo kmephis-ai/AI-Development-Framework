@@ -2,7 +2,7 @@
 """Bounded no-secret OpenHands Software Agent SDK adapter for local execution."""
 from __future__ import annotations
 
-from pathlib import Path
+from pathlib import Path, PureWindowsPath
 from urllib.parse import urlsplit
 import json
 import os
@@ -21,6 +21,8 @@ from lib.strict_json import loads as strict_loads  # noqa: E402
 SECRET_MARKERS = ("TOKEN", "SECRET", "PASSWORD", "API_KEY", "CREDENTIAL", "PRIVATE_KEY")
 CONFIG_REL = ".adwf-runtime/creative-agents/openhands-local.json"
 LOOPBACK_HOSTS = {"localhost", "127.0.0.1", "::1"}
+MAX_AGENT_FILE_BYTES = 1_000_000
+MAX_AGENT_LIST_ENTRIES = 200
 HARD_FORBIDDEN_SURFACES = (
     ".git/**",
     ".github/**",
@@ -122,6 +124,109 @@ def hard_forbidden(path: str) -> bool:
     return any(fnmatchcase(path, pattern) for pattern in HARD_FORBIDDEN_SURFACES)
 
 
+def _bounded_target(workspace: Path, raw_path: str, *, allow_root: bool = False) -> tuple[str, Path]:
+    if not isinstance(raw_path, str) or not raw_path or raw_path != raw_path.strip() or len(raw_path) > 1000:
+        raise ValueError("OPENHANDS_LOCAL_TOOL_PATH_INVALID")
+    if "\x00" in raw_path or "\\" in raw_path:
+        raise ValueError("OPENHANDS_LOCAL_TOOL_PATH_INVALID")
+    base = workspace.resolve(strict=True)
+    if not base.is_dir():
+        raise ValueError("OPENHANDS_LOCAL_TOOL_WORKSPACE_INVALID")
+    if raw_path == ".":
+        if allow_root:
+            return ".", base
+        raise ValueError("OPENHANDS_LOCAL_TOOL_PATH_INVALID")
+    windows = PureWindowsPath(raw_path)
+    if Path(raw_path).is_absolute() or windows.is_absolute() or windows.drive:
+        raise ValueError("OPENHANDS_LOCAL_TOOL_ABSOLUTE_PATH_FORBIDDEN")
+    parts = raw_path.split("/")
+    if any(part in {"", ".", ".."} for part in parts):
+        raise ValueError("OPENHANDS_LOCAL_TOOL_PATH_TRAVERSAL_FORBIDDEN")
+    current = base
+    for part in parts:
+        current = current / part
+        if current.is_symlink():
+            raise ValueError("OPENHANDS_LOCAL_TOOL_SYMLINK_FORBIDDEN")
+    target = (base / raw_path).resolve(strict=False)
+    try:
+        target.relative_to(base)
+    except ValueError as exc:
+        raise ValueError("OPENHANDS_LOCAL_TOOL_PATH_ESCAPE_FORBIDDEN") from exc
+    return "/".join(parts), target
+
+
+def _bounded_write_target(workspace: Path, raw_path: str, package: dict) -> tuple[str, Path]:
+    rel, target = _bounded_target(workspace, raw_path)
+    if hard_forbidden(rel) or not path_is_allowed(rel, package):
+        raise ValueError("OPENHANDS_LOCAL_TOOL_WRITE_SURFACE_FORBIDDEN:" + rel)
+    return rel, target
+
+
+def _bounded_read(workspace: Path, raw_path: str) -> str:
+    rel, target = _bounded_target(workspace, raw_path)
+    if not target.is_file():
+        raise ValueError("OPENHANDS_LOCAL_TOOL_READ_NOT_FILE:" + rel)
+    if target.stat().st_size > MAX_AGENT_FILE_BYTES:
+        raise ValueError("OPENHANDS_LOCAL_TOOL_READ_TOO_LARGE:" + rel)
+    return target.read_text(encoding="utf-8")
+
+
+def _bounded_list(workspace: Path, raw_path: str) -> str:
+    rel, target = _bounded_target(workspace, raw_path, allow_root=True)
+    if not target.is_dir():
+        raise ValueError("OPENHANDS_LOCAL_TOOL_LIST_NOT_DIRECTORY:" + rel)
+    entries = sorted(target.iterdir(), key=lambda item: item.name)
+    if len(entries) > MAX_AGENT_LIST_ENTRIES:
+        raise ValueError("OPENHANDS_LOCAL_TOOL_LIST_TOO_LARGE:" + rel)
+    rows = []
+    for entry in entries:
+        suffix = "@" if entry.is_symlink() else "/" if entry.is_dir() else ""
+        rows.append(entry.name + suffix)
+    return "\n".join(rows)
+
+
+def _bounded_write(workspace: Path, raw_path: str, content: str, package: dict) -> str:
+    if not isinstance(content, str):
+        raise ValueError("OPENHANDS_LOCAL_TOOL_WRITE_CONTENT_INVALID")
+    encoded = content.encode("utf-8")
+    if len(encoded) > MAX_AGENT_FILE_BYTES:
+        raise ValueError("OPENHANDS_LOCAL_TOOL_WRITE_TOO_LARGE")
+    rel, target = _bounded_write_target(workspace, raw_path, package)
+    if target.exists() and not target.is_file():
+        raise ValueError("OPENHANDS_LOCAL_TOOL_WRITE_NOT_FILE:" + rel)
+    target.parent.mkdir(parents=True, exist_ok=True)
+    parent = target.parent.resolve(strict=True)
+    base = workspace.resolve(strict=True)
+    try:
+        parent.relative_to(base)
+    except ValueError as exc:
+        raise ValueError("OPENHANDS_LOCAL_TOOL_PARENT_ESCAPE_FORBIDDEN") from exc
+    if target.is_symlink():
+        raise ValueError("OPENHANDS_LOCAL_TOOL_SYMLINK_FORBIDDEN")
+    target.write_text(content, encoding="utf-8")
+    return "wrote " + rel
+
+
+def _bounded_delete(workspace: Path, raw_path: str, package: dict) -> str:
+    rel, target = _bounded_write_target(workspace, raw_path, package)
+    if not target.is_file():
+        raise ValueError("OPENHANDS_LOCAL_TOOL_DELETE_NOT_FILE:" + rel)
+    target.unlink()
+    return "deleted " + rel
+
+
+def _bounded_operation(workspace: Path, package: dict, operation: str, raw_path: str, content: str | None) -> str:
+    if operation == "read":
+        return _bounded_read(workspace, raw_path)
+    if operation == "list":
+        return _bounded_list(workspace, raw_path)
+    if operation == "write":
+        return _bounded_write(workspace, raw_path, content, package)
+    if operation == "delete":
+        return _bounded_delete(workspace, raw_path, package)
+    raise ValueError("OPENHANDS_LOCAL_TOOL_OPERATION_INVALID")
+
+
 def _apply_changes(real_root: Path, snapshot: Path, work: Path, changed: list[str]) -> None:
     before = _files(snapshot)
     after = _files(work)
@@ -154,17 +259,63 @@ def _prompt(package: dict) -> str:
         "Acceptance criteria:\n" + acceptance + "\n\n"
         "Allowed write surfaces:\n" + allowed + "\n\n"
         "Forbidden write surfaces:\n" + forbidden + "\n\n"
+        "Use only the bounded file tool with repository-relative / paths. "
         "Work only inside the provided snapshot. Finish after making the smallest changes that satisfy the goal."
     )
 
 
 def run_openhands(workspace: Path, package: dict, config: dict[str, str]) -> float:
     try:
-        from openhands.sdk import LLM, Agent, Conversation, Tool
-        from openhands.tools.file_editor import FileEditorTool
-        from openhands.tools.task_tracker import TaskTrackerTool
+        from collections.abc import Sequence
+        from typing import Literal
+        from pydantic import Field
+        from openhands.sdk import LLM, Action, Agent, Conversation, Observation, ToolDefinition
+        from openhands.sdk.tool import Tool, ToolExecutor, register_tool
     except Exception as exc:
         raise RuntimeError("OPENHANDS_SDK_UNAVAILABLE") from exc
+
+    class ADWFBoundedFileAction(Action):
+        operation: Literal["read", "list", "write", "delete"] = Field(description="Bounded file operation")
+        path: str = Field(description="Repository-relative / path inside the disposable snapshot")
+        content: str | None = Field(default=None, description="UTF-8 content required only for write")
+
+    class ADWFBoundedFileObservation(Observation):
+        pass
+
+    class ADWFBoundedFileExecutor(ToolExecutor[ADWFBoundedFileAction, ADWFBoundedFileObservation]):
+        def __init__(self, root: Path, work_package: dict):
+            self.root = root.resolve(strict=True)
+            self.package = work_package
+
+        def __call__(self, action: ADWFBoundedFileAction, conversation=None) -> ADWFBoundedFileObservation:  # noqa: ARG002
+            try:
+                value = _bounded_operation(self.root, self.package, action.operation, action.path, action.content)
+                return ADWFBoundedFileObservation.from_text(text=value)
+            except (OSError, UnicodeError, ValueError) as exc:
+                return ADWFBoundedFileObservation.from_text(text=str(exc).splitlines()[0][:500], is_error=True)
+
+    description = (
+        "ADWF-owned bounded file tool. Operations: read, list, write, delete. "
+        "Paths must be repository-relative using / and remain inside the disposable snapshot. "
+        "Writes and deletes are checked against the exact AIWorkPackage allowed/forbidden surfaces before filesystem effect. "
+        "Absolute paths, traversal, backslashes and symlinks are rejected."
+    )
+
+    class ADWFBoundedFileTool(ToolDefinition[ADWFBoundedFileAction, ADWFBoundedFileObservation]):
+        @classmethod
+        def create(cls, conv_state, package: dict) -> Sequence[ToolDefinition]:
+            root = Path(conv_state.workspace.working_dir).resolve(strict=True)
+            executor = ADWFBoundedFileExecutor(root, package)
+            return [
+                cls(
+                    description=description,
+                    action_type=ADWFBoundedFileAction,
+                    observation_type=ADWFBoundedFileObservation,
+                    executor=executor,
+                )
+            ]
+
+    register_tool(ADWFBoundedFileTool.name, ADWFBoundedFileTool)
     llm = LLM(
         model=config["model"],
         api_key="adwf-local-no-secret",
@@ -174,10 +325,7 @@ def run_openhands(workspace: Path, package: dict, config: dict[str, str]) -> flo
     )
     agent = Agent(
         llm=llm,
-        tools=[
-            Tool(name=FileEditorTool.name),
-            Tool(name=TaskTrackerTool.name),
-        ],
+        tools=[Tool(name=ADWFBoundedFileTool.name, params={"package": package})],
     )
     conversation = Conversation(agent=agent, workspace=str(workspace))
     conversation.send_message(_prompt(package))

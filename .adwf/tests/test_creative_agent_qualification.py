@@ -174,6 +174,22 @@ class CreativeAgentQualificationTests(unittest.TestCase):
             target = root / rel
             target.parent.mkdir(parents=True, exist_ok=True)
             target.write_bytes((ROOT / rel).read_bytes())
+        # Keep this fixture intentionally minimal. Production now has multiple
+        # qualified adapters; copying the whole production registry would make
+        # an unrelated adapter's command/report files mandatory in this isolated
+        # reference-adapter timeout/nonzero/missing-result test.
+        registry_path = root / ".adwf/creative-agent-adapters.json"
+        registry = json.loads(registry_path.read_text(encoding="utf-8"))
+        registry["adapters"] = [
+            item for item in registry.get("adapters") or []
+            if item.get("id") == "reference-local"
+        ]
+        if len(registry["adapters"]) != 1:
+            raise AssertionError("minimal reference adapter fixture identity")
+        registry_path.write_text(
+            json.dumps(seal_registry(registry), ensure_ascii=False, indent=2) + "\n",
+            encoding="utf-8",
+        )
         return root
 
     def test_timeout_nonzero_and_missing_result_fail_closed(self):

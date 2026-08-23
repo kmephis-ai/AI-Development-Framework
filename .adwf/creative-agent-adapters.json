@@ -48,7 +48,7 @@
       "command": {
         "runner": "PYTHON",
         "path": ".adwf/scripts/openhands_agent_adapter.py",
-        "sha256": "a4d3f3bc7e71ad55b3f6150cae09ecd528b7051bfa8827bf17709e1ddb61b42c"
+        "sha256": "cd7951aaa7d7976ad6530831d01af8b40745ca146c00e5b179ab86140679e92e"
       },
       "authority": {
         "network": "DECLARED_EXTERNAL",
@@ -66,5 +66,5 @@
       "qualification_profile_digest": "426dee8fd5063bb8f408d6ec3ab26e7c67d9c4a2e8d91b09174cb407bd515af8"
     }
   ],
-  "registry_sha256": "559cbe6322850f6d45347f7c9f87be20b03c6ed3966ffb444cec98d2bff4b83b"
+  "registry_sha256": "1706ce73a5eacb38cba70c1f47ff7b678d0369c52035630e7da812c933dc1c6c"
 }
