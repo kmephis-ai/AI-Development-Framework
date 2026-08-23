@@ -1,0 +1,276 @@
+name: OPENHANDS-001 Materialize a1
+
+on:
+  push:
+    branches:
+      - helper/OPENHANDS-001-materialize-a1
+    paths:
+      - .adwf-materialize-trigger-openhands-001-a1
+
+permissions:
+  contents: write
+  issues: read
+  pull-requests: read
+
+concurrency:
+  group: adwf-control-${{ github.repository }}
+  cancel-in-progress: false
+
+env:
+  PYTHONDONTWRITEBYTECODE: "1"
+
+jobs:
+  materialize-source-projections:
+    if: github.ref == 'refs/heads/helper/OPENHANDS-001-materialize-a1'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd
+        with:
+          ref: adwf/openhands-001-a1
+          persist-credentials: true
+          fetch-depth: 0
+      - uses: actions/setup-python@a309ff8b426b58ec0e2a45f0f869d46889d02405
+        with:
+          python-version: "3.12.10"
+      - name: Verify exact authority and heartbeat writer lease
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        shell: python
+        run: |
+          from pathlib import Path
+          import base64, hashlib, os, re, sys
+          root = Path.cwd()
+          sys.path.insert(0, str(root / ".adwf"))
+
+          from lib.github_lease_store import GitHubLeaseStore
+          from lib.github_provider import GitHubClient
+          from lib.github_rulesets import verify_rulesets, verify_runtime_anchor_ruleset
+          from lib.strict_json import loads as strict_loads
+
+          repo = os.environ["GITHUB_REPOSITORY"]
+          token = os.environ["GITHUB_TOKEN"]
+          expected_main = "0c20ee50ac50e36422c93a32fca151b411bc8b95"
+          expected_source_head = "81c5d51ee6f77c41cc9c5d2b4e65a341d1df7a6b"
+          source_branch = "adwf/openhands-001-a1"
+          lease_id = "9f93daa9-2860-4e65-b189-3147ce8e2a6d"
+          worker_id = "adwf-runtime:openhands-001-source-a1"
+          trigger_path = ".adwf-materialize-trigger-openhands-001-a1"
+          trigger_blob = "0e2cf293284c0a66a500022085032dbfc52b64a8"
+          trigger_sha256 = "2aa9469b2734193599340765f7a6719ff0f239a7d251fe7d16ae77dfe6824f82"
+
+          client = GitHubClient(repo, token)
+          store = GitHubLeaseStore(client)
+
+          def current_main():
+              value = str((client.branch("main").get("commit") or {}).get("sha") or "")
+              if re.fullmatch(r"[0-9a-f]{40}", value) is None:
+                  raise SystemExit("MATERIALIZE_MAIN_INVALID")
+              return value
+
+          def current_source():
+              value = str((client.branch(source_branch).get("commit") or {}).get("sha") or "")
+              if re.fullmatch(r"[0-9a-f]{40}", value) is None:
+                  raise SystemExit("MATERIALIZE_SOURCE_INVALID")
+              return value
+
+          def verify_rules():
+              rows = client.rulesets()
+              if verify_rulesets(rows, expected_integration_id=15368).get("readback_verified") is not True:
+                  raise SystemExit("MATERIALIZE_MAIN_RULESET_NOT_VERIFIED")
+              if verify_runtime_anchor_ruleset(rows).get("readback_verified") is not True:
+                  raise SystemExit("MATERIALIZE_ANCHOR_RULESET_NOT_VERIFIED")
+              named = {str(x.get("name") or ""): x for x in rows}
+              for name in ("ADWF protected main", "ADWF immutable runtime anchors"):
+                  rs = named.get(name) or {}
+                  if rs.get("enforcement") != "active" or (rs.get("bypass_actors") or []) != []:
+                      raise SystemExit("MATERIALIZE_RULESET_DRIFT:" + name)
+                  if rs.get("current_user_can_bypass") not in (None, "never", False):
+                      raise SystemExit("MATERIALIZE_BYPASS_DRIFT:" + name)
+
+          if current_main() != expected_main:
+              raise SystemExit("MATERIALIZE_MAIN_DRIFT")
+          if current_source() != expected_source_head:
+              raise SystemExit("MATERIALIZE_SOURCE_DRIFT")
+          verify_rules()
+
+          trigger = client.get(f"/repos/{repo}/contents/{trigger_path}?ref={os.environ['GITHUB_SHA']}")
+          raw = base64.b64decode(str(trigger.get("content") or ""))
+          if str(trigger.get("sha") or "") != trigger_blob or hashlib.sha256(raw).hexdigest() != trigger_sha256:
+              raise SystemExit("MATERIALIZE_TRIGGER_DRIFT")
+
+          cfg = strict_loads((root / ".adwf/config.json").read_text(encoding="utf-8"))
+          policy = cfg.get("policy") or {}
+          orch = cfg.get("orchestration") or {}
+          cost = cfg.get("cost") or {}
+          if policy.get("fail_mode") != "CLOSED" or policy.get("active_autonomy") != "A2" or policy.get("max_autonomous_risk") != "R1":
+              raise SystemExit("MATERIALIZE_POLICY_DRIFT")
+          if orch.get("max_parallel_writers") != 1 or cost.get("mode") != "FREE_ONLY" or cost.get("monetary_budget") != 0:
+              raise SystemExit("MATERIALIZE_GOVERNANCE_DRIFT")
+          ttl_minutes = int(orch.get("lease_ttl_minutes") or 120)
+          if ttl_minutes != 120:
+              raise SystemExit("MATERIALIZE_TTL_DRIFT")
+
+          issue = client.get(f"/repos/{repo}/issues/268")
+          if issue.get("state") != "open" or "OPENHANDS-001" not in str(issue.get("title") or ""):
+              raise SystemExit("MATERIALIZE_ISSUE_DRIFT")
+          pr = client.pull(270)
+          if pr.get("state") != "open" or pr.get("draft") is not True:
+              raise SystemExit("MATERIALIZE_PR_STATE_DRIFT")
+          if str((pr.get("base") or {}).get("sha") or "") != expected_main or str((pr.get("head") or {}).get("sha") or "") != expected_source_head:
+              raise SystemExit("MATERIALIZE_PR_IDENTITY_DRIFT")
+          open_prs = [p for p in client.pulls() if p.get("state") == "open"]
+          if len(open_prs) != 1 or int(open_prs[0].get("number") or 0) != 270:
+              raise SystemExit("MATERIALIZE_OPEN_PR_CONFLICT")
+
+          registry, _ = store.read(expected_main_sha=expected_main, policy_max_parallel_writers=1)
+          active = [x for x in registry.get("leases") or [] if x.get("status") == "ACTIVE"]
+          if len(active) != 1:
+              raise SystemExit("MATERIALIZE_ACTIVE_WRITER_COUNT_MISMATCH")
+          target = active[0]
+          expected = {
+              "lease_id": lease_id,
+              "issue_id": "268",
+              "roadmap_id": "OPENHANDS-001",
+              "worker_id": worker_id,
+              "branch": source_branch,
+              "base_sha": expected_main,
+          }
+          for key, value in expected.items():
+              if str(target.get(key) or "") != value:
+                  raise SystemExit("MATERIALIZE_LEASE_IDENTITY_DRIFT:" + key)
+
+          heartbeat, anchor = store.heartbeat(
+              expected_main_sha=expected_main,
+              policy_max_parallel_writers=1,
+              lease_id=lease_id,
+              worker_id=worker_id,
+              ttl_minutes=ttl_minutes,
+          )
+          final, read_anchor = store.read(expected_main_sha=expected_main, policy_max_parallel_writers=1)
+          if read_anchor != anchor or final.get("revision") != heartbeat.get("revision"):
+              raise SystemExit("MATERIALIZE_HEARTBEAT_READBACK_MISMATCH")
+          active = [x for x in final.get("leases") or [] if x.get("status") == "ACTIVE"]
+          if len(active) != 1 or str(active[0].get("lease_id") or "") != lease_id:
+              raise SystemExit("MATERIALIZE_HEARTBEAT_LEASE_MISMATCH")
+          if current_main() != expected_main or current_source() != expected_source_head:
+              raise SystemExit("MATERIALIZE_POST_HEARTBEAT_DRIFT")
+          verify_rules()
+          print("OPENHANDS_MATERIALIZE_AUTHORITY=PASS")
+          print("LEASE_REVISION=" + str(final.get("revision")))
+          print("LEASE_ANCHOR=" + anchor)
+
+      - name: Materialize deterministic projections and validate candidate
+        run: |
+          python .adwf/adwf.py provider-check --input .adwf/requests/github-public-standard.json
+          python .adwf/scripts/docs_freshness.py --write
+          python .adwf/scripts/generate_manifest.py
+          python .adwf/scripts/docs_freshness.py
+          python .adwf/scripts/generate_manifest.py --check
+          python .adwf/scripts/validate_framework.py
+          python .adwf/scripts/validate_pipeline_ir.py
+          python .adwf/adwf.py doctor --scope package_integrity
+          python .adwf/adwf.py doctor --scope config_health
+          python .adwf/adwf.py self-test
+          python .adwf/scripts/validate_docs.py
+
+      - name: Guard generated-only diff and re-read authority
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        shell: python
+        run: |
+          from pathlib import Path
+          import os, re, subprocess, sys
+          root = Path.cwd()
+          sys.path.insert(0, str(root / ".adwf"))
+          from lib.github_lease_store import GitHubLeaseStore
+          from lib.github_provider import GitHubClient
+          from lib.github_rulesets import verify_rulesets, verify_runtime_anchor_ruleset
+
+          repo = os.environ["GITHUB_REPOSITORY"]
+          token = os.environ["GITHUB_TOKEN"]
+          expected_main = "0c20ee50ac50e36422c93a32fca151b411bc8b95"
+          expected_source_head = "81c5d51ee6f77c41cc9c5d2b4e65a341d1df7a6b"
+          source_branch = "adwf/openhands-001-a1"
+          lease_id = "9f93daa9-2860-4e65-b189-3147ce8e2a6d"
+          worker_id = "adwf-runtime:openhands-001-source-a1"
+          allowed = {".adwf/docs-registry.json", "MANIFEST.json", "SHA256SUMS.txt"}
+
+          status = subprocess.run(["git", "status", "--porcelain"], cwd=root, capture_output=True, text=True, check=True).stdout.splitlines()
+          changed = set()
+          for row in status:
+              if not row.strip():
+                  continue
+              path = row[3:]
+              if " -> " in path:
+                  path = path.split(" -> ", 1)[1]
+              changed.add(path)
+          if not changed or not changed.issubset(allowed):
+              raise SystemExit("MATERIALIZE_DIFF_NOT_GENERATED_ONLY:" + ",".join(sorted(changed)))
+          if "MANIFEST.json" not in changed or "SHA256SUMS.txt" not in changed:
+              raise SystemExit("MATERIALIZE_REQUIRED_PROJECTIONS_MISSING")
+
+          client = GitHubClient(repo, token)
+          store = GitHubLeaseStore(client)
+          main = str((client.branch("main").get("commit") or {}).get("sha") or "")
+          source = str((client.branch(source_branch).get("commit") or {}).get("sha") or "")
+          if main != expected_main or source != expected_source_head:
+              raise SystemExit("MATERIALIZE_PREPUSH_REF_DRIFT")
+          rows = client.rulesets()
+          if verify_rulesets(rows, expected_integration_id=15368).get("readback_verified") is not True or verify_runtime_anchor_ruleset(rows).get("readback_verified") is not True:
+              raise SystemExit("MATERIALIZE_PREPUSH_RULESET_NOT_VERIFIED")
+          registry, _ = store.read(expected_main_sha=expected_main, policy_max_parallel_writers=1)
+          active = [x for x in registry.get("leases") or [] if x.get("status") == "ACTIVE"]
+          if len(active) != 1 or str(active[0].get("lease_id") or "") != lease_id or str(active[0].get("worker_id") or "") != worker_id:
+              raise SystemExit("MATERIALIZE_PREPUSH_LEASE_DRIFT")
+          print("OPENHANDS_MATERIALIZE_DIFF_GUARD=PASS")
+          print("GENERATED_PATHS=" + ",".join(sorted(changed)))
+
+      - name: Commit and push generated projections to leased source branch
+        run: |
+          git config user.name "adwf-runtime"
+          git config user.email "adwf-runtime@users.noreply.github.com"
+          git add -- .adwf/docs-registry.json MANIFEST.json SHA256SUMS.txt
+          git commit -m "[OPENHANDS-001] Refresh deterministic generated projections"
+          echo "MATERIALIZED_HEAD=$(git rev-parse HEAD)" >> "$GITHUB_ENV"
+          git push origin HEAD:refs/heads/adwf/openhands-001-a1
+
+      - name: Verify exact push readback
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        shell: python
+        run: |
+          import os, re, sys, time
+          from pathlib import Path
+          root = Path.cwd()
+          sys.path.insert(0, str(root / ".adwf"))
+          from lib.github_provider import GitHubClient
+          from lib.github_rulesets import verify_rulesets, verify_runtime_anchor_ruleset
+
+          repo = os.environ["GITHUB_REPOSITORY"]
+          head = os.environ["MATERIALIZED_HEAD"]
+          expected_main = "0c20ee50ac50e36422c93a32fca151b411bc8b95"
+          source_branch = "adwf/openhands-001-a1"
+          if re.fullmatch(r"[0-9a-f]{40}", head) is None:
+              raise SystemExit("MATERIALIZE_NEW_HEAD_INVALID")
+          client = GitHubClient(repo, os.environ["GITHUB_TOKEN"])
+          source = str((client.branch(source_branch).get("commit") or {}).get("sha") or "")
+          if source != head:
+              raise SystemExit("MATERIALIZE_PUSH_READBACK_MISMATCH")
+          matched = False
+          for _ in range(6):
+              pr = client.pull(270)
+              if str((pr.get("head") or {}).get("sha") or "") == head:
+                  matched = True
+                  break
+              time.sleep(2)
+          if not matched:
+              raise SystemExit("MATERIALIZE_PR_HEAD_READBACK_MISMATCH")
+          main = str((client.branch("main").get("commit") or {}).get("sha") or "")
+          if main != expected_main:
+              raise SystemExit("MATERIALIZE_FINAL_MAIN_DRIFT")
+          rows = client.rulesets()
+          if verify_rulesets(rows, expected_integration_id=15368).get("readback_verified") is not True or verify_runtime_anchor_ruleset(rows).get("readback_verified") is not True:
+              raise SystemExit("MATERIALIZE_FINAL_RULESET_NOT_VERIFIED")
+          print("OPENHANDS_MATERIALIZE=PASS")
+          print("MATERIALIZED_HEAD=" + head)
