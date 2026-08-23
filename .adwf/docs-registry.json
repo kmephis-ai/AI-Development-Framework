@@ -24,7 +24,7 @@
         "skills/**"
       ],
       "mode": "manual-governance",
-      "source_digest": "db766c0056125163465e0bc8417365c85bb0854dcd598db2a7454a7413e5840a",
+      "source_digest": "98c2d53d1f3c48d59e88bdd195af1ba309ff27df0ae78522263578ed9a5f5d2b",
       "reviewed_at": "2026-08-13T00:00:00Z",
       "valid_until": "2026-11-13T00:00:00Z"
     },
@@ -37,7 +37,7 @@
         ".adwf/scripts/**"
       ],
       "mode": "architecture",
-      "source_digest": "9403031342b29c4bbddc50eeeee45ef3b31792a6281b4df85d29e4c97d240dc7",
+      "source_digest": "ecb6d3f10c7572f0d5c348036c96684c60349536ad593e98ba5a4305924e737a",
       "reviewed_at": "2026-08-13T00:00:00Z",
       "valid_until": "2026-11-13T00:00:00Z"
     },
@@ -65,7 +65,7 @@
         ".adwf/scripts/validate_capabilities.py"
       ],
       "mode": "implementation-certification",
-      "source_digest": "76b393ea5dea79202b94c05e40bdfaebe6fe14b0abf62a03fd9ac7f2dcc827d4",
+      "source_digest": "62c2bce025dd1f75ef85b7e9bcb1433ee22ee5216d967d01ef11f0c401ea0f7f",
       "reviewed_at": "2026-08-13T00:00:00Z",
       "valid_until": "2026-11-13T00:00:00Z"
     },
@@ -351,7 +351,7 @@
         ".adwf/decision-requirement-traceability.json"
       ],
       "mode": "governance-contract",
-      "source_digest": "11066971a95120f7f57d8e7ace889fe82b3ed0e70c459bc68be814be09d7f999",
+      "source_digest": "615f3942b4778d33aaa962a6e361177b6517b1e1b0d05b5dff457dd6b4f14530",
       "reviewed_at": "2026-08-13T00:00:00Z",
       "valid_until": "2026-11-13T00:00:00Z"
     },

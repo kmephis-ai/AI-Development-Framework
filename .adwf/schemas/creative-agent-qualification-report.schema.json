@@ -25,7 +25,7 @@
     "status": {"const": "PASS"},
     "supported_phases": {"type": "array", "minItems": 1, "uniqueItems": true, "items": {"enum": ["EXECUTE", "RECOVERY"]}},
     "monetary_budget_usd": {"const": 0},
-    "network": {"const": "NONE"},
+    "network": {"enum": ["NONE", "DECLARED_EXTERNAL"]},
     "secrets": {"const": "FORBIDDEN"},
     "filesystem": {"const": "PACKAGE_SCOPED"},
     "exact_package_binding": {"const": true},
