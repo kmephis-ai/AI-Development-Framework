@@ -5,12 +5,14 @@ from __future__ import annotations
 from pathlib import Path, PureWindowsPath
 from urllib.parse import urlsplit
 import json
+import math
 import os
 import shutil
 import subprocess
 import sys
 import tarfile
 import tempfile
+import warnings
 from fnmatch import fnmatchcase
 
 FRAMEWORK_ROOT = Path(__file__).resolve().parents[2]
@@ -21,6 +23,7 @@ from lib.strict_json import loads as strict_loads  # noqa: E402
 SECRET_MARKERS = ("TOKEN", "SECRET", "PASSWORD", "API_KEY", "CREDENTIAL", "PRIVATE_KEY")
 CONFIG_REL = ".adwf-runtime/creative-agents/openhands-local.json"
 LOOPBACK_HOSTS = {"localhost", "127.0.0.1", "::1"}
+COST_CALCULATION_WARNING_PREFIX = "Cost calculation failed:"
 MAX_AGENT_FILE_BYTES = 1_000_000
 MAX_AGENT_LIST_ENTRIES = 200
 HARD_FORBIDDEN_SURFACES = (
@@ -322,6 +325,8 @@ def run_openhands(workspace: Path, package: dict, config: dict[str, str]) -> flo
         base_url=config["base_url"],
         usage_id="adwf-openhands-local",
         drop_params=True,
+        input_cost_per_token=0.0,
+        output_cost_per_token=0.0,
     )
     agent = Agent(
         llm=llm,
@@ -329,12 +334,21 @@ def run_openhands(workspace: Path, package: dict, config: dict[str, str]) -> flo
     )
     conversation = Conversation(agent=agent, workspace=str(workspace))
     conversation.send_message(_prompt(package))
-    conversation.run()
+    with warnings.catch_warnings(record=True) as caught:
+        warnings.simplefilter("always")
+        conversation.run()
+    if any(str(item.message).startswith(COST_CALCULATION_WARNING_PREFIX) for item in caught):
+        raise RuntimeError("OPENHANDS_LOCAL_COST_NOT_VERIFIED")
+    for item in caught:
+        warnings.warn_explicit(item.message, item.category, item.filename, item.lineno)
     metrics = getattr(llm, "metrics", None)
     cost = getattr(metrics, "accumulated_cost", None)
     if isinstance(cost, bool) or not isinstance(cost, (int, float)):
         raise RuntimeError("OPENHANDS_LOCAL_COST_NOT_VERIFIED")
-    return float(cost)
+    verified_cost = float(cost)
+    if not math.isfinite(verified_cost):
+        raise RuntimeError("OPENHANDS_LOCAL_COST_NOT_VERIFIED")
+    return verified_cost
 
 
 def execute(root: Path, request_path: Path, result_path: Path, environ: dict[str, str]) -> int:

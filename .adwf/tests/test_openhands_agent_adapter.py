@@ -6,6 +6,7 @@ import subprocess
 import sys
 import tempfile
 import types
+import warnings
 import unittest
 from pathlib import Path
 from unittest.mock import patch
@@ -79,7 +80,12 @@ def request_value(pkg):
     }
 
 
-def fake_openhands(cost: float, *, target_path: str = "src/input.txt"):
+def fake_openhands(
+    cost: float,
+    *,
+    target_path: str = "src/input.txt",
+    cost_warning: bool = False,
+):
     sdk = types.ModuleType("openhands.sdk")
     sdk_tool = types.ModuleType("openhands.sdk.tool")
     package_mod = types.ModuleType("openhands")
@@ -95,6 +101,10 @@ def fake_openhands(cost: float, *, target_path: str = "src/input.txt"):
     class LLM:
         def __init__(self, **kwargs):
             self.kwargs = kwargs
+            if kwargs.get("input_cost_per_token") != 0.0:
+                raise RuntimeError("FAKE_INPUT_COST_RATE_NOT_ZERO")
+            if kwargs.get("output_cost_per_token") != 0.0:
+                raise RuntimeError("FAKE_OUTPUT_COST_RATE_NOT_ZERO")
             self.metrics = Metrics()
 
     class Action:
@@ -166,6 +176,11 @@ def fake_openhands(cost: float, *, target_path: str = "src/input.txt"):
             observation = definition.executor(action)
             if observation.is_error:
                 raise RuntimeError("FAKE_BOUNDED_TOOL_REJECTED:" + observation.text)
+            if cost_warning:
+                warnings.warn(
+                    "Cost calculation failed: synthetic unpriced local model",
+                    UserWarning,
+                )
 
     pydantic_mod.Field = Field
     sdk.LLM = LLM
@@ -248,7 +263,14 @@ class OpenHandsAdapterTests(unittest.TestCase):
             self.assertTrue(module.hard_forbidden(path), path)
         self.assertFalse(module.hard_forbidden("src/app.py"))
 
-    def _execute_case(self, cost: float, *, secret=False, target_path="src/input.txt"):
+    def _execute_case(
+        self,
+        cost: float,
+        *,
+        secret=False,
+        target_path="src/input.txt",
+        cost_warning=False,
+    ):
         module = load_wrapper()
         holder = tempfile.TemporaryDirectory()
         root = Path(holder.name)
@@ -272,7 +294,11 @@ class OpenHandsAdapterTests(unittest.TestCase):
         }
         if secret:
             env["GITHUB_TOKEN"] = "must-not-leak"
-        modules = fake_openhands(cost, target_path=target_path)
+        modules = fake_openhands(
+            cost,
+            target_path=target_path,
+            cost_warning=cost_warning,
+        )
         with patch.dict(sys.modules, modules, clear=False):
             code = module.execute(root, request, result, env)
         return holder, root, base, result, code
@@ -297,6 +323,28 @@ class OpenHandsAdapterTests(unittest.TestCase):
 
     def test_positive_cost_is_rejected_before_real_workspace_mutation(self):
         holder, root, base, result_path, code = self._execute_case(0.25)
+        try:
+            self.assertNotEqual(code, 0)
+            head = subprocess.check_output(["git", "rev-parse", "HEAD"], cwd=root, text=True).strip()
+            self.assertEqual(head, base)
+            self.assertEqual((root / "src/input.txt").read_text(encoding="utf-8"), "before\n")
+            self.assertFalse(result_path.exists())
+        finally:
+            holder.cleanup()
+
+    def test_cost_calculation_warning_is_rejected_before_real_workspace_mutation(self):
+        holder, root, base, result_path, code = self._execute_case(0.0, cost_warning=True)
+        try:
+            self.assertNotEqual(code, 0)
+            head = subprocess.check_output(["git", "rev-parse", "HEAD"], cwd=root, text=True).strip()
+            self.assertEqual(head, base)
+            self.assertEqual((root / "src/input.txt").read_text(encoding="utf-8"), "before\n")
+            self.assertFalse(result_path.exists())
+        finally:
+            holder.cleanup()
+
+    def test_nonfinite_cost_is_rejected_before_real_workspace_mutation(self):
+        holder, root, base, result_path, code = self._execute_case(float("nan"))
         try:
             self.assertNotEqual(code, 0)
             head = subprocess.check_output(["git", "rev-parse", "HEAD"], cwd=root, text=True).strip()
