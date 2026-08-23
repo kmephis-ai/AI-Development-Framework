@@ -1,0 +1,286 @@
+name: OPENHANDS-001 Reconcile a1
+
+on:
+  push:
+    branches:
+      - helper/OPENHANDS-001-reconcile-a1
+
+permissions:
+  contents: write
+  issues: read
+  pull-requests: read
+
+concurrency:
+  group: adwf-control-${{ github.repository }}
+  cancel-in-progress: false
+
+env:
+  PYTHONDONTWRITEBYTECODE: "1"
+
+jobs:
+  reconcile-source-lease:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - name: Checkout disposable support branch
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd
+        with:
+          fetch-depth: 1
+          persist-credentials: true
+          path: support
+      - name: Checkout exact trusted main
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd
+        with:
+          ref: 0c20ee50ac50e36422c93a32fca151b411bc8b95
+          fetch-depth: 2
+          persist-credentials: false
+          path: trusted
+      - uses: actions/setup-python@a309ff8b426b58ec0e2a45f0f869d46889d02405
+        with:
+          python-version: "3.12.10"
+      - name: Provider-reconcile stale lease and reacquire same work item
+        working-directory: trusted
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        shell: python
+        run: |
+          from pathlib import Path
+          import json, os, re, sys
+
+          root = Path.cwd()
+          sys.path.insert(0, str(root / '.adwf'))
+
+          from lib.assurance_builder import build_assurance_snapshot
+          from lib.cost_guard import evaluate_provider
+          from lib.github_lease_store import GitHubLeaseStore
+          from lib.github_provider import GitHubClient
+          from lib.github_rulesets import verify_rulesets, verify_runtime_anchor_ruleset
+          from lib.health import doctor
+          from lib.lease_registry import _registry_lease_freshness_errors
+          from lib.leases import utc_now
+          from lib.policy_runtime import evaluate_with_effective_policy
+          from lib.strict_json import loads as strict_loads
+          from lib.trusted_context import compile_trusted_context
+
+          repo = os.environ['GITHUB_REPOSITORY']
+          token = os.environ['GITHUB_TOKEN']
+          expected_main = '0c20ee50ac50e36422c93a32fca151b411bc8b95'
+          expected_source = '81c5d51ee6f77c41cc9c5d2b4e65a341d1df7a6b'
+          source_branch = 'adwf/openhands-001-a1'
+          issue_id = '268'
+          roadmap_id = 'OPENHANDS-001'
+          old_lease_id = '9f93daa9-2860-4e65-b189-3147ce8e2a6d'
+          worker_id = 'adwf-runtime:openhands-001-source-a1'
+          resources = [{'kind': 'provider', 'scope': 'global', 'shared': True, 'global': True}]
+
+          cfg = strict_loads((root / '.adwf/config.json').read_text(encoding='utf-8'))
+          policy = cfg.get('policy') or {}
+          orch = cfg.get('orchestration') or {}
+          cost = cfg.get('cost') or {}
+          if policy.get('fail_mode') != 'CLOSED' or policy.get('active_autonomy') != 'A2' or policy.get('max_autonomous_risk') != 'R1':
+              raise SystemExit('RECONCILE_POLICY_DRIFT')
+          if orch.get('max_parallel_writers') != 1 or cost.get('mode') != 'FREE_ONLY' or cost.get('monetary_budget') != 0:
+              raise SystemExit('RECONCILE_GOVERNANCE_DRIFT')
+          ttl_minutes = int(orch.get('lease_ttl_minutes') or 120)
+          if ttl_minutes != 120:
+              raise SystemExit('RECONCILE_TTL_DRIFT')
+
+          client = GitHubClient(repo, token)
+          store = GitHubLeaseStore(client)
+
+          def current_main():
+              value = str((client.branch('main').get('commit') or {}).get('sha') or '')
+              if re.fullmatch(r'[0-9a-f]{40}', value) is None:
+                  raise SystemExit('RECONCILE_MAIN_INVALID')
+              return value
+
+          def current_source():
+              value = str((client.branch(source_branch).get('commit') or {}).get('sha') or '')
+              if re.fullmatch(r'[0-9a-f]{40}', value) is None:
+                  raise SystemExit('RECONCILE_SOURCE_INVALID')
+              return value
+
+          def verify_rules():
+              rows = client.rulesets()
+              if verify_rulesets(rows, expected_integration_id=15368).get('readback_verified') is not True:
+                  raise SystemExit('RECONCILE_MAIN_RULESET_NOT_VERIFIED')
+              if verify_runtime_anchor_ruleset(rows).get('readback_verified') is not True:
+                  raise SystemExit('RECONCILE_ANCHOR_RULESET_NOT_VERIFIED')
+              named = {str(x.get('name') or ''): x for x in rows}
+              for name in ('ADWF protected main', 'ADWF immutable runtime anchors'):
+                  rs = named.get(name) or {}
+                  if rs.get('enforcement') != 'active' or (rs.get('bypass_actors') or []) != []:
+                      raise SystemExit('RECONCILE_RULESET_DRIFT:' + name)
+                  if rs.get('current_user_can_bypass') not in (None, 'never', False):
+                      raise SystemExit('RECONCILE_BYPASS_DRIFT:' + name)
+
+          def authorize_recovery_claim():
+              providers = strict_loads((root / '.adwf/providers.json').read_text(encoding='utf-8'))
+              capability = str(cost.get('default_ci_capability') or '')
+              cost_decision = evaluate_provider(
+                  providers,
+                  {
+                      'provider': capability,
+                      'mandatory_ci': True,
+                      'automated': True,
+                      'projected_cost': 0,
+                      'projected_units': 0,
+                      'repository_visibility': 'PUBLIC',
+                      'runner_class': 'standard',
+                  },
+                  canonical_provider='github',
+              )
+              if cost_decision.get('result') != 'ALLOW' or float(cost_decision.get('projected_cost_usd') or 0) != 0:
+                  raise SystemExit('RECONCILE_COST_NOT_ALLOWED')
+              categories = doctor(root).get('categories') or {}
+              assurance = build_assurance_snapshot(
+                  root,
+                  subject_sha=expected_main,
+                  health={
+                      'package_integrity': str((categories.get('package_integrity') or {}).get('status') or 'NOT_VERIFIED'),
+                      'config_health': str((categories.get('config_health') or {}).get('status') or 'NOT_VERIFIED'),
+                      'control_plane_health': 'HEALTHY',
+                      'product_health': 'NOT_VERIFIED',
+                  },
+                  gates={}, required_gates=[], evidence_records=[], evidence_refs=[],
+                  provider_readback={
+                      'provider': 'github', 'subject_sha': expected_main,
+                      'repository_visibility': 'PUBLIC', 'runner': 'NOT_VERIFIED',
+                      'larger_runner': False, 'facts_readback_verified': True,
+                      'readback_verified': True, 'purpose': 'OPENHANDS_LEASE_RECONCILIATION',
+                  },
+                  cost=cost_decision, ttl_minutes=5,
+              )
+              context = compile_trusted_context(
+                  root, action='claim', risk='R1', work_type='recovery',
+                  request={
+                      'request_id': 'openhands-001:lease-reconcile:' + expected_source,
+                      'subject_sha': expected_main,
+                      'preview_digest': None,
+                  },
+                  assurance_snapshot=assurance,
+                  provider_readback=assurance['provider'],
+              )
+              decision = evaluate_with_effective_policy(root, context)
+              if decision.result != 'ALLOW':
+                  raise SystemExit('RECONCILE_POLICY_NOT_ALLOW:' + decision.result + ':' + ','.join(decision.reason_codes))
+
+          if current_main() != expected_main or current_source() != expected_source:
+              raise SystemExit('RECONCILE_PROVIDER_REF_DRIFT')
+          verify_rules()
+
+          issue = client.get(f'/repos/{repo}/issues/{issue_id}')
+          if issue.get('state') != 'open' or roadmap_id not in str(issue.get('title') or ''):
+              raise SystemExit('RECONCILE_ISSUE_DRIFT')
+          pr = client.pull(270)
+          if pr.get('state') != 'open':
+              raise SystemExit('RECONCILE_PR_STATE_DRIFT')
+          if str((pr.get('base') or {}).get('sha') or '') != expected_main or str((pr.get('head') or {}).get('sha') or '') != expected_source:
+              raise SystemExit('RECONCILE_PR_IDENTITY_DRIFT')
+          open_prs = [p for p in client.pulls() if p.get('state') == 'open']
+          if len(open_prs) != 1 or int(open_prs[0].get('number') or 0) != 270:
+              raise SystemExit('RECONCILE_OPEN_PR_CONFLICT')
+
+          registry23, anchor23 = store.read(expected_main_sha=expected_main, policy_max_parallel_writers=1)
+          if registry23.get('revision') != 23:
+              raise SystemExit('RECONCILE_REVISION23_REQUIRED')
+          active = [x for x in registry23.get('leases') or [] if x.get('status') == 'ACTIVE']
+          if len(active) != 1:
+              raise SystemExit('RECONCILE_ACTIVE_WRITER_COUNT_MISMATCH')
+          stale = active[0]
+          expected_identity = {
+              'lease_id': old_lease_id,
+              'issue_id': issue_id,
+              'roadmap_id': roadmap_id,
+              'worker_id': worker_id,
+              'branch': source_branch,
+              'base_sha': expected_main,
+          }
+          for key, value in expected_identity.items():
+              if str(stale.get(key) or '') != value:
+                  raise SystemExit('RECONCILE_OLD_LEASE_IDENTITY_DRIFT:' + key)
+          if stale.get('resources') != resources:
+              raise SystemExit('RECONCILE_OLD_RESOURCE_DRIFT')
+          freshness = _registry_lease_freshness_errors(stale, utc_now())
+          if not freshness:
+              raise SystemExit('RECONCILE_OLD_LEASE_NOT_STALE')
+
+          authorize_recovery_claim()
+          registry24, anchor24 = store.release(
+              expected_main_sha=expected_main,
+              policy_max_parallel_writers=1,
+              lease_id=old_lease_id,
+              worker_id=worker_id,
+              provider_reconciled=True,
+              provider_reconciliation_ref='pr/270@' + expected_source,
+          )
+          read24, read_anchor24 = store.read(expected_main_sha=expected_main, policy_max_parallel_writers=1)
+          if registry24.get('revision') != 24 or read24.get('revision') != 24 or read_anchor24 != anchor24 or anchor24 == anchor23:
+              raise SystemExit('RECONCILE_RELEASE_READBACK_MISMATCH')
+          released = [x for x in read24.get('leases') or [] if x.get('lease_id') == old_lease_id]
+          if len(released) != 1 or released[0].get('status') != 'RELEASED':
+              raise SystemExit('RECONCILE_RELEASE_STATE_MISMATCH')
+          if any(x.get('status') == 'ACTIVE' for x in read24.get('leases') or []):
+              raise SystemExit('RECONCILE_RELEASE_ACTIVE_REMAINS')
+
+          state25, new_lease, anchor25 = store.acquire(
+              expected_main_sha=expected_main,
+              policy_max_parallel_writers=1,
+              issue_id=issue_id,
+              roadmap_id=roadmap_id,
+              worker_id=worker_id,
+              base_sha=expected_main,
+              branch=source_branch,
+              resources=resources,
+              ttl_minutes=ttl_minutes,
+          )
+          final, final_anchor = store.read(expected_main_sha=expected_main, policy_max_parallel_writers=1)
+          active = [x for x in final.get('leases') or [] if x.get('status') == 'ACTIVE']
+          if state25.get('revision') != 25 or final.get('revision') != 25 or final_anchor != anchor25 or anchor25 == anchor24:
+              raise SystemExit('RECONCILE_ACQUIRE_READBACK_MISMATCH')
+          if len(active) != 1 or active[0].get('lease_id') != new_lease.get('lease_id'):
+              raise SystemExit('RECONCILE_NEW_ACTIVE_MISMATCH')
+          expected_new = {
+              'issue_id': issue_id, 'roadmap_id': roadmap_id, 'worker_id': worker_id,
+              'branch': source_branch, 'base_sha': expected_main,
+          }
+          for key, value in expected_new.items():
+              if str(active[0].get(key) or '') != value:
+                  raise SystemExit('RECONCILE_NEW_LEASE_IDENTITY_DRIFT:' + key)
+          if active[0].get('resources') != resources:
+              raise SystemExit('RECONCILE_NEW_RESOURCE_DRIFT')
+          if current_main() != expected_main or current_source() != expected_source:
+              raise SystemExit('RECONCILE_FINAL_PROVIDER_REF_DRIFT')
+          verify_rules()
+
+          proof = {
+              'schema_version': 1,
+              'status': 'PASS',
+              'main_sha': expected_main,
+              'source_branch': source_branch,
+              'source_sha': expected_source,
+              'issue_id': issue_id,
+              'roadmap_id': roadmap_id,
+              'worker_id': worker_id,
+              'old_lease_id': old_lease_id,
+              'old_freshness_findings': freshness,
+              'released_revision': 24,
+              'new_lease_id': new_lease['lease_id'],
+              'active_revision': 25,
+              'release_anchor': anchor24,
+              'active_anchor': anchor25,
+              'policy': 'ALLOW',
+              'cost_usd': 0,
+          }
+          support = Path(os.environ['GITHUB_WORKSPACE']) / 'support'
+          (support / 'reconcile-proof.json').write_text(json.dumps(proof, sort_keys=True, indent=2) + '\n', encoding='utf-8')
+          print(json.dumps(proof, sort_keys=True))
+      - name: Publish reconciliation proof on disposable branch
+        shell: bash
+        run: |
+          set -euo pipefail
+          git -C support config user.name "github-actions[bot]"
+          git -C support config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git -C support add reconcile-proof.json
+          git -C support commit -m "chore: publish OPENHANDS-001 lease reconciliation proof"
+          git -C support push origin HEAD:${GITHUB_REF_NAME}
