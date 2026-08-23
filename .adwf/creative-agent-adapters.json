@@ -35,7 +35,36 @@
       "qualification_profile_id": "CREATIVE_AGENT_COMMAND_V1",
       "qualification_profile_version": 1,
       "qualification_profile_digest": "426dee8fd5063bb8f408d6ec3ab26e7c67d9c4a2e8d91b09174cb407bd515af8"
+    },
+    {
+      "id": "openhands-local",
+      "version": "1.0.0",
+      "kind": "EXTERNAL_COMMAND",
+      "invocation_mode": "COMMAND",
+      "supported_phases": [
+        "EXECUTE",
+        "RECOVERY"
+      ],
+      "command": {
+        "runner": "PYTHON",
+        "path": ".adwf/scripts/openhands_agent_adapter.py",
+        "sha256": "a4d3f3bc7e71ad55b3f6150cae09ecd528b7051bfa8827bf17709e1ddb61b42c"
+      },
+      "authority": {
+        "network": "DECLARED_EXTERNAL",
+        "secrets": "FORBIDDEN",
+        "filesystem": "PACKAGE_SCOPED"
+      },
+      "monetary_budget_usd": 0,
+      "timeout_seconds": 900,
+      "result_channel": "ADWF_ACTION_RESULT_JSON",
+      "package_schema": ".adwf/schemas/ai-work-package.schema.json",
+      "result_schema": ".adwf/schemas/ai-work-result.schema.json",
+      "qualification_report": ".adwf/creative-agent-qualification-openhands-local.json",
+      "qualification_profile_id": "CREATIVE_AGENT_COMMAND_V1",
+      "qualification_profile_version": 1,
+      "qualification_profile_digest": "426dee8fd5063bb8f408d6ec3ab26e7c67d9c4a2e8d91b09174cb407bd515af8"
     }
   ],
-  "registry_sha256": "8471ce14fb7674ef5ab251132a23b9164c325e4bc53f3c32725c0fd8e703ad35"
+  "registry_sha256": "559cbe6322850f6d45347f7c9f87be20b03c6ed3966ffb444cec98d2bff4b83b"
 }
