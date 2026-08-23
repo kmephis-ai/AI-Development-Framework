@@ -1,0 +1,106 @@
+name: OPENHANDS-001 Projection Export a1
+
+on:
+  push:
+    branches:
+      - agent/projection-export-openhands-001-20260823-a1
+
+permissions:
+  contents: write
+
+env:
+  PYTHONDONTWRITEBYTECODE: "1"
+  SOURCE_SHA: 81c5d51ee6f77c41cc9c5d2b4e65a341d1df7a6b
+  SOURCE_BRANCH: adwf/openhands-001-a1
+
+jobs:
+  export-projections:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd
+        with:
+          fetch-depth: 0
+          persist-credentials: true
+      - uses: actions/setup-python@a309ff8b426b58ec0e2a45f0f869d46889d02405
+        with:
+          python-version: "3.12.10"
+      - name: Materialize exact source in detached worktree
+        shell: bash
+        run: |
+          set -euo pipefail
+          git cat-file -e "${SOURCE_SHA}^{commit}"
+          rm -rf /tmp/adwf-source
+          git worktree add --detach /tmp/adwf-source "${SOURCE_SHA}"
+          test "$(git -C /tmp/adwf-source rev-parse HEAD)" = "${SOURCE_SHA}"
+          test -z "$(git -C /tmp/adwf-source status --porcelain --untracked-files=all)"
+      - name: Generate and validate exact-source candidate
+        shell: bash
+        run: |
+          set -euo pipefail
+          cd /tmp/adwf-source
+          python .adwf/adwf.py provider-check --input .adwf/requests/github-public-standard.json
+          python .adwf/scripts/docs_freshness.py --write
+          python .adwf/scripts/generate_manifest.py
+          python .adwf/scripts/docs_freshness.py
+          python .adwf/scripts/generate_manifest.py --check
+          python .adwf/scripts/validate_framework.py
+          python .adwf/scripts/validate_pipeline_ir.py
+          python .adwf/adwf.py doctor --scope package_integrity
+          python .adwf/adwf.py doctor --scope config_health
+          python .adwf/adwf.py self-test
+          python .adwf/scripts/validate_docs.py
+      - name: Guard generated-only exact-source diff
+        shell: python
+        run: |
+          from pathlib import Path
+          import json, os, subprocess, hashlib
+          source = Path('/tmp/adwf-source')
+          allowed = {'.adwf/docs-registry.json', 'MANIFEST.json', 'SHA256SUMS.txt'}
+          rows = subprocess.run(['git','status','--porcelain=v1','--untracked-files=all'], cwd=source, text=True, capture_output=True, check=True).stdout.splitlines()
+          changed = []
+          for row in rows:
+              if not row.strip():
+                  continue
+              path = row[3:]
+              if ' -> ' in path:
+                  path = path.split(' -> ',1)[1]
+              changed.append(path)
+          changed_set = set(changed)
+          if not changed_set or not changed_set.issubset(allowed):
+              raise SystemExit('PROJECTION_EXPORT_DIFF_UNEXPECTED:' + ','.join(sorted(changed_set)))
+          if 'MANIFEST.json' not in changed_set or 'SHA256SUMS.txt' not in changed_set:
+              raise SystemExit('PROJECTION_EXPORT_REQUIRED_FILES_MISSING')
+          out = Path('projection-output')
+          if out.exists():
+              import shutil; shutil.rmtree(out)
+          out.mkdir(parents=True)
+          mappings = {
+              '.adwf/docs-registry.json': 'docs-registry.json',
+              'MANIFEST.json': 'MANIFEST.json',
+              'SHA256SUMS.txt': 'SHA256SUMS.txt',
+          }
+          digests = {}
+          for rel, name in mappings.items():
+              raw = (source / rel).read_bytes()
+              (out / name).write_bytes(raw)
+              digests[name] = hashlib.sha256(raw).hexdigest()
+          meta = {
+              'schema_version': 1,
+              'source_branch': os.environ['SOURCE_BRANCH'],
+              'source_sha': os.environ['SOURCE_SHA'],
+              'generated_changed_paths': sorted(changed_set),
+              'sha256': digests,
+              'validation': 'PASS',
+          }
+          (out / 'meta.json').write_text(json.dumps(meta, ensure_ascii=False, sort_keys=True, indent=2) + '\n', encoding='utf-8')
+          print(json.dumps(meta, sort_keys=True))
+      - name: Publish projections to disposable support branch
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add projection-output
+          git commit -m "chore: publish OPENHANDS-001 exact-head projections [projection-output]"
+          git push origin HEAD:${GITHUB_REF_NAME}
