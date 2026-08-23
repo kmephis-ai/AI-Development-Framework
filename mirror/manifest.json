@@ -1,0 +1,12 @@
+{
+  "schema_version": 1,
+  "source_repository": "kmephis-ai/AI-Development-Framework",
+  "source_branch": "adwf/openhands-001-a1",
+  "source_sha": "81c5d51ee6f77c41cc9c5d2b4e65a341d1df7a6b",
+  "transport_sha": "08c0079aaea012287d45a7de6c82424890ad4fe8",
+  "bundle_sha256": "ce55b8d605b044c176e3f78aa726c5a3c42d855a223617660d9a09de25dfd63f",
+  "bundle_bytes": 1601092,
+  "chunk_bytes": 45000,
+  "parts": 48,
+  "bundle_ref": "refs/heads/adwf-source"
+}
