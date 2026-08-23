@@ -1,0 +1,77 @@
+name: OPENHANDS-001 Security Diagnose a2
+
+on:
+  push:
+    branches:
+      - helper/OPENHANDS-001-security-diagnose-a1
+    paths:
+      - .adwf-run-probe-trigger-a2
+
+permissions:
+  actions: read
+  contents: write
+
+jobs:
+  probe:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd
+        with:
+          persist-credentials: true
+          fetch-depth: 1
+      - name: Read exact security repair a2 run metadata
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        shell: python
+        run: |
+          import json, os, urllib.parse, urllib.request
+          repo = os.environ['GITHUB_REPOSITORY']
+          target_branch = 'helper/OPENHANDS-001-security-fix-a2'
+          query = urllib.parse.urlencode({'branch': target_branch, 'per_page': 20})
+          req = urllib.request.Request(
+              f'https://api.github.com/repos/{repo}/actions/runs?{query}',
+              headers={
+                  'Authorization': 'Bearer ' + os.environ['GITHUB_TOKEN'],
+                  'Accept': 'application/vnd.github+json',
+                  'X-GitHub-Api-Version': '2022-11-28',
+                  'User-Agent': 'adwf-actions-probe',
+              },
+          )
+          with urllib.request.urlopen(req, timeout=30) as response:
+              payload = json.load(response)
+          matches = [
+              item for item in payload.get('workflow_runs') or []
+              if item.get('name') == 'OPENHANDS-001 Security Fix a2'
+              and item.get('head_branch') == target_branch
+          ]
+          if not matches:
+              raise SystemExit('SECURITY_FIX_A2_RUN_NOT_FOUND')
+          item = sorted(matches, key=lambda value: int(value.get('id') or 0))[-1]
+          proof = {
+              'schema_version': 1,
+              'status': 'PASS',
+              'run_id': item.get('id'),
+              'name': item.get('name'),
+              'event': item.get('event'),
+              'run_status': item.get('status'),
+              'conclusion': item.get('conclusion'),
+              'head_branch': item.get('head_branch'),
+              'head_sha': item.get('head_sha'),
+              'created_at': item.get('created_at'),
+              'run_started_at': item.get('run_started_at'),
+              'updated_at': item.get('updated_at'),
+              'html_url': item.get('html_url'),
+          }
+          with open('security-fix-a2-run-probe.json', 'w', encoding='utf-8') as handle:
+              json.dump(proof, handle, ensure_ascii=False, sort_keys=True, indent=2)
+              handle.write('\n')
+          print(json.dumps(proof, sort_keys=True))
+      - name: Publish probe result on disposable support branch
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add security-fix-a2-run-probe.json
+          git commit -m "chore: publish OPENHANDS security repair a2 run probe"
+          git push origin HEAD:${GITHUB_REF_NAME}
