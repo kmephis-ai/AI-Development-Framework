@@ -1,0 +1,381 @@
+name: OPENHANDS-001 Security Fix a1
+
+on:
+  push:
+    branches:
+      - helper/OPENHANDS-001-security-fix-a1
+
+permissions:
+  contents: write
+  issues: read
+  pull-requests: read
+
+env:
+  PYTHONDONTWRITEBYTECODE: "1"
+
+concurrency:
+  group: adwf-control-${{ github.repository }}
+  cancel-in-progress: false
+
+jobs:
+  repair-openhands-source:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - name: Checkout disposable support branch
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd
+        with:
+          fetch-depth: 1
+          persist-credentials: false
+          path: support
+      - name: Checkout exact trusted main
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd
+        with:
+          ref: 0c20ee50ac50e36422c93a32fca151b411bc8b95
+          fetch-depth: 2
+          persist-credentials: false
+          path: trusted
+      - name: Checkout leased source candidate without credentials
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd
+        with:
+          ref: adwf/openhands-001-a1
+          fetch-depth: 0
+          persist-credentials: false
+          path: source
+      - uses: actions/setup-python@a309ff8b426b58ec0e2a45f0f869d46889d02405
+        with:
+          python-version: "3.12.10"
+
+      - name: Verify repair authority and heartbeat exact writer lease
+        working-directory: trusted
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        shell: python
+        run: |
+          from pathlib import Path
+          import json, os, re, sys
+
+          root = Path.cwd()
+          sys.path.insert(0, str(root / '.adwf'))
+          from lib.assurance_builder import build_assurance_snapshot
+          from lib.cost_guard import evaluate_provider
+          from lib.github_lease_store import GitHubLeaseStore
+          from lib.github_provider import GitHubClient
+          from lib.github_rulesets import verify_rulesets, verify_runtime_anchor_ruleset
+          from lib.health import doctor
+          from lib.lease_registry import _registry_lease_freshness_errors
+          from lib.leases import utc_now
+          from lib.policy_runtime import evaluate_with_effective_policy
+          from lib.strict_json import loads as strict_loads
+          from lib.trusted_context import compile_trusted_context
+
+          repo = os.environ['GITHUB_REPOSITORY']
+          token = os.environ['GITHUB_TOKEN']
+          expected_main = '0c20ee50ac50e36422c93a32fca151b411bc8b95'
+          expected_source = '81c5d51ee6f77c41cc9c5d2b4e65a341d1df7a6b'
+          source_branch = 'adwf/openhands-001-a1'
+          issue_id = '268'
+          roadmap_id = 'OPENHANDS-001'
+          worker_id = 'adwf-runtime:openhands-001-source-a1'
+          lease_id = 'a241d6e8-c4b6-4e8a-a178-a8d04098e1da'
+          resources = [{'kind': 'provider', 'scope': 'global', 'shared': True, 'global': True}]
+
+          cfg = strict_loads((root / '.adwf/config.json').read_text(encoding='utf-8'))
+          policy = cfg.get('policy') or {}
+          orch = cfg.get('orchestration') or {}
+          cost = cfg.get('cost') or {}
+          if policy.get('fail_mode') != 'CLOSED' or policy.get('active_autonomy') != 'A2' or policy.get('max_autonomous_risk') != 'R1':
+              raise SystemExit('SECURITY_FIX_POLICY_DRIFT')
+          if orch.get('max_parallel_writers') != 1 or cost.get('mode') != 'FREE_ONLY' or cost.get('monetary_budget') != 0:
+              raise SystemExit('SECURITY_FIX_GOVERNANCE_DRIFT')
+          ttl_minutes = int(orch.get('lease_ttl_minutes') or 120)
+          if ttl_minutes != 120:
+              raise SystemExit('SECURITY_FIX_TTL_DRIFT')
+
+          client = GitHubClient(repo, token)
+          store = GitHubLeaseStore(client)
+
+          def current_main():
+              value = str((client.branch('main').get('commit') or {}).get('sha') or '')
+              if re.fullmatch(r'[0-9a-f]{40}', value) is None:
+                  raise SystemExit('SECURITY_FIX_MAIN_INVALID')
+              return value
+
+          def current_source():
+              value = str((client.branch(source_branch).get('commit') or {}).get('sha') or '')
+              if re.fullmatch(r'[0-9a-f]{40}', value) is None:
+                  raise SystemExit('SECURITY_FIX_SOURCE_INVALID')
+              return value
+
+          def verify_rules():
+              rows = client.rulesets()
+              if verify_rulesets(rows, expected_integration_id=15368).get('readback_verified') is not True:
+                  raise SystemExit('SECURITY_FIX_MAIN_RULESET_NOT_VERIFIED')
+              if verify_runtime_anchor_ruleset(rows).get('readback_verified') is not True:
+                  raise SystemExit('SECURITY_FIX_ANCHOR_RULESET_NOT_VERIFIED')
+              named = {str(x.get('name') or ''): x for x in rows}
+              for name in ('ADWF protected main', 'ADWF immutable runtime anchors'):
+                  rs = named.get(name) or {}
+                  if rs.get('enforcement') != 'active' or (rs.get('bypass_actors') or []) != []:
+                      raise SystemExit('SECURITY_FIX_RULESET_DRIFT:' + name)
+                  if rs.get('current_user_can_bypass') not in (None, 'never', False):
+                      raise SystemExit('SECURITY_FIX_BYPASS_DRIFT:' + name)
+
+          def authorize_repair():
+              providers = strict_loads((root / '.adwf/providers.json').read_text(encoding='utf-8'))
+              capability = str(cost.get('default_ci_capability') or '')
+              cost_decision = evaluate_provider(
+                  providers,
+                  {
+                      'provider': capability,
+                      'mandatory_ci': True,
+                      'automated': True,
+                      'projected_cost': 0,
+                      'projected_units': 0,
+                      'repository_visibility': 'PUBLIC',
+                      'runner_class': 'standard',
+                  },
+                  canonical_provider='github',
+              )
+              if cost_decision.get('result') != 'ALLOW' or float(cost_decision.get('projected_cost_usd') or 0) != 0:
+                  raise SystemExit('SECURITY_FIX_COST_NOT_ALLOWED')
+              categories = doctor(root).get('categories') or {}
+              assurance = build_assurance_snapshot(
+                  root,
+                  subject_sha=expected_main,
+                  health={
+                      'package_integrity': str((categories.get('package_integrity') or {}).get('status') or 'NOT_VERIFIED'),
+                      'config_health': str((categories.get('config_health') or {}).get('status') or 'NOT_VERIFIED'),
+                      'control_plane_health': 'HEALTHY',
+                      'product_health': 'NOT_VERIFIED',
+                  },
+                  gates={}, required_gates=[], evidence_records=[], evidence_refs=[],
+                  provider_readback={
+                      'provider': 'github', 'subject_sha': expected_main,
+                      'repository_visibility': 'PUBLIC', 'runner': 'NOT_VERIFIED',
+                      'larger_runner': False, 'facts_readback_verified': True,
+                      'readback_verified': True, 'purpose': 'OPENHANDS_SECURITY_REPAIR',
+                  },
+                  cost=cost_decision, ttl_minutes=5,
+              )
+              context = compile_trusted_context(
+                  root, action='repair', risk='R1', work_type='recovery',
+                  request={
+                      'request_id': 'openhands-001:security-fix:' + expected_source,
+                      'subject_sha': expected_main,
+                      'preview_digest': None,
+                  },
+                  assurance_snapshot=assurance,
+                  provider_readback=assurance['provider'],
+              )
+              decision = evaluate_with_effective_policy(root, context)
+              if decision.result != 'ALLOW':
+                  raise SystemExit('SECURITY_FIX_REPAIR_NOT_ALLOWED:' + decision.result + ':' + ','.join(decision.reason_codes))
+
+          if current_main() != expected_main or current_source() != expected_source:
+              raise SystemExit('SECURITY_FIX_PROVIDER_REF_DRIFT')
+          verify_rules()
+          issue = client.get(f'/repos/{repo}/issues/{issue_id}')
+          if issue.get('state') != 'open' or roadmap_id not in str(issue.get('title') or ''):
+              raise SystemExit('SECURITY_FIX_ISSUE_DRIFT')
+          pr = client.pull(270)
+          if pr.get('state') != 'open' or pr.get('draft') is not True:
+              raise SystemExit('SECURITY_FIX_PR_STATE_DRIFT')
+          if str((pr.get('base') or {}).get('sha') or '') != expected_main or str((pr.get('head') or {}).get('sha') or '') != expected_source:
+              raise SystemExit('SECURITY_FIX_PR_IDENTITY_DRIFT')
+          open_prs = [p for p in client.pulls() if p.get('state') == 'open']
+          if len(open_prs) != 1 or int(open_prs[0].get('number') or 0) != 270:
+              raise SystemExit('SECURITY_FIX_OPEN_PR_CONFLICT')
+
+          registry, before_anchor = store.read(expected_main_sha=expected_main, policy_max_parallel_writers=1)
+          if registry.get('revision') != 27:
+              raise SystemExit('SECURITY_FIX_LEASE_REVISION_DRIFT')
+          active = [x for x in registry.get('leases') or [] if x.get('status') == 'ACTIVE']
+          if len(active) != 1:
+              raise SystemExit('SECURITY_FIX_ACTIVE_WRITER_COUNT_MISMATCH')
+          lease = active[0]
+          expected_identity = {
+              'lease_id': lease_id, 'issue_id': issue_id, 'roadmap_id': roadmap_id,
+              'worker_id': worker_id, 'branch': source_branch, 'base_sha': expected_main,
+          }
+          for key, value in expected_identity.items():
+              if str(lease.get(key) or '') != value:
+                  raise SystemExit('SECURITY_FIX_LEASE_IDENTITY_DRIFT:' + key)
+          if lease.get('resources') != resources:
+              raise SystemExit('SECURITY_FIX_RESOURCE_DRIFT')
+          freshness = _registry_lease_freshness_errors(lease, utc_now())
+          if freshness:
+              raise SystemExit('SECURITY_FIX_LEASE_NOT_FRESH:' + ','.join(freshness))
+
+          authorize_repair()
+          heartbeat, heartbeat_anchor = store.heartbeat(
+              expected_main_sha=expected_main,
+              policy_max_parallel_writers=1,
+              lease_id=lease_id,
+              worker_id=worker_id,
+              ttl_minutes=ttl_minutes,
+          )
+          final, final_anchor = store.read(expected_main_sha=expected_main, policy_max_parallel_writers=1)
+          active = [x for x in final.get('leases') or [] if x.get('status') == 'ACTIVE']
+          if heartbeat.get('revision') != 28 or final.get('revision') != 28 or final_anchor != heartbeat_anchor or heartbeat_anchor == before_anchor:
+              raise SystemExit('SECURITY_FIX_HEARTBEAT_READBACK_MISMATCH')
+          if len(active) != 1 or str(active[0].get('lease_id') or '') != lease_id:
+              raise SystemExit('SECURITY_FIX_HEARTBEAT_ACTIVE_MISMATCH')
+          if current_main() != expected_main or current_source() != expected_source:
+              raise SystemExit('SECURITY_FIX_POST_HEARTBEAT_REF_DRIFT')
+          verify_rules()
+          print('OPENHANDS_SECURITY_AUTHORITY=PASS')
+          print('LEASE_REVISION=28')
+          print('LEASE_ANCHOR=' + heartbeat_anchor)
+
+      - name: Apply bounded-tool repair without provider credentials
+        working-directory: source
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "81c5d51ee6f77c41cc9c5d2b4e65a341d1df7a6b"
+          python ../support/repair_openhands_security.py --source . --trusted ../trusted
+          python .adwf/tests/test_openhands_agent_adapter.py
+          python .adwf/adwf.py provider-check --input .adwf/requests/github-public-standard.json
+          python .adwf/scripts/docs_freshness.py --write
+          python .adwf/scripts/generate_manifest.py
+          python .adwf/scripts/docs_freshness.py
+          python .adwf/scripts/generate_manifest.py --check
+          python .adwf/scripts/validate_framework.py
+          python .adwf/scripts/validate_pipeline_ir.py
+          python .adwf/adwf.py doctor --scope package_integrity
+          python .adwf/adwf.py doctor --scope config_health
+          python .adwf/adwf.py self-test
+          python .adwf/scripts/validate_docs.py
+
+      - name: Guard exact candidate diff and provider authority before push
+        working-directory: trusted
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        shell: python
+        run: |
+          from pathlib import Path
+          import os, subprocess, sys
+          root = Path.cwd()
+          source = root.parent / 'source'
+          sys.path.insert(0, str(root / '.adwf'))
+          from lib.github_lease_store import GitHubLeaseStore
+          from lib.github_provider import GitHubClient
+          from lib.github_rulesets import verify_rulesets, verify_runtime_anchor_ruleset
+          from lib.lease_registry import _registry_lease_freshness_errors
+          from lib.leases import utc_now
+
+          repo = os.environ['GITHUB_REPOSITORY']
+          expected_main = '0c20ee50ac50e36422c93a32fca151b411bc8b95'
+          expected_source = '81c5d51ee6f77c41cc9c5d2b4e65a341d1df7a6b'
+          source_branch = 'adwf/openhands-001-a1'
+          lease_id = 'a241d6e8-c4b6-4e8a-a178-a8d04098e1da'
+          worker_id = 'adwf-runtime:openhands-001-source-a1'
+          allowed = {
+              '.adwf/scripts/openhands_agent_adapter.py',
+              '.adwf/tests/test_openhands_agent_adapter.py',
+              '.adwf/creative-agent-adapters.json',
+              '.adwf/creative-agent-qualification-openhands-local.json',
+              '.adwf/docs-registry.json',
+              'MANIFEST.json',
+              'SHA256SUMS.txt',
+          }
+          status = subprocess.run(['git', 'status', '--porcelain=v1', '--untracked-files=all'], cwd=source, text=True, capture_output=True, check=True).stdout.splitlines()
+          changed = set()
+          for row in status:
+              if not row.strip():
+                  continue
+              path = row[3:]
+              if ' -> ' in path:
+                  path = path.split(' -> ', 1)[1]
+              changed.add(path)
+          required = {
+              '.adwf/scripts/openhands_agent_adapter.py',
+              '.adwf/tests/test_openhands_agent_adapter.py',
+              '.adwf/creative-agent-adapters.json',
+              '.adwf/creative-agent-qualification-openhands-local.json',
+              'MANIFEST.json',
+              'SHA256SUMS.txt',
+          }
+          if not required.issubset(changed) or not changed.issubset(allowed):
+              raise SystemExit('SECURITY_FIX_DIFF_SCOPE_INVALID:' + ','.join(sorted(changed)))
+
+          client = GitHubClient(repo, os.environ['GITHUB_TOKEN'])
+          store = GitHubLeaseStore(client)
+          main = str((client.branch('main').get('commit') or {}).get('sha') or '')
+          source_sha = str((client.branch(source_branch).get('commit') or {}).get('sha') or '')
+          if main != expected_main or source_sha != expected_source:
+              raise SystemExit('SECURITY_FIX_PREPUSH_REF_DRIFT')
+          rows = client.rulesets()
+          if verify_rulesets(rows, expected_integration_id=15368).get('readback_verified') is not True or verify_runtime_anchor_ruleset(rows).get('readback_verified') is not True:
+              raise SystemExit('SECURITY_FIX_PREPUSH_RULESET_NOT_VERIFIED')
+          registry, _ = store.read(expected_main_sha=expected_main, policy_max_parallel_writers=1)
+          if registry.get('revision') != 28:
+              raise SystemExit('SECURITY_FIX_PREPUSH_LEASE_REVISION_DRIFT')
+          active = [x for x in registry.get('leases') or [] if x.get('status') == 'ACTIVE']
+          if len(active) != 1 or str(active[0].get('lease_id') or '') != lease_id or str(active[0].get('worker_id') or '') != worker_id:
+              raise SystemExit('SECURITY_FIX_PREPUSH_LEASE_DRIFT')
+          freshness = _registry_lease_freshness_errors(active[0], utc_now())
+          if freshness:
+              raise SystemExit('SECURITY_FIX_PREPUSH_LEASE_STALE:' + ','.join(freshness))
+          print('OPENHANDS_SECURITY_DIFF_GUARD=PASS')
+          print('CHANGED_PATHS=' + ','.join(sorted(changed)))
+
+      - name: Commit repaired exact candidate
+        working-directory: source
+        run: |
+          set -euo pipefail
+          git config user.name "adwf-runtime"
+          git config user.email "adwf-runtime@users.noreply.github.com"
+          git add -- .adwf/scripts/openhands_agent_adapter.py .adwf/tests/test_openhands_agent_adapter.py .adwf/creative-agent-adapters.json .adwf/creative-agent-qualification-openhands-local.json .adwf/docs-registry.json MANIFEST.json SHA256SUMS.txt
+          git commit -m "[OPENHANDS-001] Enforce pre-effect filesystem confinement"
+          echo "REPAIRED_HEAD=$(git rev-parse HEAD)" >> "$GITHUB_ENV"
+
+      - name: Push exact repaired candidate using provider token only after PASS
+        working-directory: source
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          git remote set-url origin "https://x-access-token:${GITHUB_TOKEN}@github.com/${GITHUB_REPOSITORY}.git"
+          git push origin HEAD:refs/heads/adwf/openhands-001-a1
+          git remote set-url origin "https://github.com/${GITHUB_REPOSITORY}.git"
+
+      - name: Verify exact source and PR readback
+        working-directory: trusted
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        shell: python
+        run: |
+          import os, re, sys, time
+          from pathlib import Path
+          root = Path.cwd()
+          sys.path.insert(0, str(root / '.adwf'))
+          from lib.github_provider import GitHubClient
+          from lib.github_rulesets import verify_rulesets, verify_runtime_anchor_ruleset
+
+          repo = os.environ['GITHUB_REPOSITORY']
+          head = os.environ['REPAIRED_HEAD']
+          expected_main = '0c20ee50ac50e36422c93a32fca151b411bc8b95'
+          if re.fullmatch(r'[0-9a-f]{40}', head) is None:
+              raise SystemExit('SECURITY_FIX_NEW_HEAD_INVALID')
+          client = GitHubClient(repo, os.environ['GITHUB_TOKEN'])
+          actual = str((client.branch('adwf/openhands-001-a1').get('commit') or {}).get('sha') or '')
+          if actual != head:
+              raise SystemExit('SECURITY_FIX_PUSH_READBACK_MISMATCH')
+          matched = False
+          for _ in range(8):
+              pr = client.pull(270)
+              if str((pr.get('head') or {}).get('sha') or '') == head:
+                  matched = True
+                  break
+              time.sleep(2)
+          if not matched:
+              raise SystemExit('SECURITY_FIX_PR_HEAD_READBACK_MISMATCH')
+          main = str((client.branch('main').get('commit') or {}).get('sha') or '')
+          if main != expected_main:
+              raise SystemExit('SECURITY_FIX_FINAL_MAIN_DRIFT')
+          rows = client.rulesets()
+          if verify_rulesets(rows, expected_integration_id=15368).get('readback_verified') is not True or verify_runtime_anchor_ruleset(rows).get('readback_verified') is not True:
+              raise SystemExit('SECURITY_FIX_FINAL_RULESET_NOT_VERIFIED')
+          print('OPENHANDS_SECURITY_FIX=PASS')
+          print('REPAIRED_HEAD=' + head)
