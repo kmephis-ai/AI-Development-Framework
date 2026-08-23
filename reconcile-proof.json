@@ -1,0 +1,21 @@
+{
+  "active_anchor": "2ee6a4a42624dd1a6102e38f3afee6f287695a9d",
+  "active_revision": 25,
+  "cost_usd": 0,
+  "issue_id": "268",
+  "main_sha": "0c20ee50ac50e36422c93a32fca151b411bc8b95",
+  "new_lease_id": "234beabb-3d15-446e-b9f9-8297f80e0089",
+  "old_freshness_findings": [
+    "LEASE_HEARTBEAT_STALE"
+  ],
+  "old_lease_id": "9f93daa9-2860-4e65-b189-3147ce8e2a6d",
+  "policy": "ALLOW",
+  "release_anchor": "50228ca363eb8b3bdc0adc248935294396c0c281",
+  "released_revision": 24,
+  "roadmap_id": "OPENHANDS-001",
+  "schema_version": 1,
+  "source_branch": "adwf/openhands-001-a1",
+  "source_sha": "81c5d51ee6f77c41cc9c5d2b4e65a341d1df7a6b",
+  "status": "PASS",
+  "worker_id": "adwf-runtime:openhands-001-source-a1"
+}
