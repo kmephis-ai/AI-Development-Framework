@@ -1,0 +1,29 @@
+{
+  "adwf_main_run_id": 32635409647,
+  "cost_usd": 0,
+  "implementation_state": "MERGED_POSTMERGE_VERIFIED",
+  "issue_number": 268,
+  "issue_state": "open",
+  "lease_anchor_after": "a6c267c805b6ca345b5397bc23ff0ebc30052b05",
+  "lease_anchor_before": "229b272f1852f6282a3a9b65f73ee984cd4e5fa8",
+  "lease_id": "a241d6e8-c4b6-4e8a-a178-a8d04098e1da",
+  "lease_revision_after": 31,
+  "lease_revision_before": 30,
+  "live_verification_state": "NOT_VERIFIED",
+  "main_sha": "7acae3307303d8fc38eaf314156ca9a50f2c1ce3",
+  "main_tree_sha": "4d727752ac7e4cfe471c31b0733cc4d65ef52dc9",
+  "parent_sha": "0c20ee50ac50e36422c93a32fca151b411bc8b95",
+  "platform_smoke_run_id": 32635409568,
+  "pr_number": 270,
+  "provider_reconciliation_ref": "github:commit:7acae3307303d8fc38eaf314156ca9a50f2c1ce3",
+  "remaining_blocker": "REAL_OPENHANDS_EXECUTION_EVIDENCE_REQUIRED",
+  "roadmap_id": "OPENHANDS-001",
+  "rulesets": "VERIFIED_NO_BYPASS",
+  "schema_version": 1,
+  "smoke_jobs_verified": [
+    "smoke (ubuntu-24.04)",
+    "smoke (windows-2022)"
+  ],
+  "source_head_sha": "949f3a484a0c35953143690bd159c2a2a04fd160",
+  "status": "PASS"
+}
