@@ -109,6 +109,22 @@ def package_integrity(root: Path) -> dict[str, Any]:
     return _category("VERIFIED" if not findings else "BROKEN", findings)
 
 
+def trust_boot_integrity(root: Path) -> dict[str, Any]:
+    """Verify only trust-critical static prerequisites needed to evaluate a repair PR.
+
+    This scope deliberately excludes candidate-repairable repository health such as
+    documentation freshness. The trusted controller already verifies provider/cost,
+    Pipeline IR and package integrity before invoking this check; compiled policy
+    validation supplies the remaining fail-closed policy/config/trust invariants.
+    """
+    findings: list[str] = []
+    try:
+        findings.extend(check_compiled_policy(root))
+    except (OSError, ValueError, json.JSONDecodeError) as exc:
+        findings.append(f"TRUST_BOOT_UNREADABLE:{type(exc).__name__}")
+    return _category("VERIFIED" if not findings else "BROKEN", findings)
+
+
 def config_health(root: Path) -> dict[str, Any]:
     findings: list[str] = []
     try:
@@ -274,6 +290,7 @@ def doctor(root: str | Path, *, scope: str = "all") -> dict[str, Any]:
     base = Path(root).resolve()
     categories = {
         "package_integrity": package_integrity(base),
+        "trust_boot_integrity": trust_boot_integrity(base),
         "config_health": config_health(base),
         "control_plane_health": control_plane_health(base),
         "product_health": product_health(base),

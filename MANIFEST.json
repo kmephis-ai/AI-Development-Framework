@@ -3,8 +3,8 @@
   "version": "1.6.0",
   "schema_version": 3,
   "scope": "FRAMEWORK_OWNED_TRUST_BOUNDARY",
-  "file_count_excluding_manifests": 577,
-  "total_bytes_excluding_manifests": 3128170,
+  "file_count_excluding_manifests": 578,
+  "total_bytes_excluding_manifests": 3131318,
   "files": [
     ".adwf/SETUP_CHECKLIST.md",
     ".adwf/actions-lock.json",
@@ -369,6 +369,7 @@
     ".adwf/tests/test_github_metrics_collector.py",
     ".adwf/tests/test_github_readback_recent_runs.py",
     ".adwf/tests/test_gitlab_adapter.py",
+    ".adwf/tests/test_gov031_trust_boot_integrity.py",
     ".adwf/tests/test_healing.py",
     ".adwf/tests/test_health.py",
     ".adwf/tests/test_incidents.py",

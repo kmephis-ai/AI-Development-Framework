@@ -761,7 +761,7 @@ def main() -> int:
     p = sub.add_parser("portfolio-view"); p.add_argument("--register")
     p = sub.add_parser("release-plan"); p.add_argument("--input", required=True)
     p = sub.add_parser("release"); p.add_argument("--auto",action="store_true"); p.add_argument("--input"); p.add_argument("--prepare",action="store_true"); p.add_argument("--confirm",action="store_true"); p.add_argument("--external",action="store_true"); p.add_argument("--publish-github",action="store_true"); p.add_argument("--output",default="dist")
-    p = sub.add_parser("doctor"); p.add_argument("--scope", choices=["all", "package_integrity", "config_health", "control_plane_health", "product_health"], default="all"); p.add_argument("--json", action="store_true")
+    p = sub.add_parser("doctor"); p.add_argument("--scope", choices=["all", "package_integrity", "trust_boot_integrity", "config_health", "control_plane_health", "product_health"], default="all"); p.add_argument("--json", action="store_true")
     p = sub.add_parser("status"); p.add_argument("--input")
     p = sub.add_parser("validate"); p.add_argument("--input", required=True); p.add_argument("--schema", required=True)
     p = sub.add_parser("issue-audit"); p.add_argument("--input", required=True)

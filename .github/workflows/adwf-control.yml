@@ -72,7 +72,7 @@ jobs:
           python .adwf/adwf.py provider-check --input .adwf/requests/github-public-standard.json
           python .adwf/scripts/validate_pipeline_ir.py
           python .adwf/adwf.py doctor --scope package_integrity
-          python .adwf/adwf.py doctor --scope config_health
+          python .adwf/adwf.py doctor --scope trust_boot_integrity
       - name: Restore public-safe durable checkpoint
         env:
           GITHUB_TOKEN: ${{ github.token }}
