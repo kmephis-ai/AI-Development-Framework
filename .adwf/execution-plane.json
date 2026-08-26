@@ -1,0 +1,52 @@
+{
+  "$schema": ".adwf/schemas/execution-plane.schema.json",
+  "schema_version": 1,
+  "role": "EXECUTION_PLANE_POLICY",
+  "ci": {
+    "authority": "GITHUB_HOSTED_ONLY",
+    "provider": "GITHUB_ACTIONS",
+    "approved_runners": [
+      "ubuntu-24.04",
+      "windows-2022"
+    ],
+    "self_hosted_runners": "FORBIDDEN",
+    "owner_workstation_ci_authority": "NONE",
+    "required_checks_source": "GITHUB_ACTIONS_ONLY"
+  },
+  "reproducible_evidence": {
+    "execution_plane": "GITHUB_HOSTED",
+    "classes": [
+      "STATIC_ANALYSIS",
+      "UNIT_TEST",
+      "REPRODUCIBLE_INTEGRATION",
+      "SCHEMA_VALIDATION",
+      "DOCS_VALIDATION",
+      "BUILD",
+      "PACKAGE_INTEGRITY",
+      "SECURITY_SCAN",
+      "PLATFORM_SMOKE",
+      "GOVERNANCE_GATE",
+      "TRUSTED_GATE"
+    ]
+  },
+  "private_execution_node": {
+    "role": "RUNTIME_EXECUTION_NODE_ONLY",
+    "ci_authority": "NONE",
+    "required_for_ci": false,
+    "registration_with_public_repository": "FORBIDDEN",
+    "mandatory_availability": false,
+    "allowed_evidence_classes": [
+      "PRIVATE_NETWORK",
+      "LOCAL_CREDENTIAL_STORE",
+      "OS_INTEGRATION",
+      "GUI_RUNTIME",
+      "PHYSICAL_DEVICE",
+      "PRIVATE_SERVICE_ENDPOINT"
+    ],
+    "runtime_status_without_execution": "NOT_VERIFIED"
+  },
+  "safety": {
+    "monetary_budget_usd": 0,
+    "private_runtime_secrets_in_ci": "FORBIDDEN"
+  }
+}
