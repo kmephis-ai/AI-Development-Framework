@@ -35,6 +35,8 @@ Detection is data-driven from the validated definition. v1 permits exactly one p
 
 `ASREF-001` adds canonical `apps-script` before generic `node`: an `appsscript.json` marker wins even when the data-centric project also has `package.json`. The built-in Apps Script definition is stricter than the generic schema: `network=NONE`, no `install`, no `start` and no preview runtime. Its mandatory reference path therefore does not require `clasp`, Google credentials or deployment.
 
+The built-in `powershell` pack uses the explicit repository marker `.adwf-powershell.json`; it does not infer PowerShell ownership from arbitrary `.ps1` files. Its initial authority is deliberately minimal: `network=NONE`, no install/start command and no preview runtime. Consumer-native CI and physical runtime gates remain outside the generic pack and must provide their own evidence.
+
 ## Command contract
 
 Allowed capability names are bounded to:
