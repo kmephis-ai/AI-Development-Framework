@@ -1,0 +1,178 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "ADWF External Thin Consumer Binding v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "$schema",
+    "schema_version",
+    "role",
+    "framework",
+    "consumer",
+    "project_pack",
+    "native_gates",
+    "safety",
+    "mutation_authority",
+    "binding_sha256"
+  ],
+  "properties": {
+    "$schema": {
+      "const": ".adwf/schemas/external-consumer-binding.schema.json"
+    },
+    "schema_version": {
+      "const": 1
+    },
+    "role": {
+      "const": "EXTERNAL_CONSUMER_BINDING"
+    },
+    "framework": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "repository",
+        "source_sha"
+      ],
+      "properties": {
+        "repository": {
+          "type": "string",
+          "pattern": "^[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+$"
+        },
+        "source_sha": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{40}$"
+        }
+      }
+    },
+    "consumer": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "repository",
+        "default_branch"
+      ],
+      "properties": {
+        "repository": {
+          "type": "string",
+          "pattern": "^[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+$"
+        },
+        "default_branch": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9._/-]*$"
+        }
+      }
+    },
+    "project_pack": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "digest"
+      ],
+      "properties": {
+        "id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 64,
+          "pattern": "^[a-z0-9][a-z0-9-]*$"
+        },
+        "digest": {
+          "type": "string",
+          "format": "sha256"
+        }
+      }
+    },
+    "native_gates": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "pr",
+        "main"
+      ],
+      "properties": {
+        "pr": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 32,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "check_name",
+              "app_slug",
+              "app_id"
+            ],
+            "properties": {
+              "check_name": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 128
+              },
+              "app_slug": {
+                "type": "string",
+                "pattern": "^[a-z0-9-]+$"
+              },
+              "app_id": {
+                "type": "integer",
+                "minimum": 1
+              }
+            }
+          }
+        },
+        "main": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 32,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "check_name",
+              "app_slug",
+              "app_id"
+            ],
+            "properties": {
+              "check_name": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 128
+              },
+              "app_slug": {
+                "type": "string",
+                "pattern": "^[a-z0-9-]+$"
+              },
+              "app_id": {
+                "type": "integer",
+                "minimum": 1
+              }
+            }
+          }
+        }
+      }
+    },
+    "safety": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "monetary_budget_usd",
+        "secrets"
+      ],
+      "properties": {
+        "monetary_budget_usd": {
+          "const": 0
+        },
+        "secrets": {
+          "const": "FORBIDDEN"
+        }
+      }
+    },
+    "mutation_authority": {
+      "const": "NONE_BINDING_IS_PROOF_ONLY"
+    },
+    "binding_sha256": {
+      "type": "string",
+      "format": "sha256"
+    }
+  }
+}
