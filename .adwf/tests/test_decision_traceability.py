@@ -10,6 +10,7 @@ import subprocess
 import sys
 import tempfile
 import unittest
+from unittest import mock
 
 ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT / ".adwf"))
@@ -316,6 +317,39 @@ class DecisionTraceabilityTests(unittest.TestCase):
             self.assertEqual(resolved["revision"], previous["revision"])
             self.assertEqual(resolved["graph_sha256"], previous["graph_sha256"])
 
+
+    def test_20_git_previous_graph_decodes_utf8_independent_of_process_locale(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_name:
+            root = Path(temp_name)
+            graph_path = root / ".adwf/decision-requirement-traceability.json"
+            graph_path.parent.mkdir(parents=True)
+            subprocess.run(["git", "init", "-q"], cwd=root, check=True)
+            subprocess.run(["git", "config", "user.name", "TRACE UTF8 test"], cwd=root, check=True)
+            subprocess.run(["git", "config", "user.email", "trace-utf8@example.invalid"], cwd=root, check=True)
+
+            previous = {"revision": 1, "locale_probe": "И"}
+            graph_path.write_text(
+                json.dumps(previous, ensure_ascii=False, indent=2) + "\n",
+                encoding="utf-8",
+            )
+            subprocess.run(["git", "add", "."], cwd=root, check=True)
+            subprocess.run(["git", "commit", "-qm", "previous utf8 graph"], cwd=root, check=True)
+
+            current = {"revision": 2, "locale_probe": "Текущий"}
+            graph_path.write_text(
+                json.dumps(current, ensure_ascii=False, indent=2) + "\n",
+                encoding="utf-8",
+            )
+            subprocess.run(["git", "add", "."], cwd=root, check=True)
+            subprocess.run(["git", "commit", "-qm", "current utf8 graph"], cwd=root, check=True)
+            subprocess.run(["git", "update-ref", "refs/remotes/origin/main", "HEAD"], cwd=root, check=True)
+
+            with mock.patch.object(subprocess, "_text_encoding", return_value="cp1251"):
+                resolved = _git_previous_graph(root)
+
+            self.assertIsNotNone(resolved)
+            self.assertEqual(resolved["revision"], 1)
+            self.assertEqual(resolved["locale_probe"], "И")
 
 if __name__ == "__main__":
     unittest.main()

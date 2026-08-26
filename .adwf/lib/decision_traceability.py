@@ -383,7 +383,7 @@ def _git_previous_graph(root: Path) -> dict[str, Any] | None:
     head: str | None = None
     try:
         process = subprocess.run(
-            ["git", "rev-parse", "HEAD"], cwd=root, capture_output=True, text=True, check=False, timeout=5
+            ["git", "rev-parse", "HEAD"], cwd=root, capture_output=True, text=True, encoding="utf-8", errors="strict", check=False, timeout=5
         )
         if process.returncode == 0 and re.fullmatch(r"[0-9a-f]{40}", process.stdout.strip()):
             head = process.stdout.strip()
@@ -398,7 +398,7 @@ def _git_previous_graph(root: Path) -> dict[str, Any] | None:
     add_candidate(env_base)
     try:
         process = subprocess.run(
-            ["git", "merge-base", "HEAD", "origin/main"], cwd=root, capture_output=True, text=True, check=False, timeout=5
+            ["git", "merge-base", "HEAD", "origin/main"], cwd=root, capture_output=True, text=True, encoding="utf-8", errors="strict", check=False, timeout=5
         )
         if process.returncode == 0:
             add_candidate(process.stdout.strip())
@@ -406,7 +406,7 @@ def _git_previous_graph(root: Path) -> dict[str, Any] | None:
         pass
     try:
         process = subprocess.run(
-            ["git", "rev-parse", "HEAD^"], cwd=root, capture_output=True, text=True, check=False, timeout=5
+            ["git", "rev-parse", "HEAD^"], cwd=root, capture_output=True, text=True, encoding="utf-8", errors="strict", check=False, timeout=5
         )
         if process.returncode == 0:
             add_candidate(process.stdout.strip())
@@ -415,7 +415,7 @@ def _git_previous_graph(root: Path) -> dict[str, Any] | None:
     for revision in dict.fromkeys(candidates):
         process = subprocess.run(
             ["git", "show", f"{revision}:.adwf/decision-requirement-traceability.json"],
-            cwd=root, capture_output=True, text=True, check=False,
+            cwd=root, capture_output=True, text=True, encoding="utf-8", errors="strict", check=False,
         )
         if process.returncode == 0:
             value = strict_loads(process.stdout)
