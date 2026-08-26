@@ -3,8 +3,8 @@
   "version": "1.6.0",
   "schema_version": 3,
   "scope": "FRAMEWORK_OWNED_TRUST_BOUNDARY",
-  "file_count_excluding_manifests": 578,
-  "total_bytes_excluding_manifests": 3133559,
+  "file_count_excluding_manifests": 579,
+  "total_bytes_excluding_manifests": 3136436,
   "files": [
     ".adwf/SETUP_CHECKLIST.md",
     ".adwf/actions-lock.json",
@@ -141,6 +141,7 @@
     ".adwf/packs/fastapi.json",
     ".adwf/packs/go.json",
     ".adwf/packs/node.json",
+    ".adwf/packs/powershell.json",
     ".adwf/packs/python.json",
     ".adwf/packs/react.json",
     ".adwf/packs/vue.json",
