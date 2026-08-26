@@ -1,0 +1,163 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "ADWF Execution Plane Policy v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "$schema",
+    "schema_version",
+    "role",
+    "ci",
+    "reproducible_evidence",
+    "private_execution_node",
+    "safety"
+  ],
+  "properties": {
+    "$schema": {
+      "const": ".adwf/schemas/execution-plane.schema.json"
+    },
+    "schema_version": {
+      "const": 1
+    },
+    "role": {
+      "const": "EXECUTION_PLANE_POLICY"
+    },
+    "ci": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "authority",
+        "provider",
+        "approved_runners",
+        "self_hosted_runners",
+        "owner_workstation_ci_authority",
+        "required_checks_source"
+      ],
+      "properties": {
+        "authority": {
+          "const": "GITHUB_HOSTED_ONLY"
+        },
+        "provider": {
+          "const": "GITHUB_ACTIONS"
+        },
+        "approved_runners": {
+          "type": "array",
+          "minItems": 2,
+          "uniqueItems": true,
+          "items": {
+            "enum": [
+              "ubuntu-24.04",
+              "windows-2022"
+            ]
+          }
+        },
+        "self_hosted_runners": {
+          "const": "FORBIDDEN"
+        },
+        "owner_workstation_ci_authority": {
+          "const": "NONE"
+        },
+        "required_checks_source": {
+          "const": "GITHUB_ACTIONS_ONLY"
+        }
+      }
+    },
+    "reproducible_evidence": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "execution_plane",
+        "classes"
+      ],
+      "properties": {
+        "execution_plane": {
+          "const": "GITHUB_HOSTED"
+        },
+        "classes": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": {
+            "enum": [
+              "STATIC_ANALYSIS",
+              "UNIT_TEST",
+              "REPRODUCIBLE_INTEGRATION",
+              "SCHEMA_VALIDATION",
+              "DOCS_VALIDATION",
+              "BUILD",
+              "PACKAGE_INTEGRITY",
+              "SECURITY_SCAN",
+              "PLATFORM_SMOKE",
+              "GOVERNANCE_GATE",
+              "TRUSTED_GATE"
+            ]
+          }
+        }
+      }
+    },
+    "private_execution_node": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "role",
+        "ci_authority",
+        "required_for_ci",
+        "registration_with_public_repository",
+        "mandatory_availability",
+        "allowed_evidence_classes",
+        "runtime_status_without_execution"
+      ],
+      "properties": {
+        "role": {
+          "const": "RUNTIME_EXECUTION_NODE_ONLY"
+        },
+        "ci_authority": {
+          "const": "NONE"
+        },
+        "required_for_ci": {
+          "const": false
+        },
+        "registration_with_public_repository": {
+          "const": "FORBIDDEN"
+        },
+        "mandatory_availability": {
+          "const": false
+        },
+        "allowed_evidence_classes": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": {
+            "enum": [
+              "PRIVATE_NETWORK",
+              "LOCAL_CREDENTIAL_STORE",
+              "OS_INTEGRATION",
+              "GUI_RUNTIME",
+              "PHYSICAL_DEVICE",
+              "PRIVATE_SERVICE_ENDPOINT"
+            ]
+          }
+        },
+        "runtime_status_without_execution": {
+          "const": "NOT_VERIFIED"
+        }
+      }
+    },
+    "safety": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "monetary_budget_usd",
+        "private_runtime_secrets_in_ci"
+      ],
+      "properties": {
+        "monetary_budget_usd": {
+          "const": 0
+        },
+        "private_runtime_secrets_in_ci": {
+          "const": "FORBIDDEN"
+        }
+      }
+    }
+  }
+}
