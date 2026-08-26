@@ -14,6 +14,14 @@
           "product_impact": false
         },
         {
+          "roadmap_id": "CODEX_EXECUTOR-001",
+          "title_ru": "Codex Goal Primary Development Executor + Windows Local Host Integration",
+          "dependencies": [
+            "SELFTEST_COVERAGE-001"
+          ],
+          "product_impact": false
+        },
+        {
           "roadmap_id": "OPENHANDS-001",
           "title_ru": "OpenHands — первый реальный Creative Executor через универсальный контракт",
           "dependencies": [
@@ -26,7 +34,7 @@
           "roadmap_id": "EXECNODE-001",
           "title_ru": "Постоянный ADWF Execution Node Runner + измерение process tax",
           "dependencies": [
-            "OPENHANDS-001"
+            "CODEX_EXECUTOR-001"
           ],
           "product_impact": false
         },
