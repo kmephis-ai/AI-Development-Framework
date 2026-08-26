@@ -1,0 +1,24 @@
+{
+  "$schema": ".adwf/schemas/project-pack.schema.json",
+  "schema_version": 1,
+  "role": "PROJECT_PACK_DEFINITION",
+  "id": "powershell",
+  "language": "powershell",
+  "detect": {
+    "files": [
+      ".adwf-powershell.json"
+    ]
+  },
+  "commands": {},
+  "preview": {},
+  "safety": {
+    "monetary_budget_usd": 0,
+    "secrets": "FORBIDDEN",
+    "network": "NONE",
+    "environment": "PROCESS_MINIMAL",
+    "data_access": {
+      "read_scope": "PROJECT_TREE",
+      "write_scope": "TOOL_OUTPUTS_ONLY"
+    }
+  }
+}

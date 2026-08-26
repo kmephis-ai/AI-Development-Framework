@@ -31,7 +31,7 @@ class ProjectPackSdkTests(unittest.TestCase):
 
     def test_all_builtin_packs_are_strict_and_digest_stable(self):
         a=load_packs(ROOT);b=load_packs(ROOT)
-        self.assertEqual(set(a),{'apps-script','edge-controller','react','vue','angular','fastapi','node','python','go'})
+        self.assertEqual(set(a),{'apps-script','edge-controller','powershell','react','vue','angular','fastapi','node','python','go'})
         self.assertEqual({k:v['digest'] for k,v in a.items()},{k:v['digest'] for k,v in b.items()})
         self.assertTrue(all(len(v['digest'])==64 for v in a.values()))
 
@@ -89,6 +89,31 @@ class ProjectPackSdkTests(unittest.TestCase):
         self.assertIn('EDGE_CONTROLLER_NETWORK_MUST_BE_NONE',errors)
         self.assertIn('EDGE_CONTROLLER_COMMAND_AUTHORITY_FORBIDDEN',errors)
         self.assertIn('EDGE_CONTROLLER_EXTERNAL_RUNTIME_FORBIDDEN',errors)
+
+    def test_powershell_marker_is_explicit_and_has_no_external_runtime_authority(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            p=Path(tmp)
+            (p/'.adwf-powershell.json').write_text('{"schema_version":1}\n',encoding='utf-8')
+            out=detect_pack(p,ROOT)
+            self.assertEqual(out['pack'],'powershell')
+            self.assertEqual(out['candidates'][0],'powershell')
+            definition=out['definition']
+            self.assertEqual(definition['language'],'powershell')
+            self.assertEqual(definition['detect']['files'],['.adwf-powershell.json'])
+            self.assertEqual(definition['safety']['network'],'NONE')
+            self.assertEqual(definition['commands'],{})
+            self.assertEqual(definition['preview'],{})
+
+    def test_powershell_pack_rejects_marker_network_install_or_preview_expansion(self):
+        definition=copy.deepcopy(load_packs(ROOT)['powershell']['definition'])
+        definition['detect']['files']=['project.ps1']
+        definition['safety']['network']='LOOPBACK'
+        definition['commands']['install']={'command':['pwsh','-File','bootstrap.ps1'],'phases':['bootstrap']}
+        definition['preview']={'default_url':'http://127.0.0.1:8080'}
+        errors=validate_pack_definition(definition,ROOT,path=Path('powershell.json'))
+        self.assertIn('POWERSHELL_DETECTION_MARKER_REQUIRED',errors)
+        self.assertIn('POWERSHELL_NETWORK_MUST_BE_NONE',errors)
+        self.assertIn('POWERSHELL_EXTERNAL_RUNTIME_FORBIDDEN',errors)
 
     def test_fastapi_contains_detection_is_definition_driven(self):
         with tempfile.TemporaryDirectory() as tmp:
