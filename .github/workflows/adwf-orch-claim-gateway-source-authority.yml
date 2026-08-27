@@ -1,4 +1,4 @@
-name: ORCH_CLAIM_GATEWAY-001 Recovery Projection Materializer A2C
+name: ORCH_CLAIM_GATEWAY-001 Terminal Lease Release A3
 
 on:
   pull_request:
@@ -7,26 +7,23 @@ on:
 permissions: {}
 
 concurrency:
-  group: orch-claim-gateway-001-recovery-projection-a2c
+  group: orch-claim-gateway-001-terminal-lease-release-a3
   cancel-in-progress: false
 
 jobs:
-  recover-authority:
+  release-lease:
     if: github.event.pull_request.number == 288 && github.event.pull_request.head.ref == 'helper/ORCH_CLAIM_GATEWAY-001-source-authority-a1'
     runs-on: ubuntu-24.04
     timeout-minutes: 6
     permissions:
+      actions: read
       contents: write
       issues: read
       pull-requests: read
-    outputs:
-      lease_id: ${{ steps.recover.outputs.lease_id }}
-      lease_revision: ${{ steps.recover.outputs.lease_revision }}
-      lease_anchor: ${{ steps.recover.outputs.lease_anchor }}
     steps:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd
         with:
-          ref: 730cab912f779bec1f3208c66eda1889f69d6f4c
+          ref: 3522578ef857f1aa4e0f18b700c050a0ecedeb58
           persist-credentials: false
           fetch-depth: 1
 
@@ -34,33 +31,32 @@ jobs:
         with:
           python-version: "3.12.10"
 
-      - name: Reconcile stale lease and acquire bounded recovery authority
-        id: recover
+      - name: Release exact terminal writer lease after verified merge
         env:
           GITHUB_TOKEN: ${{ github.token }}
-          EXPECTED_MAIN: 730cab912f779bec1f3208c66eda1889f69d6f4c
-          EXPECTED_TREE: a75f7b09b32ce1a016d0881637afcce16fc894d1
+          EXPECTED_MAIN: 3522578ef857f1aa4e0f18b700c050a0ecedeb58
+          EXPECTED_TREE: a8502135ce024279a503b5204ab831d86ef1b516
+          EXPECTED_PARENT: 730cab912f779bec1f3208c66eda1889f69d6f4c
+          EXPECTED_CANDIDATE: c1324b41345d28e3a32fca7df8105324a96bc8c2
           EXPECTED_POLICY_HASH: 8fb9e2baa6aae69f9d0e1a813ae6e63359cb3b57bfba9f5f2ecb06b8c2760379
-          EXPECTED_OLD_REVISION: '57'
-          EXPECTED_OLD_ANCHOR: ffd263dee77a851acf70c047cd1331affaf52108
-          EXPECTED_OLD_LEASE: b678196d-fed3-4e74-8e09-00a8a55a4c32
-          RECOVERY_LEASE: db7edabc-8f9c-4a27-9a2c-28700000a2c0
+          EXPECTED_REVISION: '59'
+          EXPECTED_ANCHOR: 7fd1d1086ddd56779921180f8389e55033c447ce
+          EXPECTED_LEASE: db7edabc-8f9c-4a27-9a2c-28700000a2c0
           ISSUE_ID: '287'
           PR_NUMBER: '289'
           ROADMAP_ID: ORCH_CLAIM_GATEWAY-001
           WORKER_ID: adwf-runtime:orch-claim-gateway-001-bootstrap-a1
           WORK_BRANCH: adwf/orch-claim-gateway-001-5ab023d85879
-          SOURCE_SHA: a971ffeac24125da7716e8f3594b9115b9e620cb
+          ADWF_MAIN_RUN: '33090358387'
+          ADWF_SMOKE_RUN: '33090358348'
           HELPER_PR: '288'
           HELPER_BRANCH: helper/ORCH_CLAIM_GATEWAY-001-source-authority-a1
           HELPER_PATH: .github/workflows/adwf-orch-claim-gateway-source-authority.yml
         shell: python
         run: |
-          from datetime import datetime, timezone
           from pathlib import Path
           import json
           import os
-          import re
           import sys
 
           root = Path.cwd()
@@ -76,562 +72,192 @@ jobs:
           token = os.environ["GITHUB_TOKEN"]
           expected_main = os.environ["EXPECTED_MAIN"]
           expected_tree = os.environ["EXPECTED_TREE"]
+          expected_parent = os.environ["EXPECTED_PARENT"]
+          expected_candidate = os.environ["EXPECTED_CANDIDATE"]
           expected_policy_hash = os.environ["EXPECTED_POLICY_HASH"]
-          expected_old_revision = int(os.environ["EXPECTED_OLD_REVISION"])
-          expected_old_anchor = os.environ["EXPECTED_OLD_ANCHOR"]
-          expected_old_lease = os.environ["EXPECTED_OLD_LEASE"]
-          recovery_lease = os.environ["RECOVERY_LEASE"]
+          expected_revision = int(os.environ["EXPECTED_REVISION"])
+          expected_anchor = os.environ["EXPECTED_ANCHOR"]
+          expected_lease = os.environ["EXPECTED_LEASE"]
           issue_id = os.environ["ISSUE_ID"]
           pr_number = int(os.environ["PR_NUMBER"])
           roadmap_id = os.environ["ROADMAP_ID"]
           worker_id = os.environ["WORKER_ID"]
           work_branch = os.environ["WORK_BRANCH"]
-          source_sha = os.environ["SOURCE_SHA"]
+          main_run_id = int(os.environ["ADWF_MAIN_RUN"])
+          smoke_run_id = int(os.environ["ADWF_SMOKE_RUN"])
           helper_pr = int(os.environ["HELPER_PR"])
           helper_branch = os.environ["HELPER_BRANCH"]
           helper_path = os.environ["HELPER_PATH"]
-          expected_source_paths = {
+          expected_paths = {
               ".adwf/lib/provider_claim_gateway.py",
               ".adwf/scripts/consume_agent_result.py",
               ".adwf/tests/test_provider_claim_gateway.py",
+              ".adwf/docs-registry.json",
+              "MANIFEST.json",
+              "SHA256SUMS.txt",
           }
 
           event = json.loads(Path(os.environ["GITHUB_EVENT_PATH"]).read_text(encoding="utf-8"))
           event_pr = event.get("pull_request") or {}
           if int(event_pr.get("number") or 0) != helper_pr:
-              raise SystemExit("A2C_HELPER_PR_MISMATCH")
+              raise SystemExit("A3C_HELPER_PR_MISMATCH")
           if str((event_pr.get("head") or {}).get("ref") or "") != helper_branch:
-              raise SystemExit("A2C_HELPER_BRANCH_MISMATCH")
+              raise SystemExit("A3C_HELPER_BRANCH_MISMATCH")
           if str((event_pr.get("head") or {}).get("repo", {}).get("full_name") or "") != repo:
-              raise SystemExit("A2C_HELPER_CROSS_REPOSITORY_FORBIDDEN")
-          if str((event_pr.get("base") or {}).get("sha") or "") != expected_main:
-              raise SystemExit("A2C_HELPER_BASE_SHA_DRIFT")
+              raise SystemExit("A3C_HELPER_CROSS_REPOSITORY_FORBIDDEN")
           if str((event_pr.get("base") or {}).get("ref") or "") != "main":
-              raise SystemExit("A2C_HELPER_BASE_BRANCH_DRIFT")
+              raise SystemExit("A3C_HELPER_BASE_BRANCH_DRIFT")
+          event_base_sha = str((event_pr.get("base") or {}).get("sha") or "")
+          if event_base_sha not in {expected_parent, expected_main}:
+              raise SystemExit("A3C_HELPER_BASE_SHA_DRIFT")
 
           client = GitHubClient(repo, token)
           helper_files = client.pull_files(helper_pr)
           if len(helper_files) != 1:
-              raise SystemExit("A2C_HELPER_SCOPE_NOT_SINGLE_FILE")
+              raise SystemExit("A3C_HELPER_SCOPE_NOT_SINGLE_FILE")
           helper_file = helper_files[0]
           if str(helper_file.get("filename") or "") != helper_path or str(helper_file.get("status") or "") != "added":
-              raise SystemExit("A2C_HELPER_SCOPE_PATH_MISMATCH")
+              raise SystemExit("A3C_HELPER_SCOPE_PATH_MISMATCH")
 
           repo_info = client.repo_info()
           if str(repo_info.get("default_branch") or "") != "main":
-              raise SystemExit("A2C_DEFAULT_BRANCH_DRIFT")
+              raise SystemExit("A3C_DEFAULT_BRANCH_DRIFT")
           main = client.branch("main")
           if str((main.get("commit") or {}).get("sha") or "") != expected_main:
-              raise SystemExit("A2C_MAIN_SHA_DRIFT")
+              raise SystemExit("A3C_MAIN_SHA_DRIFT")
           commit = client.get(f"/repos/{repo}/git/commits/{expected_main}")
           if str((commit.get("tree") or {}).get("sha") or "") != expected_tree:
-              raise SystemExit("A2C_MAIN_TREE_DRIFT")
+              raise SystemExit("A3C_MAIN_TREE_DRIFT")
+          parents = [str(item.get("sha") or "") for item in commit.get("parents") or []]
+          if parents != [expected_parent]:
+              raise SystemExit("A3C_MAIN_PARENT_DRIFT")
 
           policy = strict_loads((root / ".adwf/effective-policy.json").read_text(encoding="utf-8"))
-          if not isinstance(policy, dict):
-              raise SystemExit("A2C_EFFECTIVE_POLICY_INVALID")
           if policy.get("policy_hash") != expected_policy_hash:
-              raise SystemExit("A2C_EFFECTIVE_POLICY_HASH_DRIFT")
+              raise SystemExit("A3C_EFFECTIVE_POLICY_HASH_DRIFT")
           if policy.get("active_autonomy") != "A2" or policy.get("max_autonomous_risk") != "R1":
-              raise SystemExit("A2C_EFFECTIVE_POLICY_AUTONOMY_DRIFT")
+              raise SystemExit("A3C_EFFECTIVE_POLICY_AUTONOMY_DRIFT")
           if policy.get("hard_budget_usd") != 0 or policy.get("mandatory_ai_api") is not False:
-              raise SystemExit("A2C_EFFECTIVE_POLICY_FREE_ONLY_DRIFT")
+              raise SystemExit("A3C_EFFECTIVE_POLICY_FREE_ONLY_DRIFT")
           if policy.get("max_parallel_writers") != 1:
-              raise SystemExit("A2C_EFFECTIVE_POLICY_WRITER_CEILING_DRIFT")
-
-          cfg = strict_loads((root / ".adwf/config.json").read_text(encoding="utf-8"))
-          ttl = ((cfg.get("orchestration") or {}).get("lease_ttl_minutes"))
-          if isinstance(ttl, bool) or not isinstance(ttl, int) or not 1 <= ttl <= 240:
-              raise SystemExit("A2C_LEASE_TTL_INVALID")
+              raise SystemExit("A3C_EFFECTIVE_POLICY_WRITER_CEILING_DRIFT")
+          if ((policy.get("rules") or {}).get("action_min_autonomy") or {}).get("cleanup") != "A2":
+              raise SystemExit("A3C_CLEANUP_POLICY_DRIFT")
 
           rules = client.rulesets()
           main_rules = verify_rulesets(rules, expected_integration_id=15368)
           anchor_rules = verify_runtime_anchor_ruleset(rules)
           if main_rules.get("readback_verified") is not True:
-              raise SystemExit("A2C_MAIN_RULESET_NOT_VERIFIED")
+              raise SystemExit("A3C_MAIN_RULESET_NOT_VERIFIED")
           if anchor_rules.get("readback_verified") is not True:
-              raise SystemExit("A2C_ANCHOR_RULESET_NOT_VERIFIED")
+              raise SystemExit("A3C_ANCHOR_RULESET_NOT_VERIFIED")
 
-          work_issue = client.get(f"/repos/{repo}/issues/{int(issue_id)}")
-          if work_issue.get("state") != "open":
-              raise SystemExit("A2C_WORK_ISSUE_NOT_OPEN")
-          title = str(work_issue.get("title") or "")
-          if f"[{roadmap_id}]" not in title:
-              raise SystemExit("A2C_WORK_ISSUE_IDENTITY_MISMATCH")
+          issue = client.get(f"/repos/{repo}/issues/{int(issue_id)}")
+          if issue.get("state") != "open":
+              raise SystemExit("A3C_WORK_ISSUE_NOT_OPEN")
+          if f"[{roadmap_id}]" not in str(issue.get("title") or ""):
+              raise SystemExit("A3C_WORK_ISSUE_IDENTITY_MISMATCH")
 
-          work_pr = client.pull(pr_number)
-          if work_pr.get("state") != "open" or work_pr.get("merged") is True:
-              raise SystemExit("A2C_WORK_PR_NOT_OPEN")
-          if str((work_pr.get("base") or {}).get("ref") or "") != "main":
-              raise SystemExit("A2C_WORK_PR_BASE_BRANCH_DRIFT")
-          if str((work_pr.get("base") or {}).get("sha") or "") != expected_main:
-              raise SystemExit("A2C_WORK_PR_BASE_SHA_DRIFT")
-          if str((work_pr.get("head") or {}).get("ref") or "") != work_branch:
-              raise SystemExit("A2C_WORK_PR_BRANCH_DRIFT")
-          if str((work_pr.get("head") or {}).get("sha") or "") != source_sha:
-              raise SystemExit("A2C_WORK_PR_HEAD_DRIFT")
-          if str((work_pr.get("head") or {}).get("repo", {}).get("full_name") or "") != repo:
-              raise SystemExit("A2C_WORK_PR_CROSS_REPOSITORY_FORBIDDEN")
+          pr = client.pull(pr_number)
+          if pr.get("state") != "closed" or pr.get("merged") is not True:
+              raise SystemExit("A3C_WORK_PR_NOT_MERGED")
+          if str(pr.get("merge_commit_sha") or "") != expected_main:
+              raise SystemExit("A3C_WORK_PR_MERGE_SHA_DRIFT")
+          if str((pr.get("base") or {}).get("ref") or "") != "main":
+              raise SystemExit("A3C_WORK_PR_BASE_BRANCH_DRIFT")
+          if str((pr.get("base") or {}).get("sha") or "") != expected_parent:
+              raise SystemExit("A3C_WORK_PR_BASE_SHA_DRIFT")
+          if str((pr.get("head") or {}).get("ref") or "") != work_branch:
+              raise SystemExit("A3C_WORK_PR_BRANCH_DRIFT")
+          if str((pr.get("head") or {}).get("sha") or "") != expected_candidate:
+              raise SystemExit("A3C_WORK_PR_HEAD_DRIFT")
+          if str((pr.get("head") or {}).get("repo", {}).get("full_name") or "") != repo:
+              raise SystemExit("A3C_WORK_PR_CROSS_REPOSITORY_FORBIDDEN")
           work_files = client.pull_files(pr_number)
-          actual_source_paths = {str(item.get("filename") or "") for item in work_files}
-          if actual_source_paths != expected_source_paths or len(work_files) != 3:
-              raise SystemExit("A2C_WORK_PR_SOURCE_SCOPE_DRIFT")
+          actual_paths = {str(item.get("filename") or "") for item in work_files}
+          if actual_paths != expected_paths or len(work_files) != len(expected_paths):
+              raise SystemExit("A3C_WORK_PR_SCOPE_DRIFT")
 
-          source_ref = client.git_ref(work_branch)
-          if str((source_ref.get("object") or {}).get("sha") or "") != source_sha:
-              raise SystemExit("A2C_SOURCE_REF_DRIFT")
+          def verified_run(run_id, expected_name):
+              run = client.get(f"/repos/{repo}/actions/runs/{run_id}")
+              if str(run.get("name") or "") != expected_name:
+                  raise SystemExit("A3C_CI_NAME_DRIFT:" + expected_name)
+              if str(run.get("head_sha") or "") != expected_main:
+                  raise SystemExit("A3C_CI_SHA_DRIFT:" + expected_name)
+              if run.get("status") != "completed" or run.get("conclusion") != "success":
+                  raise SystemExit("A3C_CI_NOT_SUCCESS:" + expected_name)
+              return client.get(f"/repos/{repo}/actions/runs/{run_id}/jobs?per_page=100")
+
+          main_jobs = verified_run(main_run_id, "ADWF Main")
+          main_rows = main_jobs.get("jobs") or []
+          canonical = [item for item in main_rows if item.get("name") == "canonical-verification"]
+          if len(canonical) != 1 or canonical[0].get("status") != "completed" or canonical[0].get("conclusion") != "success":
+              raise SystemExit("A3C_MAIN_CANONICAL_JOB_NOT_SUCCESS")
+
+          smoke_jobs = verified_run(smoke_run_id, "ADWF Platform Smoke")
+          smoke_rows = smoke_jobs.get("jobs") or []
+          smoke = {str(item.get("name") or ""): item for item in smoke_rows}
+          if set(smoke) != {"smoke (ubuntu-24.04)", "smoke (windows-2022)"}:
+              raise SystemExit("A3C_SMOKE_JOB_SET_DRIFT")
+          for name in ("smoke (ubuntu-24.04)", "smoke (windows-2022)"):
+              if smoke[name].get("status") != "completed" or smoke[name].get("conclusion") != "success":
+                  raise SystemExit("A3C_SMOKE_JOB_NOT_SUCCESS:" + name)
 
           store = GitHubLeaseStore(client)
           registry, anchor = store.read(expected_main_sha=expected_main, policy_max_parallel_writers=1)
-          if registry.get("revision") != expected_old_revision or anchor != expected_old_anchor:
-              raise SystemExit("A2C_OLD_LEASE_STREAM_DRIFT")
+          if registry.get("revision") != expected_revision or anchor != expected_anchor:
+              raise SystemExit("A3C_LEASE_STREAM_DRIFT")
           active = [item for item in registry.get("leases") or [] if item.get("status") == "ACTIVE"]
           if len(active) != 1:
-              raise SystemExit("A2C_ACTIVE_WRITER_COUNT_DRIFT")
-          old = active[0]
-          resources = _stage1_resources()
-          required_old = {
-              "lease_id": expected_old_lease,
+              raise SystemExit("A3C_ACTIVE_WRITER_COUNT_DRIFT")
+          lease = active[0]
+          required = {
+              "lease_id": expected_lease,
               "issue_id": issue_id,
               "roadmap_id": roadmap_id,
               "worker_id": worker_id,
-              "base_sha": expected_main,
+              "base_sha": expected_parent,
               "branch": work_branch,
-              "resources": resources,
+              "resources": _stage1_resources(),
           }
-          for key, expected in required_old.items():
-              if old.get(key) != expected:
-                  raise SystemExit("A2C_OLD_LEASE_IDENTITY_DRIFT:" + key)
-          expires_at = datetime.fromisoformat(str(old.get("expires_at") or "").replace("Z", "+00:00"))
-          if expires_at.tzinfo is None or datetime.now(timezone.utc) <= expires_at.astimezone(timezone.utc):
-              raise SystemExit("A2C_OLD_LEASE_NOT_STALE")
+          for key, expected in required.items():
+              if lease.get(key) != expected:
+                  raise SystemExit("A3C_LEASE_IDENTITY_DRIFT:" + key)
 
-          reconciliation_ref = f"github:pr:{pr_number}@{source_sha}"
-          released, released_anchor = store.release(
+          reconciliation_ref = "github:commit:" + expected_main
+          released, release_anchor = store.release(
               expected_main_sha=expected_main,
               policy_max_parallel_writers=1,
-              lease_id=expected_old_lease,
+              lease_id=expected_lease,
               worker_id=worker_id,
               provider_reconciled=True,
               provider_reconciliation_ref=reconciliation_ref,
           )
-          if released.get("revision") != expected_old_revision + 1 or not released_anchor:
-              raise SystemExit("A2C_RELEASE_READBACK_INVALID")
-          old_readback = [item for item in released.get("leases") or [] if item.get("lease_id") == expected_old_lease]
-          if len(old_readback) != 1 or old_readback[0].get("status") != "RELEASED":
-              raise SystemExit("A2C_RELEASED_LEASE_MISSING")
-
-          acquired, lease, acquired_anchor = store.acquire(
-              expected_main_sha=expected_main,
-              policy_max_parallel_writers=1,
-              issue_id=issue_id,
-              roadmap_id=roadmap_id,
-              worker_id=worker_id,
-              base_sha=expected_main,
-              branch=work_branch,
-              resources=resources,
-              ttl_minutes=ttl,
-              lease_id=recovery_lease,
-          )
-          if acquired.get("revision") != expected_old_revision + 2:
-              raise SystemExit("A2C_RECOVERY_REVISION_INVALID")
-          if lease.get("lease_id") != recovery_lease or lease.get("status") != "ACTIVE":
-              raise SystemExit("A2C_RECOVERY_LEASE_INVALID")
-          if not acquired_anchor:
-              raise SystemExit("A2C_RECOVERY_ANCHOR_MISSING")
+          if released.get("revision") != expected_revision + 1 or not release_anchor:
+              raise SystemExit("A3C_RELEASE_READBACK_INVALID")
+          if released.get("observed_main_sha") != expected_main:
+              raise SystemExit("A3C_RELEASE_MAIN_BINDING_INVALID")
+          active_after = [item for item in released.get("leases") or [] if item.get("status") == "ACTIVE"]
+          if active_after:
+              raise SystemExit("A3C_RELEASE_ACTIVE_WRITER_REMAINS")
+          lease_after = [item for item in released.get("leases") or [] if item.get("lease_id") == expected_lease]
+          if len(lease_after) != 1 or lease_after[0].get("status") != "RELEASED":
+              raise SystemExit("A3C_RELEASED_LEASE_MISSING")
+          if lease_after[0].get("provider_reconciliation_ref") != reconciliation_ref:
+              raise SystemExit("A3C_RELEASE_RECONCILIATION_REF_MISMATCH")
 
           reread, reread_anchor = store.read(expected_main_sha=expected_main, policy_max_parallel_writers=1)
-          active = [item for item in reread.get("leases") or [] if item.get("status") == "ACTIVE"]
-          if reread.get("revision") != expected_old_revision + 2 or reread_anchor != acquired_anchor:
-              raise SystemExit("A2C_RECOVERY_STREAM_READBACK_MISMATCH")
-          if len(active) != 1 or active[0].get("lease_id") != recovery_lease:
-              raise SystemExit("A2C_RECOVERY_ACTIVE_READBACK_MISMATCH")
+          if reread.get("revision") != expected_revision + 1 or reread_anchor != release_anchor:
+              raise SystemExit("A3C_RELEASE_STREAM_READBACK_MISMATCH")
+          if any(item.get("status") == "ACTIVE" for item in reread.get("leases") or []):
+              raise SystemExit("A3C_RELEASE_REREAD_ACTIVE_WRITER_REMAINS")
 
-          with Path(os.environ["GITHUB_OUTPUT"]).open("a", encoding="utf-8", newline="\n") as handle:
-              handle.write("lease_id=" + recovery_lease + "\n")
-              handle.write("lease_revision=" + str(reread["revision"]) + "\n")
-              handle.write("lease_anchor=" + str(reread_anchor) + "\n")
-          print("A2C_RECOVER_AUTHORITY=PASS")
-          print("LEASE_ID=" + recovery_lease)
+          print("A3C_TERMINAL_LEASE_RELEASE=PASS")
+          print("LEASE_ID=" + expected_lease)
           print("LEASE_REVISION=" + str(reread["revision"]))
           print("LEASE_ANCHOR=" + str(reread_anchor))
-          print("SOURCE_MUTATION=False")
-          print("MERGE_AUTHORITY=False")
-          print("MONETARY_COST_USD=0")
-
-  generate-projections:
-    needs: recover-authority
-    runs-on: ubuntu-24.04
-    timeout-minutes: 10
-    permissions:
-      contents: read
-    outputs:
-      docs_b64: ${{ steps.projections.outputs.docs_b64 }}
-      docs_sha256: ${{ steps.projections.outputs.docs_sha256 }}
-      docs_size: ${{ steps.projections.outputs.docs_size }}
-      manifest_b64: ${{ steps.projections.outputs.manifest_b64 }}
-      manifest_sha256: ${{ steps.projections.outputs.manifest_sha256 }}
-      manifest_size: ${{ steps.projections.outputs.manifest_size }}
-      sums_b64: ${{ steps.projections.outputs.sums_b64 }}
-      sums_sha256: ${{ steps.projections.outputs.sums_sha256 }}
-      sums_size: ${{ steps.projections.outputs.sums_size }}
-    steps:
-      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd
-        with:
-          ref: a971ffeac24125da7716e8f3594b9115b9e620cb
-          persist-credentials: false
-          fetch-depth: 0
-
-      - uses: actions/setup-python@a309ff8b426b58ec0e2a45f0f869d46889d02405
-        with:
-          python-version: "3.12.10"
-
-      - name: Generate only canonical projections on exact untrusted source
-        id: projections
-        env:
-          EXPECTED_MAIN: 730cab912f779bec1f3208c66eda1889f69d6f4c
-          SOURCE_SHA: a971ffeac24125da7716e8f3594b9115b9e620cb
-        shell: bash
-        run: |
-          set -euo pipefail
-          test "$(git rev-parse HEAD)" = "$SOURCE_SHA"
-          expected_source=$'.adwf/lib/provider_claim_gateway.py\n.adwf/scripts/consume_agent_result.py\n.adwf/tests/test_provider_claim_gateway.py'
-          actual_source="$(git diff --name-only "$EXPECTED_MAIN" "$SOURCE_SHA" | LC_ALL=C sort)"
-          test "$actual_source" = "$expected_source"
-
-          python .adwf/scripts/docs_freshness.py --write
-          python .adwf/scripts/generate_manifest.py
-
-          expected_projection=$'.adwf/docs-registry.json\nMANIFEST.json\nSHA256SUMS.txt'
-          actual_projection="$(git status --porcelain=v1 | sed -E 's/^.. //' | LC_ALL=C sort)"
-          test "$actual_projection" = "$expected_projection"
-
-          python .adwf/scripts/docs_freshness.py
-          python .adwf/scripts/validate_docs.py
-          python .adwf/scripts/validate_managed_surface.py
-          python .adwf/scripts/generate_manifest.py --check
-          python .adwf/scripts/validate_framework.py
-          python .adwf/scripts/validate_pipeline_ir.py
-          python .adwf/adwf.py doctor --scope package_integrity
-          python .adwf/adwf.py doctor --scope config_health
-
-          actual_projection_after="$(git status --porcelain=v1 | sed -E 's/^.. //' | LC_ALL=C sort)"
-          test "$actual_projection_after" = "$expected_projection"
-
-          python - <<'PY'
-          from pathlib import Path
-          import base64
-          import hashlib
-          import os
-
-          files = {
-              "docs": Path(".adwf/docs-registry.json"),
-              "manifest": Path("MANIFEST.json"),
-              "sums": Path("SHA256SUMS.txt"),
-          }
-          output = Path(os.environ["GITHUB_OUTPUT"])
-          with output.open("a", encoding="utf-8", newline="\n") as handle:
-              for key, path in files.items():
-                  data = path.read_bytes()
-                  if not 1 <= len(data) <= 300_000:
-                      raise SystemExit("A2C_PROJECTION_SIZE_INVALID:" + key)
-                  text = data.decode("utf-8")
-                  if text.encode("utf-8") != data or "\x00" in text:
-                      raise SystemExit("A2C_PROJECTION_UTF8_INVALID:" + key)
-                  handle.write(key + "_b64=" + base64.b64encode(data).decode("ascii") + "\n")
-                  handle.write(key + "_sha256=" + hashlib.sha256(data).hexdigest() + "\n")
-                  handle.write(key + "_size=" + str(len(data)) + "\n")
-          print("A2C_GENERATE_PROJECTIONS=PASS")
-          print("SOURCE_WRITE_AUTHORITY=False")
-          print("MONETARY_COST_USD=0")
-          PY
-
-  apply-projections:
-    needs: [recover-authority, generate-projections]
-    runs-on: ubuntu-24.04
-    timeout-minutes: 7
-    permissions:
-      contents: write
-      issues: read
-      pull-requests: read
-    steps:
-      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd
-        with:
-          ref: 730cab912f779bec1f3208c66eda1889f69d6f4c
-          persist-credentials: false
-          fetch-depth: 1
-
-      - uses: actions/setup-python@a309ff8b426b58ec0e2a45f0f869d46889d02405
-        with:
-          python-version: "3.12.10"
-
-      - name: Materialize three digest-bound projection files only
-        env:
-          GITHUB_TOKEN: ${{ github.token }}
-          EXPECTED_MAIN: 730cab912f779bec1f3208c66eda1889f69d6f4c
-          EXPECTED_TREE: a75f7b09b32ce1a016d0881637afcce16fc894d1
-          EXPECTED_POLICY_HASH: 8fb9e2baa6aae69f9d0e1a813ae6e63359cb3b57bfba9f5f2ecb06b8c2760379
-          ISSUE_ID: '287'
-          PR_NUMBER: '289'
-          ROADMAP_ID: ORCH_CLAIM_GATEWAY-001
-          WORKER_ID: adwf-runtime:orch-claim-gateway-001-bootstrap-a1
-          WORK_BRANCH: adwf/orch-claim-gateway-001-5ab023d85879
-          SOURCE_SHA: a971ffeac24125da7716e8f3594b9115b9e620cb
-          LEASE_ID: ${{ needs.recover-authority.outputs.lease_id }}
-          LEASE_REVISION: ${{ needs.recover-authority.outputs.lease_revision }}
-          LEASE_ANCHOR: ${{ needs.recover-authority.outputs.lease_anchor }}
-          DOCS_B64: ${{ needs.generate-projections.outputs.docs_b64 }}
-          DOCS_SHA256: ${{ needs.generate-projections.outputs.docs_sha256 }}
-          DOCS_SIZE: ${{ needs.generate-projections.outputs.docs_size }}
-          MANIFEST_B64: ${{ needs.generate-projections.outputs.manifest_b64 }}
-          MANIFEST_SHA256: ${{ needs.generate-projections.outputs.manifest_sha256 }}
-          MANIFEST_SIZE: ${{ needs.generate-projections.outputs.manifest_size }}
-          SUMS_B64: ${{ needs.generate-projections.outputs.sums_b64 }}
-          SUMS_SHA256: ${{ needs.generate-projections.outputs.sums_sha256 }}
-          SUMS_SIZE: ${{ needs.generate-projections.outputs.sums_size }}
-        shell: python
-        run: |
-          from pathlib import Path
-          from urllib.parse import quote
-          import base64
-          import hashlib
-          import json
-          import os
-          import re
-          import sys
-          import time
-
-          root = Path.cwd()
-          sys.path.insert(0, str(root / ".adwf"))
-
-          from lib.action_executors import _stage1_resources
-          from lib.github_lease_store import GitHubLeaseStore
-          from lib.github_provider import GitHubClient
-          from lib.github_rulesets import verify_rulesets, verify_runtime_anchor_ruleset
-          from lib.strict_json import loads as strict_loads
-
-          repo = os.environ["GITHUB_REPOSITORY"]
-          client = GitHubClient(repo, os.environ["GITHUB_TOKEN"])
-          expected_main = os.environ["EXPECTED_MAIN"]
-          expected_tree = os.environ["EXPECTED_TREE"]
-          expected_policy_hash = os.environ["EXPECTED_POLICY_HASH"]
-          issue_id = os.environ["ISSUE_ID"]
-          pr_number = int(os.environ["PR_NUMBER"])
-          roadmap_id = os.environ["ROADMAP_ID"]
-          worker_id = os.environ["WORKER_ID"]
-          work_branch = os.environ["WORK_BRANCH"]
-          source_sha = os.environ["SOURCE_SHA"]
-          lease_id = os.environ["LEASE_ID"]
-          lease_revision = int(os.environ["LEASE_REVISION"])
-          lease_anchor = os.environ["LEASE_ANCHOR"]
-          source_paths = {
-              ".adwf/lib/provider_claim_gateway.py",
-              ".adwf/scripts/consume_agent_result.py",
-              ".adwf/tests/test_provider_claim_gateway.py",
-          }
-          projection_paths = {
-              ".adwf/docs-registry.json",
-              "MANIFEST.json",
-              "SHA256SUMS.txt",
-          }
-          final_paths = source_paths | projection_paths
-
-          main = client.branch("main")
-          if str((main.get("commit") or {}).get("sha") or "") != expected_main:
-              raise SystemExit("A2C_APPLY_MAIN_SHA_DRIFT")
-          main_commit = client.get(f"/repos/{repo}/git/commits/{expected_main}")
-          if str((main_commit.get("tree") or {}).get("sha") or "") != expected_tree:
-              raise SystemExit("A2C_APPLY_MAIN_TREE_DRIFT")
-
-          policy = strict_loads((root / ".adwf/effective-policy.json").read_text(encoding="utf-8"))
-          if policy.get("policy_hash") != expected_policy_hash:
-              raise SystemExit("A2C_APPLY_EFFECTIVE_POLICY_DRIFT")
-          if policy.get("active_autonomy") != "A2" or policy.get("max_autonomous_risk") != "R1":
-              raise SystemExit("A2C_APPLY_AUTONOMY_DRIFT")
-          if policy.get("hard_budget_usd") != 0 or policy.get("mandatory_ai_api") is not False:
-              raise SystemExit("A2C_APPLY_FREE_ONLY_DRIFT")
-          if policy.get("max_parallel_writers") != 1:
-              raise SystemExit("A2C_APPLY_WRITER_CEILING_DRIFT")
-
-          rules = client.rulesets()
-          if verify_rulesets(rules, expected_integration_id=15368).get("readback_verified") is not True:
-              raise SystemExit("A2C_APPLY_MAIN_RULESET_NOT_VERIFIED")
-          if verify_runtime_anchor_ruleset(rules).get("readback_verified") is not True:
-              raise SystemExit("A2C_APPLY_ANCHOR_RULESET_NOT_VERIFIED")
-
-          work_issue = client.get(f"/repos/{repo}/issues/{int(issue_id)}")
-          if work_issue.get("state") != "open" or f"[{roadmap_id}]" not in str(work_issue.get("title") or ""):
-              raise SystemExit("A2C_APPLY_WORK_ISSUE_DRIFT")
-          work_pr = client.pull(pr_number)
-          if work_pr.get("state") != "open" or work_pr.get("merged") is True:
-              raise SystemExit("A2C_APPLY_WORK_PR_NOT_OPEN")
-          if str((work_pr.get("base") or {}).get("sha") or "") != expected_main:
-              raise SystemExit("A2C_APPLY_WORK_PR_BASE_DRIFT")
-          if str((work_pr.get("head") or {}).get("ref") or "") != work_branch:
-              raise SystemExit("A2C_APPLY_WORK_PR_BRANCH_DRIFT")
-          if str((work_pr.get("head") or {}).get("sha") or "") != source_sha:
-              raise SystemExit("A2C_APPLY_WORK_PR_HEAD_DRIFT")
-          initial_files = client.pull_files(pr_number)
-          if len(initial_files) != 3 or {str(item.get("filename") or "") for item in initial_files} != source_paths:
-              raise SystemExit("A2C_APPLY_INITIAL_SCOPE_DRIFT")
-
-          source_ref = client.git_ref(work_branch)
-          if str((source_ref.get("object") or {}).get("sha") or "") != source_sha:
-              raise SystemExit("A2C_APPLY_SOURCE_REF_DRIFT")
-
-          store = GitHubLeaseStore(client)
-          registry, anchor = store.read(expected_main_sha=expected_main, policy_max_parallel_writers=1)
-          if registry.get("revision") != lease_revision or anchor != lease_anchor:
-              raise SystemExit("A2C_APPLY_LEASE_STREAM_DRIFT")
-          active = [item for item in registry.get("leases") or [] if item.get("status") == "ACTIVE"]
-          resources = _stage1_resources()
-          if len(active) != 1:
-              raise SystemExit("A2C_APPLY_ACTIVE_WRITER_COUNT_DRIFT")
-          lease = active[0]
-          expected_lease = {
-              "lease_id": lease_id,
-              "issue_id": issue_id,
-              "roadmap_id": roadmap_id,
-              "worker_id": worker_id,
-              "base_sha": expected_main,
-              "branch": work_branch,
-              "resources": resources,
-          }
-          for key, expected in expected_lease.items():
-              if lease.get(key) != expected:
-                  raise SystemExit("A2C_APPLY_LEASE_IDENTITY_DRIFT:" + key)
-
-          inputs = {
-              ".adwf/docs-registry.json": (os.environ["DOCS_B64"], os.environ["DOCS_SHA256"], os.environ["DOCS_SIZE"]),
-              "MANIFEST.json": (os.environ["MANIFEST_B64"], os.environ["MANIFEST_SHA256"], os.environ["MANIFEST_SIZE"]),
-              "SHA256SUMS.txt": (os.environ["SUMS_B64"], os.environ["SUMS_SHA256"], os.environ["SUMS_SIZE"]),
-          }
-          decoded = {}
-          for path, (encoded, expected_sha, expected_size_text) in inputs.items():
-              try:
-                  data = base64.b64decode(encoded, validate=True)
-                  expected_size = int(expected_size_text)
-              except Exception as exc:
-                  raise SystemExit("A2C_APPLY_PROJECTION_ENVELOPE_INVALID:" + path) from exc
-              if len(data) != expected_size or not 1 <= len(data) <= 300_000:
-                  raise SystemExit("A2C_APPLY_PROJECTION_SIZE_INVALID:" + path)
-              if hashlib.sha256(data).hexdigest() != expected_sha:
-                  raise SystemExit("A2C_APPLY_PROJECTION_DIGEST_INVALID:" + path)
-              try:
-                  text = data.decode("utf-8")
-              except UnicodeDecodeError as exc:
-                  raise SystemExit("A2C_APPLY_PROJECTION_UTF8_INVALID:" + path) from exc
-              if text.encode("utf-8") != data or "\x00" in text or not text.endswith("\n"):
-                  raise SystemExit("A2C_APPLY_PROJECTION_TEXT_INVALID:" + path)
-              current = client.content(path, ref=source_sha)
-              current_data = base64.b64decode(str(current.get("content") or "").replace("\n", ""), validate=True)
-              if current_data == data:
-                  raise SystemExit("A2C_APPLY_PROJECTION_NOT_CHANGED:" + path)
-              decoded[path] = data
-
-          try:
-              docs = json.loads(decoded[".adwf/docs-registry.json"].decode("utf-8"))
-              manifest = json.loads(decoded["MANIFEST.json"].decode("utf-8"))
-          except json.JSONDecodeError as exc:
-              raise SystemExit("A2C_APPLY_JSON_PROJECTION_INVALID") from exc
-          if not isinstance(docs, dict) or not isinstance(manifest, dict):
-              raise SystemExit("A2C_APPLY_JSON_PROJECTION_NOT_OBJECT")
-          manifest_files = manifest.get("files")
-          if not isinstance(manifest_files, list) or any(not isinstance(item, str) for item in manifest_files):
-              raise SystemExit("A2C_APPLY_MANIFEST_FILES_INVALID")
-          for required in source_paths | {".adwf/docs-registry.json"}:
-              if required not in manifest_files:
-                  raise SystemExit("A2C_APPLY_MANIFEST_REQUIRED_PATH_MISSING:" + required)
-
-          sum_paths = set()
-          for line in decoded["SHA256SUMS.txt"].decode("utf-8").splitlines():
-              match = re.fullmatch(r"([0-9a-f]{64})  ([^\x00\r\n]+)", line)
-              if match is None:
-                  raise SystemExit("A2C_APPLY_SUMS_LINE_INVALID")
-              path = match.group(2)
-              if path.startswith("/") or ".." in Path(path).parts or path in sum_paths:
-                  raise SystemExit("A2C_APPLY_SUMS_PATH_INVALID")
-              sum_paths.add(path)
-          for required in source_paths | {".adwf/docs-registry.json", "MANIFEST.json"}:
-              if required not in sum_paths:
-                  raise SystemExit("A2C_APPLY_SUMS_REQUIRED_PATH_MISSING:" + required)
-
-          source_commit = client.get(f"/repos/{repo}/git/commits/{source_sha}")
-          source_tree = str((source_commit.get("tree") or {}).get("sha") or "")
-          if re.fullmatch(r"[0-9a-f]{40}", source_tree) is None:
-              raise SystemExit("A2C_APPLY_SOURCE_TREE_INVALID")
-
-          tree_entries = []
-          for path in sorted(projection_paths):
-              blob = client.post(
-                  f"/repos/{repo}/git/blobs",
-                  {"content": decoded[path].decode("utf-8"), "encoding": "utf-8"},
-              )
-              blob_sha = str(blob.get("sha") or "")
-              if re.fullmatch(r"[0-9a-f]{40}", blob_sha) is None:
-                  raise SystemExit("A2C_APPLY_BLOB_CREATE_FAILED:" + path)
-              tree_entries.append({"path": path, "mode": "100644", "type": "blob", "sha": blob_sha})
-
-          tree = client.post(
-              f"/repos/{repo}/git/trees",
-              {"base_tree": source_tree, "tree": tree_entries},
-          )
-          new_tree = str(tree.get("sha") or "")
-          if re.fullmatch(r"[0-9a-f]{40}", new_tree) is None or new_tree == source_tree:
-              raise SystemExit("A2C_APPLY_TREE_CREATE_FAILED")
-          commit = client.post(
-              f"/repos/{repo}/git/commits",
-              {
-                  "message": "ORCH_CLAIM_GATEWAY-001: materialize canonical projections",
-                  "tree": new_tree,
-                  "parents": [source_sha],
-              },
-          )
-          new_sha = str(commit.get("sha") or "")
-          if re.fullmatch(r"[0-9a-f]{40}", new_sha) is None:
-              raise SystemExit("A2C_APPLY_COMMIT_CREATE_FAILED")
-
-          pre_update_ref = client.git_ref(work_branch)
-          if str((pre_update_ref.get("object") or {}).get("sha") or "") != source_sha:
-              raise SystemExit("A2C_APPLY_PRE_UPDATE_REF_DRIFT")
-          pre_update_pr = client.pull(pr_number)
-          if str((pre_update_pr.get("head") or {}).get("sha") or "") != source_sha:
-              raise SystemExit("A2C_APPLY_PRE_UPDATE_PR_DRIFT")
-
-          client.patch(
-              f"/repos/{repo}/git/refs/heads/{quote(work_branch, safe='')}",
-              {"sha": new_sha, "force": False},
-          )
-          final_ref = client.git_ref(work_branch)
-          if str((final_ref.get("object") or {}).get("sha") or "") != new_sha:
-              raise SystemExit("A2C_APPLY_REF_READBACK_MISMATCH")
-          final_commit = client.get(f"/repos/{repo}/git/commits/{new_sha}")
-          parents = final_commit.get("parents") or []
-          if len(parents) != 1 or str((parents[0] or {}).get("sha") or "") != source_sha:
-              raise SystemExit("A2C_APPLY_COMMIT_PARENT_MISMATCH")
-          if str((final_commit.get("tree") or {}).get("sha") or "") != new_tree:
-              raise SystemExit("A2C_APPLY_COMMIT_TREE_MISMATCH")
-
-          final_pr = None
-          final_files = None
-          for _ in range(12):
-              candidate = client.pull(pr_number)
-              if str((candidate.get("head") or {}).get("sha") or "") == new_sha:
-                  files = client.pull_files(pr_number)
-                  if {str(item.get("filename") or "") for item in files} == final_paths and len(files) == 6:
-                      final_pr = candidate
-                      final_files = files
-                      break
-              time.sleep(1)
-          if final_pr is None or final_files is None:
-              raise SystemExit("A2C_APPLY_PR_READBACK_MISMATCH")
-
-          print("A2C_APPLY_PROJECTIONS=PASS")
-          print("OLD_SOURCE_SHA=" + source_sha)
-          print("NEW_SOURCE_SHA=" + new_sha)
-          print("NEW_TREE_SHA=" + new_tree)
-          print("FINAL_PR_PATH_COUNT=6")
-          print("MERGE_AUTHORITY=False")
+          print("PROVIDER_RECONCILIATION_REF=" + reconciliation_ref)
+          print("ACTIVE_WRITERS=0")
           print("ISSUE_CLOSE_AUTHORITY=False")
-          print("RULESET_POLICY_CHANGE=False")
+          print("SOURCE_MUTATION=False")
           print("MONETARY_COST_USD=0")
