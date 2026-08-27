@@ -6,6 +6,8 @@ on:
 
 permissions:
   contents: write
+  issues: read
+  pull-requests: read
 
 jobs:
   acquire-or-refresh-lease:
@@ -125,7 +127,7 @@ jobs:
           if anchor_rules.get("readback_verified") is not True:
               raise SystemExit("BOOTSTRAP_ANCHOR_RULESET_NOT_VERIFIED")
 
-          files = client.get(f"/repos/{repo}/pulls/{pr_number}/files?per_page=100")
+          files = client.pull_files(pr_number)
           if not isinstance(files, list) or len(files) != 1:
               raise SystemExit("BOOTSTRAP_HELPER_SCOPE_NOT_SINGLE_FILE")
           only = files[0]
