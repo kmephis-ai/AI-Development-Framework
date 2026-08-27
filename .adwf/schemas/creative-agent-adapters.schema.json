@@ -26,10 +26,10 @@
       "additionalProperties": false,
       "properties": {
         "id": {
-          "const": "CREATIVE_AGENT_COMMAND_V1"
+          "const": "CREATIVE_AGENT_COMMAND_V2"
         },
         "version": {
-          "const": 1
+          "const": 2
         },
         "digest": {
           "type": "string",
@@ -50,6 +50,7 @@
           "supported_phases",
           "command",
           "authority",
+          "executor_auth",
           "monetary_budget_usd",
           "timeout_seconds",
           "result_channel",
@@ -142,6 +143,12 @@
               }
             }
           },
+          "executor_auth": {
+            "enum": [
+              "NONE",
+              "PROVIDER_MANAGED_SESSION"
+            ]
+          },
           "monetary_budget_usd": {
             "const": 0
           },
@@ -165,16 +172,47 @@
             "maxLength": 240
           },
           "qualification_profile_id": {
-            "const": "CREATIVE_AGENT_COMMAND_V1"
+            "const": "CREATIVE_AGENT_COMMAND_V2"
           },
           "qualification_profile_version": {
-            "const": 1
+            "const": 2
           },
           "qualification_profile_digest": {
             "type": "string",
             "format": "sha256"
           }
-        }
+        },
+        "allOf": [
+          {
+            "oneOf": [
+              {
+                "properties": {
+                  "executor_auth": {
+                    "const": "NONE"
+                  }
+                }
+              },
+              {
+                "properties": {
+                  "executor_auth": {
+                    "const": "PROVIDER_MANAGED_SESSION"
+                  },
+                  "kind": {
+                    "const": "EXTERNAL_COMMAND"
+                  },
+                  "authority": {
+                    "type": "object",
+                    "properties": {
+                      "secrets": {
+                        "const": "FORBIDDEN"
+                      }
+                    }
+                  }
+                }
+              }
+            ]
+          }
+        ]
       }
     },
     "registry_sha256": {

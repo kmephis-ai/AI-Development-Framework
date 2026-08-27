@@ -67,6 +67,9 @@ class CreativeAgentQualificationTests(unittest.TestCase):
         self.assertEqual(report, reference_qualification_report(adapter))
         self.assertFalse(report["real_external_agent_verified"])
         self.assertTrue(report["low_trust_result"])
+        self.assertEqual(report["executor_auth"], "NONE")
+        self.assertEqual(report["qualification_profile_id"], "CREATIVE_AGENT_COMMAND_V2")
+        self.assertEqual(report["qualification_profile_version"], 2)
 
     def test_tampered_registry_report_and_authority_fail_closed(self):
         registry = load_registry(ROOT)
@@ -121,12 +124,64 @@ class CreativeAgentQualificationTests(unittest.TestCase):
         self.assertNotIn("OPENAI_API_KEY", env)
         self.assertNotIn("PASSWORD", env)
         self.assertEqual(env["ADWF_AGENT_ADAPTER_ID"], "reference-local")
+        self.assertEqual(env["ADWF_AGENT_EXECUTOR_AUTH"], "NONE")
+
+
+    def test_provider_managed_executor_auth_is_external_only_secret_free_and_fail_closed(self):
+        registry = load_registry(ROOT)
+        schema = json.loads((ROOT / ".adwf/schemas/creative-agent-adapters.schema.json").read_text())
+
+        external = copy.deepcopy(registry)
+        external_adapter = next(item for item in external["adapters"] if item["id"] == "openhands-local")
+        external_adapter["executor_auth"] = "PROVIDER_MANAGED_SESSION"
+        self.assertEqual(validate(external, schema), [])
+
+        secret_delivery = copy.deepcopy(external)
+        next(item for item in secret_delivery["adapters"] if item["id"] == "openhands-local")["authority"]["secrets"] = "DECLARED_REQUIRED"
+        self.assertTrue(validate(secret_delivery, schema))
+
+        reference = copy.deepcopy(registry)
+        next(item for item in reference["adapters"] if item["id"] == "reference-local")["executor_auth"] = "PROVIDER_MANAGED_SESSION"
+        self.assertTrue(validate(reference, schema))
+
+        unknown = copy.deepcopy(registry)
+        next(item for item in unknown["adapters"] if item["id"] == "openhands-local")["executor_auth"] = "UNKNOWN"
+        self.assertTrue(validate(unknown, schema))
+
+    def test_provider_managed_executor_auth_marker_is_non_secret_and_credentials_are_not_forwarded(self):
+        registry = load_registry(ROOT)
+        adapter = copy.deepcopy(next(item for item in registry["adapters"] if item["id"] == "openhands-local"))
+        adapter["executor_auth"] = "PROVIDER_MANAGED_SESSION"
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            env = sanitized_agent_environment(
+                {
+                    "PATH": os.environ.get("PATH", ""),
+                    "GITHUB_TOKEN": "github-secret",
+                    "GH_TOKEN": "gh-secret",
+                    "OPENAI_API_KEY": "api-secret",
+                    "PASSWORD": "password-secret",
+                    "CREDENTIAL_FILE": "credential-secret",
+                    "PRIVATE_KEY": "private-secret",
+                },
+                request=root / "request.json",
+                result=root / "result.json",
+                state=state(),
+                adapter=adapter,
+            )
+        self.assertEqual(env["ADWF_AGENT_EXECUTOR_AUTH"], "PROVIDER_MANAGED_SESSION")
+        serialized = "\n".join(f"{key}={value}" for key, value in sorted(env.items()))
+        for secret in ("github-secret", "gh-secret", "api-secret", "password-secret", "credential-secret", "private-secret"):
+            self.assertNotIn(secret, serialized)
+        for name in ("GITHUB_TOKEN", "GH_TOKEN", "OPENAI_API_KEY", "PASSWORD", "CREDENTIAL_FILE", "PRIVATE_KEY"):
+            self.assertNotIn(name, env)
 
     def test_reference_qualification_runs_offline_and_remains_synthetic(self):
         result = run_reference_qualification(ROOT)
         self.assertEqual(result["status"], "PASS")
         self.assertEqual(result["network"], "NONE")
         self.assertEqual(result["secrets"], "FORBIDDEN")
+        self.assertEqual(result["executor_auth"], "NONE")
         self.assertEqual(result["monetary_budget_usd"], 0)
         self.assertTrue(result["low_trust_result"])
         self.assertFalse(result["real_external_agent_verified"])

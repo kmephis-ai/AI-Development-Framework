@@ -5,16 +5,17 @@
   "adapter_version": "1.0.1",
   "adapter_kind": "EXTERNAL_COMMAND",
   "invocation_mode": "COMMAND",
-  "qualification_profile_id": "CREATIVE_AGENT_COMMAND_V1",
-  "qualification_profile_version": 1,
-  "qualification_profile_digest": "426dee8fd5063bb8f408d6ec3ab26e7c67d9c4a2e8d91b09174cb407bd515af8",
-  "adapter_digest": "53c13bdeacbcf47c84f14dd69f0ea9e09dbd129f93bd5d98c69889285d01f842",
+  "qualification_profile_id": "CREATIVE_AGENT_COMMAND_V2",
+  "qualification_profile_version": 2,
+  "qualification_profile_digest": "bcaff6ec0197821b2884ff69cc2afc86011d19ab38bbb6e8a0f716be8844cdc6",
+  "adapter_digest": "fd7e0b654d81fa1a6eea0cd62999f578aed43b103a1caf824ccc2b884e84a6dd",
   "status": "PASS",
   "supported_phases": [
     "EXECUTE",
     "RECOVERY"
   ],
   "monetary_budget_usd": 0,
+  "executor_auth": "NONE",
   "network": "DECLARED_EXTERNAL",
   "secrets": "FORBIDDEN",
   "filesystem": "PACKAGE_SCOPED",
@@ -30,5 +31,5 @@
   "missing_result_fail_closed": true,
   "low_trust_result": true,
   "real_external_agent_verified": false,
-  "report_sha256": "ab3e98d7bffcdb7d420967a87c9e263a2dd2874876674b74540288fd42698514"
+  "report_sha256": "0ecf629e91912a11183e3290b583eca2f5939662df1d987a2f192083f1fec73e"
 }
