@@ -1,0 +1,245 @@
+name: ORCH_CLAIM_GATEWAY-001 Source Authority Bootstrap
+
+on:
+  pull_request:
+    types: [opened, reopened, synchronize]
+
+permissions:
+  contents: write
+
+jobs:
+  acquire-or-refresh-lease:
+    if: github.event.pull_request.head.ref == 'helper/ORCH_CLAIM_GATEWAY-001-source-authority-a1'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd
+        with:
+          ref: 730cab912f779bec1f3208c66eda1889f69d6f4c
+          persist-credentials: false
+          fetch-depth: 1
+
+      - uses: actions/setup-python@a309ff8b426b58ec0e2a45f0f869d46889d02405
+        with:
+          python-version: "3.12.10"
+
+      - name: Acquire or refresh exact provider-durable lease
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+          EXPECTED_MAIN: 730cab912f779bec1f3208c66eda1889f69d6f4c
+          EXPECTED_TREE: a75f7b09b32ce1a016d0881637afcce16fc894d1
+          EXPECTED_PREVIOUS_REVISION: '55'
+          EXPECTED_PREVIOUS_ANCHOR: a6759e49d3205346e0b24a6bcd059275f07ceaa6
+          EXPECTED_PREVIOUS_OBSERVED_MAIN: fe5ac9411ac43a962f5afb0f0e2ef82226dfe3b3
+          ISSUE_ID: '287'
+          ROADMAP_ID: ORCH_CLAIM_GATEWAY-001
+          RUN_ID: orch-claim-gateway-001-bootstrap-a1
+          WORKER_ID: adwf-runtime:orch-claim-gateway-001-bootstrap-a1
+          WORK_BRANCH: adwf/orch-claim-gateway-001-5ab023d85879
+          HELPER_BRANCH: helper/ORCH_CLAIM_GATEWAY-001-source-authority-a1
+          HELPER_PATH: .github/workflows/adwf-orch-claim-gateway-source-authority.yml
+        shell: python
+        run: |
+          from pathlib import Path
+          import json
+          import os
+          import sys
+
+          root = Path.cwd()
+          sys.path.insert(0, str(root / ".adwf"))
+
+          from lib.action_executors import (
+              ExecutorWait,
+              _stage1_resources,
+              _writer_branch,
+              _writer_id,
+              claim_executor,
+          )
+          from lib.github_lease_store import GitHubLeaseStore
+          from lib.github_provider import GitHubClient
+          from lib.github_rulesets import verify_rulesets, verify_runtime_anchor_ruleset
+          from lib.provider_contracts import ProviderContractError
+          from lib.strict_json import loads as strict_loads
+
+          repo = os.environ["GITHUB_REPOSITORY"]
+          token = os.environ["GITHUB_TOKEN"]
+          expected_main = os.environ["EXPECTED_MAIN"]
+          expected_tree = os.environ["EXPECTED_TREE"]
+          expected_previous_revision = int(os.environ["EXPECTED_PREVIOUS_REVISION"])
+          expected_previous_anchor = os.environ["EXPECTED_PREVIOUS_ANCHOR"]
+          expected_previous_observed_main = os.environ["EXPECTED_PREVIOUS_OBSERVED_MAIN"]
+          issue_id = os.environ["ISSUE_ID"]
+          roadmap_id = os.environ["ROADMAP_ID"]
+          run_id = os.environ["RUN_ID"]
+          expected_worker = os.environ["WORKER_ID"]
+          expected_branch = os.environ["WORK_BRANCH"]
+          helper_branch = os.environ["HELPER_BRANCH"]
+          helper_path = os.environ["HELPER_PATH"]
+
+          event = json.loads(Path(os.environ["GITHUB_EVENT_PATH"]).read_text(encoding="utf-8"))
+          pr = event.get("pull_request") or {}
+          pr_number = int(pr.get("number") or 0)
+          if pr_number <= 0:
+              raise SystemExit("BOOTSTRAP_PR_NUMBER_MISSING")
+          if str((pr.get("head") or {}).get("ref") or "") != helper_branch:
+              raise SystemExit("BOOTSTRAP_HELPER_BRANCH_MISMATCH")
+          if str((pr.get("head") or {}).get("repo", {}).get("full_name") or "") != repo:
+              raise SystemExit("BOOTSTRAP_CROSS_REPOSITORY_HEAD_FORBIDDEN")
+          if str((pr.get("base") or {}).get("sha") or "") != expected_main:
+              raise SystemExit("BOOTSTRAP_PR_BASE_SHA_DRIFT")
+
+          cfg = strict_loads((root / ".adwf/config.json").read_text(encoding="utf-8"))
+          policy = cfg.get("policy") or {}
+          orchestration = cfg.get("orchestration") or {}
+          cost = cfg.get("cost") or {}
+          if policy.get("active_autonomy") != "A2" or policy.get("max_autonomous_risk") != "R1":
+              raise SystemExit("BOOTSTRAP_POLICY_DRIFT")
+          if orchestration.get("max_parallel_writers") != 1:
+              raise SystemExit("BOOTSTRAP_WRITER_CEILING_DRIFT")
+          ttl = orchestration.get("lease_ttl_minutes")
+          if isinstance(ttl, bool) or not isinstance(ttl, int) or not 1 <= ttl <= 240:
+              raise SystemExit("BOOTSTRAP_TTL_POLICY_INVALID")
+          if cost.get("mode") != "FREE_ONLY" or cost.get("monetary_budget") != 0:
+              raise SystemExit("BOOTSTRAP_FREE_ONLY_DRIFT")
+
+          client = GitHubClient(repo, token)
+          repo_info = client.repo_info()
+          if str(repo_info.get("default_branch") or "") != "main":
+              raise SystemExit("BOOTSTRAP_DEFAULT_BRANCH_DRIFT")
+          main = client.branch("main")
+          if str((main.get("commit") or {}).get("sha") or "") != expected_main:
+              raise SystemExit("BOOTSTRAP_MAIN_SHA_DRIFT")
+          commit = client.get(f"/repos/{repo}/git/commits/{expected_main}")
+          if str((commit.get("tree") or {}).get("sha") or "") != expected_tree:
+              raise SystemExit("BOOTSTRAP_MAIN_TREE_DRIFT")
+
+          work_issue = client.get(f"/repos/{repo}/issues/{int(issue_id)}")
+          if work_issue.get("state") != "open":
+              raise SystemExit("BOOTSTRAP_WORK_ISSUE_NOT_OPEN")
+
+          rules = client.rulesets()
+          main_rules = verify_rulesets(rules, expected_integration_id=15368)
+          anchor_rules = verify_runtime_anchor_ruleset(rules)
+          if main_rules.get("readback_verified") is not True:
+              raise SystemExit("BOOTSTRAP_MAIN_RULESET_NOT_VERIFIED")
+          if anchor_rules.get("readback_verified") is not True:
+              raise SystemExit("BOOTSTRAP_ANCHOR_RULESET_NOT_VERIFIED")
+
+          files = client.get(f"/repos/{repo}/pulls/{pr_number}/files?per_page=100")
+          if not isinstance(files, list) or len(files) != 1:
+              raise SystemExit("BOOTSTRAP_HELPER_SCOPE_NOT_SINGLE_FILE")
+          only = files[0]
+          if str(only.get("filename") or "") != helper_path or str(only.get("status") or "") != "added":
+              raise SystemExit("BOOTSTRAP_HELPER_SCOPE_PATH_MISMATCH")
+
+          state = {
+              "phase": "CLAIM",
+              "run_id": run_id,
+              "roadmap_id": roadmap_id,
+              "issue_id": issue_id,
+              "subject_sha": expected_main,
+              "risk": "R1",
+              "work_type": "governance",
+          }
+          resources = _stage1_resources()
+          if _writer_id(state) != expected_worker:
+              raise SystemExit("BOOTSTRAP_WORKER_ID_DRIFT")
+          if _writer_branch(state) != expected_branch:
+              raise SystemExit("BOOTSTRAP_WORK_BRANCH_DRIFT")
+
+          store = GitHubLeaseStore(client)
+          registry, anchor = store.read(
+              expected_main_sha=expected_main,
+              policy_max_parallel_writers=1,
+          )
+          active = [x for x in registry.get("leases") or [] if x.get("status") == "ACTIVE"]
+
+          if not active:
+              if (
+                  registry.get("revision") != expected_previous_revision
+                  or anchor != expected_previous_anchor
+                  or registry.get("observed_main_sha") != expected_previous_observed_main
+              ):
+                  raise SystemExit("BOOTSTRAP_PREVIOUS_REGISTRY_DRIFT")
+              claim = claim_executor(root, state, "orch-claim-gateway-bootstrap-a1", {})
+              if isinstance(claim, ExecutorWait):
+                  raise SystemExit(
+                      "BOOTSTRAP_CANONICAL_CLAIM_WAIT:"
+                      + json.dumps(claim.to_dict(), ensure_ascii=True, sort_keys=True)
+                  )
+              meta = claim.get("metadata") or {}
+              if claim.get("outcome") != "PASS":
+                  raise SystemExit("BOOTSTRAP_CANONICAL_CLAIM_NOT_PASS")
+              if meta.get("lease_model") != "PROVIDER_DURABLE_CAS":
+                  raise SystemExit("BOOTSTRAP_LEASE_MODEL_INVALID")
+              if meta.get("resumed_existing") is not False:
+                  raise SystemExit("BOOTSTRAP_UNEXPECTED_RESUME")
+              lease_id = str(meta.get("lease_id") or "")
+          else:
+              compatible = [
+                  x
+                  for x in active
+                  if x.get("issue_id") == issue_id
+                  and x.get("roadmap_id") == roadmap_id
+                  and x.get("worker_id") == expected_worker
+                  and x.get("base_sha") == expected_main
+                  and x.get("branch") == expected_branch
+                  and x.get("resources") == resources
+              ]
+              if len(active) != 1 or len(compatible) != 1:
+                  raise SystemExit("BOOTSTRAP_ACTIVE_PROVIDER_LEASE_INCOMPATIBLE")
+              lease_id = str(compatible[0].get("lease_id") or "")
+              refreshed, _ = store.heartbeat(
+                  expected_main_sha=expected_main,
+                  policy_max_parallel_writers=1,
+                  lease_id=lease_id,
+                  worker_id=expected_worker,
+                  ttl_minutes=ttl,
+              )
+              if refreshed.get("observed_main_sha") != expected_main:
+                  raise SystemExit("BOOTSTRAP_HEARTBEAT_MAIN_BINDING_MISMATCH")
+
+          reread, reread_anchor = store.read(
+              expected_main_sha=expected_main,
+              policy_max_parallel_writers=1,
+          )
+          matches = [
+              x
+              for x in reread.get("leases") or []
+              if x.get("status") == "ACTIVE"
+              and x.get("lease_id") == lease_id
+              and x.get("issue_id") == issue_id
+              and x.get("roadmap_id") == roadmap_id
+              and x.get("worker_id") == expected_worker
+              and x.get("base_sha") == expected_main
+              and x.get("branch") == expected_branch
+              and x.get("resources") == resources
+          ]
+          if len(matches) != 1:
+              raise SystemExit("BOOTSTRAP_LEASE_READBACK_MISSING")
+          if reread.get("observed_main_sha") != expected_main or reread_anchor is None:
+              raise SystemExit("BOOTSTRAP_LEASE_READBACK_BINDING_MISMATCH")
+
+          try:
+              branch_readback = client.git_ref(expected_branch)
+          except ProviderContractError as exc:
+              if str(exc) != "PROVIDER_HTTP_404":
+                  raise
+              client.create_ref(expected_branch, expected_main)
+              branch_readback = client.git_ref(expected_branch)
+
+          branch_sha = str((branch_readback.get("object") or {}).get("sha") or "")
+          if not branch_sha:
+              raise SystemExit("BOOTSTRAP_WORK_BRANCH_READBACK_MISSING")
+
+          print("ORCH_CLAIM_GATEWAY_BOOTSTRAP=PASS")
+          print("LEASE_ID=" + lease_id)
+          print("LEASE_REGISTRY_REVISION=" + str(reread["revision"]))
+          print("LEASE_ANCHOR=" + str(reread_anchor))
+          print("LEASE_OBSERVED_MAIN=" + str(reread["observed_main_sha"]))
+          print("WORKER_ID=" + expected_worker)
+          print("WORK_BRANCH=" + expected_branch)
+          print("WORK_BRANCH_SHA=" + branch_sha)
+          print("SOURCE_MUTATION_BY_HELPER=False")
+          print("MERGE_AUTHORITY=False")
+          print("MONETARY_COST_USD=0")
