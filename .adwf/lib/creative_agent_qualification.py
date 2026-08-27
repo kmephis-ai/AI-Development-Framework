@@ -29,8 +29,8 @@ from .strict_json import loads as strict_loads
 
 DIGEST_RE = re.compile(r"^[0-9a-f]{64}$")
 SAFE_ID_RE = re.compile(r"^[a-z0-9][a-z0-9-]{1,63}$")
-PROFILE_ID = "CREATIVE_AGENT_COMMAND_V1"
-PROFILE_VERSION = 1
+PROFILE_ID = "CREATIVE_AGENT_COMMAND_V2"
+PROFILE_VERSION = 2
 SAFE_ENV_NAMES = {
     "PATH", "LANG", "LC_ALL", "LC_CTYPE", "TMPDIR", "TMP", "TEMP",
     "SYSTEMROOT", "WINDIR", "PATHEXT", "PYTHONIOENCODING",
@@ -101,6 +101,7 @@ def reference_qualification_report(adapter: dict[str, Any]) -> dict[str, Any]:
         "status": "PASS",
         "supported_phases": list(adapter["supported_phases"]),
         "monetary_budget_usd": adapter["monetary_budget_usd"],
+        "executor_auth": adapter["executor_auth"],
         "network": adapter["authority"]["network"],
         "secrets": adapter["authority"]["secrets"],
         "filesystem": adapter["authority"]["filesystem"],
@@ -186,9 +187,19 @@ def validate_registry(registry: dict[str, Any], root: str | Path) -> list[str]:
         if not _safe_relative(qpath):
             errors.append("ADAPTER_QUALIFICATION_PATH_INVALID:" + aid)
         authority = adapter.get("authority") if isinstance(adapter.get("authority"), dict) else {}
+        executor_auth = adapter.get("executor_auth")
+        if executor_auth == "PROVIDER_MANAGED_SESSION":
+            if adapter.get("kind") != "EXTERNAL_COMMAND":
+                errors.append("PROVIDER_MANAGED_SESSION_KIND_FORBIDDEN:" + aid)
+            if authority.get("secrets") != "FORBIDDEN":
+                errors.append("PROVIDER_MANAGED_SESSION_SECRET_DELIVERY_FORBIDDEN:" + aid)
+        elif executor_auth != "NONE":
+            errors.append("EXECUTOR_AUTH_MODE_INVALID:" + aid)
         if adapter.get("monetary_budget_usd") != 0:
             errors.append("COMMAND_ADAPTER_COST_FORBIDDEN:" + aid)
         if adapter.get("kind") == "REFERENCE_DETERMINISTIC":
+            if executor_auth != "NONE":
+                errors.append("REFERENCE_ADAPTER_EXECUTOR_AUTH_FORBIDDEN:" + aid)
             if authority != {"network": "NONE", "secrets": "FORBIDDEN", "filesystem": "PACKAGE_SCOPED"}:
                 errors.append("COMMAND_ADAPTER_AUTHORITY_FORBIDDEN:" + aid)
             if adapter.get("invocation_mode") != "COMMAND":
@@ -275,6 +286,7 @@ def sanitized_agent_environment(
             "ADWF_PHASE": str(state.get("phase") or ""),
             "ADWF_AGENT_ADAPTER_ID": str(adapter.get("id") or ""),
             "ADWF_AGENT_ADAPTER_VERSION": str(adapter.get("version") or ""),
+            "ADWF_AGENT_EXECUTOR_AUTH": str(adapter.get("executor_auth") or ""),
             "ADWF_AGENT_NETWORK_AUTHORITY": str((adapter.get("authority") or {}).get("network") or ""),
             "ADWF_AGENT_SECRETS_AUTHORITY": str((adapter.get("authority") or {}).get("secrets") or ""),
         }
@@ -429,6 +441,7 @@ def run_reference_qualification(root: str | Path) -> dict[str, Any]:
         "adapter_digest": adapter_digest(adapter),
         "qualification_profile_digest": adapter["qualification_profile_digest"],
         "report_sha256": report["report_sha256"],
+        "executor_auth": adapter["executor_auth"],
         "network": adapter["authority"]["network"],
         "secrets": adapter["authority"]["secrets"],
         "filesystem": adapter["authority"]["filesystem"],

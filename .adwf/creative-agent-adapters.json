@@ -2,9 +2,9 @@
   "$schema": ".adwf/schemas/creative-agent-adapters.schema.json",
   "schema_version": 1,
   "qualification_profile": {
-    "id": "CREATIVE_AGENT_COMMAND_V1",
-    "version": 1,
-    "digest": "426dee8fd5063bb8f408d6ec3ab26e7c67d9c4a2e8d91b09174cb407bd515af8"
+    "id": "CREATIVE_AGENT_COMMAND_V2",
+    "version": 2,
+    "digest": "bcaff6ec0197821b2884ff69cc2afc86011d19ab38bbb6e8a0f716be8844cdc6"
   },
   "adapters": [
     {
@@ -32,9 +32,10 @@
       "package_schema": ".adwf/schemas/ai-work-package.schema.json",
       "result_schema": ".adwf/schemas/ai-work-result.schema.json",
       "qualification_report": ".adwf/creative-agent-qualification.json",
-      "qualification_profile_id": "CREATIVE_AGENT_COMMAND_V1",
-      "qualification_profile_version": 1,
-      "qualification_profile_digest": "426dee8fd5063bb8f408d6ec3ab26e7c67d9c4a2e8d91b09174cb407bd515af8"
+      "qualification_profile_id": "CREATIVE_AGENT_COMMAND_V2",
+      "qualification_profile_version": 2,
+      "qualification_profile_digest": "bcaff6ec0197821b2884ff69cc2afc86011d19ab38bbb6e8a0f716be8844cdc6",
+      "executor_auth": "NONE"
     },
     {
       "id": "openhands-local",
@@ -61,10 +62,11 @@
       "package_schema": ".adwf/schemas/ai-work-package.schema.json",
       "result_schema": ".adwf/schemas/ai-work-result.schema.json",
       "qualification_report": ".adwf/creative-agent-qualification-openhands-local.json",
-      "qualification_profile_id": "CREATIVE_AGENT_COMMAND_V1",
-      "qualification_profile_version": 1,
-      "qualification_profile_digest": "426dee8fd5063bb8f408d6ec3ab26e7c67d9c4a2e8d91b09174cb407bd515af8"
+      "qualification_profile_id": "CREATIVE_AGENT_COMMAND_V2",
+      "qualification_profile_version": 2,
+      "qualification_profile_digest": "bcaff6ec0197821b2884ff69cc2afc86011d19ab38bbb6e8a0f716be8844cdc6",
+      "executor_auth": "NONE"
     }
   ],
-  "registry_sha256": "eed73114abc74d7cfef604b06b2b7d4d7e9ebc5d77e1f69e2e6976da6d8a232b"
+  "registry_sha256": "af42830c0433becf70fb7d4d2ab4c8b7888951d68fccfb216ed707c8ada54ed9"
 }
