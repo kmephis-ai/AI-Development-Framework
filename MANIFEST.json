@@ -3,8 +3,8 @@
   "version": "1.6.0",
   "schema_version": 3,
   "scope": "FRAMEWORK_OWNED_TRUST_BOUNDARY",
-  "file_count_excluding_manifests": 594,
-  "total_bytes_excluding_manifests": 3280506,
+  "file_count_excluding_manifests": 595,
+  "total_bytes_excluding_manifests": 3281418,
   "files": [
     ".adwf/SETUP_CHECKLIST.md",
     ".adwf/actions-lock.json",
@@ -483,6 +483,7 @@
     "docs/architecture/EXECUTIVE_AUTOPILOT_V1_5.md",
     "docs/architecture/EXECUTIVE_AUTOPILOT_V1_6.md",
     "docs/decisions/README.md",
+    "docs/framework/GOV034_PROVIDER_OPS_E2E_PROOF.md",
     "docs/governance/AI_WORK_CONTRACTS.md",
     "docs/governance/AUTONOMY_POLICY.md",
     "docs/governance/CAPABILITY_LIVE_EVIDENCE.md",

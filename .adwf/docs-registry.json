@@ -11,7 +11,7 @@
         ".github/workflows/**"
       ],
       "mode": "generated-status-block+manual",
-      "source_digest": "23514803c256aeb19c3ebc1c5f7f3a2b08022bf5e8e9327c0defb130906bb774",
+      "source_digest": "2b6df86a75cb94fa2ed8ed3ef9e69cb7214e72bbe761612344a5fe13a5e458f4",
       "reviewed_at": "2026-08-13T00:00:00Z",
       "valid_until": "2026-11-13T00:00:00Z"
     },
