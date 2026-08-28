@@ -9,6 +9,7 @@ from lib.runtime_supervisor import RuntimeSupervisor
 from lib.github_provider import GitHubClient
 from lib.github_agent_inbox import GitHubAgentInbox,validate_agent_result
 from lib.provider_claim_gateway import has_claim_marker,process_issue_comment_claim
+from lib.provider_ops_gateway import has_provider_ops_marker,process_issue_comment_provider_ops
 from lib.strict_json import loads as strict_loads
 from lib.work_memory import WorkMemoryStore
 
@@ -23,6 +24,13 @@ def _event():
 
 def main()->int:
     event=_event();comment=((event or {}).get('comment') or {}) if isinstance(event,dict) else {}
+    if has_provider_ops_marker(comment.get('body')):
+        repo,token=os.environ.get('GITHUB_REPOSITORY',''),os.environ.get('GITHUB_TOKEN','')
+        if not repo or not token:raise SystemExit('GITHUB_REPOSITORY/GITHUB_TOKEN missing')
+        result=process_issue_comment_provider_ops(ROOT,event or {},GitHubClient(repo,token))
+        if result is None:raise SystemExit('PROVIDER_OPS_REQUEST_ROUTING_FAILED')
+        print(json.dumps(result,ensure_ascii=True,sort_keys=True,separators=(',',':')))
+        return 1 if result.get('status')=='NOT_VERIFIED' else 0
     if has_claim_marker(comment.get('body')):
         repo,token=os.environ.get('GITHUB_REPOSITORY',''),os.environ.get('GITHUB_TOKEN','')
         if not repo or not token:raise SystemExit('GITHUB_REPOSITORY/GITHUB_TOKEN missing')

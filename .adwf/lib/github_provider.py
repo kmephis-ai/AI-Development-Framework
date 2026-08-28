@@ -48,6 +48,23 @@ class GitHubClient:
 
     def git_ref(self,branch:str)->dict[str,Any]: return self.get(f"/repos/{self.repo}/git/ref/heads/{quote(branch,safe='')}")
     def create_ref(self,branch:str,sha:str)->dict[str,Any]: return self.post(f"/repos/{self.repo}/git/refs",{"ref":f"refs/heads/{branch}","sha":sha})
+    def git_commit(self,sha:str)->dict[str,Any]: return self.get(f"/repos/{self.repo}/git/commits/{quote(sha,safe='')}")
+    def git_tree(self,sha:str,*,recursive:bool=False)->dict[str,Any]:
+        suffix='?recursive=1' if recursive else ''
+        return self.get(f"/repos/{self.repo}/git/trees/{quote(sha,safe='')}{suffix}")
+    def git_blob(self,sha:str)->dict[str,Any]: return self.get(f"/repos/{self.repo}/git/blobs/{quote(sha,safe='')}")
+    def create_blob(self,content:bytes)->dict[str,Any]:
+        if not isinstance(content,(bytes,bytearray)): raise ProviderContractError("GITHUB_GIT_BLOB_CONTENT_INVALID")
+        encoded=base64.b64encode(bytes(content)).decode('ascii')
+        return self.post(f"/repos/{self.repo}/git/blobs",{"content":encoded,"encoding":"base64"})
+    def create_tree(self,*,base_tree_sha:str,entries:list[dict[str,Any]])->dict[str,Any]:
+        if not isinstance(entries,list) or not entries: raise ProviderContractError("GITHUB_GIT_TREE_ENTRIES_INVALID")
+        return self.post(f"/repos/{self.repo}/git/trees",{"base_tree":base_tree_sha,"tree":entries})
+    def create_commit(self,*,message:str,tree_sha:str,parent_sha:str)->dict[str,Any]:
+        if not isinstance(message,str) or not message.strip(): raise ProviderContractError("GITHUB_GIT_COMMIT_MESSAGE_INVALID")
+        return self.post(f"/repos/{self.repo}/git/commits",{"message":message,"tree":tree_sha,"parents":[parent_sha]})
+    def update_branch_ref(self,branch:str,sha:str)->dict[str,Any]:
+        return self.patch(f"/repos/{self.repo}/git/refs/heads/{quote(branch,safe='')}",{"sha":sha,"force":False})
     def tag_ref(self,tag:str)->dict[str,Any]: return self.get(f"/repos/{self.repo}/git/ref/tags/{quote(tag,safe='')}")
     def matching_tag_refs(self,prefix:str)->list[dict[str,Any]]: return self.list(f"/repos/{self.repo}/git/matching-refs/tags/{quote(prefix,safe='')}")
     def tag_object(self,sha:str)->dict[str,Any]: return self.get(f"/repos/{self.repo}/git/tags/{sha}")
