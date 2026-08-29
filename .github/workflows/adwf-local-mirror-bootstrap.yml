@@ -1,4 +1,4 @@
-name: GOV-034 Stage-3 Finalization Recovery V8
+name: ADWF Local Git Mirror Bootstrap
 
 on:
   push:
@@ -6,115 +6,53 @@ on:
       - agent/local-mirror-gov034-stage2-20260829-a2
 
 permissions:
-  contents: write
-  issues: read
-  pull-requests: read
-
-concurrency:
-  group: gov034-stage3-finalization-v8-${{ github.repository }}
-  cancel-in-progress: false
+  contents: read
 
 env:
-  PYTHONDONTWRITEBYTECODE: "1"
+  SOURCE_SHA: 8c9a8a94c05412c5c0c20e42e3612ddf7570f962
+  SOURCE_BRANCH: main
+  MIRROR_ARTIFACT_NAME: adwf-local-mirror-gov034-stage2-20260829-a2
 
 jobs:
-  v8-reacquire-restage:
+  build-bundle:
     runs-on: ubuntu-24.04
-    timeout-minutes: 15
+    timeout-minutes: 10
     steps:
-      - name: Checkout exact protected BASE as trusted controller
-        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd
         with:
-          ref: aad3aba5ccb5f37882b8d51e89ff2c66da6e2822
-          path: trusted
-          fetch-depth: 2
+          fetch-depth: 0
           persist-credentials: false
 
-      - uses: actions/setup-python@a309ff8b426b58ec0e2a45f0f869d46889d02405
+      - name: Build exact-source bundle
+        shell: bash
+        run: |
+          set -euo pipefail
+          git cat-file -e "${SOURCE_SHA}^{commit}"
+          git branch -f adwf-source "${SOURCE_SHA}"
+          mkdir -p mirror-artifact
+          git bundle create mirror-artifact/repository.bundle refs/heads/adwf-source --tags
+          git bundle verify mirror-artifact/repository.bundle
+          BUNDLE_SHA256="$(sha256sum mirror-artifact/repository.bundle | awk '{print $1}')"
+          BUNDLE_BYTES="$(wc -c < mirror-artifact/repository.bundle | tr -d ' ')"
+          printf '%s  %s\n' "${BUNDLE_SHA256}" "repository.bundle" > mirror-artifact/SHA256SUMS.txt
+          cat > mirror-artifact/manifest.json <<JSON
+          {
+            "schema_version": 1,
+            "source_repository": "${GITHUB_REPOSITORY}",
+            "source_branch": "${SOURCE_BRANCH}",
+            "source_sha": "${SOURCE_SHA}",
+            "transport_sha": "${GITHUB_SHA}",
+            "bundle_sha256": "${BUNDLE_SHA256}",
+            "bundle_bytes": ${BUNDLE_BYTES},
+            "bundle_ref": "refs/heads/adwf-source"
+          }
+          JSON
+
+      - name: Upload bundle artifact
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         with:
-          python-version: "3.12.10"
-          check-latest: false
-
-      - name: Materialize exact digest-bound V8 controller
-        shell: bash
-        run: |
-          set -euo pipefail
-          python - <<'PYV8'
-          from pathlib import Path
-          import base64, hashlib, zlib
-          payload = """\
-          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
-          """
-          raw = zlib.decompress(base64.b64decode("".join(payload.split()), validate=True))
-          if hashlib.sha256(raw).hexdigest() != "7ae61a80009d6a4ff767840d8caccb505f1fca04726dcfe9cf745a9e8bfd72ee":
-              raise SystemExit("V8_CONTROLLER_DIGEST_MISMATCH")
-          Path("v8_controller.py").write_bytes(raw)
-          print("V8_CONTROLLER_READY", len(raw), hashlib.sha256(raw).hexdigest())
-          PYV8
-          python -m py_compile v8_controller.py
-
-      - name: Reacquire rev98 and publish exact restage child
-        shell: bash
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: |
-          set -euo pipefail
-          python v8_controller.py
+          name: ${{ env.MIRROR_ARTIFACT_NAME }}
+          path: mirror-artifact/
+          if-no-files-found: error
+          retention-days: 1
+          compression-level: 0
