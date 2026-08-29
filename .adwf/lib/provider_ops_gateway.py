@@ -1,7 +1,7 @@
 """Trusted provider-hosted repository operations gateway.
 
-Stage 1 implements only MATERIALIZE_PROJECTIONS. Issue-comment payloads are
-strictly bounded data. Authority comes from exact protected BASE code, provider
+Stage 1 implements MATERIALIZE_PROJECTIONS and Stage 2 adds release-only
+LEASE_RECONCILE. Issue-comment payloads are strictly bounded data. Authority comes from exact protected BASE code, provider
 readback, the current effective policy/rulesets, the live writer lease, and the
 BASE trust classifier. Candidate code is never imported or executed.
 """
@@ -32,13 +32,22 @@ PROVIDER_OPS_MARKER = "ADWF-PROVIDER-OPS-REQUEST v1"
 PROVIDER_OPS_ROLE = "ADWF_PROVIDER_OPS_REQUEST_V1"
 PROVIDER_OPS_SCHEMA_VERSION = 1
 MATERIALIZE_PROJECTIONS = "MATERIALIZE_PROJECTIONS"
+LEASE_RECONCILE = "LEASE_RECONCILE"
 PROJECTION_PATHS = [".adwf/docs-registry.json", "MANIFEST.json", "SHA256SUMS.txt"]
-REQUEST_FIELDS = {
+MATERIALIZE_REQUEST_FIELDS = {
     "schema_version", "role", "request_id", "operation", "issue_id", "roadmap_id",
     "expected_main_sha", "pr_number", "base_sha", "head_sha", "branch", "worker_id",
     "lease_id", "lease_registry_revision", "source_paths", "projection_paths",
     "monetary_budget_usd", "request_digest",
 }
+LEASE_RECONCILE_REQUEST_FIELDS = {
+    "schema_version", "role", "request_id", "operation", "issue_id", "roadmap_id",
+    "expected_main_sha", "lease_registry_revision", "lease_id", "lease_base_sha",
+    "branch", "worker_id", "pr_number", "pr_head_sha", "monetary_budget_usd",
+    "request_digest",
+}
+# Backward-compatible public alias used by Stage-1 tests/callers.
+REQUEST_FIELDS = MATERIALIZE_REQUEST_FIELDS
 _SHA40 = re.compile(r"^[0-9a-f]{40}$")
 _SHA256 = re.compile(r"^[0-9a-f]{64}$")
 _REQUEST_ID = re.compile(r"^[a-z0-9][a-z0-9-]{7,63}$")
@@ -119,6 +128,32 @@ def build_provider_ops_comment(
     return PROVIDER_OPS_MARKER + "\n" + _canonical(request)
 
 
+def build_lease_reconcile_comment(
+    *, request_id: str, issue_id: int, roadmap_id: str, expected_main_sha: str,
+    lease_registry_revision: int, lease_id: str, lease_base_sha: str, branch: str,
+    worker_id: str, pr_number: int, pr_head_sha: str,
+) -> str:
+    request: dict[str, Any] = {
+        "schema_version": PROVIDER_OPS_SCHEMA_VERSION,
+        "role": PROVIDER_OPS_ROLE,
+        "request_id": request_id,
+        "operation": LEASE_RECONCILE,
+        "issue_id": issue_id,
+        "roadmap_id": roadmap_id,
+        "expected_main_sha": expected_main_sha,
+        "lease_registry_revision": lease_registry_revision,
+        "lease_id": lease_id,
+        "lease_base_sha": lease_base_sha,
+        "branch": branch,
+        "worker_id": worker_id,
+        "pr_number": pr_number,
+        "pr_head_sha": pr_head_sha,
+        "monetary_budget_usd": 0,
+    }
+    request["request_digest"] = _digest_payload(request)
+    return PROVIDER_OPS_MARKER + "\n" + _canonical(request)
+
+
 def has_provider_ops_marker(body: Any) -> bool:
     if not isinstance(body, str):
         return False
@@ -135,23 +170,27 @@ def parse_provider_ops_comment(body: str) -> dict[str, Any]:
         request = strict_loads(lines[1])
     except (json.JSONDecodeError, ValueError) as exc:
         raise ValueError("PROVIDER_OPS_REQUEST_JSON_INVALID") from exc
-    if not isinstance(request, dict) or set(request) != REQUEST_FIELDS:
+    if not isinstance(request, dict):
         raise ValueError("PROVIDER_OPS_REQUEST_FIELDS_INVALID")
     if request.get("schema_version") != PROVIDER_OPS_SCHEMA_VERSION or request.get("role") != PROVIDER_OPS_ROLE:
         raise ValueError("PROVIDER_OPS_REQUEST_IDENTITY_INVALID")
-    if request.get("operation") != MATERIALIZE_PROJECTIONS:
+    operation = request.get("operation")
+    if operation == MATERIALIZE_PROJECTIONS:
+        expected_fields = MATERIALIZE_REQUEST_FIELDS
+    elif operation == LEASE_RECONCILE:
+        expected_fields = LEASE_RECONCILE_REQUEST_FIELDS
+    else:
         raise ValueError("PROVIDER_OPS_OPERATION_UNSUPPORTED")
+    if set(request) != expected_fields:
+        raise ValueError("PROVIDER_OPS_REQUEST_FIELDS_INVALID")
     if not isinstance(request.get("request_id"), str) or _REQUEST_ID.fullmatch(request["request_id"]) is None:
         raise ValueError("PROVIDER_OPS_REQUEST_ID_INVALID")
     if isinstance(request.get("issue_id"), bool) or not isinstance(request.get("issue_id"), int) or request["issue_id"] < 1:
         raise ValueError("PROVIDER_OPS_ISSUE_ID_INVALID")
     if not isinstance(request.get("roadmap_id"), str) or _ROADMAP_ID.fullmatch(request["roadmap_id"]) is None:
         raise ValueError("PROVIDER_OPS_ROADMAP_ID_INVALID")
-    for field in ("expected_main_sha", "base_sha", "head_sha"):
-        if not isinstance(request.get(field), str) or _SHA40.fullmatch(request[field]) is None:
-            raise ValueError("PROVIDER_OPS_SHA_INVALID")
-    if request["base_sha"] != request["expected_main_sha"] or request["head_sha"] == request["base_sha"]:
-        raise ValueError("PROVIDER_OPS_BASE_HEAD_INVALID")
+    if not isinstance(request.get("expected_main_sha"), str) or _SHA40.fullmatch(request["expected_main_sha"]) is None:
+        raise ValueError("PROVIDER_OPS_SHA_INVALID")
     if isinstance(request.get("pr_number"), bool) or not isinstance(request.get("pr_number"), int) or request["pr_number"] < 1:
         raise ValueError("PROVIDER_OPS_PR_NUMBER_INVALID")
     branch = request.get("branch")
@@ -166,10 +205,20 @@ def parse_provider_ops_comment(body: str) -> dict[str, Any]:
     revision = request.get("lease_registry_revision")
     if isinstance(revision, bool) or not isinstance(revision, int) or revision < 1:
         raise ValueError("PROVIDER_OPS_LEASE_REVISION_INVALID")
-    source_paths = _canonical_paths(request.get("source_paths"))
-    projections = _canonical_paths(request.get("projection_paths"))
-    if projections != PROJECTION_PATHS or set(source_paths) & set(PROJECTION_PATHS):
-        raise ValueError("PROVIDER_OPS_PROJECTION_PATHS_INVALID")
+    if operation == MATERIALIZE_PROJECTIONS:
+        for field in ("base_sha", "head_sha"):
+            if not isinstance(request.get(field), str) or _SHA40.fullmatch(request[field]) is None:
+                raise ValueError("PROVIDER_OPS_SHA_INVALID")
+        if request["base_sha"] != request["expected_main_sha"] or request["head_sha"] == request["base_sha"]:
+            raise ValueError("PROVIDER_OPS_BASE_HEAD_INVALID")
+        source_paths = _canonical_paths(request.get("source_paths"))
+        projections = _canonical_paths(request.get("projection_paths"))
+        if projections != PROJECTION_PATHS or set(source_paths) & set(PROJECTION_PATHS):
+            raise ValueError("PROVIDER_OPS_PROJECTION_PATHS_INVALID")
+    else:
+        for field in ("lease_base_sha", "pr_head_sha"):
+            if not isinstance(request.get(field), str) or _SHA40.fullmatch(request[field]) is None:
+                raise ValueError("PROVIDER_OPS_SHA_INVALID")
     budget = request.get("monetary_budget_usd")
     if isinstance(budget, bool) or budget != 0:
         raise ValueError("PROVIDER_OPS_MONETARY_BUDGET_INVALID")
@@ -610,6 +659,172 @@ def _verify_replay(client: GitHubClient, request: dict[str, Any], branch_sha: st
     }
 
 
+def _reconcile_ref(request: dict[str, Any]) -> str:
+    return (
+        f"github:provider-ops:{request['request_id']}:{request['request_digest']}:"
+        f"pr/{request['pr_number']}@{request['pr_head_sha']}:main@{request['expected_main_sha']}"
+    )
+
+
+def _reconcile_pr_identity(client: GitHubClient, request: dict[str, Any], default: str) -> dict[str, Any]:
+    pr = client.pull(request["pr_number"])
+    if int(pr.get("number") or 0) != request["pr_number"]:
+        raise ValueError("PROVIDER_OPS_PR_IDENTITY_MISMATCH")
+    base = pr.get("base") or {}; head = pr.get("head") or {}; head_repo = head.get("repo") or {}
+    if str(base.get("ref") or "") != default or str(base.get("sha") or "") != request["lease_base_sha"]:
+        raise ValueError("PROVIDER_OPS_PR_BASE_MISMATCH")
+    if str(head.get("ref") or "") != request["branch"] or str(head_repo.get("full_name") or "") != client.repo or head_repo.get("fork") is True:
+        raise ValueError("PROVIDER_OPS_PR_HEAD_REPOSITORY_MISMATCH")
+    if str(head.get("sha") or "") != request["pr_head_sha"]:
+        raise ValueError("PROVIDER_OPS_PR_HEAD_DRIFT")
+    branch_sha = str((client.git_ref(request["branch"]).get("object") or {}).get("sha") or "")
+    if branch_sha != request["pr_head_sha"]:
+        raise ValueError("PROVIDER_OPS_BRANCH_HEAD_DRIFT")
+    merged = pr.get("merged") is True
+    state = str(pr.get("state") or "")
+    if merged:
+        if state != "closed" or str(pr.get("merge_commit_sha") or "") != request["expected_main_sha"]:
+            raise ValueError("PROVIDER_OPS_MERGED_PR_MAIN_IDENTITY_NOT_VERIFIED")
+        main_node = _commit_node(client, request["expected_main_sha"], {})
+        if main_node["parents"] != [request["lease_base_sha"]]:
+            raise ValueError("PROVIDER_OPS_MERGED_MAIN_PARENT_MISMATCH")
+    elif state != "open":
+        raise ValueError("PROVIDER_OPS_PR_NOT_OPEN_OR_MERGED")
+    return {"pr": pr, "branch_sha": branch_sha, "merged": merged}
+
+
+def _reconcile_registry(client: GitHubClient, request: dict[str, Any]) -> tuple[dict[str, Any], str | None, dict[str, Any] | None]:
+    registry, anchor = GitHubLeaseStore(client).read(
+        expected_main_sha=request["expected_main_sha"], policy_max_parallel_writers=1,
+    )
+    matches = [lease for lease in registry.get("leases") or [] if lease.get("lease_id") == request["lease_id"]]
+    lease = matches[0] if len(matches) == 1 else None
+    return registry, anchor, lease
+
+
+def _reconcile_replay(request: dict[str, Any], registry: dict[str, Any], lease: dict[str, Any] | None) -> dict[str, Any] | None:
+    if lease is None or lease.get("status") != "RELEASED":
+        return None
+    if lease.get("worker_id") != request["worker_id"] or lease.get("base_sha") != request["lease_base_sha"] or lease.get("branch") != request["branch"]:
+        return None
+    if lease.get("provider_reconciliation_ref") != _reconcile_ref(request):
+        return None
+    if registry.get("revision") < request["lease_registry_revision"] + 1 or registry.get("observed_main_sha") != request["expected_main_sha"]:
+        return None
+    return {
+        "status": "ALREADY_APPLIED", "operation": LEASE_RECONCILE, "mutation": False,
+        "request_id": request["request_id"], "request_digest": request["request_digest"],
+        "lease_id": request["lease_id"], "lease_registry_revision": registry.get("revision"),
+        "provider_readback": True, "merge_authority": False, "issue_close_authority": False,
+        "monetary_cost_usd": 0,
+    }
+
+
+def _reconcile_live_identity(root: Path, client: GitHubClient, request: dict[str, Any], *, allow_replay: bool) -> dict[str, Any]:
+    info = client.repo_info(); default = str(info.get("default_branch") or "")
+    if not default:
+        raise ValueError("PROVIDER_OPS_DEFAULT_BRANCH_MISSING")
+    main = str((client.branch(default).get("commit") or {}).get("sha") or "")
+    if main != request["expected_main_sha"]:
+        raise ValueError("PROVIDER_OPS_MAIN_DRIFT")
+    if _local_head(root) != main:
+        raise ValueError("PROVIDER_OPS_TRUSTED_CHECKOUT_MAIN_MISMATCH")
+    _rulesets(client)
+    issue = client.get(f"/repos/{client.repo}/issues/{request['issue_id']}")
+    if issue.get("state") != "open" or issue.get("pull_request") is not None or int(issue.get("number") or 0) != request["issue_id"]:
+        raise ValueError("PROVIDER_OPS_ISSUE_NOT_OPEN")
+    if not _issue_title_has_roadmap(str(issue.get("title") or ""), request["roadmap_id"]):
+        raise ValueError("PROVIDER_OPS_ISSUE_ROADMAP_MISMATCH")
+    pr_state = _reconcile_pr_identity(client, request, default)
+    registry, anchor, lease = _reconcile_registry(client, request)
+    if allow_replay:
+        replay = _reconcile_replay(request, registry, lease)
+        if replay is not None:
+            return {"replay": replay, "main_sha": main, "registry": registry, "lease": lease, **pr_state}
+    if registry.get("revision") != request["lease_registry_revision"]:
+        raise ValueError("PROVIDER_OPS_LEASE_REVISION_MISMATCH")
+    if registry.get("observed_main_sha") != request["lease_base_sha"]:
+        raise ValueError("PROVIDER_OPS_LEASE_OBSERVED_MAIN_MISMATCH")
+    active = [row for row in registry.get("leases") or [] if row.get("status") == "ACTIVE"]
+    if len(active) != 1 or lease is None or active[0].get("lease_id") != request["lease_id"]:
+        raise ValueError("PROVIDER_OPS_SOLE_ACTIVE_LEASE_REQUIRED")
+    expected = {
+        "worker_id": request["worker_id"], "issue_id": str(request["issue_id"]), "roadmap_id": request["roadmap_id"],
+        "base_sha": request["lease_base_sha"], "branch": request["branch"],
+        "resources": [{"global": True, "kind": "provider", "scope": "global", "shared": True}],
+    }
+    for key, value in expected.items():
+        if lease.get(key) != value:
+            raise ValueError("PROVIDER_OPS_LEASE_IDENTITY_MISMATCH:" + key)
+    freshness = _registry_lease_freshness_errors(lease, datetime.now(timezone.utc))
+    invalid_freshness = [item for item in freshness if item not in {"LEASE_EXPIRED", "LEASE_HEARTBEAT_STALE"}]
+    if invalid_freshness:
+        raise ValueError("PROVIDER_OPS_LEASE_FRESHNESS_NOT_VERIFIED:" + ",".join(invalid_freshness))
+    merged_reconciles_main = pr_state["merged"] and main != request["lease_base_sha"]
+    if not freshness and not merged_reconciles_main:
+        raise ValueError("PROVIDER_OPS_FRESH_ACTIVE_LEASE_NOT_RELEASABLE")
+    if pr_state["merged"] is False and main != request["lease_base_sha"]:
+        raise ValueError("PROVIDER_OPS_OPEN_PR_MAIN_DRIFT")
+    return {
+        "main_sha": main, "registry": registry, "lease": lease, "lease_anchor": anchor,
+        "freshness_errors": freshness, "merged_reconciles_main": merged_reconciles_main, **pr_state,
+    }
+
+
+def _process_lease_reconcile(root: Path, event: dict[str, Any], client: GitHubClient, request: dict[str, Any]) -> dict[str, Any]:
+    try:
+        live = _reconcile_live_identity(root, client, request, allow_replay=True)
+    except Exception as exc:
+        return _not_verified(str(exc), request)
+    if live.get("replay") is not None:
+        return live["replay"]
+    # Re-read every mutable provider identity immediately before the immutable CAS append.
+    try:
+        pre = _reconcile_live_identity(root, client, request, allow_replay=False)
+        if pre["registry"].get("revision") != live["registry"].get("revision") or pre["branch_sha"] != live["branch_sha"]:
+            raise ValueError("PROVIDER_OPS_RECONCILE_PREFLIGHT_DRIFT")
+    except Exception as exc:
+        return _not_verified(str(exc), request)
+    reconciliation_ref = _reconcile_ref(request)
+    try:
+        persisted, anchor = GitHubLeaseStore(client).release(
+            expected_main_sha=request["expected_main_sha"], policy_max_parallel_writers=1,
+            lease_id=request["lease_id"], worker_id=request["worker_id"], provider_reconciled=True,
+            provider_reconciliation_ref=reconciliation_ref,
+        )
+    except Exception as exc:
+        try:
+            winner, _, target = _reconcile_registry(client, request)
+            replay = _reconcile_replay(request, winner, target)
+            if replay is not None:
+                return replay
+        except Exception:
+            pass
+        return _not_verified("PROVIDER_OPS_LEASE_RECONCILE_CAS_FAILED:" + str(exc), request)
+    try:
+        post = _reconcile_live_identity(root, client, request, allow_replay=True)
+        replay = post.get("replay")
+        if replay is None:
+            raise ValueError("PROVIDER_OPS_LEASE_RECONCILE_POST_READBACK_FAILED")
+        if persisted.get("revision") != request["lease_registry_revision"] + 1 or post["registry"].get("revision") != persisted.get("revision"):
+            raise ValueError("PROVIDER_OPS_LEASE_RECONCILE_REVISION_INVALID")
+        if any(row.get("status") == "ACTIVE" for row in post["registry"].get("leases") or []):
+            raise ValueError("PROVIDER_OPS_LEASE_RECONCILE_ACTIVE_WRITER_REMAINS")
+        if post["branch_sha"] != request["pr_head_sha"] or post["main_sha"] != request["expected_main_sha"]:
+            raise ValueError("PROVIDER_OPS_LEASE_RECONCILE_PROVIDER_IDENTITY_DRIFT")
+    except Exception as exc:
+        return _not_verified(str(exc), request, mutation=True, lease_anchor=anchor)
+    return {
+        "status": "PASS", "operation": LEASE_RECONCILE, "mutation": True,
+        "request_id": request["request_id"], "request_digest": request["request_digest"],
+        "lease_id": request["lease_id"], "released_lease_base_sha": request["lease_base_sha"],
+        "lease_registry_revision_before": request["lease_registry_revision"],
+        "lease_registry_revision_after": persisted["revision"], "lease_anchor": anchor,
+        "provider_reconciliation_ref": reconciliation_ref, "provider_readback": True,
+        "merge_authority": False, "issue_close_authority": False, "monetary_cost_usd": 0,
+    }
+
+
 def process_issue_comment_provider_ops(root: Path, event: dict[str, Any], client: GitHubClient) -> dict[str, Any] | None:
     comment = event.get("comment") if isinstance(event, dict) else None
     body = (comment or {}).get("body") if isinstance(comment, dict) else None
@@ -639,6 +854,8 @@ def process_issue_comment_provider_ops(root: Path, event: dict[str, Any], client
     reason = _policy_gate(root)
     if reason:
         return _rejected(reason, request)
+    if request["operation"] == LEASE_RECONCILE:
+        return _process_lease_reconcile(root, event, client, request)
 
     # Read live identities without requiring the original HEAD so a verified
     # replay can return ALREADY_APPLIED without attempting a second mutation.

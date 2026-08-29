@@ -400,5 +400,192 @@ class FullFlowTests(unittest.TestCase):
         self.assertEqual(result["status"], "ALREADY_APPLIED"); self.assertFalse(result["mutation"]); self.assertFalse(client.blobs); self.assertFalse(client.updated)
 
 
+RECON_MAIN = "9" * 40
+RECON_PR_HEAD = "8" * 40
+RECON_ANCHOR = "7" * 40
+
+
+def reconcile_body(**overrides):
+    values = dict(
+        request_id="gov034-reconcile-a1", issue_id=291, roadmap_id="GOV-034",
+        expected_main_sha=RECON_MAIN, lease_registry_revision=82, lease_id=LEASE,
+        lease_base_sha=MAIN, branch=BRANCH, worker_id=WORKER, pr_number=99,
+        pr_head_sha=RECON_PR_HEAD,
+    )
+    values.update(overrides)
+    return GATE.build_lease_reconcile_comment(**values)
+
+
+def reconcile_event(body=None, actor="owner", association="OWNER"):
+    return {
+        "action": "created", "repository": {"full_name": "owner/repo"}, "issue": {"number": 291},
+        "sender": {"login": actor},
+        "comment": {"body": body if body is not None else reconcile_body(), "author_association": association, "user": {"login": actor}},
+    }
+
+
+class ReconcileClient(Client):
+    def __init__(self, *, merged=True, main=RECON_MAIN, pr_head=RECON_PR_HEAD):
+        super().__init__()
+        self.main = main
+        self.branch_sha = pr_head
+        self.pr_sha = pr_head
+        self.merged = merged
+        self.pr_fork = False
+        self.merge_commit_sha = main if merged else None
+        self.commit_nodes[main] = {"sha": main, "tree": {"sha": TREE_NEW}, "parents": [{"sha": MAIN}], "message": "merged"}
+
+    def pull(self, number):
+        return {
+            "number": 99, "state": "closed" if self.merged else "open", "merged": self.merged,
+            "merge_commit_sha": self.merge_commit_sha, "body": "", "user": {"login": "owner"},
+            "base": {"sha": MAIN, "ref": "main"},
+            "head": {"sha": self.pr_sha, "ref": BRANCH, "repo": {"full_name": self.repo, "fork": self.pr_fork}},
+        }
+
+
+class FakeLeaseStore:
+    def __init__(self, registry, *, fail_release=None):
+        self.registry = registry
+        self.fail_release = fail_release
+        self.release_calls = []
+
+    def read(self, *, expected_main_sha, policy_max_parallel_writers):
+        return self.registry, RECON_ANCHOR
+
+    def release(self, **kwargs):
+        self.release_calls.append(dict(kwargs))
+        if self.fail_release:
+            raise ValueError(self.fail_release)
+        target = next(x for x in self.registry["leases"] if x["lease_id"] == kwargs["lease_id"])
+        target["status"] = "RELEASED"
+        target["released_at"] = "2026-08-29T11:20:00Z"
+        target["provider_reconciled_at"] = "2026-08-29T11:20:00Z"
+        target["provider_reconciliation_ref"] = kwargs["provider_reconciliation_ref"]
+        self.registry["revision"] += 1
+        self.registry["observed_main_sha"] = kwargs["expected_main_sha"]
+        return self.registry, "6" * 40
+
+
+def reconcile_registry(*, status="ACTIVE", revision=82, base=MAIN, branch=BRANCH, worker=WORKER, lease_id=LEASE):
+    return {
+        "revision": revision, "observed_main_sha": MAIN, "max_parallel_writers": 1,
+        "leases": [{
+            "lease_id": lease_id, "worker_id": worker, "issue_id": "291", "roadmap_id": "GOV-034",
+            "base_sha": base, "branch": branch,
+            "resources": [{"global": True, "kind": "provider", "scope": "global", "shared": True}],
+            "status": status, "heartbeat_at": "2026-08-29T10:00:00Z", "expires_at": "2026-08-29T12:00:00Z",
+            "released_at": None, "provider_reconciled_at": None, "provider_reconciliation_ref": None,
+        }],
+    }
+
+
+class ProviderOpsLeaseReconcileTests(unittest.TestCase):
+    def root(self):
+        td = tempfile.TemporaryDirectory(); self.addCleanup(td.cleanup); root = Path(td.name); write_policy(root); return root
+
+    def process(self, *, client=None, store=None, freshness=None, body=None):
+        client = client or ReconcileClient()
+        store = store or FakeLeaseStore(reconcile_registry())
+        freshness = [] if freshness is None else freshness
+        with mock.patch.object(GATE, "GitHubLeaseStore", return_value=store), \
+             mock.patch.object(GATE, "_rulesets"), \
+             mock.patch.object(GATE, "_local_head", return_value=client.main), \
+             mock.patch.object(GATE, "_registry_lease_freshness_errors", return_value=freshness):
+            result = GATE.process_issue_comment_provider_ops(self.root(), reconcile_event(body), client)
+        return result, store
+
+    def test_reconcile_request_roundtrip_is_operation_discriminated(self):
+        body = reconcile_body(); req = GATE.parse_provider_ops_comment(body)
+        self.assertEqual(req["operation"], GATE.LEASE_RECONCILE)
+        self.assertEqual(set(req), GATE.LEASE_RECONCILE_REQUEST_FIELDS)
+        raw = json.loads(body.split("\n", 1)[1]); raw["provider_reconciliation_ref"] = "caller:forged"; raw["request_digest"] = GATE._digest_payload(raw)
+        with self.assertRaisesRegex(ValueError, "FIELDS"):
+            GATE.parse_provider_ops_comment(GATE.PROVIDER_OPS_MARKER + "\n" + json.dumps(raw, sort_keys=True, separators=(",", ":")))
+
+    def test_reconcile_paid_digest_tamper_and_field_substitution_rejected(self):
+        raw = json.loads(reconcile_body().split("\n", 1)[1]); raw["monetary_budget_usd"] = 1; raw["request_digest"] = GATE._digest_payload(raw)
+        with self.assertRaisesRegex(ValueError, "BUDGET"):
+            GATE.parse_provider_ops_comment(GATE.PROVIDER_OPS_MARKER + "\n" + json.dumps(raw, sort_keys=True, separators=(",", ":")))
+        with self.assertRaisesRegex(ValueError, "DIGEST"):
+            GATE.parse_provider_ops_comment(reconcile_body().replace('"pr_number":99', '"pr_number":98'))
+
+    def test_fresh_open_active_lease_is_not_releasable(self):
+        client = ReconcileClient(merged=False, main=MAIN)
+        body = reconcile_body(expected_main_sha=MAIN)
+        result, store = self.process(client=client, freshness=[], body=body)
+        self.assertEqual(result["reason"], "PROVIDER_OPS_FRESH_ACTIVE_LEASE_NOT_RELEASABLE")
+        self.assertEqual(store.release_calls, [])
+
+    def test_stale_open_pr_releases_exactly_one_lease_and_preserves_refs(self):
+        client = ReconcileClient(merged=False, main=MAIN)
+        body = reconcile_body(expected_main_sha=MAIN)
+        result, store = self.process(client=client, freshness=["LEASE_HEARTBEAT_STALE"], body=body)
+        self.assertEqual((result["status"], result["operation"], result["mutation"]), ("PASS", GATE.LEASE_RECONCILE, True))
+        self.assertEqual(result["lease_registry_revision_after"], 83)
+        self.assertEqual((client.main, client.branch_sha, client.pr_sha), (MAIN, RECON_PR_HEAD, RECON_PR_HEAD))
+        self.assertEqual(len(store.release_calls), 1)
+        self.assertTrue(store.release_calls[0]["provider_reconciled"])
+        self.assertEqual(store.release_calls[0]["provider_reconciliation_ref"], result["provider_reconciliation_ref"])
+
+    def test_provider_verified_merge_can_release_fresh_lease(self):
+        result, store = self.process(freshness=[])
+        self.assertEqual(result["status"], "PASS")
+        self.assertEqual(len(store.release_calls), 1)
+
+    def test_wrong_revision_identity_fork_and_head_drift_cause_no_release(self):
+        cases = []
+        cases.append((FakeLeaseStore(reconcile_registry(revision=83)), ReconcileClient(), None))
+        cases.append((FakeLeaseStore(reconcile_registry(worker="other")), ReconcileClient(), None))
+        fork = ReconcileClient(); fork.pr_fork = True; cases.append((FakeLeaseStore(reconcile_registry()), fork, None))
+        head = ReconcileClient(pr_head="5" * 40); cases.append((FakeLeaseStore(reconcile_registry()), head, None))
+        for store, client, body in cases:
+            with self.subTest(client=client, revision=store.registry["revision"]):
+                result, _ = self.process(client=client, store=store, freshness=["LEASE_HEARTBEAT_STALE"], body=body)
+                self.assertNotEqual(result["status"], "PASS")
+                self.assertEqual(store.release_calls, [])
+
+    def test_closed_unmerged_pr_and_unverified_merge_commit_are_rejected(self):
+        client = ReconcileClient(merged=False, main=MAIN)
+        original = client.pull
+        client.pull = lambda n: {**original(n), "state": "closed"}
+        result, store = self.process(client=client, freshness=["LEASE_HEARTBEAT_STALE"], body=reconcile_body(expected_main_sha=MAIN))
+        self.assertIn("PR_NOT_OPEN_OR_MERGED", result["reason"]); self.assertEqual(store.release_calls, [])
+        client = ReconcileClient(); client.merge_commit_sha = "4" * 40
+        result, store = self.process(client=client, freshness=[])
+        self.assertIn("MERGED_PR_MAIN_IDENTITY_NOT_VERIFIED", result["reason"]); self.assertEqual(store.release_calls, [])
+        client = ReconcileClient(); original = client.pull
+        client.pull = lambda n: {**original(n), "base": {"sha": "3" * 40, "ref": "main"}}
+        result, store = self.process(client=client, freshness=[])
+        self.assertIn("PR_BASE_MISMATCH", result["reason"]); self.assertEqual(store.release_calls, [])
+
+    def test_registry_observed_main_mismatch_is_not_releasable(self):
+        registry = reconcile_registry(); registry["observed_main_sha"] = "2" * 40
+        store = FakeLeaseStore(registry)
+        result, _ = self.process(store=store, freshness=["LEASE_HEARTBEAT_STALE"])
+        self.assertIn("LEASE_OBSERVED_MAIN_MISMATCH", result["reason"]); self.assertEqual(store.release_calls, [])
+
+    def test_replay_is_already_applied_without_second_registry_mutation(self):
+        req = GATE.parse_provider_ops_comment(reconcile_body())
+        registry = reconcile_registry(status="RELEASED", revision=83); registry["observed_main_sha"] = RECON_MAIN
+        lease = registry["leases"][0]
+        lease["released_at"] = lease["provider_reconciled_at"] = "2026-08-29T11:20:00Z"
+        lease["provider_reconciliation_ref"] = GATE._reconcile_ref(req)
+        store = FakeLeaseStore(registry)
+        result, _ = self.process(store=store, freshness=[])
+        self.assertEqual((result["status"], result["mutation"]), ("ALREADY_APPLIED", False))
+        self.assertEqual(store.release_calls, [])
+
+    def test_cas_failure_is_not_verified_and_does_not_claim_success(self):
+        store = FakeLeaseStore(reconcile_registry(), fail_release="LEASE_PROVIDER_CAS_LOST:revision=83")
+        result, _ = self.process(store=store, freshness=[])
+        self.assertEqual(result["status"], "NOT_VERIFIED")
+        self.assertIn("CAS_FAILED", result["reason"])
+
+    def test_invalid_future_or_malformed_freshness_fails_closed(self):
+        result, store = self.process(freshness=["LEASE_HEARTBEAT_IN_FUTURE"])
+        self.assertIn("FRESHNESS_NOT_VERIFIED", result["reason"])
+        self.assertEqual(store.release_calls, [])
+
 if __name__ == "__main__":
     unittest.main()
