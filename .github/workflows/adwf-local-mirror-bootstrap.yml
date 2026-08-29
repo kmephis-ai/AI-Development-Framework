@@ -1,4 +1,4 @@
-name: GOV-034 Stage-3 Test Repair V7 Recovery
+name: GOV-034 Stage-3 Test Repair V7 Recovery Retry
 
 on:
   push:
@@ -67,22 +67,98 @@ jobs:
         run: |
           set -euo pipefail
           cd candidate/.adwf/tests
-          env -i PATH="$PATH" HOME="$HOME" LANG=C.UTF-8 LC_ALL=C.UTF-8 PYTHONDONTWRITEBYTECODE=1 python -m unittest -v test_provider_ops_gateway.ProviderOpsLeaseReleaseUnchangedTests
+          env -i PATH="$PATH" HOME="$HOME" LANG=C.UTF-8 LC_ALL=C.UTF-8 PYTHONDONTWRITEBYTECODE=1             python -m unittest -v test_provider_ops_gateway.ProviderOpsLeaseReleaseUnchangedTests
 
-      - name: Full ADWF self-test before lease mutation
-        shell: bash
-        run: |
-          set -euo pipefail
-          cd candidate
-          env -i PATH="$PATH" HOME="$HOME" LANG=C.UTF-8 LC_ALL=C.UTF-8 PYTHONDONTWRITEBYTECODE=1 python .adwf/adwf.py self-test
-
-      - name: Checkout exact trusted protected BASE
+      - name: Checkout exact trusted protected BASE for disposable projection validation
         uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd
         with:
           ref: aad3aba5ccb5f37882b8d51e89ff2c66da6e2822
           path: trusted
           fetch-depth: 2
           persist-credentials: false
+
+      - name: Materialize disposable candidate projections with exact BASE generators
+        shell: bash
+        run: |
+          set -euo pipefail
+          python - <<'PYV7PROJ'
+          from pathlib import Path
+          import hashlib, os, subprocess, sys
+
+          workspace = Path.cwd()
+          candidate = (workspace / 'candidate').resolve()
+          trusted = (workspace / 'trusted').resolve()
+          projections = ['.adwf/docs-registry.json', 'MANIFEST.json', 'SHA256SUMS.txt']
+          projection_set = set(projections)
+
+          def snapshot_nonprojections():
+              result = {}
+              for path in candidate.rglob('*'):
+                  if path.is_symlink():
+                      raise SystemExit('V7_DISPOSABLE_SYMLINK_FORBIDDEN:' + path.relative_to(candidate).as_posix())
+                  if not path.is_file():
+                      continue
+                  rel = path.relative_to(candidate).as_posix()
+                  if rel == '.git' or rel.startswith('.git/'):
+                      continue
+                  if rel in projection_set:
+                      continue
+                  raw = path.read_bytes()
+                  result[rel] = hashlib.sha256(raw).hexdigest()
+              return result
+
+          env = {
+              'PATH': os.environ['PATH'],
+              'HOME': os.environ['HOME'],
+              'LANG': 'C.UTF-8',
+              'LC_ALL': 'C.UTF-8',
+              'PYTHONDONTWRITEBYTECODE': '1',
+          }
+          commands = [
+              [sys.executable, '-I', str(trusted / '.adwf/scripts/docs_freshness.py'), '--root', str(candidate), '--write'],
+              [sys.executable, '-I', str(trusted / '.adwf/scripts/generate_manifest.py'), '--root', str(candidate)],
+          ]
+          before = snapshot_nonprojections()
+          for command in commands:
+              proc = subprocess.run(command, cwd=trusted, env=env, text=True, capture_output=True, check=False, timeout=45)
+              if proc.stdout:
+                  print(proc.stdout, end='')
+              if proc.stderr:
+                  print(proc.stderr, end='', file=sys.stderr)
+              if proc.returncode != 0:
+                  raise SystemExit('V7_DISPOSABLE_GENERATOR_FAILED')
+          after = snapshot_nonprojections()
+          if before != after:
+              changed = sorted(set(before) ^ set(after) | {p for p in before.keys() & after.keys() if before[p] != after[p]})
+              raise SystemExit('V7_DISPOSABLE_GENERATOR_UNEXPECTED_PATH:' + ','.join(changed[:20]))
+          first = {}
+          for rel in projections:
+              path = candidate / rel
+              if path.is_symlink() or not path.is_file():
+                  raise SystemExit('V7_DISPOSABLE_PROJECTION_MISSING:' + rel)
+              first[rel] = path.read_bytes()
+          for command in commands:
+              proc = subprocess.run(command, cwd=trusted, env=env, text=True, capture_output=True, check=False, timeout=45)
+              if proc.stdout:
+                  print(proc.stdout, end='')
+              if proc.stderr:
+                  print(proc.stderr, end='', file=sys.stderr)
+              if proc.returncode != 0:
+                  raise SystemExit('V7_DISPOSABLE_GENERATOR_SECOND_RUN_FAILED')
+          if before != snapshot_nonprojections():
+              raise SystemExit('V7_DISPOSABLE_GENERATOR_SECOND_RUN_UNEXPECTED_PATH')
+          second = {rel: (candidate / rel).read_bytes() for rel in projections}
+          if first != second:
+              raise SystemExit('V7_DISPOSABLE_GENERATOR_NOT_IDEMPOTENT')
+          print('V7_DISPOSABLE_PROJECTIONS_PASS')
+          PYV7PROJ
+
+      - name: Full ADWF self-test before lease mutation
+        shell: bash
+        run: |
+          set -euo pipefail
+          cd candidate
+          env -i PATH="$PATH" HOME="$HOME" LANG=C.UTF-8 LC_ALL=C.UTF-8 PYTHONDONTWRITEBYTECODE=1             python .adwf/adwf.py self-test
 
       - name: Materialize exact V7 trusted controller
         shell: bash
@@ -94,7 +170,7 @@ jobs:
           from pathlib import Path
           import base64, hashlib, os, zlib
           raw = zlib.decompress(base64.b64decode(os.environ['V7_CONTROLLER_ZB64'], validate=True))
-          if hashlib.sha256(raw).hexdigest() != '6cbbdf24e236f7b437508ccea3cf61a322a97852c9b5e1859cafafa5aecf39e1':
+          if hashlib.sha256(raw).hexdigest() != '39a018b1de00422597da13f81c95c5ab4bd73d4841ad028216d964dc72987db7':
               raise SystemExit('V7_CONTROLLER_DIGEST_MISMATCH')
           Path('v7_controller.py').write_bytes(raw)
           print('V7_CONTROLLER_BYTES_PASS')
