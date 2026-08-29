@@ -1,4 +1,4 @@
-name: ADWF Local Git Mirror Bootstrap
+name: GOV-034 Stage-2 Bootstrap Rebind
 
 on:
   push:
@@ -6,53 +6,254 @@ on:
       - agent/local-mirror-gov034-stage2-20260829-a2
 
 permissions:
-  contents: read
+  contents: write
+  issues: read
+  pull-requests: read
+
+concurrency:
+  group: gov034-stage2-bootstrap-rebind-${{ github.repository }}
+  cancel-in-progress: false
 
 env:
-  SOURCE_SHA: 8c9a8a94c05412c5c0c20e42e3612ddf7570f962
-  SOURCE_BRANCH: main
-  MIRROR_ARTIFACT_NAME: adwf-local-mirror-gov034-stage2-20260829-a2
+  PYTHONDONTWRITEBYTECODE: "1"
 
 jobs:
-  build-bundle:
+  rebind-stale-writer:
     runs-on: ubuntu-24.04
     timeout-minutes: 10
     steps:
-      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd
+      - name: Checkout exact trusted main
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd
         with:
-          fetch-depth: 0
+          ref: 8c9a8a94c05412c5c0c20e42e3612ddf7570f962
+          fetch-depth: 2
           persist-credentials: false
-
-      - name: Build exact-source bundle
-        shell: bash
-        run: |
-          set -euo pipefail
-          git cat-file -e "${SOURCE_SHA}^{commit}"
-          git branch -f adwf-source "${SOURCE_SHA}"
-          mkdir -p mirror-artifact
-          git bundle create mirror-artifact/repository.bundle refs/heads/adwf-source --tags
-          git bundle verify mirror-artifact/repository.bundle
-          BUNDLE_SHA256="$(sha256sum mirror-artifact/repository.bundle | awk '{print $1}')"
-          BUNDLE_BYTES="$(wc -c < mirror-artifact/repository.bundle | tr -d ' ')"
-          printf '%s  %s\n' "${BUNDLE_SHA256}" "repository.bundle" > mirror-artifact/SHA256SUMS.txt
-          cat > mirror-artifact/manifest.json <<JSON
-          {
-            "schema_version": 1,
-            "source_repository": "${GITHUB_REPOSITORY}",
-            "source_branch": "${SOURCE_BRANCH}",
-            "source_sha": "${SOURCE_SHA}",
-            "transport_sha": "${GITHUB_SHA}",
-            "bundle_sha256": "${BUNDLE_SHA256}",
-            "bundle_bytes": ${BUNDLE_BYTES},
-            "bundle_ref": "refs/heads/adwf-source"
-          }
-          JSON
-
-      - name: Upload bundle artifact
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+      - uses: actions/setup-python@a309ff8b426b58ec0e2a45f0f869d46889d02405
         with:
-          name: ${{ env.MIRROR_ARTIFACT_NAME }}
-          path: mirror-artifact/
-          if-no-files-found: error
-          retention-days: 1
-          compression-level: 0
+          python-version: "3.12.10"
+      - name: Release stale lease and rebind exact PR branch
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        shell: python
+        run: |
+          from pathlib import Path
+          import json, os, re, sys
+
+          root = Path.cwd()
+          sys.path.insert(0, str(root / '.adwf'))
+
+          from lib.github_lease_store import GitHubLeaseStore
+          from lib.github_provider import GitHubClient
+          from lib.github_rulesets import verify_rulesets, verify_runtime_anchor_ruleset
+          from lib.lease_registry import _registry_lease_freshness_errors
+          from lib.leases import utc_now
+          from lib.strict_json import loads as strict_loads
+
+          repo = os.environ['GITHUB_REPOSITORY']
+          token = os.environ['GITHUB_TOKEN']
+          expected_main = '8c9a8a94c05412c5c0c20e42e3612ddf7570f962'
+          issue_id = 291
+          roadmap_id = 'GOV-034'
+          pr_number = 295
+          source_head = '03f45210d52cfda5e07e184ed2de4d95d43ffcb4'
+          expected_revision = 84
+          release_revision = 85
+          acquire_revision = 86
+          old_lease_id = '73d0ef75-dbac-4998-aa2a-6bd32eebc319'
+          old_worker_id = 'adwf-runtime:claim-gov034-stage2-20260829-a5'
+          new_lease_id = '6d8d6967-2f47-4fa0-b927-be3513196d45'
+          new_worker_id = 'adwf-runtime:rebind-gov034-stage2-20260829-a6'
+          writer_branch = 'adwf/gov-034-7c2dec17476a'
+          resources = [{'kind': 'provider', 'scope': 'global', 'shared': True, 'global': True}]
+          reconciliation_ref = 'github:pr:295@03f45210d52cfda5e07e184ed2de4d95d43ffcb4:bootstrap-release'
+
+          config = strict_loads((root / '.adwf/config.json').read_text(encoding='utf-8'))
+          policy = strict_loads((root / '.adwf/effective-policy.json').read_text(encoding='utf-8'))
+          orch = config.get('orchestration') or {}
+          cost = config.get('cost') or {}
+          if policy.get('active_autonomy') != 'A2' or policy.get('max_autonomous_risk') != 'R1':
+              raise SystemExit('BOOTSTRAP_POLICY_AUTONOMY_DRIFT')
+          if policy.get('hard_budget_usd') != 0 or policy.get('mandatory_ai_api') is not False:
+              raise SystemExit('BOOTSTRAP_POLICY_COST_DRIFT')
+          if policy.get('max_parallel_writers') != 1 or orch.get('max_parallel_writers') != 1:
+              raise SystemExit('BOOTSTRAP_WRITER_CEILING_DRIFT')
+          if cost.get('mode') != 'FREE_ONLY' or cost.get('monetary_budget') != 0:
+              raise SystemExit('BOOTSTRAP_FREE_ONLY_DRIFT')
+          if int(orch.get('heartbeat_minutes') or 0) != 30 or int(orch.get('lease_ttl_minutes') or 0) != 120:
+              raise SystemExit('BOOTSTRAP_LEASE_POLICY_DRIFT')
+
+          client = GitHubClient(repo, token)
+          store = GitHubLeaseStore(client)
+
+          def current_main():
+              value = str((client.branch('main').get('commit') or {}).get('sha') or '')
+              if re.fullmatch(r'[0-9a-f]{40}', value) is None:
+                  raise SystemExit('BOOTSTRAP_MAIN_SHA_INVALID')
+              return value
+
+          def current_writer():
+              value = str((client.branch(writer_branch).get('commit') or {}).get('sha') or '')
+              if re.fullmatch(r'[0-9a-f]{40}', value) is None:
+                  raise SystemExit('BOOTSTRAP_WRITER_SHA_INVALID')
+              return value
+
+          def verify_rules():
+              rows = client.rulesets()
+              if verify_rulesets(rows, expected_integration_id=15368).get('readback_verified') is not True:
+                  raise SystemExit('BOOTSTRAP_MAIN_RULESET_NOT_VERIFIED')
+              if verify_runtime_anchor_ruleset(rows).get('readback_verified') is not True:
+                  raise SystemExit('BOOTSTRAP_ANCHOR_RULESET_NOT_VERIFIED')
+              named = {str(x.get('name') or ''): x for x in rows}
+              for name in ('ADWF protected main', 'ADWF immutable runtime anchors'):
+                  row = named.get(name) or {}
+                  if row.get('enforcement') != 'active' or (row.get('bypass_actors') or []) != []:
+                      raise SystemExit('BOOTSTRAP_RULESET_DRIFT:' + name)
+                  if row.get('current_user_can_bypass') not in (None, 'never', False):
+                      raise SystemExit('BOOTSTRAP_BYPASS_DRIFT:' + name)
+
+          def verify_issue():
+              issue = client.get(f'/repos/{repo}/issues/{issue_id}')
+              if issue.get('state') != 'open' or roadmap_id not in str(issue.get('title') or ''):
+                  raise SystemExit('BOOTSTRAP_ISSUE_DRIFT')
+
+          def verify_pr():
+              pr = client.pull(pr_number)
+              base = pr.get('base') or {}
+              head = pr.get('head') or {}
+              head_repo = head.get('repo') or {}
+              if pr.get('state') != 'open' or pr.get('merged') is True or int(pr.get('number') or 0) != pr_number:
+                  raise SystemExit('BOOTSTRAP_PR_STATE_DRIFT')
+              if str(base.get('ref') or '') != 'main' or str(base.get('sha') or '') != expected_main:
+                  raise SystemExit('BOOTSTRAP_PR_BASE_DRIFT')
+              if str(head.get('ref') or '') != writer_branch or str(head.get('sha') or '') != source_head:
+                  raise SystemExit('BOOTSTRAP_PR_HEAD_DRIFT')
+              if str(head_repo.get('full_name') or '') != repo or head_repo.get('fork') is True:
+                  raise SystemExit('BOOTSTRAP_PR_REPOSITORY_DRIFT')
+
+          def require_exact_registry(revision):
+              registry, anchor = store.read(expected_main_sha=expected_main, policy_max_parallel_writers=1)
+              if registry.get('revision') != revision or registry.get('observed_main_sha') != expected_main:
+                  raise SystemExit('BOOTSTRAP_REGISTRY_REVISION_DRIFT')
+              return registry, anchor
+
+          def require_exact_old_active(registry):
+              active = [x for x in registry.get('leases') or [] if x.get('status') == 'ACTIVE']
+              if len(active) != 1:
+                  raise SystemExit('BOOTSTRAP_ACTIVE_WRITER_COUNT_DRIFT')
+              lease = active[0]
+              expected = {
+                  'lease_id': old_lease_id,
+                  'worker_id': old_worker_id,
+                  'issue_id': str(issue_id),
+                  'roadmap_id': roadmap_id,
+                  'base_sha': expected_main,
+                  'branch': writer_branch,
+              }
+              for key, value in expected.items():
+                  if str(lease.get(key) or '') != value:
+                      raise SystemExit('BOOTSTRAP_LEASE_IDENTITY_DRIFT:' + key)
+              if lease.get('resources') != resources:
+                  raise SystemExit('BOOTSTRAP_LEASE_RESOURCE_DRIFT')
+              if not _registry_lease_freshness_errors(lease, utc_now()):
+                  raise SystemExit('BOOTSTRAP_LEASE_NOT_RECONCILIATION_REQUIRED')
+              return lease
+
+          def verify_refs_and_contract():
+              if current_main() != expected_main or current_writer() != source_head:
+                  raise SystemExit('BOOTSTRAP_PROVIDER_REF_DRIFT')
+              verify_issue()
+              verify_pr()
+              verify_rules()
+
+          verify_refs_and_contract()
+          before, before_anchor = require_exact_registry(expected_revision)
+          require_exact_old_active(before)
+
+          # Last fail-closed seam before releasing the stale lease.
+          verify_refs_and_contract()
+          precas, precas_anchor = require_exact_registry(expected_revision)
+          require_exact_old_active(precas)
+          if precas_anchor != before_anchor:
+              raise SystemExit('BOOTSTRAP_PRECAS_ANCHOR_DRIFT')
+
+          released_state, release_anchor = store.release(
+              expected_main_sha=expected_main,
+              policy_max_parallel_writers=1,
+              lease_id=old_lease_id,
+              worker_id=old_worker_id,
+              provider_reconciled=True,
+              provider_reconciliation_ref=reconciliation_ref,
+          )
+          after_release, after_release_anchor = require_exact_registry(release_revision)
+          if released_state.get('revision') != release_revision or after_release_anchor != release_anchor:
+              raise SystemExit('BOOTSTRAP_REV85_NOT_VERIFIED')
+          if [x for x in after_release.get('leases') or [] if x.get('status') == 'ACTIVE']:
+              raise SystemExit('BOOTSTRAP_REV85_ACTIVE_WRITER_REMAINS')
+          old_matches = [x for x in after_release.get('leases') or [] if x.get('lease_id') == old_lease_id]
+          if len(old_matches) != 1 or old_matches[0].get('status') != 'RELEASED' or old_matches[0].get('provider_reconciliation_ref') != reconciliation_ref:
+              raise SystemExit('BOOTSTRAP_REV85_RELEASE_EVIDENCE_MISMATCH')
+
+          # Rebind only after provider proves the exact PR/branch stayed unchanged.
+          verify_refs_and_contract()
+          check_release, check_release_anchor = require_exact_registry(release_revision)
+          if check_release_anchor != release_anchor:
+              raise SystemExit('BOOTSTRAP_PREACQUIRE_ANCHOR_DRIFT')
+
+          acquired_state, new_lease, acquire_anchor = store.acquire(
+              expected_main_sha=expected_main,
+              policy_max_parallel_writers=1,
+              issue_id=str(issue_id),
+              roadmap_id=roadmap_id,
+              worker_id=new_worker_id,
+              base_sha=expected_main,
+              branch=writer_branch,
+              resources=resources,
+              ttl_minutes=120,
+              lease_id=new_lease_id,
+          )
+          final, final_anchor = require_exact_registry(acquire_revision)
+          if acquired_state.get('revision') != acquire_revision or final_anchor != acquire_anchor or acquire_anchor == release_anchor:
+              raise SystemExit('BOOTSTRAP_REV86_NOT_VERIFIED')
+          active = [x for x in final.get('leases') or [] if x.get('status') == 'ACTIVE']
+          if len(active) != 1:
+              raise SystemExit('BOOTSTRAP_REV86_ACTIVE_WRITER_COUNT')
+          current = active[0]
+          expected_new = {
+              'lease_id': new_lease_id,
+              'worker_id': new_worker_id,
+              'issue_id': str(issue_id),
+              'roadmap_id': roadmap_id,
+              'base_sha': expected_main,
+              'branch': writer_branch,
+          }
+          for key, value in expected_new.items():
+              if str(current.get(key) or '') != value:
+                  raise SystemExit('BOOTSTRAP_REV86_LEASE_IDENTITY:' + key)
+          if current.get('resources') != resources or _registry_lease_freshness_errors(current, utc_now()):
+              raise SystemExit('BOOTSTRAP_REV86_LEASE_NOT_FRESH')
+          verify_refs_and_contract()
+
+          print(json.dumps({
+              'status': 'PASS',
+              'mutation': True,
+              'operation': 'BOOTSTRAP_STALE_RELEASE_REBIND_SAME_BRANCH',
+              'main_sha': expected_main,
+              'branch': writer_branch,
+              'branch_sha': source_head,
+              'pr_number': pr_number,
+              'pr_head_sha': source_head,
+              'released_lease_id': old_lease_id,
+              'new_lease_id': new_lease_id,
+              'new_worker_id': new_worker_id,
+              'old_revision': expected_revision,
+              'release_revision': release_revision,
+              'new_revision': acquire_revision,
+              'release_anchor': release_anchor,
+              'new_anchor': acquire_anchor,
+              'active_writers_after': 1,
+              'provider_reconciliation_ref': reconciliation_ref,
+              'merge_authority': False,
+              'issue_close_authority': False,
+              'source_ref_mutation': False,
+              'monetary_cost_usd': 0,
+          }, sort_keys=True, separators=(',', ':')))
