@@ -1,4 +1,4 @@
-name: GOV-034 Stage-3 Test Repair V7 Recovery Retry
+name: GOV-034 Stage-3 Test Repair V7 Recovery Retry4
 
 on:
   push:
@@ -22,7 +22,7 @@ jobs:
     runs-on: ubuntu-24.04
     timeout-minutes: 15
     steps:
-      - name: Checkout exact pre-repair PR HEAD as disposable test candidate
+      - name: Checkout exact pre-repair PR HEAD
         uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd
         with:
           ref: 39800c71282954333087c26b55f3ec5ff8ee9506
@@ -35,41 +35,27 @@ jobs:
           python-version: "3.12.10"
           check-latest: false
 
-      - name: Build exact V7 test-only candidate and verify byte identity
+      - name: Build exact repair candidate and focused test
         shell: bash
         run: |
           set -euo pipefail
-          python - <<'PYV7PATCH'
+          python - <<'PY'
           from pathlib import Path
           import ast, hashlib
-          path = Path('candidate/.adwf/tests/test_provider_ops_gateway.py')
-          raw = path.read_bytes()
-          def git_blob(data):
-              return hashlib.sha1(b'blob ' + str(len(data)).encode() + b'\0' + data).hexdigest()
-          if git_blob(raw) != 'edd2db96e4add36c4f2f5d11891679fb43056a85':
-              raise SystemExit('V7_CANDIDATE_BASE_BLOB_DRIFT')
-          old = '    def process(self, *, client=None, store=None, freshness=None, body=None):\n        client = client or Client()\n        client.main = MAIN\n        if client.branch_sha == HEAD:\n            client.branch_sha = MAIN\n'.encode('utf-8')
-          new = '    def process(self, *, client=None, store=None, freshness=None, body=None):\n        if client is None:\n            client = Client()\n            client.branch_sha = MAIN\n        client.main = MAIN\n'.encode('utf-8')
-          if raw.count(old) != 1:
-              raise SystemExit('V7_CANDIDATE_OLD_SNIPPET_COUNT')
-          fixed = raw.replace(old, new)
-          if git_blob(fixed) != 'ce268e7611745ff16f8ce0b31630c79b129d0348':
-              raise SystemExit('V7_CANDIDATE_FIXED_BLOB_MISMATCH')
-          if hashlib.sha256(fixed).hexdigest() != '533c7f30b6366ac94d58cfe665370339d2a34fb2f2bef4cb8000329c487711c9':
-              raise SystemExit('V7_CANDIDATE_FIXED_SHA256_MISMATCH')
-          ast.parse(fixed.decode('utf-8'), filename=str(path))
-          path.write_bytes(fixed)
-          print('V7_CANDIDATE_BYTES_PASS')
-          PYV7PATCH
-
-      - name: Focused Stage-3 lease-release tests before lease mutation
-        shell: bash
-        run: |
-          set -euo pipefail
+          p=Path('candidate/.adwf/tests/test_provider_ops_gateway.py'); raw=p.read_bytes()
+          blob=lambda b: hashlib.sha1(b'blob '+str(len(b)).encode()+b'\0'+b).hexdigest()
+          if blob(raw)!='edd2db96e4add36c4f2f5d11891679fb43056a85': raise SystemExit('V7_CANDIDATE_BASE_BLOB_DRIFT')
+          old=b'    def process(self, *, client=None, store=None, freshness=None, body=None):\n        client = client or Client()\n        client.main = MAIN\n        if client.branch_sha == HEAD:\n            client.branch_sha = MAIN\n'
+          new=b'    def process(self, *, client=None, store=None, freshness=None, body=None):\n        if client is None:\n            client = Client()\n            client.branch_sha = MAIN\n        client.main = MAIN\n'
+          if raw.count(old)!=1: raise SystemExit('V7_CANDIDATE_OLD_SNIPPET_COUNT')
+          fixed=raw.replace(old,new)
+          if blob(fixed)!='ce268e7611745ff16f8ce0b31630c79b129d0348' or hashlib.sha256(fixed).hexdigest()!='533c7f30b6366ac94d58cfe665370339d2a34fb2f2bef4cb8000329c487711c9': raise SystemExit('V7_CANDIDATE_FIXED_IDENTITY')
+          ast.parse(fixed.decode()); p.write_bytes(fixed); print('V7_CANDIDATE_BYTES_PASS')
+          PY
           cd candidate/.adwf/tests
-          env -i PATH="$PATH" HOME="$HOME" LANG=C.UTF-8 LC_ALL=C.UTF-8 PYTHONDONTWRITEBYTECODE=1             python -m unittest -v test_provider_ops_gateway.ProviderOpsLeaseReleaseUnchangedTests
+          env -i PATH="$PATH" HOME="$HOME" LANG=C.UTF-8 LC_ALL=C.UTF-8 PYTHONDONTWRITEBYTECODE=1 python -m unittest -v test_provider_ops_gateway.ProviderOpsLeaseReleaseUnchangedTests
 
-      - name: Checkout exact trusted protected BASE for disposable projection validation
+      - name: Checkout exact protected BASE
         uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd
         with:
           ref: aad3aba5ccb5f37882b8d51e89ff2c66da6e2822
@@ -77,104 +63,55 @@ jobs:
           fetch-depth: 2
           persist-credentials: false
 
-      - name: Materialize disposable candidate projections with exact BASE generators
+      - name: Disposable canonical projections and full self-test before lease mutation
         shell: bash
         run: |
           set -euo pipefail
-          python - <<'PYV7PROJ'
-          from pathlib import Path
-          import hashlib, os, subprocess, sys
-
-          workspace = Path.cwd()
-          candidate = (workspace / 'candidate').resolve()
-          trusted = (workspace / 'trusted').resolve()
-          projections = ['.adwf/docs-registry.json', 'MANIFEST.json', 'SHA256SUMS.txt']
-          projection_set = set(projections)
-
-          def snapshot_nonprojections():
-              result = {}
-              for path in candidate.rglob('*'):
-                  if path.is_symlink():
-                      raise SystemExit('V7_DISPOSABLE_SYMLINK_FORBIDDEN:' + path.relative_to(candidate).as_posix())
-                  if not path.is_file():
-                      continue
-                  rel = path.relative_to(candidate).as_posix()
-                  if rel == '.git' or rel.startswith('.git/'):
-                      continue
-                  if rel in projection_set:
-                      continue
-                  raw = path.read_bytes()
-                  result[rel] = hashlib.sha256(raw).hexdigest()
-              return result
-
-          env = {
-              'PATH': os.environ['PATH'],
-              'HOME': os.environ['HOME'],
-              'LANG': 'C.UTF-8',
-              'LC_ALL': 'C.UTF-8',
-              'PYTHONDONTWRITEBYTECODE': '1',
-          }
-          commands = [
-              [sys.executable, '-I', str(trusted / '.adwf/scripts/docs_freshness.py'), '--root', str(candidate), '--write'],
-              [sys.executable, '-I', str(trusted / '.adwf/scripts/generate_manifest.py'), '--root', str(candidate)],
-          ]
-          before = snapshot_nonprojections()
-          for command in commands:
-              proc = subprocess.run(command, cwd=trusted, env=env, text=True, capture_output=True, check=False, timeout=45)
-              if proc.stdout:
-                  print(proc.stdout, end='')
-              if proc.stderr:
-                  print(proc.stderr, end='', file=sys.stderr)
-              if proc.returncode != 0:
-                  raise SystemExit('V7_DISPOSABLE_GENERATOR_FAILED')
-          after = snapshot_nonprojections()
-          if before != after:
-              changed = sorted(set(before) ^ set(after) | {p for p in before.keys() & after.keys() if before[p] != after[p]})
-              raise SystemExit('V7_DISPOSABLE_GENERATOR_UNEXPECTED_PATH:' + ','.join(changed[:20]))
-          first = {}
-          for rel in projections:
-              path = candidate / rel
-              if path.is_symlink() or not path.is_file():
-                  raise SystemExit('V7_DISPOSABLE_PROJECTION_MISSING:' + rel)
-              first[rel] = path.read_bytes()
-          for command in commands:
-              proc = subprocess.run(command, cwd=trusted, env=env, text=True, capture_output=True, check=False, timeout=45)
-              if proc.stdout:
-                  print(proc.stdout, end='')
-              if proc.stderr:
-                  print(proc.stderr, end='', file=sys.stderr)
-              if proc.returncode != 0:
-                  raise SystemExit('V7_DISPOSABLE_GENERATOR_SECOND_RUN_FAILED')
-          if before != snapshot_nonprojections():
-              raise SystemExit('V7_DISPOSABLE_GENERATOR_SECOND_RUN_UNEXPECTED_PATH')
-          second = {rel: (candidate / rel).read_bytes() for rel in projections}
-          if first != second:
-              raise SystemExit('V7_DISPOSABLE_GENERATOR_NOT_IDEMPOTENT')
-          print('V7_DISPOSABLE_PROJECTIONS_PASS')
-          PYV7PROJ
-
-      - name: Full ADWF self-test before lease mutation
-        shell: bash
-        run: |
-          set -euo pipefail
+          cleanenv=(env -i PATH="$PATH" HOME="$HOME" LANG=C.UTF-8 LC_ALL=C.UTF-8 PYTHONDONTWRITEBYTECODE=1)
+          "${cleanenv[@]}" python -I trusted/.adwf/scripts/docs_freshness.py --root "$PWD/candidate" --write
+          "${cleanenv[@]}" python -I trusted/.adwf/scripts/generate_manifest.py --root "$PWD/candidate"
+          python - <<'PY'
+          import subprocess
+          got=set(subprocess.check_output(['git','-C','candidate','diff','--name-only'],text=True).splitlines())
+          want={'.adwf/tests/test_provider_ops_gateway.py','.adwf/docs-registry.json','MANIFEST.json','SHA256SUMS.txt'}
+          if got!=want: raise SystemExit('V7_DISPOSABLE_GENERATOR_UNEXPECTED_PATH:'+','.join(sorted(got)))
+          PY
+          sha256sum candidate/.adwf/docs-registry.json candidate/MANIFEST.json candidate/SHA256SUMS.txt > /tmp/v7-proj.before
+          "${cleanenv[@]}" python -I trusted/.adwf/scripts/docs_freshness.py --root "$PWD/candidate" --write
+          "${cleanenv[@]}" python -I trusted/.adwf/scripts/generate_manifest.py --root "$PWD/candidate"
+          sha256sum candidate/.adwf/docs-registry.json candidate/MANIFEST.json candidate/SHA256SUMS.txt > /tmp/v7-proj.after
+          cmp /tmp/v7-proj.before /tmp/v7-proj.after
           cd candidate
-          env -i PATH="$PATH" HOME="$HOME" LANG=C.UTF-8 LC_ALL=C.UTF-8 PYTHONDONTWRITEBYTECODE=1             python .adwf/adwf.py self-test
+          "${cleanenv[@]}" python .adwf/adwf.py self-test
 
-      - name: Materialize exact V7 trusted controller
+      - name: Materialize exact V7 trusted controller from verified parent transport
         shell: bash
-        env:
-          V7_CONTROLLER_ZB64: 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
         run: |
           set -euo pipefail
-          python - <<'PYV7CONTROLLER'
+          curl -fsSL 'https://raw.githubusercontent.com/kmephis-ai/AI-Development-Framework/2764f0a1f4ccd4809fcffb3b58b8c81ac9be4b9a/.github/workflows/adwf-local-mirror-bootstrap.yml' -o /tmp/parent.yml
+          python - <<'PY'
           from pathlib import Path
-          import base64, hashlib, os, zlib
-          raw = zlib.decompress(base64.b64decode(os.environ['V7_CONTROLLER_ZB64'], validate=True))
-          if hashlib.sha256(raw).hexdigest() != 'd247e3ea377c4a7f999cafb9d7439e1ad4ba6eb3635cf697bacaeb275cea145e':
-              raise SystemExit('V7_CONTROLLER_DIGEST_MISMATCH')
-          Path('v7_controller.py').write_bytes(raw)
-          print('V7_CONTROLLER_BYTES_PASS')
-          PYV7CONTROLLER
+          import base64, hashlib, re, zlib
+          text=Path('/tmp/parent.yml').read_text()
+          m=re.search(r'^\s*V7_CONTROLLER_ZB64:\s*(\S+)\s*$',text,re.M)
+          if not m: raise SystemExit('V7_PARENT_CONTROLLER_MISSING')
+          raw=zlib.decompress(base64.b64decode(m.group(1),validate=True))
+          if hashlib.sha256(raw).hexdigest()!='d247e3ea377c4a7f999cafb9d7439e1ad4ba6eb3635cf697bacaeb275cea145e': raise SystemExit('V7_PARENT_CONTROLLER_DIGEST')
+          s=raw.decode()
+          repl=[(
+          "transport_first = '63757bd5f68ee5b0f8463057ad22a1c22a798ab7'\ntransport_parent = '6f633c6410b0c96122b1893bf116f8c0bd58aa46'\n",
+          "transport_first = '63757bd5f68ee5b0f8463057ad22a1c22a798ab7'\ntransport_second = '6f633c6410b0c96122b1893bf116f8c0bd58aa46'\ntransport_parent = '2764f0a1f4ccd4809fcffb3b58b8c81ac9be4b9a'\n"),(
+          "    _require_workflow_only_child(transport_first, transport_root, 'FIRST')\n    _require_workflow_only_child(transport_parent, transport_first, 'SECOND')\n    _require_workflow_only_child(transport_sha, transport_parent, 'THIRD')\n",
+          "    _require_workflow_only_child(transport_first, transport_root, 'FIRST')\n    _require_workflow_only_child(transport_second, transport_first, 'SECOND')\n    _require_workflow_only_child(transport_parent, transport_second, 'THIRD')\n    _require_workflow_only_child(transport_sha, transport_parent, 'FOURTH')\n"),(
+          "    'transport_first': transport_first,\n    'transport_parent': transport_parent,\n",
+          "    'transport_first': transport_first,\n    'transport_second': transport_second,\n    'transport_parent': transport_parent,\n")]
+          for old,new in repl:
+              if s.count(old)!=1: raise SystemExit('V7_CONTROLLER_PATCH_SHAPE')
+              s=s.replace(old,new)
+          out=s.encode()
+          if hashlib.sha256(out).hexdigest()!='6565c981dd89bafc02512ebc2339c31e91da1fbd59b68cae3cd949478db2698d': raise SystemExit('V7_CONTROLLER_DIGEST_MISMATCH')
+          Path('v7_controller.py').write_bytes(out); print('V7_CONTROLLER_BYTES_PASS')
+          PY
 
       - name: Rebind stale writer and publish exact test-harness-only child
         shell: bash
