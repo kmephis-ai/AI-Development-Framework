@@ -587,5 +587,104 @@ class ProviderOpsLeaseReconcileTests(unittest.TestCase):
         self.assertIn("FRESHNESS_NOT_VERIFIED", result["reason"])
         self.assertEqual(store.release_calls, [])
 
+
+
+def unchanged_body(**overrides):
+    values = dict(
+        request_id="gov034-unchanged-a1", issue_id=291, roadmap_id="GOV-034",
+        expected_main_sha=MAIN, lease_registry_revision=90, lease_id=LEASE,
+        lease_base_sha=MAIN, branch=BRANCH, worker_id=WORKER, branch_head_sha=MAIN,
+    )
+    values.update(overrides)
+    return GATE.build_lease_release_unchanged_comment(**values)
+
+
+def unchanged_event(body=None, actor="owner", association="OWNER"):
+    return {
+        "action": "created", "repository": {"full_name": "owner/repo"}, "issue": {"number": 291},
+        "sender": {"login": actor},
+        "comment": {"body": body if body is not None else unchanged_body(), "author_association": association, "user": {"login": actor}},
+    }
+
+
+class ProviderOpsLeaseReleaseUnchangedTests(unittest.TestCase):
+    def root(self):
+        td = tempfile.TemporaryDirectory(); self.addCleanup(td.cleanup); root = Path(td.name); write_policy(root); return root
+
+    def process(self, *, client=None, store=None, freshness=None, body=None):
+        if client is None:
+            client = Client()
+            client.branch_sha = MAIN
+        client.main = MAIN
+        store = store or FakeLeaseStore(reconcile_registry(revision=90))
+        freshness = [] if freshness is None else freshness
+        with mock.patch.object(GATE, "GitHubLeaseStore", return_value=store), \
+             mock.patch.object(GATE, "_rulesets"), \
+             mock.patch.object(GATE, "_local_head", return_value=client.main), \
+             mock.patch.object(GATE, "_registry_lease_freshness_errors", return_value=freshness):
+            result = GATE.process_issue_comment_provider_ops(self.root(), unchanged_event(body), client)
+        return result, store, client
+
+    def test_request_roundtrip_is_pr_free_and_reconciliation_ref_not_caller_controlled(self):
+        body = unchanged_body(); req = GATE.parse_provider_ops_comment(body)
+        self.assertEqual(req["operation"], GATE.LEASE_RELEASE_UNCHANGED)
+        self.assertEqual(set(req), GATE.LEASE_RELEASE_UNCHANGED_REQUEST_FIELDS)
+        self.assertNotIn("pr_number", req); self.assertNotIn("provider_reconciliation_ref", req)
+        raw = json.loads(body.split("\n", 1)[1]); raw["provider_reconciliation_ref"] = "caller:forged"; raw["request_digest"] = GATE._digest_payload(raw)
+        with self.assertRaisesRegex(ValueError, "FIELDS"):
+            GATE.parse_provider_ops_comment(GATE.PROVIDER_OPS_MARKER + "\n" + json.dumps(raw, sort_keys=True, separators=(",", ":")))
+
+    def test_request_requires_main_lease_base_and_branch_head_to_match(self):
+        with self.assertRaisesRegex(ValueError, "UNCHANGED_BRANCH_IDENTITY"):
+            GATE.parse_provider_ops_comment(unchanged_body(branch_head_sha=HEAD))
+        with self.assertRaisesRegex(ValueError, "UNCHANGED_BRANCH_IDENTITY"):
+            GATE.parse_provider_ops_comment(unchanged_body(lease_base_sha=HEAD))
+
+    def test_fresh_or_stale_unchanged_lease_releases_without_pr_or_source_ref_mutation(self):
+        for freshness in ([], ["LEASE_HEARTBEAT_STALE"], ["LEASE_EXPIRED"]):
+            with self.subTest(freshness=freshness):
+                result, store, client = self.process(freshness=freshness)
+                self.assertEqual((result["status"], result["operation"], result["mutation"]), ("PASS", GATE.LEASE_RELEASE_UNCHANGED, True))
+                self.assertEqual(result["lease_registry_revision_after"], 91)
+                self.assertEqual((client.main, client.branch_sha), (MAIN, MAIN))
+                self.assertEqual(client.updated, [])
+                self.assertEqual(len(store.release_calls), 1)
+                self.assertTrue(store.release_calls[0]["provider_reconciled"])
+                self.assertEqual(store.release_calls[0]["provider_reconciliation_ref"], result["provider_reconciliation_ref"])
+                self.assertNotIn("pr/", result["provider_reconciliation_ref"])
+
+    def test_branch_registry_and_lease_identity_drift_cause_zero_release(self):
+        cases = []
+        branch = Client(); branch.main = MAIN; branch.branch_sha = HEAD
+        cases.append((branch, FakeLeaseStore(reconcile_registry(revision=90)), "BRANCH_HEAD_DRIFT"))
+        registry = reconcile_registry(revision=90); registry["observed_main_sha"] = HEAD
+        good = Client(); good.main = MAIN; good.branch_sha = MAIN
+        cases.append((good, FakeLeaseStore(registry), "LEASE_OBSERVED_MAIN_MISMATCH"))
+        cases.append((good, FakeLeaseStore(reconcile_registry(revision=90, worker="other")), "LEASE_IDENTITY_MISMATCH"))
+        for client, store, reason in cases:
+            with self.subTest(reason=reason):
+                result, _, _ = self.process(client=client, store=store, freshness=[])
+                self.assertIn(reason, result["reason"])
+                self.assertEqual(store.release_calls, [])
+
+    def test_replay_is_already_applied_without_second_cas(self):
+        req = GATE.parse_provider_ops_comment(unchanged_body())
+        registry = reconcile_registry(status="RELEASED", revision=91)
+        lease = registry["leases"][0]
+        lease["released_at"] = lease["provider_reconciled_at"] = "2026-08-29T18:30:00Z"
+        lease["provider_reconciliation_ref"] = GATE._unchanged_ref(req)
+        store = FakeLeaseStore(registry)
+        result, _, client = self.process(store=store, freshness=[])
+        self.assertEqual((result["status"], result["mutation"]), ("ALREADY_APPLIED", False))
+        self.assertEqual(store.release_calls, []); self.assertEqual(client.updated, [])
+
+    def test_cas_loss_and_invalid_future_heartbeat_fail_closed(self):
+        store = FakeLeaseStore(reconcile_registry(revision=90), fail_release="LEASE_PROVIDER_CAS_LOST:revision=91")
+        result, _, _ = self.process(store=store, freshness=[])
+        self.assertEqual(result["status"], "NOT_VERIFIED"); self.assertIn("CAS_FAILED", result["reason"])
+        store = FakeLeaseStore(reconcile_registry(revision=90))
+        result, _, _ = self.process(store=store, freshness=["LEASE_HEARTBEAT_IN_FUTURE"])
+        self.assertIn("FRESHNESS_NOT_VERIFIED", result["reason"]); self.assertEqual(store.release_calls, [])
+
 if __name__ == "__main__":
     unittest.main()
