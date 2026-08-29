@@ -1,4 +1,4 @@
-name: GOV-034 Stage-3 Test Repair V7 Recovery Retry5
+name: ADWF Local Git Mirror Bootstrap
 
 on:
   push:
@@ -6,217 +6,53 @@ on:
       - agent/local-mirror-gov034-stage2-20260829-a2
 
 permissions:
-  contents: write
-  issues: read
-  pull-requests: read
-
-concurrency:
-  group: gov034-stage3-test-repair-v7-${{ github.repository }}
-  cancel-in-progress: false
+  contents: read
 
 env:
-  PYTHONDONTWRITEBYTECODE: "1"
+  SOURCE_SHA: 8c9a8a94c05412c5c0c20e42e3612ddf7570f962
+  SOURCE_BRANCH: main
+  MIRROR_ARTIFACT_NAME: adwf-local-mirror-gov034-stage2-20260829-a2
 
 jobs:
-  repair-stage3-test:
+  build-bundle:
     runs-on: ubuntu-24.04
-    timeout-minutes: 15
+    timeout-minutes: 10
     steps:
-      - name: Checkout exact pre-repair PR HEAD
-        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd
         with:
-          ref: 39800c71282954333087c26b55f3ec5ff8ee9506
-          path: candidate
-          fetch-depth: 2
+          fetch-depth: 0
           persist-credentials: false
 
-      - uses: actions/setup-python@a309ff8b426b58ec0e2a45f0f869d46889d02405
+      - name: Build exact-source bundle
+        shell: bash
+        run: |
+          set -euo pipefail
+          git cat-file -e "${SOURCE_SHA}^{commit}"
+          git branch -f adwf-source "${SOURCE_SHA}"
+          mkdir -p mirror-artifact
+          git bundle create mirror-artifact/repository.bundle refs/heads/adwf-source --tags
+          git bundle verify mirror-artifact/repository.bundle
+          BUNDLE_SHA256="$(sha256sum mirror-artifact/repository.bundle | awk '{print $1}')"
+          BUNDLE_BYTES="$(wc -c < mirror-artifact/repository.bundle | tr -d ' ')"
+          printf '%s  %s\n' "${BUNDLE_SHA256}" "repository.bundle" > mirror-artifact/SHA256SUMS.txt
+          cat > mirror-artifact/manifest.json <<JSON
+          {
+            "schema_version": 1,
+            "source_repository": "${GITHUB_REPOSITORY}",
+            "source_branch": "${SOURCE_BRANCH}",
+            "source_sha": "${SOURCE_SHA}",
+            "transport_sha": "${GITHUB_SHA}",
+            "bundle_sha256": "${BUNDLE_SHA256}",
+            "bundle_bytes": ${BUNDLE_BYTES},
+            "bundle_ref": "refs/heads/adwf-source"
+          }
+          JSON
+
+      - name: Upload bundle artifact
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         with:
-          python-version: "3.12.10"
-          check-latest: false
-
-      - name: Build exact repair candidate and focused test
-        shell: bash
-        run: |
-          set -euo pipefail
-          python - <<'PY'
-          from pathlib import Path
-          import ast, hashlib
-          p=Path('candidate/.adwf/tests/test_provider_ops_gateway.py'); raw=p.read_bytes()
-          blob=lambda b: hashlib.sha1(b'blob '+str(len(b)).encode()+b'\0'+b).hexdigest()
-          if blob(raw)!='edd2db96e4add36c4f2f5d11891679fb43056a85': raise SystemExit('V7_CANDIDATE_BASE_BLOB_DRIFT')
-          old=b'    def process(self, *, client=None, store=None, freshness=None, body=None):\n        client = client or Client()\n        client.main = MAIN\n        if client.branch_sha == HEAD:\n            client.branch_sha = MAIN\n'
-          new=b'    def process(self, *, client=None, store=None, freshness=None, body=None):\n        if client is None:\n            client = Client()\n            client.branch_sha = MAIN\n        client.main = MAIN\n'
-          if raw.count(old)!=1: raise SystemExit('V7_CANDIDATE_OLD_SNIPPET_COUNT')
-          fixed=raw.replace(old,new)
-          if blob(fixed)!='ce268e7611745ff16f8ce0b31630c79b129d0348' or hashlib.sha256(fixed).hexdigest()!='533c7f30b6366ac94d58cfe665370339d2a34fb2f2bef4cb8000329c487711c9': raise SystemExit('V7_CANDIDATE_FIXED_IDENTITY')
-          ast.parse(fixed.decode()); p.write_bytes(fixed); print('V7_CANDIDATE_BYTES_PASS')
-          PY
-          cd candidate/.adwf/tests
-          env -i PATH="$PATH" HOME="$HOME" LANG=C.UTF-8 LC_ALL=C.UTF-8 PYTHONDONTWRITEBYTECODE=1 python -m unittest -v test_provider_ops_gateway.ProviderOpsLeaseReleaseUnchangedTests
-
-      - name: Checkout exact protected BASE
-        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd
-        with:
-          ref: aad3aba5ccb5f37882b8d51e89ff2c66da6e2822
-          path: trusted
-          fetch-depth: 2
-          persist-credentials: false
-
-      - name: Disposable canonical projections and full self-test before lease mutation
-        shell: bash
-        run: |
-          set -euo pipefail
-          cleanenv=(env -i PATH="$PATH" HOME="$HOME" LANG=C.UTF-8 LC_ALL=C.UTF-8 PYTHONDONTWRITEBYTECODE=1)
-          "${cleanenv[@]}" python -I trusted/.adwf/scripts/docs_freshness.py --root "$PWD/candidate" --write
-          "${cleanenv[@]}" python -I trusted/.adwf/scripts/generate_manifest.py --root "$PWD/candidate"
-          python - <<'PY'
-          import subprocess
-          got=set(subprocess.check_output(['git','-C','candidate','diff','--name-only'],text=True).splitlines())
-          want={'.adwf/tests/test_provider_ops_gateway.py','.adwf/docs-registry.json','MANIFEST.json','SHA256SUMS.txt'}
-          if got!=want: raise SystemExit('V7_DISPOSABLE_GENERATOR_UNEXPECTED_PATH:'+','.join(sorted(got)))
-          PY
-          sha256sum candidate/.adwf/docs-registry.json candidate/MANIFEST.json candidate/SHA256SUMS.txt > /tmp/v7-proj.before
-          "${cleanenv[@]}" python -I trusted/.adwf/scripts/docs_freshness.py --root "$PWD/candidate" --write
-          "${cleanenv[@]}" python -I trusted/.adwf/scripts/generate_manifest.py --root "$PWD/candidate"
-          sha256sum candidate/.adwf/docs-registry.json candidate/MANIFEST.json candidate/SHA256SUMS.txt > /tmp/v7-proj.after
-          cmp /tmp/v7-proj.before /tmp/v7-proj.after
-          cd candidate
-          "${cleanenv[@]}" python .adwf/adwf.py self-test
-
-      - name: Materialize exact V7 trusted controller from literal digest-bound payload
-        shell: bash
-        run: |
-          set -euo pipefail
-          python - <<'PYV7CONTROLLER'
-          from pathlib import Path
-          import base64, hashlib, zlib
-          payload = """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
-          tf8Fmg74Xg==""".replace('\n','')
-          raw = zlib.decompress(base64.b64decode(payload, validate=True))
-          if hashlib.sha256(raw).hexdigest() != '0563e1bbab93f283b61bd6f2dde00298ac9bfecd149212cd6d60e0159662249e': raise SystemExit('V7_CONTROLLER_DIGEST_MISMATCH')
-          Path('v7_controller.py').write_bytes(raw)
-          print('V7_CONTROLLER_BYTES_PASS')
-          PYV7CONTROLLER
-
-      - name: Rebind stale writer and publish exact test-harness-only child
-        shell: bash
-        env:
-          GITHUB_TOKEN: ${{ github.token }}
-        run: |
-          set -euo pipefail
-          cd trusted
-          python ../v7_controller.py
+          name: ${{ env.MIRROR_ARTIFACT_NAME }}
+          path: mirror-artifact/
+          if-no-files-found: error
+          retention-days: 1
+          compression-level: 0
