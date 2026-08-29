@@ -612,10 +612,10 @@ class ProviderOpsLeaseReleaseUnchangedTests(unittest.TestCase):
         td = tempfile.TemporaryDirectory(); self.addCleanup(td.cleanup); root = Path(td.name); write_policy(root); return root
 
     def process(self, *, client=None, store=None, freshness=None, body=None):
-        client = client or Client()
-        client.main = MAIN
-        if client.branch_sha == HEAD:
+        if client is None:
+            client = Client()
             client.branch_sha = MAIN
+        client.main = MAIN
         store = store or FakeLeaseStore(reconcile_registry(revision=90))
         freshness = [] if freshness is None else freshness
         with mock.patch.object(GATE, "GitHubLeaseStore", return_value=store), \
