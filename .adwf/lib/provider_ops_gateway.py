@@ -1,7 +1,7 @@
 """Trusted provider-hosted repository operations gateway.
 
-Stage 1 implements MATERIALIZE_PROJECTIONS and Stage 2 adds release-only
-LEASE_RECONCILE. Issue-comment payloads are strictly bounded data. Authority comes from exact protected BASE code, provider
+Stage 1 implements MATERIALIZE_PROJECTIONS, Stage 2 adds PR-backed release-only
+LEASE_RECONCILE, and Stage 3 adds unchanged-branch release-only LEASE_RELEASE_UNCHANGED. Issue-comment payloads are strictly bounded data. Authority comes from exact protected BASE code, provider
 readback, the current effective policy/rulesets, the live writer lease, and the
 BASE trust classifier. Candidate code is never imported or executed.
 """
@@ -33,6 +33,7 @@ PROVIDER_OPS_ROLE = "ADWF_PROVIDER_OPS_REQUEST_V1"
 PROVIDER_OPS_SCHEMA_VERSION = 1
 MATERIALIZE_PROJECTIONS = "MATERIALIZE_PROJECTIONS"
 LEASE_RECONCILE = "LEASE_RECONCILE"
+LEASE_RELEASE_UNCHANGED = "LEASE_RELEASE_UNCHANGED"
 PROJECTION_PATHS = [".adwf/docs-registry.json", "MANIFEST.json", "SHA256SUMS.txt"]
 MATERIALIZE_REQUEST_FIELDS = {
     "schema_version", "role", "request_id", "operation", "issue_id", "roadmap_id",
@@ -45,6 +46,11 @@ LEASE_RECONCILE_REQUEST_FIELDS = {
     "expected_main_sha", "lease_registry_revision", "lease_id", "lease_base_sha",
     "branch", "worker_id", "pr_number", "pr_head_sha", "monetary_budget_usd",
     "request_digest",
+}
+LEASE_RELEASE_UNCHANGED_REQUEST_FIELDS = {
+    "schema_version", "role", "request_id", "operation", "issue_id", "roadmap_id",
+    "expected_main_sha", "lease_registry_revision", "lease_id", "lease_base_sha",
+    "branch", "worker_id", "branch_head_sha", "monetary_budget_usd", "request_digest",
 }
 # Backward-compatible public alias used by Stage-1 tests/callers.
 REQUEST_FIELDS = MATERIALIZE_REQUEST_FIELDS
@@ -154,6 +160,31 @@ def build_lease_reconcile_comment(
     return PROVIDER_OPS_MARKER + "\n" + _canonical(request)
 
 
+def build_lease_release_unchanged_comment(
+    *, request_id: str, issue_id: int, roadmap_id: str, expected_main_sha: str,
+    lease_registry_revision: int, lease_id: str, lease_base_sha: str, branch: str,
+    worker_id: str, branch_head_sha: str,
+) -> str:
+    request: dict[str, Any] = {
+        "schema_version": PROVIDER_OPS_SCHEMA_VERSION,
+        "role": PROVIDER_OPS_ROLE,
+        "request_id": request_id,
+        "operation": LEASE_RELEASE_UNCHANGED,
+        "issue_id": issue_id,
+        "roadmap_id": roadmap_id,
+        "expected_main_sha": expected_main_sha,
+        "lease_registry_revision": lease_registry_revision,
+        "lease_id": lease_id,
+        "lease_base_sha": lease_base_sha,
+        "branch": branch,
+        "worker_id": worker_id,
+        "branch_head_sha": branch_head_sha,
+        "monetary_budget_usd": 0,
+    }
+    request["request_digest"] = _digest_payload(request)
+    return PROVIDER_OPS_MARKER + "\n" + _canonical(request)
+
+
 def has_provider_ops_marker(body: Any) -> bool:
     if not isinstance(body, str):
         return False
@@ -179,6 +210,8 @@ def parse_provider_ops_comment(body: str) -> dict[str, Any]:
         expected_fields = MATERIALIZE_REQUEST_FIELDS
     elif operation == LEASE_RECONCILE:
         expected_fields = LEASE_RECONCILE_REQUEST_FIELDS
+    elif operation == LEASE_RELEASE_UNCHANGED:
+        expected_fields = LEASE_RELEASE_UNCHANGED_REQUEST_FIELDS
     else:
         raise ValueError("PROVIDER_OPS_OPERATION_UNSUPPORTED")
     if set(request) != expected_fields:
@@ -191,8 +224,6 @@ def parse_provider_ops_comment(body: str) -> dict[str, Any]:
         raise ValueError("PROVIDER_OPS_ROADMAP_ID_INVALID")
     if not isinstance(request.get("expected_main_sha"), str) or _SHA40.fullmatch(request["expected_main_sha"]) is None:
         raise ValueError("PROVIDER_OPS_SHA_INVALID")
-    if isinstance(request.get("pr_number"), bool) or not isinstance(request.get("pr_number"), int) or request["pr_number"] < 1:
-        raise ValueError("PROVIDER_OPS_PR_NUMBER_INVALID")
     branch = request.get("branch")
     if not isinstance(branch, str) or _BRANCH.fullmatch(branch) is None or branch.startswith("-") or ".." in branch or branch.endswith("/"):
         raise ValueError("PROVIDER_OPS_BRANCH_INVALID")
@@ -206,6 +237,8 @@ def parse_provider_ops_comment(body: str) -> dict[str, Any]:
     if isinstance(revision, bool) or not isinstance(revision, int) or revision < 1:
         raise ValueError("PROVIDER_OPS_LEASE_REVISION_INVALID")
     if operation == MATERIALIZE_PROJECTIONS:
+        if isinstance(request.get("pr_number"), bool) or not isinstance(request.get("pr_number"), int) or request["pr_number"] < 1:
+            raise ValueError("PROVIDER_OPS_PR_NUMBER_INVALID")
         for field in ("base_sha", "head_sha"):
             if not isinstance(request.get(field), str) or _SHA40.fullmatch(request[field]) is None:
                 raise ValueError("PROVIDER_OPS_SHA_INVALID")
@@ -215,10 +248,18 @@ def parse_provider_ops_comment(body: str) -> dict[str, Any]:
         projections = _canonical_paths(request.get("projection_paths"))
         if projections != PROJECTION_PATHS or set(source_paths) & set(PROJECTION_PATHS):
             raise ValueError("PROVIDER_OPS_PROJECTION_PATHS_INVALID")
-    else:
+    elif operation == LEASE_RECONCILE:
+        if isinstance(request.get("pr_number"), bool) or not isinstance(request.get("pr_number"), int) or request["pr_number"] < 1:
+            raise ValueError("PROVIDER_OPS_PR_NUMBER_INVALID")
         for field in ("lease_base_sha", "pr_head_sha"):
             if not isinstance(request.get(field), str) or _SHA40.fullmatch(request[field]) is None:
                 raise ValueError("PROVIDER_OPS_SHA_INVALID")
+    else:
+        for field in ("lease_base_sha", "branch_head_sha"):
+            if not isinstance(request.get(field), str) or _SHA40.fullmatch(request[field]) is None:
+                raise ValueError("PROVIDER_OPS_SHA_INVALID")
+        if request["lease_base_sha"] != request["expected_main_sha"] or request["branch_head_sha"] != request["expected_main_sha"]:
+            raise ValueError("PROVIDER_OPS_UNCHANGED_BRANCH_IDENTITY_INVALID")
     budget = request.get("monetary_budget_usd")
     if isinstance(budget, bool) or budget != 0:
         raise ValueError("PROVIDER_OPS_MONETARY_BUDGET_INVALID")
@@ -825,6 +866,142 @@ def _process_lease_reconcile(root: Path, event: dict[str, Any], client: GitHubCl
     }
 
 
+def _unchanged_ref(request: dict[str, Any]) -> str:
+    return (
+        f"github:provider-ops:{request['request_id']}:{request['request_digest']}:"
+        f"branch/{request['branch']}@{request['branch_head_sha']}:main@{request['expected_main_sha']}"
+    )
+
+
+def _unchanged_replay(request: dict[str, Any], registry: dict[str, Any], lease: dict[str, Any] | None) -> dict[str, Any] | None:
+    if lease is None or lease.get("status") != "RELEASED":
+        return None
+    expected = {
+        "worker_id": request["worker_id"], "issue_id": str(request["issue_id"]),
+        "roadmap_id": request["roadmap_id"], "base_sha": request["lease_base_sha"],
+        "branch": request["branch"],
+        "resources": [{"global": True, "kind": "provider", "scope": "global", "shared": True}],
+    }
+    if any(lease.get(key) != value for key, value in expected.items()):
+        return None
+    if lease.get("provider_reconciliation_ref") != _unchanged_ref(request):
+        return None
+    if registry.get("revision") < request["lease_registry_revision"] + 1 or registry.get("observed_main_sha") != request["expected_main_sha"]:
+        return None
+    return {
+        "status": "ALREADY_APPLIED", "operation": LEASE_RELEASE_UNCHANGED, "mutation": False,
+        "request_id": request["request_id"], "request_digest": request["request_digest"],
+        "lease_id": request["lease_id"], "lease_registry_revision": registry.get("revision"),
+        "branch": request["branch"], "branch_head_sha": request["branch_head_sha"],
+        "provider_readback": True, "merge_authority": False, "issue_close_authority": False,
+        "monetary_cost_usd": 0,
+    }
+
+
+def _unchanged_live_identity(root: Path, client: GitHubClient, request: dict[str, Any], *, allow_replay: bool) -> dict[str, Any]:
+    info = client.repo_info(); default = str(info.get("default_branch") or "")
+    if not default:
+        raise ValueError("PROVIDER_OPS_DEFAULT_BRANCH_MISSING")
+    main = str((client.branch(default).get("commit") or {}).get("sha") or "")
+    if main != request["expected_main_sha"]:
+        raise ValueError("PROVIDER_OPS_MAIN_DRIFT")
+    if _local_head(root) != main:
+        raise ValueError("PROVIDER_OPS_TRUSTED_CHECKOUT_MAIN_MISMATCH")
+    _rulesets(client)
+    issue = client.get(f"/repos/{client.repo}/issues/{request['issue_id']}")
+    if issue.get("state") != "open" or issue.get("pull_request") is not None or int(issue.get("number") or 0) != request["issue_id"]:
+        raise ValueError("PROVIDER_OPS_ISSUE_NOT_OPEN")
+    if not _issue_title_has_roadmap(str(issue.get("title") or ""), request["roadmap_id"]):
+        raise ValueError("PROVIDER_OPS_ISSUE_ROADMAP_MISMATCH")
+    branch_sha = str((client.git_ref(request["branch"]).get("object") or {}).get("sha") or "")
+    if branch_sha != request["branch_head_sha"]:
+        raise ValueError("PROVIDER_OPS_BRANCH_HEAD_DRIFT")
+    if branch_sha != main or request["lease_base_sha"] != main:
+        raise ValueError("PROVIDER_OPS_UNCHANGED_BRANCH_NOT_VERIFIED")
+    registry, anchor, lease = _reconcile_registry(client, request)
+    if allow_replay:
+        replay = _unchanged_replay(request, registry, lease)
+        if replay is not None:
+            return {"replay": replay, "main_sha": main, "branch_sha": branch_sha, "registry": registry, "lease": lease, "lease_anchor": anchor}
+    if registry.get("revision") != request["lease_registry_revision"]:
+        raise ValueError("PROVIDER_OPS_LEASE_REVISION_MISMATCH")
+    if registry.get("observed_main_sha") != main:
+        raise ValueError("PROVIDER_OPS_LEASE_OBSERVED_MAIN_MISMATCH")
+    active = [row for row in registry.get("leases") or [] if row.get("status") == "ACTIVE"]
+    if len(active) != 1 or lease is None or active[0].get("lease_id") != request["lease_id"]:
+        raise ValueError("PROVIDER_OPS_SOLE_ACTIVE_LEASE_REQUIRED")
+    expected = {
+        "worker_id": request["worker_id"], "issue_id": str(request["issue_id"]), "roadmap_id": request["roadmap_id"],
+        "base_sha": request["lease_base_sha"], "branch": request["branch"],
+        "resources": [{"global": True, "kind": "provider", "scope": "global", "shared": True}],
+    }
+    for key, value in expected.items():
+        if lease.get(key) != value:
+            raise ValueError("PROVIDER_OPS_LEASE_IDENTITY_MISMATCH:" + key)
+    freshness = _registry_lease_freshness_errors(lease, datetime.now(timezone.utc))
+    invalid_freshness = [item for item in freshness if item not in {"LEASE_EXPIRED", "LEASE_HEARTBEAT_STALE"}]
+    if invalid_freshness:
+        raise ValueError("PROVIDER_OPS_LEASE_FRESHNESS_NOT_VERIFIED:" + ",".join(invalid_freshness))
+    return {
+        "main_sha": main, "branch_sha": branch_sha, "registry": registry, "lease": lease,
+        "lease_anchor": anchor, "freshness_errors": freshness,
+    }
+
+
+def _process_lease_release_unchanged(root: Path, event: dict[str, Any], client: GitHubClient, request: dict[str, Any]) -> dict[str, Any]:
+    try:
+        live = _unchanged_live_identity(root, client, request, allow_replay=True)
+    except Exception as exc:
+        return _not_verified(str(exc), request)
+    if live.get("replay") is not None:
+        return live["replay"]
+    try:
+        pre = _unchanged_live_identity(root, client, request, allow_replay=False)
+        if pre["registry"].get("revision") != live["registry"].get("revision") or pre["branch_sha"] != live["branch_sha"] or pre["main_sha"] != live["main_sha"]:
+            raise ValueError("PROVIDER_OPS_UNCHANGED_PREFLIGHT_DRIFT")
+    except Exception as exc:
+        return _not_verified(str(exc), request)
+    reconciliation_ref = _unchanged_ref(request)
+    try:
+        persisted, anchor = GitHubLeaseStore(client).release(
+            expected_main_sha=request["expected_main_sha"], policy_max_parallel_writers=1,
+            lease_id=request["lease_id"], worker_id=request["worker_id"], provider_reconciled=True,
+            provider_reconciliation_ref=reconciliation_ref,
+        )
+    except Exception as exc:
+        try:
+            winner, _, target = _reconcile_registry(client, request)
+            replay = _unchanged_replay(request, winner, target)
+            if replay is not None:
+                return replay
+        except Exception:
+            pass
+        return _not_verified("PROVIDER_OPS_LEASE_RELEASE_UNCHANGED_CAS_FAILED:" + str(exc), request)
+    try:
+        post = _unchanged_live_identity(root, client, request, allow_replay=True)
+        replay = post.get("replay")
+        if replay is None:
+            raise ValueError("PROVIDER_OPS_LEASE_RELEASE_UNCHANGED_POST_READBACK_FAILED")
+        if persisted.get("revision") != request["lease_registry_revision"] + 1 or post["registry"].get("revision") != persisted.get("revision"):
+            raise ValueError("PROVIDER_OPS_LEASE_RELEASE_UNCHANGED_REVISION_INVALID")
+        if any(row.get("status") == "ACTIVE" for row in post["registry"].get("leases") or []):
+            raise ValueError("PROVIDER_OPS_LEASE_RELEASE_UNCHANGED_ACTIVE_WRITER_REMAINS")
+        if post["branch_sha"] != request["branch_head_sha"] or post["main_sha"] != request["expected_main_sha"]:
+            raise ValueError("PROVIDER_OPS_LEASE_RELEASE_UNCHANGED_PROVIDER_IDENTITY_DRIFT")
+    except Exception as exc:
+        return _not_verified(str(exc), request, mutation=True, lease_anchor=anchor)
+    return {
+        "status": "PASS", "operation": LEASE_RELEASE_UNCHANGED, "mutation": True,
+        "request_id": request["request_id"], "request_digest": request["request_digest"],
+        "lease_id": request["lease_id"], "released_lease_base_sha": request["lease_base_sha"],
+        "branch": request["branch"], "branch_head_sha": request["branch_head_sha"],
+        "lease_registry_revision_before": request["lease_registry_revision"],
+        "lease_registry_revision_after": persisted["revision"], "lease_anchor": anchor,
+        "provider_reconciliation_ref": reconciliation_ref, "provider_readback": True,
+        "merge_authority": False, "issue_close_authority": False, "monetary_cost_usd": 0,
+    }
+
+
 def process_issue_comment_provider_ops(root: Path, event: dict[str, Any], client: GitHubClient) -> dict[str, Any] | None:
     comment = event.get("comment") if isinstance(event, dict) else None
     body = (comment or {}).get("body") if isinstance(comment, dict) else None
@@ -856,6 +1033,8 @@ def process_issue_comment_provider_ops(root: Path, event: dict[str, Any], client
         return _rejected(reason, request)
     if request["operation"] == LEASE_RECONCILE:
         return _process_lease_reconcile(root, event, client, request)
+    if request["operation"] == LEASE_RELEASE_UNCHANGED:
+        return _process_lease_release_unchanged(root, event, client, request)
 
     # Read live identities without requiring the original HEAD so a verified
     # replay can return ALREADY_APPLIED without attempting a second mutation.
