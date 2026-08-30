@@ -91,6 +91,8 @@ def codex_version(executable: str) -> str:
     proc = subprocess.run(
         [executable, "--version"],
         text=True,
+        encoding="utf-8",
+        errors="strict",
         capture_output=True,
         check=False,
         timeout=30,
@@ -108,6 +110,8 @@ def verify_chatgpt_auth(executable: str) -> None:
     proc = subprocess.run(
         [executable, "login", "status"],
         text=True,
+        encoding="utf-8",
+        errors="strict",
         capture_output=True,
         check=False,
         timeout=30,
@@ -215,6 +219,8 @@ def run_codex(workspace: Path, package: dict, executable: str) -> None:
         build_codex_argv(executable, prompt, windows=(os.name == "nt")),
         cwd=workspace,
         text=True,
+        encoding="utf-8",
+        errors="strict",
         capture_output=True,
         check=False,
         timeout=CODEX_TIMEOUT_SECONDS,
