@@ -79,7 +79,7 @@
       "command": {
         "runner": "PYTHON",
         "path": ".adwf/scripts/codex_goal_adapter.py",
-        "sha256": "93e2ac5bc0cdec23860e1289f8f1094d27ed4e14d18ecd6d22470c813b528788"
+        "sha256": "8bd4c534f0e640d5530c446da045a310699628187cf344a6f84dc93ff6d349ea"
       },
       "authority": {
         "network": "DECLARED_EXTERNAL",
@@ -98,5 +98,5 @@
       "executor_auth": "PROVIDER_MANAGED_SESSION"
     }
   ],
-  "registry_sha256": "a1046f245c4e24a751ef87eb6f0936c5d938e82109c3d631c3377a725367404c"
+  "registry_sha256": "831bcf369ba9b81fa0469cb4f87c6c4c0885a56b737e7e716afb3f7c394d46e3"
 }
