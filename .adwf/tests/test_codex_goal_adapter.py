@@ -97,21 +97,47 @@ class CodexGoalAdapterTests(unittest.TestCase):
 
     def test_version_is_pinned_to_measured_cli(self):
         good = subprocess.CompletedProcess(["codex", "--version"], 0, stdout="codex-cli 0.149.1\n", stderr="")
-        with patch.object(codex.subprocess, "run", return_value=good):
+        with patch.object(codex.subprocess, "run", return_value=good) as run:
             self.assertEqual(codex.codex_version("codex"), "0.149.1")
+        self.assertEqual(run.call_args.kwargs["encoding"], "utf-8")
+        self.assertEqual(run.call_args.kwargs["errors"], "strict")
         drift = subprocess.CompletedProcess(["codex", "--version"], 0, stdout="codex-cli 0.150.0\n", stderr="")
         with patch.object(codex.subprocess, "run", return_value=drift):
             with self.assertRaisesRegex(ValueError, "CODEX_GOAL_VERSION_UNQUALIFIED"):
                 codex.codex_version("codex")
 
     def test_provider_auth_must_be_chatgpt(self):
-        good = subprocess.CompletedProcess(["codex", "login", "status"], 0, stdout="Logged in using ChatGPT\n", stderr="")
-        with patch.object(codex.subprocess, "run", return_value=good):
+        good = subprocess.CompletedProcess(
+            ["codex", "login", "status"], 0, stdout="Logged in using ChatGPT — готово\n", stderr=""
+        )
+        with patch.object(codex.subprocess, "run", return_value=good) as run:
             codex.verify_chatgpt_auth("codex")
+        self.assertEqual(run.call_args.kwargs["encoding"], "utf-8")
+        self.assertEqual(run.call_args.kwargs["errors"], "strict")
         api = subprocess.CompletedProcess(["codex", "login", "status"], 0, stdout="Logged in using API key\n", stderr="")
         with patch.object(codex.subprocess, "run", return_value=api):
             with self.assertRaisesRegex(ValueError, "CODEX_GOAL_CHATGPT_AUTH_REQUIRED"):
                 codex.verify_chatgpt_auth("codex")
+
+    def test_codex_exec_uses_strict_utf8_and_accepts_unicode_jsonl(self):
+        completed = subprocess.CompletedProcess(
+            ["codex", "exec"],
+            0,
+            stdout=json.dumps({"type": "turn.completed", "message": "готово ✓"}, ensure_ascii=False) + "\n",
+            stderr="",
+        )
+        with patch.object(codex.subprocess, "run", return_value=completed) as run:
+            codex.run_codex(ROOT, package(), "codex")
+        self.assertEqual(run.call_args.kwargs["encoding"], "utf-8")
+        self.assertEqual(run.call_args.kwargs["errors"], "strict")
+
+    def test_malformed_codex_utf8_cannot_become_successful_terminal_event(self):
+        decode_error = UnicodeDecodeError("utf-8", b'\x98', 0, 1, "invalid start byte")
+        with patch.object(codex.subprocess, "run", side_effect=decode_error) as run:
+            with self.assertRaises(UnicodeDecodeError):
+                codex.run_codex(ROOT, package(), "codex")
+        self.assertEqual(run.call_args.kwargs["encoding"], "utf-8")
+        self.assertEqual(run.call_args.kwargs["errors"], "strict")
 
     def test_secret_environment_is_rejected_before_execution(self):
         with tempfile.TemporaryDirectory() as tmp:
