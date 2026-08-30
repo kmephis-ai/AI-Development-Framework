@@ -148,6 +148,17 @@ class CodexGoalAdapterTests(unittest.TestCase):
             with self.assertRaisesRegex(ValueError, "WRITE_SURFACE_FORBIDDEN"):
                 codex.validate_changed_paths(root, pkg, ["docs/outside.md"])
 
+    def test_hard_forbidden_surfaces_override_wildcard_package_scope(self):
+        pkg = package(allowed_write_surfaces=["**"])
+        for path in (".adwf/roadmap.json", "AGENTS.md"):
+            with self.subTest(path=path):
+                with self.assertRaises(ValueError) as raised:
+                    codex.validate_changed_paths(ROOT, pkg, [path])
+                self.assertEqual(
+                    str(raised.exception),
+                    "CODEX_GOAL_WRITE_SURFACE_FORBIDDEN:" + path,
+                )
+
     def test_ignored_change_is_rejected(self):
         pkg = package(allowed_write_surfaces=["src/**"])
         with tempfile.TemporaryDirectory() as tmp:
