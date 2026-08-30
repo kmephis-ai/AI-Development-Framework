@@ -24,7 +24,7 @@
         "skills/**"
       ],
       "mode": "manual-governance",
-      "source_digest": "77eee90c32babff3e5cfe6c779b34621d90c8f7c422f937f8833e287529405d1",
+      "source_digest": "672c38cc7e3a253610294ca5dbbd1cec001eaaf8eace8af826b4325b6afc80f5",
       "reviewed_at": "2026-08-13T00:00:00Z",
       "valid_until": "2026-11-13T00:00:00Z"
     },
@@ -37,7 +37,7 @@
         ".adwf/scripts/**"
       ],
       "mode": "architecture",
-      "source_digest": "2694a9cec79fddb67539851774742b85fb4bafdaecd543a994557b20343df25d",
+      "source_digest": "82bc4f3954bb400d07e68fc4b3eba99dbf852ed7d90c14305e09295cf7a06f2a",
       "reviewed_at": "2026-08-13T00:00:00Z",
       "valid_until": "2026-11-13T00:00:00Z"
     },
@@ -351,7 +351,7 @@
         ".adwf/decision-requirement-traceability.json"
       ],
       "mode": "governance-contract",
-      "source_digest": "5a6e365ace29a161adcc65ca443585eef39f8db9da5dde2f6d391352339074ae",
+      "source_digest": "7dbed727f81bafe8072aba26faa5e7433b86376fff5c2643fdad41a43720a61d",
       "reviewed_at": "2026-08-13T00:00:00Z",
       "valid_until": "2026-11-13T00:00:00Z"
     },
