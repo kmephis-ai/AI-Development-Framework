@@ -66,7 +66,37 @@
       "qualification_profile_version": 2,
       "qualification_profile_digest": "bcaff6ec0197821b2884ff69cc2afc86011d19ab38bbb6e8a0f716be8844cdc6",
       "executor_auth": "NONE"
+    },
+    {
+      "id": "codex-goal-local",
+      "version": "1.0.0",
+      "kind": "EXTERNAL_COMMAND",
+      "invocation_mode": "COMMAND",
+      "supported_phases": [
+        "EXECUTE",
+        "RECOVERY"
+      ],
+      "command": {
+        "runner": "PYTHON",
+        "path": ".adwf/scripts/codex_goal_adapter.py",
+        "sha256": "93e2ac5bc0cdec23860e1289f8f1094d27ed4e14d18ecd6d22470c813b528788"
+      },
+      "authority": {
+        "network": "DECLARED_EXTERNAL",
+        "secrets": "FORBIDDEN",
+        "filesystem": "PACKAGE_SCOPED"
+      },
+      "monetary_budget_usd": 0,
+      "timeout_seconds": 900,
+      "result_channel": "ADWF_ACTION_RESULT_JSON",
+      "package_schema": ".adwf/schemas/ai-work-package.schema.json",
+      "result_schema": ".adwf/schemas/ai-work-result.schema.json",
+      "qualification_report": ".adwf/creative-agent-qualification-codex-goal-local.json",
+      "qualification_profile_id": "CREATIVE_AGENT_COMMAND_V2",
+      "qualification_profile_version": 2,
+      "qualification_profile_digest": "bcaff6ec0197821b2884ff69cc2afc86011d19ab38bbb6e8a0f716be8844cdc6",
+      "executor_auth": "PROVIDER_MANAGED_SESSION"
     }
   ],
-  "registry_sha256": "af42830c0433becf70fb7d4d2ab4c8b7888951d68fccfb216ed707c8ada54ed9"
+  "registry_sha256": "a1046f245c4e24a751ef87eb6f0936c5d938e82109c3d631c3377a725367404c"
 }
