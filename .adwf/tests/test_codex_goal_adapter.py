@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import importlib.util
 import json
-import os
 import subprocess
 import sys
 import tempfile
@@ -87,6 +86,113 @@ class CodexGoalAdapterTests(unittest.TestCase):
         failed = good + "\n" + json.dumps({"type": "turn.failed"})
         self.assertFalse(codex._jsonl_completed(failed))
 
+    def test_public_visible_agent_message_is_bounded_and_allowlisted(self):
+        stdout = "\n".join(
+            [
+                json.dumps({"type": "thread.started", "thread_id": "private-thread-id"}),
+                json.dumps(
+                    {
+                        "type": "item.completed",
+                        "item": {"type": "agent_message", "text": "  No files needed.\nEverything already matches.  "},
+                    }
+                ),
+                json.dumps({"type": "turn.completed", "usage": {"secret": "not retained"}}),
+            ]
+        )
+        observation = codex._codex_observation(stdout)
+        self.assertEqual(observation["terminal_state"], "completed")
+        self.assertEqual(observation["event_counts"]["item.completed"], 1)
+        self.assertTrue(observation["visible_agent_message"])
+        self.assertEqual(observation["visible_excerpt"], "No files needed. Everything already matches.")
+        self.assertEqual(
+            set(observation),
+            {"terminal_state", "event_counts", "visible_agent_message", "visible_excerpt"},
+        )
+        self.assertNotIn("private-thread-id", repr(observation))
+        self.assertNotIn("not retained", repr(observation))
+
+    def test_reasoning_unknown_and_command_payloads_are_excluded(self):
+        stdout = "\n".join(
+            [
+                json.dumps({"type": "reasoning", "text": "hidden chain"}),
+                json.dumps(
+                    {
+                        "type": "item.completed",
+                        "item": {"type": "command_execution", "stdout": "command-secret", "stderr": "error-secret"},
+                    }
+                ),
+                json.dumps({"type": "future.event", "payload": "unknown-secret"}),
+                json.dumps({"type": "turn.completed"}),
+            ]
+        )
+        observation = codex._codex_observation(stdout)
+        rendered = repr(observation)
+        for forbidden in ("hidden chain", "command-secret", "error-secret", "unknown-secret"):
+            self.assertNotIn(forbidden, rendered)
+        self.assertFalse(observation["visible_agent_message"])
+        self.assertIsNone(observation["visible_excerpt"])
+
+    def test_visible_excerpt_length_is_deterministic(self):
+        text = "z" * (codex.MAX_VISIBLE_EXCERPT_CHARS + 50)
+        stdout = "\n".join(
+            [
+                json.dumps({"type": "item.completed", "item": {"type": "agent_message", "text": text}}),
+                json.dumps({"type": "turn.completed"}),
+            ]
+        )
+        first = codex._codex_observation(stdout)
+        second = codex._codex_observation(stdout)
+        self.assertEqual(first, second)
+        self.assertEqual(first["visible_excerpt"], "z" * codex.MAX_VISIBLE_EXCERPT_CHARS)
+
+    def test_secret_like_visible_message_is_omitted_fail_closed(self):
+        for text in (
+            "API_KEY=abcdef123456",
+            "password: hunter2",
+            "Use sk-abcdefgh12345678 for access",
+            "-----BEGIN PRIVATE KEY----- material",
+        ):
+            with self.subTest(text=text):
+                stdout = "\n".join(
+                    [
+                        json.dumps({"type": "item.completed", "item": {"type": "agent_message", "text": text}}),
+                        json.dumps({"type": "turn.completed"}),
+                    ]
+                )
+                observation = codex._codex_observation(stdout)
+                self.assertTrue(observation["visible_agent_message"])
+                self.assertIsNone(observation["visible_excerpt"])
+                self.assertNotIn(text, codex._no_changes_diagnostic(observation))
+
+    def test_completed_no_diff_raises_safe_diagnostic_before_apply(self):
+        observation = {
+            "terminal_state": "completed",
+            "event_counts": {event_type: 1 for event_type in codex.PUBLIC_EVENT_TYPES},
+            "visible_agent_message": True,
+            "visible_excerpt": "No repository changes were necessary.",
+        }
+        diagnostic = codex._no_changes_diagnostic(observation)
+        self.assertTrue(diagnostic.startswith("CODEX_GOAL_NO_CHANGES_DIAGNOSTIC;"))
+        self.assertNotIn("\n", diagnostic)
+        self.assertLessEqual(len(diagnostic), 240)
+        with self.assertRaises(RuntimeError) as raised:
+            raise RuntimeError(diagnostic)
+        self.assertEqual(str(raised.exception), diagnostic)
+
+    def test_no_change_diagnostic_is_deterministically_bounded(self):
+        observation = {
+            "terminal_state": "completed",
+            "event_counts": {event_type: 1000000 for event_type in codex.PUBLIC_EVENT_TYPES},
+            "visible_agent_message": True,
+            "visible_excerpt": "x" * 1000,
+        }
+        first = codex._no_changes_diagnostic(observation)
+        second = codex._no_changes_diagnostic(observation)
+        self.assertEqual(first, second)
+        self.assertTrue(first.startswith("CODEX_GOAL_NO_CHANGES_DIAGNOSTIC;"))
+        self.assertLessEqual(len(first), 240)
+        self.assertNotIn("\n", first)
+
     def test_prompt_preserves_authority_boundary(self):
         value = codex._prompt(package())
         self.assertIn("this prompt is not authority", value)
@@ -119,17 +225,41 @@ class CodexGoalAdapterTests(unittest.TestCase):
             with self.assertRaisesRegex(ValueError, "CODEX_GOAL_CHATGPT_AUTH_REQUIRED"):
                 codex.verify_chatgpt_auth("codex")
 
-    def test_codex_exec_uses_strict_utf8_and_accepts_unicode_jsonl(self):
+    def test_codex_exec_uses_strict_utf8_and_returns_observation(self):
         completed = subprocess.CompletedProcess(
             ["codex", "exec"],
             0,
-            stdout=json.dumps({"type": "turn.completed", "message": "готово ✓"}, ensure_ascii=False) + "\n",
+            stdout="\n".join(
+                [
+                    json.dumps(
+                        {"type": "item.completed", "item": {"type": "agent_message", "text": "готово ✓"}},
+                        ensure_ascii=False,
+                    ),
+                    json.dumps({"type": "turn.completed"}),
+                ]
+            )
+            + "\n",
             stderr="",
         )
         with patch.object(codex.subprocess, "run", return_value=completed) as run:
-            codex.run_codex(ROOT, package(), "codex")
+            observation = codex.run_codex(ROOT, package(), "codex")
         self.assertEqual(run.call_args.kwargs["encoding"], "utf-8")
         self.assertEqual(run.call_args.kwargs["errors"], "strict")
+        self.assertEqual(observation["terminal_state"], "completed")
+        self.assertEqual(observation["visible_excerpt"], "готово ✓")
+
+    def test_failed_terminal_event_remains_failure(self):
+        failed = subprocess.CompletedProcess(
+            ["codex", "exec"],
+            0,
+            stdout="\n".join(
+                [json.dumps({"type": "turn.completed"}), json.dumps({"type": "turn.failed", "error": "private"})]
+            ),
+            stderr="",
+        )
+        with patch.object(codex.subprocess, "run", return_value=failed):
+            with self.assertRaisesRegex(RuntimeError, "CODEX_GOAL_TERMINAL_EVENT_NOT_VERIFIED"):
+                codex.run_codex(ROOT, package(), "codex")
 
     def test_malformed_codex_utf8_cannot_become_successful_terminal_event(self):
         decode_error = UnicodeDecodeError("utf-8", b'\x98', 0, 1, "invalid start byte")
