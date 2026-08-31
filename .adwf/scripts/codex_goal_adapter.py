@@ -28,6 +28,22 @@ SECRET_MARKERS = ("TOKEN", "SECRET", "PASSWORD", "API_KEY", "CREDENTIAL", "PRIVA
 SUPPORTED_CODEX_VERSIONS = {"0.149.1"}
 CODEX_TIMEOUT_SECONDS = 840
 MAX_CHANGED_FILE_BYTES = 1_000_000
+MAX_VISIBLE_EXCERPT_CHARS = 80
+MAX_FAILURE_CHARS = 240
+PUBLIC_EVENT_TYPES = (
+    "thread.started",
+    "turn.started",
+    "item.completed",
+    "turn.completed",
+    "turn.failed",
+)
+EVENT_LABELS = {
+    "thread.started": "thread_started",
+    "turn.started": "turn_started",
+    "item.completed": "item_completed",
+    "turn.completed": "turn_completed",
+    "turn.failed": "turn_failed",
+}
 HARD_FORBIDDEN_SURFACES = (
     ".git/**",
     ".github/**",
@@ -45,6 +61,10 @@ HARD_FORBIDDEN_SURFACES = (
 )
 VERSION_RE = re.compile(r"^codex-cli ([0-9]+\.[0-9]+\.[0-9]+)\s*$")
 SHA40 = re.compile(r"^[0-9a-f]{40}$")
+SECRET_LIKE_RE = re.compile(
+    r"(?i)(?:token|secret|password|api[_ -]?key|credential|private[_ -]?key)\s*[:=]|"
+    r"\bsk-[A-Za-z0-9_-]{8,}|-----BEGIN [A-Z ]*PRIVATE KEY-----"
+)
 
 
 def fail(code: str) -> int:
@@ -192,9 +212,25 @@ def _clone_exact(root: Path, base_sha: str, target: Path) -> None:
         raise RuntimeError("CODEX_GOAL_DISPOSABLE_DIRTY")
 
 
-def _jsonl_completed(stdout: str) -> bool:
+def _safe_visible_excerpt(value: object) -> str | None:
+    if not isinstance(value, str) or not value:
+        return None
+    one_line = " ".join(value.split())
+    if not one_line or SECRET_LIKE_RE.search(one_line):
+        return None
+    safe = "".join(character if 32 <= ord(character) != 127 else " " for character in one_line)
+    safe = " ".join(safe.split())
+    if not safe:
+        return None
+    return safe[:MAX_VISIBLE_EXCERPT_CHARS]
+
+
+def _codex_observation(stdout: str) -> dict:
+    counts = {event_type: 0 for event_type in PUBLIC_EVENT_TYPES}
     completed = False
     failed = False
+    visible_message = False
+    excerpt = None
     for raw in stdout.splitlines():
         raw = raw.strip()
         if not raw:
@@ -206,14 +242,62 @@ def _jsonl_completed(stdout: str) -> bool:
         if not isinstance(event, dict):
             continue
         event_type = event.get("type")
+        if event_type not in counts:
+            continue
+        counts[event_type] = min(counts[event_type] + 1, 999)
         if event_type == "turn.failed":
             failed = True
         elif event_type == "turn.completed":
             completed = True
-    return completed and not failed
+        elif event_type == "item.completed":
+            item = event.get("item")
+            if isinstance(item, dict) and item.get("type") == "agent_message" and isinstance(item.get("text"), str):
+                visible_message = True
+                candidate = _safe_visible_excerpt(item.get("text"))
+                if candidate is not None:
+                    excerpt = candidate
+    terminal_state = "failed" if failed else "completed" if completed else "unverified"
+    return {
+        "terminal_state": terminal_state,
+        "event_counts": counts,
+        "visible_agent_message": visible_message,
+        "visible_excerpt": excerpt,
+    }
 
 
-def run_codex(workspace: Path, package: dict, executable: str) -> None:
+def _jsonl_completed(stdout: str) -> bool:
+    return _codex_observation(stdout)["terminal_state"] == "completed"
+
+
+def _no_changes_diagnostic(observation: dict) -> str:
+    counts = observation.get("event_counts") if isinstance(observation, dict) else {}
+    if not isinstance(counts, dict):
+        counts = {}
+    encoded_counts = ",".join(
+        EVENT_LABELS[event_type] + "=" + str(min(max(int(counts.get(event_type, 0)), 0), 999))
+        for event_type in PUBLIC_EVENT_TYPES
+    )
+    state = observation.get("terminal_state") if isinstance(observation, dict) else None
+    if state not in {"completed", "failed", "unverified"}:
+        state = "unverified"
+    visible = "1" if observation.get("visible_agent_message") is True else "0"
+    diagnostic = (
+        "CODEX_GOAL_NO_CHANGES_DIAGNOSTIC;terminal="
+        + state
+        + ";events="
+        + encoded_counts
+        + ";visible="
+        + visible
+    )
+    excerpt = observation.get("visible_excerpt") if isinstance(observation, dict) else None
+    if isinstance(excerpt, str) and excerpt:
+        room = MAX_FAILURE_CHARS - len(diagnostic) - len(";excerpt=")
+        if room > 0:
+            diagnostic += ";excerpt=" + excerpt[:room]
+    return diagnostic[:MAX_FAILURE_CHARS]
+
+
+def run_codex(workspace: Path, package: dict, executable: str) -> dict:
     prompt = _prompt(package)
     proc = subprocess.run(
         build_codex_argv(executable, prompt, windows=(os.name == "nt")),
@@ -227,8 +311,10 @@ def run_codex(workspace: Path, package: dict, executable: str) -> None:
     )
     if proc.returncode != 0:
         raise RuntimeError("CODEX_GOAL_EXEC_FAILED")
-    if not _jsonl_completed(proc.stdout):
+    observation = _codex_observation(proc.stdout)
+    if observation["terminal_state"] != "completed":
         raise RuntimeError("CODEX_GOAL_TERMINAL_EVENT_NOT_VERIFIED")
+    return observation
 
 
 def changed_paths(workspace: Path, base_sha: str) -> list[str]:
@@ -362,14 +448,14 @@ def execute(root: Path, request_path: Path, result_path: Path, environ: dict[str
         with tempfile.TemporaryDirectory(prefix="adwf-codex-goal-") as tmp:
             disposable = Path(tmp) / "workspace"
             _clone_exact(root, base_sha, disposable)
-            run_codex(disposable, package, executable)
+            observation = run_codex(disposable, package, executable)
             if git(disposable, "rev-parse", "HEAD") != base_sha:
                 raise RuntimeError("CODEX_GOAL_AGENT_GIT_COMMIT_FORBIDDEN")
             if git(disposable, "remote", "-v"):
                 raise RuntimeError("CODEX_GOAL_AGENT_REMOTE_FORBIDDEN")
             changed = changed_paths(disposable, base_sha)
             if not changed:
-                raise RuntimeError("CODEX_GOAL_NO_CHANGES")
+                raise RuntimeError(_no_changes_diagnostic(observation))
             validate_changed_paths(disposable, package, changed)
             apply_changes(root, disposable, changed)
             applied = True
@@ -459,7 +545,7 @@ def execute(root: Path, request_path: Path, result_path: Path, environ: dict[str
                     timeout=60,
                 )
         finally:
-            return fail(str(exc).splitlines()[0][:240])
+            return fail(str(exc).splitlines()[0][:MAX_FAILURE_CHARS])
 
 
 def main() -> int:
