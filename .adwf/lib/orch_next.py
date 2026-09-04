@@ -83,7 +83,8 @@ def _validate_fresh_inputs(
     lease_errors = validate_lease_registry(lease_registry)
     if lease_errors:
         raise ValueError("ORCH_NEXT_LEASE_REGISTRY_INVALID:" + ",".join(lease_errors))
-    if lease_registry.get("observed_main_sha") != main_sha:
+    active_leases = [item for item in lease_registry.get("leases", []) if item.get("status") == "ACTIVE"]
+    if lease_registry.get("observed_main_sha") != main_sha and active_leases:
         raise ValueError("ORCH_NEXT_LEASE_MAIN_DRIFT")
     if lease_registry.get("max_parallel_writers") != policy.get("max_parallel_writers"):
         raise ValueError("ORCH_NEXT_LEASE_POLICY_DRIFT")

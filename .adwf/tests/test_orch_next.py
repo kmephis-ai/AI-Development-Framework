@@ -147,6 +147,53 @@ class OrchNextTests(unittest.TestCase):
         self.assertEqual(result["status"], "WRITER_BUSY")
         self.assertFalse(result["durable_run_created"])
 
+    def test_released_only_registry_from_previous_main_allows_bootstrap(self):
+        previous_main = "1" * 40
+        registry = empty_lease_registry(
+            "kmephis-ai/AI-Development-Framework", previous_main, max_parallel_writers=1
+        )
+        result = bootstrap_next_run(
+            self.root,
+            project_state=self.state,
+            lease_registry=registry,
+            assurance_snapshot=self.assurance,
+            provider_readback=self.readback,
+        )
+        self.assertEqual(result["status"], "RUN_CREATED")
+        self.assertTrue(result["durable_run_created"])
+        self.assertFalse(result["provider_claim_mutation"])
+        self.assertEqual(result["main_sha"], SHA)
+
+    def test_active_registry_from_previous_main_blocks_drift(self):
+        previous_main = "1" * 40
+        registry = empty_lease_registry(
+            "kmephis-ai/AI-Development-Framework", previous_main, max_parallel_writers=1
+        )
+        registry, _ = acquire_registry_lease(
+            registry,
+            expected_revision=0,
+            observed_main_sha=previous_main,
+            policy_max_parallel_writers=1,
+            issue_id="309",
+            roadmap_id="ORCH_NEXT-001",
+            worker_id="adwf-runtime:test-old-main",
+            base_sha=previous_main,
+            branch="adwf/orch-next-old-main-test",
+            resources=[{"kind":"source","scope":".adwf/lib/orch_next.py","shared":False,"global":False}],
+            now=datetime.now(timezone.utc),
+            lease_id="06f68c57-1f70-41ae-9c70-019e45db9dcb",
+        )
+        result = bootstrap_next_run(
+            self.root,
+            project_state=self.state,
+            lease_registry=registry,
+            assurance_snapshot=self.assurance,
+            provider_readback=self.readback,
+        )
+        self.assertEqual(result["status"], "BLOCK")
+        self.assertEqual(result["reason"], "ORCH_NEXT_LEASE_MAIN_DRIFT")
+        self.assertFalse(result["durable_run_created"])
+
     def test_stale_snapshot_blocks(self):
         self.state["snapshot"]["valid_until"] = "2000-01-01T00:00:00Z"
         result = bootstrap_next_run(self.root, **self.kwargs())
