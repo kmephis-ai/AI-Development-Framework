@@ -81,50 +81,31 @@ def reconcile_snapshot(
         errors.append("CANONICAL_PROVIDER_MISMATCH")
     work_items = []
     roadmap_seen: dict[str, int] = {}
-    for issue in issues:
-        labels = [item.get("name", item) if isinstance(item, dict) else item for item in issue.get("labels", [])]
-        machine = [STATE_LABELS[label] for label in labels if label in STATE_LABELS]
+    deferred_done: dict[str, list[tuple[dict[str, Any], dict[str, Any]]]] = {}
+
+    def append_issue(issue: dict[str, Any], state: str, marker: dict[str, Any], *, terminal_dependency: bool = False) -> None:
         body = issue.get("body") or ""
-        marker: dict[str, Any] = parse_issue_marker(body)
-        if issue.get("state") == "closed":
-            if marker.get("valid") and marker.get("state") == "DONE":
-                machine = ["DONE"]
-            elif machine:
-                errors.append(f"CLOSED_ACTIVE_ISSUE_WITHOUT_DONE_EVIDENCE:{issue.get('number')}")
-                continue
-            else:
-                # Historical/planning issues are provider history, not live queue authority.
-                # Closed != DONE: ignore them unless a valid terminal marker proves DONE.
-                continue
-        elif not machine:
-            # A Roadmap-shaped body alone is planning content. Live operational queue
-            # authority requires an explicit machine-state label.
-            continue
-        if len(set(machine)) != 1:
-            errors.append(f"ISSUE_CONTRACT_INVALID:{issue.get('number')}")
-            continue
         parsed, parse_errors = parse_issue_form(
-            body, number=issue.get("number"), title=str(issue.get("title") or ""), state=machine[0],
+            body, number=issue.get("number"), title=str(issue.get("title") or ""), state=state,
             max_autonomous_risk=str(config.get("policy", {}).get("max_autonomous_risk", "R1")),
         )
         quality = issue_quality(parsed)
         if parse_errors or quality["status"] == "FAIL":
             details = parse_errors + quality["findings"]
             errors.append(f"ISSUE_CONTRACT_INVALID:{issue.get('number')}:" + ",".join(details[:5]))
-            continue
-        if quality["status"] == "NEEDS_SPLIT" and machine[0] in {"READY", "IN_PROGRESS", "REVIEW", "VERIFICATION"}:
+            return
+        if quality["status"] == "NEEDS_SPLIT" and state in {"READY", "IN_PROGRESS", "REVIEW", "VERIFICATION"}:
             errors.append(f"ISSUE_NEEDS_SPLIT:{issue.get('number')}")
-            continue
+            return
         roadmap_id = parsed["roadmap_id"]
-        if machine[0] in {"IN_PROGRESS", "REVIEW", "VERIFICATION", "RECOVERY", "DONE"}:
-            marker = marker or parse_issue_marker(body)
+        if state in {"IN_PROGRESS", "REVIEW", "VERIFICATION", "RECOVERY", "DONE"}:
             if not marker.get("valid"):
                 errors.append(f"ACTIVE_ISSUE_MARKER_INVALID:{issue.get('number')}")
-                continue
-            if marker.get("roadmap_id") != roadmap_id or marker.get("state") != machine[0]:
+                return
+            if marker.get("roadmap_id") != roadmap_id or marker.get("state") != state:
                 errors.append(f"ISSUE_MARKER_SPLIT_BRAIN:{issue.get('number')}")
-                continue
-            if machine[0] in {"IN_PROGRESS", "REVIEW"}:
+                return
+            if state in {"IN_PROGRESS", "REVIEW"}:
                 try:
                     heartbeat = parse_time(marker["heartbeat_at"])
                     expires = parse_time(marker["expires_at"])
@@ -134,18 +115,63 @@ def reconcile_snapshot(
                 except (AttributeError, KeyError, TypeError, ValueError):
                     errors.append(f"ACTIVE_ISSUE_LEASE_TIME_INVALID:{issue.get('number')}")
         roadmap_seen[roadmap_id] = roadmap_seen.get(roadmap_id, 0) + 1
+        dependencies = [] if terminal_dependency else parsed["dependencies"]
         work_items.append({
             "id": roadmap_id, "roadmap_id": roadmap_id, "number": int(issue.get("number")), "title": parsed["title"],
-            "state": machine[0], "priority": parsed["priority"], "risk": parsed["risk"], "type": parsed["type"],
-            "goal": parsed["goal"], "conflict_domains": parsed["conflict_domains"], "dependencies": parsed["dependencies"],
-            "dependencies_resolved": parsed["dependencies_resolved"], "human_required": parsed["human_required"],
-            "autonomy_allowed": parsed["autonomy_allowed"], "product_impact": parsed["product_impact"],
-            "roadmap_order": parsed["roadmap_order"], "critical_path_score": 0,
-            "ready_since": issue.get("updated_at") if machine[0] == "READY" else None,
+            "state": state, "priority": parsed["priority"], "risk": parsed["risk"], "type": parsed["type"],
+            "goal": parsed["goal"], "conflict_domains": parsed["conflict_domains"], "dependencies": dependencies,
+            "dependencies_resolved": True if terminal_dependency else parsed["dependencies_resolved"],
+            "human_required": parsed["human_required"], "autonomy_allowed": parsed["autonomy_allowed"],
+            "product_impact": parsed["product_impact"], "roadmap_order": parsed["roadmap_order"], "critical_path_score": 0,
+            "ready_since": issue.get("updated_at") if state == "READY" else None,
             "writer_id": marker.get("writer_id"), "lease_id": marker.get("lease_id"),
             "workspace_id": marker.get("workspace_id"), "heartbeat_at": marker.get("heartbeat_at"),
             "expires_at": marker.get("expires_at"), "updated_at": issue.get("updated_at"),
         })
+
+    for issue in issues:
+        labels = [item.get("name", item) if isinstance(item, dict) else item for item in issue.get("labels", [])]
+        machine = [STATE_LABELS[label] for label in labels if label in STATE_LABELS]
+        body = issue.get("body") or ""
+        marker: dict[str, Any] = parse_issue_marker(body)
+        if issue.get("state") == "closed":
+            if marker.get("valid") and marker.get("state") == "DONE":
+                roadmap_id = str(marker.get("roadmap_id") or "")
+                if roadmap_id:
+                    deferred_done.setdefault(roadmap_id, []).append((issue, marker))
+            elif machine:
+                errors.append(f"CLOSED_ACTIVE_ISSUE_WITHOUT_DONE_EVIDENCE:{issue.get('number')}")
+            # Closed history is not live queue authority. A valid DONE record is
+            # materialized later only when a live item names it as a dependency.
+            continue
+        if not machine:
+            # A Roadmap-shaped body alone is planning content. Live operational queue
+            # authority requires an explicit machine-state label.
+            continue
+        if len(set(machine)) != 1:
+            errors.append(f"ISSUE_CONTRACT_INVALID:{issue.get('number')}")
+            continue
+        append_issue(issue, machine[0], marker)
+
+    # Terminal history is evidence for a live dependency, not operational work by itself.
+    # Restricting DONE materialization to direct live dependencies prevents unrelated
+    # historical Issues from re-entering the current queue while preserving dependency truth.
+    required_done = {
+        dependency
+        for item in work_items
+        if item.get("state") != "DONE"
+        for dependency in item.get("dependencies", [])
+        if dependency not in roadmap_seen
+    }
+    for roadmap_id in sorted(required_done):
+        candidates = deferred_done.get(roadmap_id, [])
+        if len(candidates) > 1:
+            errors.append(f"ROADMAP_ID_NOT_ONE_TO_ONE:{roadmap_id}")
+            continue
+        if len(candidates) == 1:
+            issue, marker = candidates[0]
+            append_issue(issue, "DONE", marker, terminal_dependency=True)
+
     duplicates = sorted(name for name, count in roadmap_seen.items() if count != 1)
     if duplicates:
         errors.append("ROADMAP_ID_NOT_ONE_TO_ONE:" + ",".join(duplicates))
