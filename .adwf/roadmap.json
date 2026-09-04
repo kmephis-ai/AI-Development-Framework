@@ -42,7 +42,7 @@
           "roadmap_id": "ORCH-001",
           "title_ru": "Durable autonomous development orchestration + Human-by-Exception",
           "dependencies": [
-            "EXECNODE-001"
+            "RUNTIME-001"
           ],
           "product_impact": false
         },
@@ -50,7 +50,7 @@
           "roadmap_id": "RUNTIME-001",
           "title_ru": "12â€“24h Ñ€Ğ°Ğ±Ğ¾Ñ‚Ğ° Ğ±ĞµĞ· Ğ²Ğ»Ğ°Ğ´ĞµĞ»ÑŒÑ†Ğ° + restart/resume proof",
           "dependencies": [
-            "ORCH-001"
+            "EXECNODE-001"
           ],
           "product_impact": false
         }
@@ -64,7 +64,7 @@
           "roadmap_id": "CEO-001",
           "title_ru": "ĞÑƒĞ»ĞµĞ²Ğ¾Ğ¹ Ñ‚ĞµÑ…Ğ½Ğ¸Ñ‡ĞµÑĞºĞ¸Ğ¹ ĞºĞ¾Ğ½Ñ‚Ñ€Ğ¾Ğ»ÑŒ Ğ²Ğ»Ğ°Ğ´ĞµĞ»ÑŒÑ†Ğ°",
           "dependencies": [
-            "RUNTIME-001"
+            "ORCH-001"
           ],
           "product_impact": true
         },
@@ -242,297 +242,4 @@
         },
         {
           "roadmap_id": "UPGRADE-003",
-          "title_ru": "Real External Consumer Exact Aâ†’Bâ†’Rollbackâ†’B Proof v1",
-          "dependencies": [
-            "UPGRADE_FIX-001"
-          ],
-          "product_impact": false
-        },
-        {
-          "roadmap_id": "GOV-021",
-          "title_ru": "Provider-Resolved Live Evidence Governance + Upgrade Capability Promotion v1",
-          "dependencies": [
-            "UPGRADE-003"
-          ],
-          "product_impact": false
-        },
-        {
-          "roadmap_id": "EDGEREF-001",
-          "title_ru": "Reference Edge Controller End-to-End Conformance v1",
-          "dependencies": [
-            "GOV-021"
-          ],
-          "product_impact": false
-        },
-        {
-          "roadmap_id": "AGENTQUAL-001",
-          "title_ru": "Replaceable Creative Agent Qualification Contract + Reference Adapter v1",
-          "dependencies": [
-            "TRACE-001"
-          ],
-          "product_impact": false
-        },
-        {
-          "roadmap_id": "CONSUMER_INSTALL-001",
-          "title_ru": "Provider-durable Consumer Installation Record + Fresh-session Integrity v1",
-          "dependencies": [
-            "AGENTQUAL-001"
-          ],
-          "product_impact": false
-        },
-        {
-          "roadmap_id": "CONSUMER_OPS-001",
-          "title_ru": "Consumer Operational State + Native Roadmap Binding v1",
-          "dependencies": [
-            "CONSUMER_INSTALL-001"
-          ],
-          "product_impact": false
-        },
-        {
-          "roadmap_id": "CONSUMER_GATE-001",
-          "title_ru": "Consumer Native Gate Binding + exact provider readback v1",
-          "dependencies": [
-            "CONSUMER_OPS-001"
-          ],
-          "product_impact": false
-        },
-        {
-          "roadmap_id": "CONSUMER_ROUTE-001",
-          "title_ru": "Consumer-aware CI Routing + Native Gate Delegation v1",
-          "dependencies": [
-            "CONSUMER_GATE-001"
-          ],
-          "product_impact": false
-        },
-        {
-          "roadmap_id": "CONSUMER_WAIT-001",
-          "title_ru": "Bounded Native Gate Wait for Real Consumer CI Latency",
-          "dependencies": [
-            "CONSUMER_ROUTE-001"
-          ],
-          "product_impact": false
-        },
-        {
-          "roadmap_id": "CONSUMER_CONTROL-001",
-          "title_ru": "Consumer-aware Trusted Control Routing v1",
-          "dependencies": [
-            "CONSUMER_WAIT-001"
-          ],
-          "product_impact": false
-        },
-        {
-          "roadmap_id": "CONSUMER_INSTR-001",
-          "title_ru": "Layered AI Instruction Ownership for Connected Consumers v1",
-          "dependencies": [
-            "CONSUMER_CONTROL-001"
-          ],
-          "product_impact": false
-        },
-        {
-          "roadmap_id": "CONSUMER_GATE_RETRY-001",
-          "title_ru": "Provider-authoritative repeated native check-run resolution v1",
-          "dependencies": [
-            "CONSUMER_INSTR-001"
-          ],
-          "product_impact": false
-        },
-        {
-          "roadmap_id": "SESSION_CONTINUITY-001",
-          "title_ru": "Generic Durable AI Session Handover & Resume â€” live proof completion",
-          "dependencies": [
-            "CONSUMER_GATE_RETRY-001"
-          ],
-          "product_impact": false
-        },
-        {
-          "roadmap_id": "DELIVERY_SHA_IDENTITY-001",
-          "title_ru": "Exact merged delivery revision continuity through PROMOTE/OBSERVE",
-          "dependencies": [
-            "SESSION_CONTINUITY-001"
-          ],
-          "product_impact": false
-        },
-        {
-          "roadmap_id": "MULTIWRITER-001",
-          "title_ru": "Conflict-domain safe multi-writer orchestration",
-          "dependencies": [
-            "RUNTIME-001"
-          ],
-          "product_impact": false
-        },
-        {
-          "roadmap_id": "PPCF-001",
-          "title_ru": "Provider & Plugin Capability Framework",
-          "dependencies": [
-            "SESSION_CONTINUITY-001"
-          ],
-          "product_impact": false
-        }
-      ]
-    },
-    {
-      "id": "PRODUCT-EVALUATION-INTELLIGENCE",
-      "title_ru": "Product Truth & Evaluation Intelligence â€” long-horizon architecture",
-      "tasks": [
-        {
-          "roadmap_id": "PRODUCT_TRUTH-001",
-          "title_ru": "ĞšĞ¾Ğ½Ñ‚Ñ€Ğ°ĞºÑ‚ Ğ¿Ñ€Ğ¾Ğ´ÑƒĞºÑ‚Ğ¾Ğ²Ğ¾Ğ³Ğ¾ Ğ·Ğ°Ğ¼Ñ‹ÑĞ»Ğ° Ğ¸ Ğ¿Ğ¾Ğ»ÑŒĞ·Ğ¾Ğ²Ğ°Ñ‚ĞµĞ»ÑŒÑĞºĞ¾Ğ³Ğ¾ Ğ¾Ğ¿Ñ‹Ñ‚Ğ° Consumer",
-          "dependencies": [
-            "CONSUMER_OPS-001"
-          ],
-          "product_impact": true
-        },
-        {
-          "roadmap_id": "EVAL-001",
-          "title_ru": "ĞĞµĞ·Ğ°Ğ²Ğ¸ÑĞ¸Ğ¼Ğ°Ñ Ğ¿Ñ€Ğ¾Ğ´ÑƒĞºÑ‚Ğ¾Ğ²Ğ°Ñ Ğ¾Ñ†ĞµĞ½ĞºĞ° Ğ¸ Quality Intelligence",
-          "dependencies": [
-            "PRODUCT_TRUTH-001",
-            "AGENTQUAL-001",
-            "CONSUMER_GATE-001"
-          ],
-          "product_impact": true
-        },
-        {
-          "roadmap_id": "CONTEXT-001",
-          "title_ru": "Context Compiler / Agent Context Engineering",
-          "dependencies": [
-            "PRODUCT_TRUTH-001",
-            "AIWORK-001",
-            "TRACE-001",
-            "SESSION_CONTINUITY-001"
-          ],
-          "product_impact": false
-        },
-        {
-          "roadmap_id": "AGENT_EVAL-001",
-          "title_ru": "Continuous Real-Agent Qualification & Task-Class Routing",
-          "dependencies": [
-            "AGENTQUAL-001",
-            "EVAL-001",
-            "PPCF-001"
-          ],
-          "product_impact": false
-        },
-        {
-          "roadmap_id": "ARCH_FITNESS-001",
-          "title_ru": "Agent-legible Architecture Fitness Functions",
-          "dependencies": [
-            "AIWORK-001",
-            "TRACE-001"
-          ],
-          "product_impact": false
-        },
-        {
-          "roadmap_id": "CODE_QUALITY-001",
-          "title_ru": "Evidence-backed Critical Code Quality & Mutation-Sensitive Verification",
-          "dependencies": [
-            "ARCH_FITNESS-001",
-            "EVAL-001"
-          ],
-          "product_impact": false
-        },
-        {
-          "roadmap_id": "AGENT_RUNTIME_SAFE-001",
-          "title_ru": "Secure Agent Execution Identity/Egress Envelope",
-          "dependencies": [
-            "ENVSAFE-001",
-            "PPCF-001",
-            "ORCH-001"
-          ],
-          "product_impact": false
-        },
-        {
-          "roadmap_id": "AGENT_OBS-001",
-          "title_ru": "Agentic Execution & Evaluation Observability",
-          "dependencies": [
-            "ORCH-001",
-            "EVAL-001",
-            "PPCF-001"
-          ],
-          "product_impact": false
-        },
-        {
-          "roadmap_id": "EPI-001",
-          "title_ru": "External Practice Intelligence â€” evidence-driven capability discovery",
-          "dependencies": [
-            "TRACE-001",
-            "PPCF-001"
-          ],
-          "product_impact": false
-        },
-        {
-          "roadmap_id": "INTEROP-001",
-          "title_ru": "Optional Agent/Tool Interoperability Profile",
-          "dependencies": [
-            "PPCF-001",
-            "ORCH-001",
-            "AGENT_RUNTIME_SAFE-001"
-          ],
-          "product_impact": false
-        }
-      ]
-    },
-    {
-      "id": "CONSUMER-FLEET-EVOLUTION",
-      "title_ru": "Consumer Fleet Evolution & Convergence â€” long-horizon architecture",
-      "tasks": [
-        {
-          "roadmap_id": "FLEET_CONTRACT-001",
-          "title_ru": "Consumer Desired/Observed State + Conformance/Exception Contract",
-          "dependencies": [
-            "CONSUMER_OPS-001",
-            "PACKSDK-001",
-            "TRACE-001"
-          ],
-          "product_impact": false
-        },
-        {
-          "roadmap_id": "CONSUMER_FEEDBACK-001",
-          "title_ru": "Cross-Consumer Problem & Friction Intelligence",
-          "dependencies": [
-            "FLEET_CONTRACT-001",
-            "EVAL-001",
-            "TRACE-001"
-          ],
-          "product_impact": false
-        },
-        {
-          "roadmap_id": "SOLUTION_RECIPE-001",
-          "title_ru": "Versioned Reusable Remediation & Migration Recipes",
-          "dependencies": [
-            "CONSUMER_FEEDBACK-001",
-            "UPGRADE-002",
-            "PACKSDK-001"
-          ],
-          "product_impact": false
-        },
-        {
-          "roadmap_id": "FLEET_ROLLOUT-001",
-          "title_ru": "Staged Consumer Fleet Reconciliation & Rollout",
-          "dependencies": [
-            "SOLUTION_RECIPE-001",
-            "ORCH-001",
-            "CONSUMER_GATE_RETRY-001"
-          ],
-          "product_impact": false
-        }
-      ]
-    },
-    {
-      "id": "RESTRICTED-NETWORK-RESILIENCE",
-      "title_ru": "Restricted-Network Execution Resilience â€” RU reference profile",
-      "tasks": [
-        {
-          "roadmap_id": "NETRES_RU-001",
-          "title_ru": "Ğ£ÑÑ‚Ğ¾Ğ¹Ñ‡Ğ¸Ğ²Ğ¾ÑÑ‚ÑŒ Ñ€Ğ°Ğ·Ñ€Ğ°Ğ±Ğ¾Ñ‚ĞºĞ¸ Ğ¸ CI Ğº ÑĞµÑ‚ĞµĞ²Ñ‹Ğ¼ Ğ¾Ğ³Ñ€Ğ°Ğ½Ğ¸Ñ‡ĞµĞ½Ğ¸ÑĞ¼ + RU reference profile",
-          "dependencies": [
-            "DEVENV-001",
-            "ENVSAFE-001",
-            "PPCF-001"
-          ],
-          "product_impact": false
-        }
-      ]
-    }
-  ]
-}
+          "title_r²È="24€€€€€€€€€€‰=9MU5I}=AL´ÀÀÄˆ(€€€€€€€€€t°(€€€€€€€€€€‰ÁÉ½‘ÕÑ}¥µÁ…Ğˆè™…±Í”(€€€€€€€ô°(€€€€€€€ì(€€€€€€€€€€‰É½…‘µ…Á}¥ˆè€‰=9MU5I}I=UQ´ÀÀÄˆ°(€€€€€€€€€€‰Ñ¥Ñ±•}ÉÔˆè€‰½¹ÍÕµ•Èµ…İ…É”$I½ÕÑ¥¹œ€¬9…Ñ¥Ù”…Ñ”•±•…Ñ¥½¸ØÄˆ°(€€€€€€€€€€‰‘•Á•¹‘•¹¥•Ìˆèl(€€€€€€€€€€€€‰=9MU5I}Q´ÀÀÄˆ(€€€€€€€€€t°(€€€€€€€€€€‰ÁÉ½‘ÕÑ}¥µÁ…Ğˆè™…±Í”(€€€€€€€ô°(€€€€€€€ì(€€€€€€€€€€‰É½…‘µ…Á}¥ˆè€‰=9MU5I}]%P´ÀÀÄˆ°(€€€€€€€€€€‰Ñ¥Ñ±•}ÉÔˆè€‰	½Õ¹‘•9…Ñ¥Ù”…Ñ”]…¥Ğ™½ÈI•…°½¹ÍÕµ•È$1…Ñ•¹äˆ°(€€€€€€€€€€‰‘•Á•¹‘•¹¥•Ìˆèl(€€€€€€€€€€€€‰=9MU5I}I=UQ´ÀÀÄˆ(€€€€€€€€€t°(€€€€€€€€€€‰ÁÉ½‘ÕÑ}¥µÁ…Ğˆè™…±Í”(€€€€€€€ô°(€€€€€€€ì(€€€€€€€€€€‰É½…‘µ…Á}¥ˆè€‰=9MU5I}=9QI=0´ÀÀÄˆ°(€€€€€€€€€€‰Ñ¥Ñ±•}ÉÔˆè€‰½¹ÍÕµ•Èµ…İ…É”QÉÕÍÑ•½¹ÑÉ½°I½ÕÑ¥¹œØÄˆ°(€€€€€€€€€€‰‘•Á•¹‘•¹¥•Ìˆèl(€€€€€€€€€€€€‰=9MU5I}]%P´ÀÀÄˆ(€€€€€€€€€t°(€€€€€€€€€€‰ÁÉ½‘ÕÑ}¥µÁ…Ğˆè™…±Í”(€€€€€€€ô°(€€€€€€€ì(€€€€€€€€€€‰É½…‘µ…Á}¥ˆè€‰=9MU5I}%9MQH´ÀÀÄˆ°(€€€€€€€€€€‰Ñ¥Ñ±•}ÉÔˆè€‰1…å•É•$%¹ÍÑÉÕÑ¥½¸=İ¹•ÉÍ¡¥À™½È½¹¹•Ñ•½¹ÍÕµ•ÉÌØÄˆ°(€€€€€€€€€€‰‘•Á•¹‘•¹¥•Ìˆèl(€€€€€€€€€€€€‰=9MU5I}=9QI=0´ÀÀÄˆ(€€€€€€€€€t°(€€€€€€€€€€‰ÁÉ½‘ÕÑ}¥µÁ…Ğˆè™…±Í”(€€€€€€€ô°(€€€€€€€ì(€€€€€€€€€€‰É½…‘µ…Á}¥ˆè€‰=9MU5I}Q}IQId´ÀÀÄˆ°(€€€€€€€€€€‰Ñ¥Ñ±•}ÉÔˆè€‰AÉ½Ù¥‘•Èµ…ÕÑ¡½É¥Ñ…Ñ¥Ù”É•Á•…Ñ•¹…Ñ¥Ù”¡•¬µÉÕ¸É•Í½±ÕÑ¥½¸ØÄˆ°(€€€€€€€€€€‰‘•Á•¹‘•¹¥•Ìˆèl(€€€€€€€€€€€€‰=9MU5I}%9MQH´ÀÀÄˆ(€€€€€€€€€t°(€€€€€€€€€€‰ÁÉ½‘ÕÑ}¥µÁ…Ğˆè™…±Í”(€€€€€€€ô°(€€€€€€€ì(€€€€€€€€€€‰É½…‘µ…Á}¥ˆè€‰MMM%=9}=9Q%9U%Qd´ÀÀÄˆ°(€€€€€€€€€€‰Ñ¥Ñ±•}ÉÔˆè€‰•¹•É¥ŒÕÉ…‰±”$M•ÍÍ¥½¸!…¹‘½Ù•È€˜I•ÍÕµ”ƒŠP±¥Ù”ÁÉ½½˜½µÁ±•Ñ¥½¸ˆ°(€€€€€€€€€€‰‘•Á•¹‘•¹¥•Ìˆèl(€€€€€€€€€€€€‰=9MU5I}Q}IQId´ÀÀÄˆ(€€€€€€€€€t°(€€€€€€€€€€‰ÁÉ½‘ÕÑ}¥µÁ…Ğˆè™…±Í”(€€€€€€€ô°(€€€€€€€ì(€€€€€€€€€€‰É½…‘µ…Á}¥ˆè€‰1%YIe}M!}%9Q%Qd´ÀÀÄˆ°(€€€€€€€€€€‰Ñ¥Ñ±•}ÉÔˆè€‰á…Ğµ•É•‘•±¥Ù•ÉäÉ•Ù¥Í¥½¸½¹Ñ¥¹Õ¥ÑäÑ¡É½Õ AI=5=Q½=	MIYˆ°(€€€€€€€€€€‰‘•Á•¹‘•¹¥•Ìˆèl(€€€€€€€€€€€€‰MMM%=9}=9Q%9U%Qd´ÀÀÄˆ(€€€€€€€€€t°(€€€€€€€€€€‰ÁÉ½‘ÕÑ}¥µÁ…Ğˆè™…±Í”(€€€€€€€ô°(€€€€€€€ì(€€€€€€€€€€‰É½…‘µ…Á}¥ˆè€‰5U1Q%]I%QH´ÀÀÄˆ°(€€€€€€€€€€‰Ñ¥Ñ±•}ÉÔˆè€‰½¹™±¥Ğµ‘½µ…¥¸Í…™”µÕ±Ñ¤µİÉ¥Ñ•È½É¡•ÍÑÉ…Ñ¥½¸ˆ°(€€€€€€€€€€‰‘•Á•¹‘•¹¥•Ìˆèl(€€€€€€€€€€€€‰IU9Q%5´ÀÀÄˆ(€€€€€€€€€t°(€€€€€€€€€€‰ÁÉ½‘ÕÑ}¥µÁ…Ğˆè™…±Í”(€€€€€€€ô°(€€€€€€€ì(€€€€€€€€€€‰É½…‘µ…Á}¥ˆè€‰AA´ÀÀÄˆ°(€€€€€€€€€€‰Ñ¥Ñ±•}ÉÔˆè€‰AÉ½Ù¥‘•È€˜A±Õ¥¸…Á…‰¥±¥ÑäÉ…µ•İ½É¬ˆ°(€€€€€€€€€€‰‘•Á•¹‘•¹¥•Ìˆèl(€€€€€€€€€€€€‰MMM%=9}=9Q%9U%Qd´ÀÀÄˆ(€€€€€€€€€t°(€€€€€€€€€€‰ÁÉ½‘ÕÑ}¥µÁ…Ğˆè™…±Í”(€€€€€€€ô(€€€€€t(€€€ô°(€€€ì(€€€€€€‰¥ˆè€‰AI=UPµY1UQ%=8µ%9Q11%9ˆ°(€€€€€€‰Ñ¥Ñ±•}ÉÔˆè€‰AÉ½‘ÕĞQÉÕÑ €˜Ù…±Õ…Ñ¥½¸%¹Ñ•±±¥•¹”ƒŠP±½¹œµ¡½É¥é½¸…É¡¥Ñ•ÑÕÉ”ˆ°(€€€€€€‰Ñ…Í­Ìˆèl(€€€€€€€ì(€€€€€€€€€€‰É½…‘µ…Á}¥ˆè€‰AI=UQ}QIUQ ´ÀÀÄˆ°(€€€€€€€€€€‰Ñ¥Ñ±•}ÉÔˆè€‹BkBûB÷FFBÃBëFƒBÿFBûBÓFBëFBûBËBûBÏBøƒBßBÃBóF/FBïBÀƒBàƒBÿBûBïF3BßBûBËBÃFB×BïF3FBëBûBÏBøƒBûBÿF/FBÀ½¹ÍÕµ•Èˆ°(€€€€€€€€€€‰‘•Á•¹‘•¹¥•Ìˆèl(€€€€€€€€€€€€‰=9MU5I}=AL´ÀÀÄˆ(€€€€€€€€€t°(€€€€€€€€€€‰ÁÉ½‘ÕÑ}¥µÁ…ĞˆèÑÉÕ”(€€€€€€€ô°(€€€€€€€ì(€€€€€€€€€€‰É½…‘µ…Á}¥ˆè€‰Y0´ÀÀÄˆ°(€€€€€€€€€€‰Ñ¥Ñ±•}ÉÔˆè€‹BwB×BßBÃBËBãFBãBóBÃF<ƒBÿFBûBÓFBëFBûBËBÃF<ƒBûFB×B÷BëBÀƒBàEÕ…±¥Ñä%¹Ñ•±±¥•¹”ˆ°(€€€€€€€€€€‰‘•Á•¹‘•¹¥•Ìˆèl(€€€€€€€€€€€€‰AI=UQ}QIUQ ´ÀÀÄˆ°(€€€€€€€€€€€€‰9QEU0´ÀÀÄˆ°(€€€€€€€€€€€€‰=9MU5I}Q´ÀÀÄˆ(€€€€€€€€€t°(€€€€€€€€€€‰ÁÉ½‘ÕÑ}¥µÁ…ĞˆèÑÉÕ”(€€€€€€€ô°(€€€€€€€ì(€€€€€€€€€€‰É½…‘µ…Á}¥ˆè€‰=9QaP´ÀÀÄˆ°(€€€€€€€€€€‰Ñ¥Ñ±•}ÉÔˆè€‰½¹Ñ•áĞ½µÁ¥±•È€¼•¹Ğ½¹Ñ•áĞ¹¥¹••É¥¹œˆ°(€€€€€€€€€€‰‘•Á•¹‘•¹¥•Ìˆèl(€€€€€€€€€€€€‰AI=UQ}QIUQ ´ÀÀÄˆ°(€€€€€€€€€€€€‰%]=I,´ÀÀÄˆ°(€€€€€€€€€€€€‰QI´ÀÀÄˆ°(€€€€€€€€€€€€‰MMM%=9}=9Q%9U%Qd´ÀÀÄˆ(€€€€€€€€€t°(€€€€€€€€€€‰ÁÉ½‘ÕÑ}¥µÁ…Ğˆè™…±Í”(€€€€€€€ô°(€€€€€€€ì(€€€€€€€€€€‰É½…‘µ…Á}¥ˆè€‰9Q}Y0´ÀÀÄˆ°(€€€€€€€€€€‰Ñ¥Ñ±•}ÉÔˆè€‰½¹Ñ¥¹Õ½ÕÌI•…°µ•¹ĞEÕ…±¥™¥…Ñ¥½¸€˜Q…Í¬µ±…ÍÌI½ÕÑ¥¹œˆ°(€€€€€€€€€€‰‘•Á•¹‘•¹¥•Ìˆèl(€€€€€€€€€€€€‰9QEU0´ÀÀÄˆ°(€€€€€€€€€€€€‰Y0´ÀÀÄˆ°(€€€€€€€€€€€€‰AA´ÀÀÄˆ(€€€€€€€€€t°(€€€€€€€€€€‰ÁÉ½‘ÕÑ}¥µÁ…Ğˆè™…±Í”(€€€€€€€ô°(€€€€€€€ì(€€€€€€€€€€‰É½…‘µ…Á}¥ˆè€‰I!}%Q9ML´ÀÀÄˆ°(€€€€€€€€€€‰Ñ¥Ñ±•}ÉÔˆè€‰•¹Ğµ±•¥‰±”É¡¥Ñ•ÑÕÉ”¥Ñ¹•ÍÌÕ¹Ñ¥½¹Ìˆ°(€€€€€€€€€€‰‘•Á•¹‘•¹¥•Ìˆèl(€€€€€€€€€€€€‰%]=I,´ÀÀÄˆ°(€€€€€€€€€€€€‰QI´ÀÀÄˆ(€€€€€€€€€t°(€€€€€€€€€€‰ÁÉ½‘ÕÑ}¥µÁ…Ğˆè™…±Í”(€€€€€€€ô°(€€€€€€€ì(€€€€€€€€€€‰É½…‘µ…Á}¥ˆè€‰=}EU1%Qd´ÀÀÄˆ°(€€€€€€€€€€‰Ñ¥Ñ±•}ÉÔˆè€‰Ù¥‘•¹”µ‰…­•É¥Ñ¥…°½‘”EÕ…±¥Ñä€˜5ÕÑ…Ñ¥½¸µM•¹Í¥Ñ¥Ù”Y•É¥™¥…Ñ¥½¸ˆ°(€€€€€€€€€€‰‘•Á•¹‘•¹¥•Ìˆèl(€€€€€€€€€€€€‰I!}%Q9ML´ÀÀÄˆ°(€€€€€€€€€€€€‰Y0´ÀÀÄˆ(€€€€€€€€€t°(€€€€€€€€€€‰ÁÉ½‘ÕÑ}¥µÁ…Ğˆè™…±Í”(€€€€€€€ô°(€€€€€€€ì(€€€€€€€€€€‰É½…‘µ…Á}¥ˆè€‰9Q}IU9Q%5}M´ÀÀÄˆ°(€€€€€€€€€€‰Ñ¥Ñ±•}ÉÔˆè€‰M•ÕÉ”•¹Ğá•ÕÑ¥½¸%‘•¹Ñ¥Ñä½É•ÍÌ¹Ù•±½Á”ˆ°(€€€€€€€€€€‰‘•Á•¹‘•¹¥•Ìˆèl(€€€€€€€€€€€€‰9YM´ÀÀÄˆ°(€€€€€€€€€€€€‰AA´ÀÀÄˆ°(€€€€€€€€€€€€‰=I ´ÀÀÄˆ(€€€€€€€€€t°(€€€€€€€€€€‰ÁÉ½‘ÕÑ}¥µÁ…Ğˆè™…±Í”(€€€€€€€ô°(€€€€€€€ì(€€€€€€€€€€‰É½…‘µ…Á}¥ˆè€‰9Q}=	L´ÀÀÄˆ°(€€€€€€€€€€‰Ñ¥Ñ±•}ÉÔˆè€‰•¹Ñ¥Œá•ÕÑ¥½¸€˜Ù…±Õ…Ñ¥½¸=‰Í•ÉÙ…‰¥±¥Ñäˆ°(€€€€€€€€€€‰‘•Á•¹‘•¹¥•Ìˆèl(€€€€€€€€€€€€‰=I ´ÀÀÄˆ°(€€€€€€€€€€€€‰Y0´ÀÀÄˆ°(€€€€€€€€€€€€‰AA´ÀÀÄˆ(€€€€€€€€€t°(€€€€€€€€€€‰ÁÉ½‘ÕÑ}¥µÁ…Ğˆè™…±Í”(€€€€€€€ô°(€€€€€€€ì(€€€€€€€€€€‰É½…‘µ…Á}¥ˆè€‰A$´ÀÀÄˆ°(€€€€€€€€€€‰Ñ¥Ñ±•}ÉÔˆè€‰áÑ•É¹…°AÉ…Ñ¥”%¹Ñ•±±¥•¹”ƒŠP•Ù¥‘•¹”µ‘É¥Ù•¸…Á…‰¥±¥Ñä‘¥Í½Ù•Éäˆ°(€€€€€€€€€€‰‘•Á•¹‘•¹¥•Ìˆèl(€€€€€€€€€€€€‰QI´ÀÀÄˆ°(€€€€€€€€€€€€‰AA´ÀÀÄˆ(€€€€€€€€€t°(€€€€€€€€€€‰ÁÉ½‘ÕÑ}¥µÁ…Ğˆè™…±Í”(€€€€€€€ô°(€€€€€€€ì(€€€€€€€€€€‰É½…‘µ…Á}¥ˆè€‰%9QI=@´ÀÀÄˆ°(€€€€€€€€€€‰Ñ¥Ñ±•}ÉÔˆè€‰=ÁÑ¥½¹…°•¹Ğ½Q½½°%¹Ñ•É½Á•É…‰¥±¥ÑäAÉ½™¥±”ˆ°(€€€€€€€€€€‰‘•Á•¹‘•¹¥•Ìˆèl(€€€€€€€€€€€€‰AA´ÀÀÄˆ°(€€€€€€€€€€€€‰=I ´ÀÀÄˆ°(€€€€€€€€€€€€‰9Q}IU9Q%5}M´ÀÀÄˆ(€€€€€€€€€t°(€€€€€€€€€€‰ÁÉ½‘ÕÑ}¥µÁ…Ğˆè™…±Í”(€€€€€€€ô(€€€€€t(€€€ô°(€€€ì(€€€€€€‰¥ˆè€‰=9MU5Hµ1PµY=1UQ%=8ˆ°(€€€€€€‰Ñ¥Ñ±•}ÉÔˆè€‰½¹ÍÕµ•È±••ĞÙ½±ÕÑ¥½¸€˜½¹Ù•É•¹”ƒŠP±½¹œµ¡½É¥é½¸…É¡¥Ñ•ÑÕÉ”ˆ°(€€€€€€‰Ñ…Í­Ìˆèl(€€€€€€€ì(€€€€€€€€€€‰É½…‘µ…Á}¥ˆè€‰1Q}=9QIP´ÀÀÄˆ°(€€€€€€€€€€‰Ñ¥Ñ±•}ÉÔˆè€‰½¹ÍÕµ•È•Í¥É•½=‰Í•ÉÙ•MÑ…Ñ”€¬½¹™½Éµ…¹”½á•ÁÑ¥½¸½¹ÑÉ…Ğˆ°(€€€€€€€€€€‰‘•Á•¹‘•¹¥•Ìˆèl(€€€€€€€€€€€€‰=9MU5I}=AL´ÀÀÄˆ°(€€€€€€€€€€€€‰A-M,´ÀÀÄˆ°(€€€€€€€€€€€€‰QI´ÀÀÄˆ(€€€€€€€€€t°(€€€€€€€€€€‰ÁÉ½‘ÕÑ}¥µÁ…Ğˆè™…±Í”(€€€€€€€ô°(€€€€€€€ì(€€€€€€€€€€‰É½…‘µ…Á}¥ˆè€‰=9MU5I}	,´ÀÀÄˆ°(€€€€€€€€€€‰Ñ¥Ñ±•}ÉÔˆè€‰É½ÍÌµ½¹ÍÕµ•ÈAÉ½‰±•´€˜É¥Ñ¥½¸%¹Ñ•±±¥•¹”ˆ°(€€€€€€€€€€‰‘•Á•¹‘•¹¥•Ìˆèl(€€€€€€€€€€€€‰1Q}=9QIP´ÀÀÄˆ°(€€€€€€€€€€€€‰Y0´ÀÀÄˆ°(€€€€€€€€€€€€‰QI´ÀÀÄˆ(€€€€€€€€€t°(€€€€€€€€€€‰ÁÉ½‘ÕÑ}¥µÁ…Ğˆè™…±Í”(€€€€€€€ô°(€€€€€€€ì(€€€€€€€€€€‰É½…‘µ…Á}¥ˆè€‰M=1UQ%=9}I%A´ÀÀÄˆ°(€€€€€€€€€€‰Ñ¥Ñ±•}ÉÔˆè€‰Y•ÉÍ¥½¹•I•ÕÍ…‰±”I•µ•‘¥…Ñ¥½¸€˜5¥É…Ñ¥½¸I•¥Á•Ìˆ°(€€€€€€€€€€‰‘•Á•¹‘•¹¥•Ìˆèl(€€€€€€€€€€€€‰=9MU5I}	,´ÀÀÄˆ°(€€€€€€€€€€€€‰UAI´ÀÀÈˆ°(€€€€€€€€€€€€‰A-M,´ÀÀÄˆ(€€€€€€€€€t°(€€€€€€€€€€‰ÁÉ½‘ÕÑ}¥µÁ…Ğˆè™…±Í”(€€€€€€€ô°(€€€€€€€ì(€€€€€€€€€€‰É½…‘µ…Á}¥ˆè€‰1Q}I=11=UP´ÀÀÄˆ°(€€€€€€€€€€‰Ñ¥Ñ±•}ÉÔˆè€‰MÑ…•½¹ÍÕµ•È±••ĞI•½¹¥±¥…Ñ¥½¸€˜I½±±½ÕĞˆ°(€€€€€€€€€€‰‘•Á•¹‘•¹¥•Ìˆèl(€€€€€€€€€€€€‰M=1UQ%=9}I%A´ÀÀÄˆ°(€€€€€€€€€€€€‰=I ´ÀÀÄˆ°(€€€€€€€€€€€€‰=9MU5I}Q}IQId´ÀÀÄˆ(€€€€€€€€€t°(€€€€€€€€€€‰ÁÉ½‘ÕÑ}¥µÁ…Ğˆè™…±Í”(€€€€€€€ô(€€€€€t(€€€ô°(€€€ì(€€€€€€‰¥ˆè€‰IMQI%Qµ9Q]=I,µIM%1%9ˆ°(€€€€€€‰Ñ¥Ñ±•}ÉÔˆè€‰I•ÍÑÉ¥Ñ•µ9•Ñİ½É¬á•ÕÑ¥½¸I•Í¥±¥•¹”ƒŠPITÉ•™•É•¹”ÁÉ½™¥±”ˆ°(€€€€€€‰Ñ…Í­Ìˆèl(€€€€€€€ì(€€€€€€€€€€‰É½…‘µ…Á}¥ˆè€‰9QIM}IT´ÀÀÄˆ°(€€€€€€€€€€‰Ñ¥Ñ±•}ÉÔˆè€‹BFFBûBçFBãBËBûFFF0ƒFBÃBßFBÃBÇBûFBëBàƒBà$ƒBèƒFB×FB×BËF/BğƒBûBÏFBÃB÷BãFB×B÷BãF?Bğ€¬ITÉ•™•É•¹”ÁÉ½™¥±”ˆ°(€€€€€€€€€€‰‘•Á•¹‘•¹¥•Ìˆèl(€€€€€€€€€€€€‰Y9X´ÀÀÄˆ°(€€€€€€€€€€€€‰9YM´ÀÀÄˆ°(€€€€€€€€€€€€‰AA´ÀÀÄˆ(€€€€€€€€€t°(€€€€€€€€€€‰ÁÉ½‘ÕÑ}¥µÁ…Ğˆè™…±Í”(€€€€€€€ô(€€€€€t(€€€ô(€t)ô
