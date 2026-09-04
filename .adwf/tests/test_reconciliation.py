@@ -156,7 +156,11 @@ NO
         dependency["state"] = "closed"
         dependency["labels"] = []
         dependency["body"] = dependency["body"].replace("RM-7", "RM-1")
-        dependency["body"] += "\n<!-- ADWF-CONTRACT Roadmap-ID: RM-1 Writer: old-writer Writer-Lease: 123e4567-e89b-12d3-a456-426614174098 Workspace: rm-1 State: DONE -->\n"
+        dependency["body"] += (
+            "\n<!-- ADWF-CONTRACT Roadmap-ID: RM-1 Writer: old-writer "
+            "Writer-Lease: 123e4567-e89b-12d3-a456-426614174098 Workspace: rm-1 State: DONE "
+            "Heartbeat: 2026-08-01T09:00:00Z Expires: 2026-08-01T09:00:00Z -->\n"
+        )
         live = copy.deepcopy(self.issue)
         live["body"] = live["body"].replace("### Зависимости\n\nNONE", "### Зависимости\n\nRM-1")
         result = reconcile_snapshot(self.state, self.config, provider="github", main_sha="a" * 40,
