@@ -132,6 +132,47 @@ NO
                                     workspace_registry={"schema_version": 1, "workspaces": []}, now=self.now)
         self.assertTrue(any("DEPENDENCY_STATUS_MISMATCH" in item for item in result["blockers"]))
 
+    def test_unrelated_closed_done_history_cannot_poison_live_reconciliation(self):
+        historical = {
+            "number": 99,
+            "title": "[OLD-1] Historical governance item",
+            "state": "closed",
+            "labels": [],
+            "updated_at": "2026-08-01T09:00:00Z",
+            "body": "### Roadmap ID\n\nOLD-1\n\n<!-- ADWF-CONTRACT Roadmap-ID: OLD-1 Writer: old-writer Writer-Lease: 123e4567-e89b-12d3-a456-426614174099 Workspace: old-1 State: DONE -->\n",
+        }
+        result = reconcile_snapshot(self.state, self.config, provider="github", main_sha="a" * 40,
+                                    issues=[historical], pulls=[], runs=[], cost={"result": "ALLOW", "provider": "github_self_hosted"},
+                                    workspace_registry={"schema_version": 1, "workspaces": []}, now=self.now)
+        self.assertEqual(result["status"], "ACTIVE")
+        self.assertEqual(result["health"]["adwf"], "VERIFIED")
+        self.assertEqual(result["work_items"], [])
+        self.assertEqual(result["queue"]["ready"], 0)
+
+    def test_live_dependency_can_use_closed_done_terminal_certificate(self):
+        dependency = copy.deepcopy(self.issue)
+        dependency["number"] = 6
+        dependency["title"] = "[RM-1] Завершённая зависимость"
+        dependency["state"] = "closed"
+        dependency["labels"] = []
+        dependency["body"] = dependency["body"].replace("RM-7", "RM-1")
+        dependency["body"] += (
+            "\n<!-- ADWF-CONTRACT Roadmap-ID: RM-1 Writer: old-writer "
+            "Writer-Lease: 123e4567-e89b-12d3-a456-426614174098 Workspace: rm-1 State: DONE "
+            "Heartbeat: 2026-08-01T09:00:00Z Expires: 2026-08-01T09:00:00Z -->\n"
+        )
+        live = copy.deepcopy(self.issue)
+        live["body"] = live["body"].replace("### Зависимости\n\nNONE", "### Зависимости\n\nRM-1")
+        result = reconcile_snapshot(self.state, self.config, provider="github", main_sha="a" * 40,
+                                    issues=[dependency, live], pulls=[], runs=[], cost={"result": "ALLOW", "provider": "github_self_hosted"},
+                                    workspace_registry={"schema_version": 1, "workspaces": []}, now=self.now)
+        self.assertEqual(result["status"], "ACTIVE")
+        self.assertEqual(result["health"]["adwf"], "VERIFIED")
+        by_id = {item["roadmap_id"]: item for item in result["work_items"]}
+        self.assertEqual(by_id["RM-1"]["state"], "DONE")
+        self.assertEqual(by_id["RM-1"]["dependencies"], [])
+        self.assertTrue(by_id["RM-7"]["dependencies_resolved"])
+
     def test_review_marker_also_requires_fresh_lease_heartbeat(self):
         issue = copy.deepcopy(self.issue)
         issue["labels"] = [{"name": "roadmap:review"}]
