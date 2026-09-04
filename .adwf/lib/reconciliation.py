@@ -85,16 +85,21 @@ def reconcile_snapshot(
         labels = [item.get("name", item) if isinstance(item, dict) else item for item in issue.get("labels", [])]
         machine = [STATE_LABELS[label] for label in labels if label in STATE_LABELS]
         body = issue.get("body") or ""
-        marker: dict[str, Any] = {}
-        if not machine and "### Roadmap ID" not in body:
-            continue
+        marker: dict[str, Any] = parse_issue_marker(body)
         if issue.get("state") == "closed":
-            marker = parse_issue_marker(body)
             if marker.get("valid") and marker.get("state") == "DONE":
                 machine = ["DONE"]
-            else:
-                errors.append(f"CLOSED_ISSUE_WITHOUT_DONE_EVIDENCE:{issue.get('number')}")
+            elif machine:
+                errors.append(f"CLOSED_ACTIVE_ISSUE_WITHOUT_DONE_EVIDENCE:{issue.get('number')}")
                 continue
+            else:
+                # Historical/planning issues are provider history, not live queue authority.
+                # Closed != DONE: ignore them unless a valid terminal marker proves DONE.
+                continue
+        elif not machine:
+            # A Roadmap-shaped body alone is planning content. Live operational queue
+            # authority requires an explicit machine-state label.
+            continue
         if len(set(machine)) != 1:
             errors.append(f"ISSUE_CONTRACT_INVALID:{issue.get('number')}")
             continue
