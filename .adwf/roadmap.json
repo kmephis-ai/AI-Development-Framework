@@ -42,7 +42,7 @@
           "roadmap_id": "ORCH-001",
           "title_ru": "Durable autonomous development orchestration + Human-by-Exception",
           "dependencies": [
-            "EXECNODE-001"
+            "RUNTIME-001"
           ],
           "product_impact": false
         },
@@ -50,7 +50,7 @@
           "roadmap_id": "RUNTIME-001",
           "title_ru": "12–24h работа без владельца + restart/resume proof",
           "dependencies": [
-            "ORCH-001"
+            "EXECNODE-001"
           ],
           "product_impact": false
         }
@@ -64,7 +64,7 @@
           "roadmap_id": "CEO-001",
           "title_ru": "Нулевой технический контроль владельца",
           "dependencies": [
-            "RUNTIME-001"
+            "ORCH-001"
           ],
           "product_impact": true
         },
