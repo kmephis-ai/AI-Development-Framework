@@ -1,0 +1,19 @@
+[Unit]
+Description=ADWF private Execution Node runtime
+Wants=network-online.target
+After=network-online.target
+
+[Service]
+Type=simple
+WorkingDirectory=@REPO_ROOT@
+Environment=PYTHONUNBUFFERED=1
+Environment=GITHUB_REPOSITORY=kmephis-ai/AI-Development-Framework
+Environment=ADWF_GITHUB_TOKEN_FILE=@TOKEN_FILE@
+ExecStart=@PYTHON@ @REPO_ROOT@/.adwf/scripts/run_execution_node_host.py --interval-seconds 300
+Restart=on-failure
+RestartSec=30
+NoNewPrivileges=true
+PrivateTmp=true
+
+[Install]
+WantedBy=default.target
