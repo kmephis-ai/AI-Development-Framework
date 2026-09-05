@@ -14,6 +14,8 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Callable
 
+from .file_lock import exclusive_file_lock
+
 _EVIDENCE_KEYS = (
     "status", "active", "run_id", "reason", "resume_decision", "node_outcome",
     "supervisor_status", "cycle_duration_seconds",
@@ -38,34 +40,32 @@ def read_private_token(path: str | Path) -> str:
 
 
 class LinuxProcessLock(AbstractContextManager["LinuxProcessLock"]):
+    """Host singleton wrapper over ADWF's canonical cross-platform file lock."""
+
     def __init__(self, path: str | Path):
         self.path = Path(path)
+        self._lock = None
         self.handle = None
 
     def __enter__(self) -> "LinuxProcessLock":
-        if os.name == "nt":
-            raise RuntimeError("EXECNODE_HOST_LOCK_BACKEND_UNSUPPORTED")
-        import fcntl
-        self.path.parent.mkdir(parents=True, exist_ok=True)
-        self.handle = self.path.open("a+", encoding="utf-8")
+        self._lock = exclusive_file_lock(self.path, timeout_seconds=0.1)
         try:
-            fcntl.flock(self.handle.fileno(), fcntl.LOCK_EX | fcntl.LOCK_NB)
-        except BlockingIOError as exc:
-            self.handle.close()
-            self.handle = None
+            self.handle = self._lock.__enter__()
+        except TimeoutError as exc:
+            self._lock = None
             raise RuntimeError("EXECNODE_HOST_ALREADY_RUNNING") from exc
         self.handle.seek(0)
         self.handle.truncate()
-        self.handle.write(str(os.getpid()))
+        self.handle.write(str(os.getpid()).encode("ascii"))
         self.handle.flush()
         return self
 
     def __exit__(self, exc_type, exc, tb) -> None:
-        if self.handle is not None:
-            import fcntl
-            fcntl.flock(self.handle.fileno(), fcntl.LOCK_UN)
-            self.handle.close()
-            self.handle = None
+        lock = self._lock
+        self._lock = None
+        self.handle = None
+        if lock is not None:
+            lock.__exit__(exc_type, exc, tb)
 
 
 def _git_head(root: Path) -> str | None:
