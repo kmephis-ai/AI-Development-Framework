@@ -335,7 +335,21 @@ def _commit_node(client: GitHubClient, sha: str, cache: dict[str, dict[str, Any]
         if _SHA40.fullmatch(value) is None:
             raise ValueError("PROVIDER_OPS_COMMIT_PARENT_INVALID")
         parent_shas.append(value)
-    node = {"sha": sha, "tree_sha": tree_sha, "parents": parent_shas, "message": str(payload.get("message") or "")}
+    verification = payload.get("verification") if isinstance(payload.get("verification"), dict) else {}
+    author = payload.get("author") if isinstance(payload.get("author"), dict) else {}
+    committer = payload.get("committer") if isinstance(payload.get("committer"), dict) else {}
+    node = {
+        "sha": sha,
+        "tree_sha": tree_sha,
+        "parents": parent_shas,
+        "message": str(payload.get("message") or ""),
+        "verification": {
+            "verified": verification.get("verified") is True,
+            "reason": str(verification.get("reason") or ""),
+        },
+        "author": {"name": str(author.get("name") or ""), "email": str(author.get("email") or "")},
+        "committer": {"name": str(committer.get("name") or ""), "email": str(committer.get("email") or "")},
+    }
     cache[sha] = node
     return node
 
@@ -355,6 +369,101 @@ def _prove_ancestor(client: GitHubClient, base_sha: str, head_sha: str, cache: d
         seen.add(current)
         pending.extend(parent for parent in _commit_node(client, current, cache)["parents"] if parent not in seen)
     raise ValueError("PROVIDER_OPS_BASE_NOT_ANCESTOR")
+
+
+def _linear_history_to_base(
+    client: GitHubClient, base_sha: str, head_sha: str, cache: dict[str, dict[str, Any]],
+) -> list[dict[str, Any]]:
+    """Return HEAD-to-BASE(exclusive) history; recovery rejects merge/rewritten ambiguity."""
+    history: list[dict[str, Any]] = []
+    current = head_sha
+    while current != base_sha:
+        if len(history) >= _MAX_ANCESTRY_COMMITS:
+            raise ValueError("PROVIDER_OPS_ANCESTRY_LIMIT")
+        node = _commit_node(client, current, cache)
+        if len(node["parents"]) != 1:
+            raise ValueError("PROVIDER_OPS_REMATERIALIZE_LINEAR_ANCESTRY_REQUIRED")
+        history.append(node)
+        current = node["parents"][0]
+    _commit_node(client, base_sha, cache)
+    return history
+
+
+def _trusted_materializer_node(node: dict[str, Any], roadmap_id: str) -> bool:
+    verification = node.get("verification") or {}
+    author = node.get("author") or {}
+    committer = node.get("committer") or {}
+    if verification.get("verified") is not True or verification.get("reason") != "valid":
+        return False
+    if author != {
+        "name": "github-actions[bot]",
+        "email": "41898282+github-actions[bot]@users.noreply.github.com",
+    }:
+        return False
+    if committer != {"name": "GitHub", "email": "noreply@github.com"}:
+        return False
+    message = str(node.get("message") or "")
+    lines = message.splitlines()
+    if not lines or lines[0] != f"{roadmap_id}: materialize deterministic projections":
+        return False
+    if f"ADWF-Provider-Ops: {MATERIALIZE_PROJECTIONS}" not in lines:
+        return False
+    if len(node.get("parents") or []) != 1:
+        return False
+    parent = node["parents"][0]
+    if f"ADWF-Provider-Ops-Parent: {parent}" not in lines:
+        return False
+    request_lines = [line for line in lines if line.startswith("ADWF-Provider-Ops-Request: ")]
+    digest_lines = [line for line in lines if line.startswith("ADWF-Provider-Ops-Digest: ")]
+    if len(request_lines) != 1 or len(digest_lines) != 1:
+        return False
+    request_id = request_lines[0].split(": ", 1)[1]
+    digest = digest_lines[0].split(": ", 1)[1]
+    return _REQUEST_ID.fullmatch(request_id) is not None and _SHA256.fullmatch(digest) is not None
+
+
+def _source_effect_with_verified_materialization_lineage(
+    client: GitHubClient,
+    request: dict[str, Any],
+    base_files: dict[str, dict[str, Any]],
+    head_files: dict[str, dict[str, Any]],
+    cache: dict[str, dict[str, Any]],
+) -> tuple[list[dict[str, Any]], str | None]:
+    full_effect = _tree_effect(base_files, head_files)
+    projection_drift = any(base_files.get(path) != head_files.get(path) for path in PROJECTION_PATHS)
+    if not projection_drift:
+        return full_effect, None
+
+    history = _linear_history_to_base(client, request["base_sha"], request["head_sha"], cache)
+    previous_files = base_files
+    trusted_materializers: list[str] = []
+    for node in reversed(history):
+        current_files = _tree_files(client, node["tree_sha"])
+        projection_changed = any(
+            previous_files.get(path) != current_files.get(path) for path in PROJECTION_PATHS
+        )
+        marker = f"ADWF-Provider-Ops: {MATERIALIZE_PROJECTIONS}" in str(node.get("message") or "")
+        if marker:
+            if not _trusted_materializer_node(node, request["roadmap_id"]):
+                raise ValueError("PROVIDER_OPS_REMATERIALIZE_UNVERIFIED_MATERIALIZER_ANCESTOR")
+            try:
+                _projection_effect_paths(previous_files, current_files)
+            except ValueError as exc:
+                raise ValueError("PROVIDER_OPS_REMATERIALIZE_ANCESTOR_EFFECT_INVALID") from exc
+            trusted_materializers.append(node["sha"])
+        elif projection_changed:
+            if not trusted_materializers:
+                raise ValueError("PROVIDER_OPS_PROJECTION_PREEDIT_FORBIDDEN")
+            raise ValueError("PROVIDER_OPS_REMATERIALIZE_PROJECTION_TAMPERED_AFTER_MATERIALIZATION")
+        previous_files = current_files
+
+    if not trusted_materializers:
+        raise ValueError("PROVIDER_OPS_PROJECTION_PREEDIT_FORBIDDEN")
+    if previous_files != head_files:
+        raise ValueError("PROVIDER_OPS_REMATERIALIZE_HEAD_TREE_READBACK_MISMATCH")
+
+    source_effect = [row for row in full_effect if row["path"] not in set(PROJECTION_PATHS)]
+    return source_effect, trusted_materializers[-1]
 
 
 def _tree_files(client: GitHubClient, tree_sha: str) -> dict[str, dict[str, Any]]:
@@ -1069,13 +1178,16 @@ def process_issue_comment_provider_ops(root: Path, event: dict[str, Any], client
         head_node = _commit_node(client, request["head_sha"], cache)
         base_files = _tree_files(client, base_node["tree_sha"])
         head_files = _tree_files(client, head_node["tree_sha"])
-        effect = _tree_effect(base_files, head_files)
+        full_effect = _tree_effect(base_files, head_files)
+        effect, rematerialized_from_sha = _source_effect_with_verified_materialization_lineage(
+            client, request, base_files, head_files, cache,
+        )
         effect_paths = [row["path"] for row in effect]
         if effect_paths != request["source_paths"]:
-            return _rejected("PROVIDER_OPS_SOURCE_EFFECT_MISMATCH", request, provider_changed_paths=effect_paths)
-        for projection in PROJECTION_PATHS:
-            if base_files.get(projection) != head_files.get(projection):
-                return _rejected("PROVIDER_OPS_PROJECTION_PREEDIT_FORBIDDEN", request, path=projection)
+            return _rejected(
+                "PROVIDER_OPS_SOURCE_EFFECT_MISMATCH", request,
+                provider_changed_paths=[row["path"] for row in full_effect],
+            )
         classification = _trust_classification(root, client, effect)
         if classification.get("result") == "BLOCK":
             return _rejected("PROVIDER_OPS_BASE_TRUST_CLASSIFICATION_BLOCK", request, trust=classification)
@@ -1144,6 +1256,7 @@ def process_issue_comment_provider_ops(root: Path, event: dict[str, Any], client
         "request_id": request["request_id"], "request_digest": request["request_digest"],
         "base_sha": request["base_sha"], "source_head_sha": request["head_sha"], "new_head_sha": new_sha,
         "changed_paths": changed_projection_paths, "source_paths": list(request["source_paths"]),
+        "rematerialized_from_sha": rematerialized_from_sha,
         "lease_id": request["lease_id"], "lease_registry_revision": request["lease_registry_revision"],
         "provider_readback": True, "trust_authorization": authorization,
         "merge_authority": False, "issue_close_authority": False, "monetary_cost_usd": 0,
