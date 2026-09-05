@@ -187,6 +187,29 @@ class ProviderObjectTests(unittest.TestCase):
         head = {"a": {"sha": "1"*40, "mode": "100755", "size": 1}}
         self.assertEqual(GATE._tree_effect(base, head)[0]["status"], "M")
 
+    def test_projection_effect_accepts_nonempty_subset_and_rejects_empty_or_outside(self):
+        base = {
+            path: {"sha": str(index + 1) * 40, "mode": "100644", "size": 1}
+            for index, path in enumerate(GATE.PROJECTION_PATHS)
+        }
+        one = dict(base)
+        one["MANIFEST.json"] = {"sha": "9" * 40, "mode": "100644", "size": 2}
+        self.assertEqual(GATE._projection_effect_paths(base, one), ["MANIFEST.json"])
+
+        two = dict(one)
+        two["SHA256SUMS.txt"] = {"sha": "8" * 40, "mode": "100644", "size": 2}
+        self.assertEqual(
+            GATE._projection_effect_paths(base, two),
+            ["MANIFEST.json", "SHA256SUMS.txt"],
+        )
+        with self.assertRaisesRegex(ValueError, "EMPTY"):
+            GATE._projection_effect_paths(base, dict(base))
+
+        outside = dict(one)
+        outside["unexpected.txt"] = {"sha": "7" * 40, "mode": "100644", "size": 1}
+        with self.assertRaisesRegex(ValueError, "OUTSIDE_ALLOWLIST"):
+            GATE._projection_effect_paths(base, outside)
+
     def test_blob_missing_invalid_base64_size_and_oversize_rejected(self):
         client = Client(); entry = {"sha": "1"*40, "size": 3, "mode": "100644"}
         client.blob_payloads[entry["sha"]] = {"sha": entry["sha"], "encoding": "base64", "content": "!!!"}
@@ -344,6 +367,55 @@ class FullFlowTests(unittest.TestCase):
         self.assertFalse(result["merge_authority"]); self.assertFalse(result["issue_close_authority"]); self.assertEqual(result["monetary_cost_usd"], 0)
         self.assertEqual(client.created_commit_args[2], HEAD)
 
+    def test_success_reports_actual_projection_subset(self):
+        client = Client(); req, pr, pre, post, effect, base_files, head_files, new_files = self.common_patches(client)
+        unchanged = GATE.PROJECTION_PATHS[0]
+        new_files = dict(new_files); new_files[unchanged] = head_files[unchanged]
+        client.commit_nodes[NEW]["message"] = GATE._commit_message(req)
+        calls = {"n": 0}
+        def live(*args, **kwargs):
+            calls["n"] += 1
+            if calls["n"] == 1:
+                return pre
+            return {"main_sha": MAIN, "pr": client.pull(99), "branch_sha": NEW, "lease": {}, "lease_anchor": "anchor"}
+        with mock.patch.object(GATE, "_live_identity", side_effect=live), \
+             mock.patch.object(GATE, "_prove_ancestor"), \
+             mock.patch.object(GATE, "_commit_node", side_effect=lambda c,s,cache: {MAIN:{"tree_sha":TREE_BASE,"parents":[],"message":"base"},HEAD:{"tree_sha":TREE_HEAD,"parents":[MAIN],"message":"head"},NEW:{"tree_sha":TREE_NEW,"parents":[HEAD],"message":GATE._commit_message(req)}}[s]), \
+             mock.patch.object(GATE, "_tree_files", side_effect=lambda c,s:{TREE_BASE:base_files,TREE_HEAD:head_files,TREE_NEW:new_files}[s]), \
+             mock.patch.object(GATE, "_trust_classification", return_value={"result":"ALLOW","authorization_mode":"STANDING_OWNER_POLICY"}), \
+             mock.patch.object(GATE, "_materialize_candidate_root"), \
+             mock.patch.object(GATE, "_generate_projections", return_value={p:(p+"\n").encode() for p in GATE.PROJECTION_PATHS}), \
+             mock.patch.object(GATE, "_policy_gate", return_value=None):
+            result = GATE.process_issue_comment_provider_ops(self.root(), event(), client)
+        self.assertEqual(result["status"], "PASS")
+        self.assertEqual(result["changed_paths"], GATE.PROJECTION_PATHS[1:])
+        self.assertEqual(client.updated, [(BRANCH, NEW, False)])
+
+    def test_zero_or_outside_projection_effect_never_mutates_ref(self):
+        for case in ("empty", "outside"):
+            with self.subTest(case=case):
+                client = Client(); req, pr, pre, post, effect, base_files, head_files, new_files = self.common_patches(client)
+                if case == "empty":
+                    candidate_files = dict(head_files)
+                    expected_reason = "PROVIDER_OPS_PROJECTION_EFFECT_EMPTY"
+                else:
+                    candidate_files = dict(new_files)
+                    candidate_files["unexpected.txt"] = {"sha":"9"*40,"mode":"100644","size":1}
+                    expected_reason = "PROVIDER_OPS_PROJECTION_EFFECT_OUTSIDE_ALLOWLIST"
+                with mock.patch.object(GATE, "_live_identity", return_value=pre), \
+                     mock.patch.object(GATE, "_prove_ancestor"), \
+                     mock.patch.object(GATE, "_commit_node", side_effect=lambda c,s,cache: {MAIN:{"tree_sha":TREE_BASE,"parents":[],"message":"base"},HEAD:{"tree_sha":TREE_HEAD,"parents":[MAIN],"message":"head"}}[s]), \
+                     mock.patch.object(GATE, "_tree_files", side_effect=lambda c,s:{TREE_BASE:base_files,TREE_HEAD:head_files,TREE_NEW:candidate_files}[s]), \
+                     mock.patch.object(GATE, "_trust_classification", return_value={"result":"ALLOW"}), \
+                     mock.patch.object(GATE, "_materialize_candidate_root"), \
+                     mock.patch.object(GATE, "_generate_projections", return_value={p:b"x" for p in GATE.PROJECTION_PATHS}), \
+                     mock.patch.object(GATE, "_policy_gate", return_value=None):
+                    result = GATE.process_issue_comment_provider_ops(self.root(), event(), client)
+                self.assertEqual(result["status"], "NOT_VERIFIED")
+                self.assertIn(expected_reason, result["reason"])
+                self.assertEqual(client.updated, [])
+                self.assertFalse(hasattr(client, "created_commit_args"))
+
     def test_human_required_without_exact_head_attestation_is_rejected_before_git_mutation(self):
         client = Client(); req, pr, pre, post, effect, base_files, head_files, new_files = self.common_patches(client)
         with mock.patch.object(GATE, "_live_identity", return_value=pre), mock.patch.object(GATE, "_prove_ancestor"), \
@@ -385,6 +457,22 @@ class FullFlowTests(unittest.TestCase):
              mock.patch.object(GATE, "_generate_projections", return_value={p:b"x" for p in GATE.PROJECTION_PATHS}), mock.patch.object(GATE, "_policy_gate", return_value=None):
             result = GATE.process_issue_comment_provider_ops(self.root(), event(), client)
         self.assertEqual(result["status"], "NOT_VERIFIED"); self.assertIn("BRANCH_CAS_FAILED", result["reason"])
+
+    def test_replay_accepts_projection_subset_and_reports_actual_paths(self):
+        client = Client(); client.branch_sha = NEW; client.pr_sha = NEW
+        req = GATE.parse_provider_ops_comment(request_body()); client.commit_nodes[NEW]["message"] = GATE._commit_message(req)
+        parent_files = {"x": {"sha":"1"*40,"mode":"100644","size":1}}
+        for i,p in enumerate(GATE.PROJECTION_PATHS):
+            parent_files[p] = {"sha":str(i+2)*40,"mode":"100644","size":1}
+        current_files = dict(parent_files)
+        current_files["MANIFEST.json"] = {"sha":"9"*40,"mode":"100644","size":2}
+        live = {"main_sha": MAIN, "pr": client.pull(99), "branch_sha": NEW, "lease": {}, "lease_anchor": "anchor"}
+        with mock.patch.object(GATE, "_live_identity", return_value=live), mock.patch.object(GATE, "_commit_node", side_effect=lambda c,s,cache:{HEAD:{"tree_sha":TREE_HEAD,"parents":[MAIN],"message":"head"},NEW:{"tree_sha":TREE_NEW,"parents":[HEAD],"message":GATE._commit_message(req)}}[s]), \
+             mock.patch.object(GATE, "_tree_files", side_effect=lambda c,s:{TREE_HEAD:parent_files,TREE_NEW:current_files}[s]), mock.patch.object(GATE, "_policy_gate", return_value=None):
+            result = GATE.process_issue_comment_provider_ops(self.root(), event(), client)
+        self.assertEqual(result["status"], "ALREADY_APPLIED")
+        self.assertEqual(result["changed_paths"], ["MANIFEST.json"])
+        self.assertFalse(result["mutation"]); self.assertFalse(client.blobs); self.assertFalse(client.updated)
 
     def test_replay_exact_child_returns_already_applied_without_second_commit(self):
         client = Client(); client.branch_sha = NEW; client.pr_sha = NEW
