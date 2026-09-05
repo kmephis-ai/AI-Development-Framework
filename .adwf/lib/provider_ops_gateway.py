@@ -403,6 +403,19 @@ def _tree_effect(base: dict[str, dict[str, Any]], head: dict[str, dict[str, Any]
     return records
 
 
+def _projection_effect_paths(
+    base: dict[str, dict[str, Any]],
+    head: dict[str, dict[str, Any]],
+) -> list[str]:
+    paths = [row["path"] for row in _tree_effect(base, head)]
+    allowed = set(PROJECTION_PATHS)
+    if any(path not in allowed for path in paths):
+        raise ValueError("PROVIDER_OPS_PROJECTION_EFFECT_OUTSIDE_ALLOWLIST")
+    if not paths:
+        raise ValueError("PROVIDER_OPS_PROJECTION_EFFECT_EMPTY")
+    return paths
+
+
 def _blob_bytes(client: GitHubClient, entry: dict[str, Any]) -> bytes:
     if entry["size"] > _MAX_CHANGED_BLOB_BYTES:
         raise ValueError("PROVIDER_OPS_BLOB_TOO_LARGE")
@@ -689,13 +702,14 @@ def _verify_replay(client: GitHubClient, request: dict[str, Any], branch_sha: st
     parent = _commit_node(client, request["head_sha"], cache)
     current_files = _tree_files(client, node["tree_sha"])
     parent_files = _tree_files(client, parent["tree_sha"])
-    effect = _tree_effect(parent_files, current_files)
-    if [row["path"] for row in effect] != PROJECTION_PATHS:
+    try:
+        changed_paths = _projection_effect_paths(parent_files, current_files)
+    except ValueError:
         return None
     return {
         "status": "ALREADY_APPLIED", "mutation": False, "request_id": request["request_id"],
         "request_digest": request["request_digest"], "head_sha": request["head_sha"], "new_head_sha": branch_sha,
-        "changed_paths": PROJECTION_PATHS, "provider_readback": True, "merge_authority": False,
+        "changed_paths": changed_paths, "provider_readback": True, "merge_authority": False,
         "issue_close_authority": False, "monetary_cost_usd": 0,
     }
 
@@ -1092,8 +1106,7 @@ def process_issue_comment_provider_ops(root: Path, event: dict[str, Any], client
         if _SHA40.fullmatch(tree_sha) is None:
             raise ValueError("PROVIDER_OPS_TREE_CREATE_FAILED")
         tree_files = _tree_files(client, tree_sha)
-        if [row["path"] for row in _tree_effect(head_files, tree_files)] != PROJECTION_PATHS:
-            raise ValueError("PROVIDER_OPS_CREATED_TREE_EFFECT_MISMATCH")
+        changed_projection_paths = _projection_effect_paths(head_files, tree_files)
         created_commit = client.create_commit(message=_commit_message(request), tree_sha=tree_sha, parent_sha=request["head_sha"])
         new_sha = str(created_commit.get("sha") or "")
         if _SHA40.fullmatch(new_sha) is None:
@@ -1117,7 +1130,11 @@ def process_issue_comment_provider_ops(root: Path, event: dict[str, Any], client
             raise ValueError("PROVIDER_OPS_POST_UPDATE_IDENTITY_MISMATCH")
         post_node = _commit_node(client, new_sha, {})
         post_tree = _tree_files(client, post_node["tree_sha"])
-        if post_node["parents"] != [request["head_sha"]] or [row["path"] for row in _tree_effect(head_files, post_tree)] != PROJECTION_PATHS:
+        try:
+            post_projection_paths = _projection_effect_paths(head_files, post_tree)
+        except ValueError as exc:
+            raise ValueError("PROVIDER_OPS_POST_UPDATE_COMMIT_EFFECT_MISMATCH") from exc
+        if post_node["parents"] != [request["head_sha"]] or post_projection_paths != changed_projection_paths:
             raise ValueError("PROVIDER_OPS_POST_UPDATE_COMMIT_EFFECT_MISMATCH")
     except Exception as exc:
         return _not_verified(str(exc), request, new_head_sha=new_sha, mutation=True)
@@ -1126,7 +1143,7 @@ def process_issue_comment_provider_ops(root: Path, event: dict[str, Any], client
         "status": "PASS", "operation": MATERIALIZE_PROJECTIONS, "mutation": True,
         "request_id": request["request_id"], "request_digest": request["request_digest"],
         "base_sha": request["base_sha"], "source_head_sha": request["head_sha"], "new_head_sha": new_sha,
-        "changed_paths": list(PROJECTION_PATHS), "source_paths": list(request["source_paths"]),
+        "changed_paths": changed_projection_paths, "source_paths": list(request["source_paths"]),
         "lease_id": request["lease_id"], "lease_registry_revision": request["lease_registry_revision"],
         "provider_readback": True, "trust_authorization": authorization,
         "merge_authority": False, "issue_close_authority": False, "monetary_cost_usd": 0,
